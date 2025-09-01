@@ -1,9 +1,5 @@
-import DesktopShell from "@/components/desktop/DesktopShell";
+import WebContainerHost from '@/components/WebContainerHost';
 
 export default function Home() {
-  return (
-    <main>
-      <DesktopShell />
-    </main>
-  );
+  return <WebContainerHost />;
 }
