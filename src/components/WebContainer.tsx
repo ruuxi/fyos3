@@ -38,11 +38,6 @@ export default function WebContainer() {
         setLoadingStage('Installing dependencies...');
         // Use pnpm for faster dependency installation
         const installProcess = await instance.spawn('pnpm', ['install']);
-        installProcess.output.pipeTo(new WritableStream({
-            write(data) {
-              console.log(data);
-            }
-          }));
         
         // Stream installation output for better UX
         installProcess.output.pipeTo(new WritableStream({
@@ -107,7 +102,7 @@ export default function WebContainer() {
   }
 
   return (
-    <div className="w-full h-full relative bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div className="w-full h-full relative bg-white overflow-hidden">
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
           <div className="text-center">
