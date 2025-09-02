@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 interface App {
   id: string
@@ -9,6 +9,7 @@ interface App {
   top?: number
   width?: number
   height?: number
+  closing?: boolean
 }
 
 interface MenuBarProps {
@@ -139,7 +140,7 @@ function Window({ app, zIndex, onClose, onFocus, onMove, onResize }: WindowProps
     }
   }
   return (
-    <div className="window" style={{left: app.left ?? 90, top: app.top ?? 90, width: app.width ?? 560, height: app.height ?? 360, zIndex}} onMouseDown={onFocus}>
+    <div className={`window${app.closing ? ' closing' : ' opening'}`} style={{left: app.left ?? 90, top: app.top ?? 90, width: app.width ?? 560, height: app.height ?? 360, zIndex}} onMouseDown={onFocus}>
       <div className="titlebar" onMouseDown={startMove}>
         <div className="traffic" onMouseDown={(e)=>e.stopPropagation()}>
           <div className="b red" onClick={onClose} title="Close" />
@@ -206,7 +207,7 @@ export default function Desktop(){
       .catch(()=> setApps([]))
   }, [])
 
-  const dockApps = useMemo(()=> apps.slice(0,8), [apps])
+  // Dock removed for now.
 
   function launch(app: App){
     setOpen(prev => {
@@ -217,7 +218,12 @@ export default function Desktop(){
   }
 
   function close(appId: string){
-    setOpen(prev => prev.filter(w => w.id !== appId))
+    // Animate close before removing
+    const DURATION = 220
+    setOpen(prev => prev.map(w => w.id === appId ? { ...w, closing: true } : w))
+    setTimeout(()=>{
+      setOpen(prev => prev.filter(w => w.id !== appId))
+    }, DURATION)
   }
 
   function focus(appId: string){
@@ -273,6 +279,8 @@ export default function Desktop(){
   const iconPositionsRef = useRef(iconPositions)
   useEffect(()=>{ iconPositionsRef.current = iconPositions }, [iconPositions])
 
+  const [launchingIconId, setLaunchingIconId] = useState<string | null>(null)
+
   return (
     <div className="desktop">
       <div className="wallpaper" />
@@ -284,7 +292,7 @@ export default function Desktop(){
           return (
             <div
               key={a.id}
-              className="desktop-icon"
+              className={`desktop-icon${launchingIconId===a.id ? ' launching' : ''}`}
               style={{ left: pos.left, top: pos.top }}
               onMouseDown={(e)=>{
                 dragIconRef.current = {
@@ -298,6 +306,8 @@ export default function Desktop(){
               }}
               onClick={(e)=>{
                 if (suppressClickRef.current.has(a.id)) { e.preventDefault(); return }
+                setLaunchingIconId(a.id)
+                setTimeout(()=> setLaunchingIconId(prev => prev===a.id ? null : prev), 600)
                 launch(a)
               }}
             >
@@ -319,14 +329,6 @@ export default function Desktop(){
           onResize={(size)=>updateWindow(app.id, size)}
         />
       ))}
-
-      <div className="dock">
-        {dockApps.map(a => (
-          <div key={a.id} className="icon" title={a.name} onClick={()=>launch(a)}>
-            <span style={{fontSize:22}}>{a.icon ?? '📦'}</span>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
