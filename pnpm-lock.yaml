@@ -26,6 +26,9 @@ importers:
       '@webcontainer/api':
         specifier: ^1.6.1
         version: 1.6.1
+      '@webcontainer/snapshot':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@xterm/addon-fit':
         specifier: ^0.10.0
         version: 0.10.0(@xterm/xterm@5.5.0)
@@ -504,6 +507,10 @@ packages:
   '@modelcontextprotocol/sdk@1.17.4':
     resolution: {integrity: sha512-zq24hfuAmmlNZvik0FLI58uE5sriN0WWsQzIlYnzSuKDAHFqJtBFrl/LfB1NLgJT5Y7dEBzaX4yAKqOPrcetaw==}
     engines: {node: '>=18'}
+
+  '@msgpack/msgpack@3.1.2':
+    resolution: {integrity: sha512-JEW4DEtBzfe8HvUYecLU9e6+XJnKDlUAIve8FvPzF3Kzs6Xo/KuZkZJsDH0wJXl/qEZbeeE7edxDNY3kMs39hQ==}
+    engines: {node: '>= 18'}
 
   '@mswjs/interceptors@0.39.6':
     resolution: {integrity: sha512-bndDP83naYYkfayr/qhBHMhk0YGwS1iv6vaEGcr0SQbO0IZtbOPqjKjds/WcG+bJA+1T5vCx6kprKOzn5Bg+Vw==}
@@ -1152,6 +1159,10 @@ packages:
 
   '@webcontainer/api@1.6.1':
     resolution: {integrity: sha512-2RS2KiIw32BY1Icf6M1DvqSmcon9XICZCDgS29QJb2NmF12ZY2V5Ia+949hMKB3Wno+P/Y8W+sPP59PZeXSELg==}
+
+  '@webcontainer/snapshot@0.1.0':
+    resolution: {integrity: sha512-PTIGQ3osUpTbK/dqB8RYbcZGv8IK+DJACx709z5sFbeIlngB3hUFpTEYFYs1SbUvr/AEQqvd0/bhc4ectrPRRw==}
+    engines: {node: '>=16'}
 
   '@xterm/addon-fit@0.10.0':
     resolution: {integrity: sha512-UFYkDm4HUahf2lnEyHvio51TNGiLK66mqP2JoATy7hRZeXaGMRDr00JiSF7m63vR5WKATF605yEggJKsw0JpMQ==}
@@ -3603,6 +3614,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@msgpack/msgpack@3.1.2': {}
+
   '@mswjs/interceptors@0.39.6':
     dependencies:
       '@open-draft/deferred-promise': 2.2.0
@@ -4173,6 +4186,10 @@ snapshots:
       zod: 3.24.4
 
   '@webcontainer/api@1.6.1': {}
+
+  '@webcontainer/snapshot@0.1.0':
+    dependencies:
+      '@msgpack/msgpack': 3.1.2
 
   '@xterm/addon-fit@0.10.0(@xterm/xterm@5.5.0)':
     dependencies:
