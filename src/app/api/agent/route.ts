@@ -1,4 +1,3 @@
-import { openai } from '@ai-sdk/openai';
 import { convertToModelMessages, streamText, UIMessage, stepCountIs, tool } from 'ai';
 import { z } from 'zod';
 
@@ -8,7 +7,7 @@ export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
   const result = streamText({
-    model: openai('gpt-4o-mini'),
+    model: 'anthropic/claude-sonnet-4',
     messages: convertToModelMessages(messages),
     stopWhen: stepCountIs(8),
     system:

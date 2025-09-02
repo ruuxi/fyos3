@@ -90,6 +90,18 @@ export default function AIAgentBar() {
               // minimal entry file
               const appIndex = `export default function App(){return React.createElement('div', null, '${name}');}`;
               await writeFile(`${base}/index.js`, appIndex);
+              // update registry
+              try {
+                const regRaw = await readFile('apps/registry.json', 'utf-8');
+                const registry = JSON.parse(regRaw);
+                registry.push({ id, name, icon: metadata.icon, path: `/${base}/index.js` });
+                await writeFile('apps/registry.json', JSON.stringify(registry, null, 2));
+              } catch (e) {
+                // If registry missing, create it
+                await writeFile('apps/registry.json', JSON.stringify([
+                  { id, name, icon: metadata.icon, path: `/${base}/index.js` }
+                ], null, 2));
+              }
               addToolResult({ tool: 'create_app', toolCallId: toolCall.toolCallId, output: { id, path: base } });
               break;
             }

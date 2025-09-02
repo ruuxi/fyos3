@@ -41,7 +41,11 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
 
   const mkdir = useCallback(async (path: string, recursive = true) => {
     if (!instance) throw new Error('WebContainer not ready');
-    await instance.fs.mkdir(path, { recursive });
+    if (recursive) {
+      await instance.fs.mkdir(path, { recursive: true });
+    } else {
+      await instance.fs.mkdir(path);
+    }
   }, [instance]);
 
   const exists = useCallback(async (path: string) => {
@@ -128,4 +132,3 @@ export function useWebContainer() {
   if (!ctx) throw new Error('useWebContainer must be used within WebContainerProvider');
   return ctx;
 }
-

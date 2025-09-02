@@ -5,7 +5,7 @@ export const files: FileSystemTree = {
   'package.json': {
     file: {
       contents: `{
-  "name": "vite-react-app",
+  "name": "mac-desktop",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -29,8 +29,122 @@ export const files: FileSystemTree = {
   },
   'apps': {
     directory: {
-      '.gitkeep': { file: { contents: '' } },
-    },
+      'registry.json': {
+        file: {
+          contents: `[
+  {"id":"00000000-0000-0000-0000-000000000001","name":"Finder","icon":"🗂️","path":"/apps/app-00000000-0000-0000-0000-000000000001/index.js"},
+  {"id":"00000000-0000-0000-0000-000000000002","name":"Safari","icon":"🌐","path":"/apps/app-00000000-0000-0000-0000-000000000002/index.js"},
+  {"id":"00000000-0000-0000-0000-000000000003","name":"Notes","icon":"📝","path":"/apps/app-00000000-0000-0000-0000-000000000003/index.js"},
+  {"id":"00000000-0000-0000-0000-000000000004","name":"Terminal","icon":"🖥️","path":"/apps/app-00000000-0000-0000-0000-000000000004/index.js"},
+  {"id":"00000000-0000-0000-0000-000000000005","name":"Settings","icon":"⚙️","path":"/apps/app-00000000-0000-0000-0000-000000000005/index.js"}
+]`
+        }
+      },
+      'app-00000000-0000-0000-0000-000000000001': {
+        directory: {
+          'index.js': { file: { contents: `import React from 'react'
+export default function Finder(){
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Finder</div>
+        <span className="badge">Home</span>
+      </div>
+      <p className="muted">This is a simple Finder. It lists installed apps:</p>
+      <AppsList />
+    </div>
+  )
+}
+
+function AppsList(){
+  const [apps, setApps] = React.useState([])
+  React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
+  return (
+    <ul className="list">
+      {apps.map(a=> <li key={a.id}>{a.icon} {a.name} <code style={{color:'#6b7280'}}>{a.id.slice(0,8)}</code></li>)}
+    </ul>
+  )
+}
+` } } }
+      },
+      'app-00000000-0000-0000-0000-000000000002': { directory: { 'index.js': { file: { contents: `import React from 'react'
+export default function Safari(){
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Safari</div>
+        <span className="badge">Preview</span>
+      </div>
+      <p className="muted">Minimal browser placeholder. Open external sites is disabled in this preview.</p>
+      <div style={{background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:8,padding:10}}>
+        <div style={{fontSize:13,color:'#6b7280'}}>Address Bar</div>
+        <input style={{width:'100%',padding:8,borderRadius:6,border:'1px solid #d1d5db'}} placeholder="https://example.com" disabled />
+      </div>
+    </div>
+  )
+}
+` } } } },
+      'app-00000000-0000-0000-0000-000000000003': { directory: { 'index.js': { file: { contents: `import React from 'react'
+export default function Notes(){
+  const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])
+  const [t, setT] = React.useState('')
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Notes</div>
+        <span className="badge">Local</span>
+      </div>
+      <div style={{display:'flex',gap:10,marginTop:10}}>
+        <textarea value={t} onChange={e=>setT(e.target.value)} placeholder="Write a note…" style={{flex:1,height:90,border:'1px solid #e5e7eb',borderRadius:8,padding:8}} />
+        <button onClick={()=>{ if(t.trim()){ setNotes(n=>[{id:Date.now(),text:t.trim()},...n]); setT('') } }} style={{padding:'8px 12px'}}>Add</button>
+      </div>
+      <ul className="list" style={{marginTop:8}}>
+        {notes.map(n=> <li key={n.id}>{n.text}</li>)}
+      </ul>
+    </div>
+  )
+}
+` } } } },
+      'app-00000000-0000-0000-0000-000000000004': { directory: { 'index.js': { file: { contents: `import React from 'react'
+export default function Terminal(){
+  const [lines, setLines] = React.useState(['Welcome to Terminal'])
+  const [cmd, setCmd] = React.useState('help')
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Terminal</div>
+        <span className="badge">Demo</span>
+      </div>
+      <div style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',background:'#111827',color:'#d1d5db',borderRadius:8,padding:10,marginTop:8}}>
+        {lines.map((l,i)=>(<div key={i}>> {l}</div>))}
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:8}}>
+        <input value={cmd} onChange={e=>setCmd(e.target.value)} style={{flex:1,border:'1px solid #e5e7eb',borderRadius:6,padding:8}} />
+        <button onClick={()=>{ setLines(l=>[...l, 'executed: '+cmd]); setCmd('') }}>Run</button>
+      </div>
+    </div>
+  )
+}
+` } } } },
+      'app-00000000-0000-0000-0000-000000000005': { directory: { 'index.js': { file: { contents: `import React from 'react'
+export default function Settings(){
+  const [dark, setDark] = React.useState(false)
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Settings</div>
+        <span className="badge">System</span>
+      </div>
+      <div style={{marginTop:10}}>
+        <label style={{display:'flex',alignItems:'center',gap:8}}>
+          <input type="checkbox" checked={dark} onChange={()=>setDark(v=>!v)} /> Dark Mode (demo)
+        </label>
+      </div>
+    </div>
+  )
+}
+` } } } }
+    } as FileSystemTree
   },
   'desktop': {
     directory: {
@@ -85,7 +199,8 @@ export default defineConfig({
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <title>macOS Desktop</title>
+    <style>html,body,#root{height:100%;margin:0}</style>
   </head>
   <body>
     <div id="root"></div>
@@ -96,18 +211,125 @@ export default defineConfig({
   },
   'src': {
     directory: {
+      'desktop': {
+        directory: {
+          'styles.css': {
+            file: {
+              contents: `:root{--bar:#f6f6f6;--text:#111;--muted:#6b7280;--bg:#0b1020;--glass:rgba(255,255,255,0.25);--dock:rgba(255,255,255,0.3);}*{box-sizing:border-box}body{font-family:Inter,ui-sans-serif,system-ui,Arial} .desktop{height:100%;position:relative;color:#111}.wallpaper{position:absolute;inset:0;background:linear-gradient(135deg,#0b1020 0%,#1e2760 60%,#462e7e 100%)}.menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(255,255,255,.65),rgba(255,255,255,.3));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.35)}.menubar .title{font-weight:600;font-size:12px}.menubar .right{margin-left:auto;font-size:12px;color:var(--muted)}.dock{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;display:flex;gap:10px;padding:10px 12px;border-radius:18px;background:var(--dock);backdrop-filter: blur(10px);border:1px solid rgba(255,255,255,.35)}.dock .icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:white;cursor:pointer;transition:transform .12s}.dock .icon:hover{transform:translateY(-5px)}.desktop-icons{position:absolute;top:52px;left:16px;display:grid;gap:14px}.desktop-icon{width:64px;text-align:center;color:white}.desktop-icon .glyph{font-size:36px;line-height:36px}.window{position:absolute;top:90px;left:90px;min-width:380px;min-height:240px;background:white;border-radius:10px;box-shadow:0 15px 40px rgba(0,0,0,.25);overflow:hidden;border:1px solid rgba(0,0,0,.08)}.window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(255,255,255,.9),rgba(255,255,255,.65));border-bottom:1px solid rgba(0,0,0,.07)}.traffic{display:flex;gap:6px;margin-right:6px}.traffic .b{width:12px;height:12px;border-radius:50%}.b.red{background:#ff5f57}.b.yellow{background:#febc2e}.b.green{background:#28c840}.window .title{font-weight:600;font-size:12px;color:#222}.window .content{padding:12px;font-size:14px;color:#1f2937}.badge{font-size:11px;color:#374151;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px}.muted{color:#6b7280}.list{padding-left:16px}`
+            }
+          },
+          'Desktop.jsx': {
+            file: {
+              contents: `import React, { useEffect, useMemo, useState } from 'react'
+
+function MenuBar({ appName }){
+  const [time, setTime] = useState(new Date())
+  useEffect(()=>{ const t=setInterval(()=>setTime(new Date()), 30000); return ()=>clearInterval(t) },[])
+  return (
+    <div className="menubar">
+      <div className="title"> {appName || 'Finder'}</div>
+      <div className="right">{time.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+    </div>
+  )
+}
+
+function Window({ app, onClose }){
+  const [Comp, setComp] = useState(null)
+  useEffect(()=>{
+    let mounted = true
+    import(/* @vite-ignore */ app.path).then(m=>{ if(mounted) setComp(()=>m.default) })
+    return ()=>{ mounted = false }
+  }, [app.path])
+  return (
+    <div className="window" style={{left: app.left ?? 90, top: app.top ?? 90}}>
+      <div className="titlebar">
+        <div className="traffic">
+          <div className="b red" onClick={onClose} title="Close" />
+          <div className="b yellow" title="Minimize" />
+          <div className="b green" title="Zoom" />
+        </div>
+        <div className="title">{app.name}</div>
+        <div style={{marginLeft:'auto'}} className="badge">{app.id.slice(0,8)}</div>
+      </div>
+      <div className="content">
+        {Comp ? <Comp /> : <div className="muted">Loading {app.name}…</div>}
+      </div>
+    </div>
+  )
+}
+
+export default function Desktop(){
+  const [apps, setApps] = useState([])
+  const [open, setOpen] = useState([])
+  const focusedName = open.length ? open[open.length-1].name : 'Finder'
+
+  useEffect(()=>{
+    fetch('/apps/registry.json?_=' + Date.now())
+      .then(r=>r.json())
+      .then(list=> setApps(list))
+      .catch(()=> setApps([]))
+  }, [])
+
+  const dockApps = useMemo(()=> apps.slice(0,8), [apps])
+
+  function launch(app){
+    setOpen(prev => {
+      const idx = prev.findIndex(w => w.id === app.id)
+      if (idx >= 0) return [...prev.slice(0, idx), ...prev.slice(idx+1), prev[idx]]
+      return [...prev, app]
+    })
+  }
+
+  function close(appId){
+    setOpen(prev => prev.filter(w => w.id !== appId))
+  }
+
+  return (
+    <div className="desktop">
+      <div className="wallpaper" />
+      <MenuBar appName={focusedName} />
+
+      <div className="desktop-icons">
+        {apps.slice(0,6).map(a => (
+          <div key={a.id} className="desktop-icon" onDoubleClick={()=>launch(a)}>
+            <div className="glyph">{a.icon ?? '📦'}</div>
+            <div style={{fontSize:12,marginTop:6}}>{a.name}</div>
+          </div>
+        ))}
+      </div>
+
+      {open.map(app => (
+        <Window key={app.id} app={app} onClose={()=>close(app.id)} />
+      ))}
+
+      <div className="dock">
+        {dockApps.map(a => (
+          <div key={a.id} className="icon" title={a.name} onClick={()=>launch(a)}>
+            <span style={{fontSize:22}}>{a.icon ?? '📦'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+`
+            }
+          }
+        }
+      },
       'main.jsx': {
         file: {
           contents: `import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import App from './App.jsx'
-import './index.css'
+import Desktop from './desktop/Desktop.jsx'
+import './desktop/styles.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
-  </StrictMode>,
-)`,
+    <Desktop />
+  </StrictMode>
+)
+`,
         },
       },
       'App.jsx': {
