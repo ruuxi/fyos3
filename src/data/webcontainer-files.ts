@@ -32,17 +32,17 @@ export const files: FileSystemTree = {
       'registry.json': {
         file: {
           contents: `[
-  {"id":"00000000-0000-0000-0000-000000000001","name":"Finder","icon":"🗂️","path":"/apps/app-00000000-0000-0000-0000-000000000001/index.js"},
-  {"id":"00000000-0000-0000-0000-000000000002","name":"Safari","icon":"🌐","path":"/apps/app-00000000-0000-0000-0000-000000000002/index.js"},
-  {"id":"00000000-0000-0000-0000-000000000003","name":"Notes","icon":"📝","path":"/apps/app-00000000-0000-0000-0000-000000000003/index.js"},
-  {"id":"00000000-0000-0000-0000-000000000004","name":"Terminal","icon":"🖥️","path":"/apps/app-00000000-0000-0000-0000-000000000004/index.js"},
-  {"id":"00000000-0000-0000-0000-000000000005","name":"Settings","icon":"⚙️","path":"/apps/app-00000000-0000-0000-0000-000000000005/index.js"}
+  {"id":"00000000-0000-0000-0000-000000000001","name":"Finder","icon":"🗂️","path":"/apps/app-00000000-0000-0000-0000-000000000001/index.jsx"},
+  {"id":"00000000-0000-0000-0000-000000000002","name":"Safari","icon":"🌐","path":"/apps/app-00000000-0000-0000-0000-000000000002/index.jsx"},
+  {"id":"00000000-0000-0000-0000-000000000003","name":"Notes","icon":"📝","path":"/apps/app-00000000-0000-0000-0000-000000000003/index.jsx"},
+  {"id":"00000000-0000-0000-0000-000000000004","name":"Terminal","icon":"🖥️","path":"/apps/app-00000000-0000-0000-0000-000000000004/index.jsx"},
+  {"id":"00000000-0000-0000-0000-000000000005","name":"Settings","icon":"⚙️","path":"/apps/app-00000000-0000-0000-0000-000000000005/index.jsx"}
 ]`
         }
       },
       'app-00000000-0000-0000-0000-000000000001': {
         directory: {
-          'index.js': { file: { contents: `import React from 'react'
+          'index.jsx': { file: { contents: `import React from 'react'
 export default function Finder(){
   return (
     <div>
@@ -67,7 +67,7 @@ function AppsList(){
 }
 ` } } }
       },
-      'app-00000000-0000-0000-0000-000000000002': { directory: { 'index.js': { file: { contents: `import React from 'react'
+      'app-00000000-0000-0000-0000-000000000002': { directory: { 'index.jsx': { file: { contents: `import React from 'react'
 export default function Safari(){
   return (
     <div>
@@ -84,7 +84,7 @@ export default function Safari(){
   )
 }
 ` } } } },
-      'app-00000000-0000-0000-0000-000000000003': { directory: { 'index.js': { file: { contents: `import React from 'react'
+      'app-00000000-0000-0000-0000-000000000003': { directory: { 'index.jsx': { file: { contents: `import React from 'react'
 export default function Notes(){
   const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])
   const [t, setT] = React.useState('')
@@ -105,7 +105,7 @@ export default function Notes(){
   )
 }
 ` } } } },
-      'app-00000000-0000-0000-0000-000000000004': { directory: { 'index.js': { file: { contents: `import React from 'react'
+      'app-00000000-0000-0000-0000-000000000004': { directory: { 'index.jsx': { file: { contents: `import React from 'react'
 export default function Terminal(){
   const [lines, setLines] = React.useState(['Welcome to Terminal'])
   const [cmd, setCmd] = React.useState('help')
@@ -126,7 +126,7 @@ export default function Terminal(){
   )
 }
 ` } } } },
-      'app-00000000-0000-0000-0000-000000000005': { directory: { 'index.js': { file: { contents: `import React from 'react'
+      'app-00000000-0000-0000-0000-000000000005': { directory: { 'index.jsx': { file: { contents: `import React from 'react'
 export default function Settings(){
   const [dark, setDark] = React.useState(false)
   return (
