@@ -12,8 +12,10 @@ export default function Finder(){
   )
 }
 
+type App = { id: string; name: string; icon: string }
+
 function AppsList(){
-  const [apps, setApps] = React.useState([])
+  const [apps, setApps] = React.useState<App[]>([])
   React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
   return (
     <ul className="list">

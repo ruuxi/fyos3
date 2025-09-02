@@ -1,6 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
-function MenuBar({ appName }){
+interface App {
+  id: string
+  name: string
+  icon?: string
+  path: string
+  left?: number
+  top?: number
+}
+
+interface MenuBarProps {
+  appName?: string
+}
+
+interface WindowProps {
+  app: App
+  onClose: () => void
+}
+
+function MenuBar({ appName }: MenuBarProps){
   const [time, setTime] = useState(new Date())
   useEffect(()=>{ const t=setInterval(()=>setTime(new Date()), 30000); return ()=>clearInterval(t) },[])
   return (
@@ -11,8 +29,8 @@ function MenuBar({ appName }){
   )
 }
 
-function Window({ app, onClose }){
-  const [Comp, setComp] = useState(null)
+function Window({ app, onClose }: WindowProps){
+  const [Comp, setComp] = useState<React.ComponentType | null>(null)
   useEffect(()=>{
     let mounted = true
     import(/* @vite-ignore */ app.path).then(m=>{ if(mounted) setComp(()=>m.default) })
@@ -37,8 +55,8 @@ function Window({ app, onClose }){
 }
 
 export default function Desktop(){
-  const [apps, setApps] = useState([])
-  const [open, setOpen] = useState([])
+  const [apps, setApps] = useState<App[]>([])
+  const [open, setOpen] = useState<App[]>([])
   const focusedName = open.length ? open[open.length-1].name : 'Finder'
 
   useEffect(()=>{
@@ -50,7 +68,7 @@ export default function Desktop(){
 
   const dockApps = useMemo(()=> apps.slice(0,8), [apps])
 
-  function launch(app){
+  function launch(app: App){
     setOpen(prev => {
       const idx = prev.findIndex(w => w.id === app.id)
       if (idx >= 0) return [...prev.slice(0, idx), ...prev.slice(idx+1), prev[idx]]
@@ -58,7 +76,7 @@ export default function Desktop(){
     })
   }
 
-  function close(appId){
+  function close(appId: string){
     setOpen(prev => prev.filter(w => w.id !== appId))
   }
 
