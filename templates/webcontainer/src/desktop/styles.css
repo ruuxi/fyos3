@@ -1,1 +1,42 @@
-:root{--bar:#f6f6f6;--text:#111;--muted:#6b7280;--bg:#0b1020;--glass:rgba(255,255,255,0.25);--dock:rgba(255,255,255,0.3);}*{box-sizing:border-box}body{font-family:Inter,ui-sans-serif,system-ui,Arial} .desktop{height:100%;position:relative;color:#111}.wallpaper{position:absolute;inset:0;background:linear-gradient(135deg,#0b1020 0%,#1e2760 60%,#462e7e 100%)}.menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(255,255,255,.65),rgba(255,255,255,.3));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.35)}.menubar .title{font-weight:600;font-size:12px}.menubar .right{margin-left:auto;font-size:12px;color:var(--muted)}.dock{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;display:flex;gap:10px;padding:10px 12px;border-radius:18px;background:var(--dock);backdrop-filter: blur(10px);border:1px solid rgba(255,255,255,.35)}.dock .icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:white;cursor:pointer;transition:transform .12s}.dock .icon:hover{transform:translateY(-5px)}.desktop-icons{position:absolute;top:52px;left:16px;display:grid;gap:14px}.desktop-icon{width:64px;text-align:center;color:white}.desktop-icon .glyph{font-size:36px;line-height:36px}.window{position:absolute;top:90px;left:90px;min-width:380px;min-height:240px;background:white;border-radius:10px;box-shadow:0 15px 40px rgba(0,0,0,.25);overflow:hidden;border:1px solid rgba(0,0,0,.08)}.window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(255,255,255,.9),rgba(255,255,255,.65));border-bottom:1px solid rgba(0,0,0,.07)}.traffic{display:flex;gap:6px;margin-right:6px}.traffic .b{width:12px;height:12px;border-radius:50%}.b.red{background:#ff5f57}.b.yellow{background:#febc2e}.b.green{background:#28c840}.window .title{font-weight:600;font-size:12px;color:#222}.window .content{padding:12px;font-size:14px;color:#1f2937}.badge{font-size:11px;color:#374151;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px}.muted{color:#6b7280}.list{padding-left:16px}
+/* Base variables and layout */
+:root{--bar:#f6f6f6;--text:#111;--muted:#6b7280;--bg:#0b1020;--glass:rgba(255,255,255,0.25);--dock:rgba(255,255,255,0.3);}
+*{box-sizing:border-box}
+body{font-family:Inter,ui-sans-serif,system-ui,Arial}
+.desktop{height:100%;position:relative;color:#111}
+.wallpaper{position:absolute;inset:0;background:linear-gradient(135deg,#0b1020 0%,#1e2760 60%,#462e7e 100%)}
+.menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(255,255,255,.65),rgba(255,255,255,.3));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.35)}
+.menubar .title{font-weight:600;font-size:12px}
+.menubar .right{margin-left:auto;font-size:12px;color:var(--muted)}
+
+/* Dock */
+.dock{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;display:flex;gap:10px;padding:10px 12px;border-radius:18px;background:var(--dock);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.35)}
+.dock .icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:white;cursor:pointer;transition:transform .12s}
+.dock .icon:hover{transform:translateY(-5px)}
+
+/* Desktop icons (absolute + draggable) */
+.desktop-icons{position:absolute;inset:0}
+.desktop-icon{position:absolute;width:64px;text-align:center;color:white;cursor:default;user-select:none}
+.desktop-icon .glyph{font-size:36px;line-height:36px}
+
+/* Window */
+.window{position:absolute;top:90px;left:90px;min-width:280px;min-height:160px;background:white;border-radius:10px;box-shadow:0 15px 40px rgba(0,0,0,.25);overflow:hidden;border:1px solid rgba(0,0,0,.08)}
+.window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(255,255,255,.9),rgba(255,255,255,.65));border-bottom:1px solid rgba(0,0,0,.07);cursor:move}
+.traffic{display:flex;gap:6px;margin-right:6px}
+.traffic .b{width:12px;height:12px;border-radius:50%}
+.b.red{background:#ff5f57}
+.b.yellow{background:#febc2e}
+.b.green{background:#28c840}
+.window .title{font-weight:600;font-size:12px;color:#222}
+.window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:12px;font-size:14px;color:#1f2937;overflow:auto}
+
+/* Resize handles (corners) */
+.resize-handle{position:absolute;width:12px;height:12px;background:transparent}
+.resize-handle.nw{left:-1px;top:-1px;cursor:nwse-resize}
+.resize-handle.ne{right:-1px;top:-1px;cursor:nesw-resize}
+.resize-handle.sw{left:-1px;bottom:-1px;cursor:nesw-resize}
+.resize-handle.se{right:-1px;bottom:-1px;cursor:nwse-resize}
+
+/* Misc */
+.badge{font-size:11px;color:#374151;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px}
+.muted{color:#6b7280}
+.list{padding-left:16px}
