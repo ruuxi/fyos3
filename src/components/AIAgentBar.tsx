@@ -80,7 +80,7 @@ export default function AIAgentBar() {
           {/* Header with collapse button */}
           <div className="flex items-center justify-between p-3 text-black">
             <div className="flex items-center space-x-2">
-              <span className="font-medium text-sm">AI Assistant</span>
+              <span className="font-medium text-sm">AI Agent</span>
             </div>
             <div className="flex items-center space-x-1">
               <Button
@@ -93,45 +93,6 @@ export default function AIAgentBar() {
               </Button>
             </div>
           </div>
-
-          {/* Chat History - Expandable */}
-          {isExpanded && messages.length > 0 && (
-            <div className="max-h-64 overflow-y-auto border-b border-gray-100 p-4">
-              <div className="space-y-3">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex items-start space-x-3 ${
-                      message.sender === 'user' ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
-                    {message.sender === 'agent' && (
-                      <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-gray-600" />
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                        message.sender === 'user'
-                          ? 'bg-gray-600 text-white'
-                          : 'bg-gray-100 text-gray-900'
-                      }`}
-                    >
-                      <p className="text-sm">{message.content}</p>
-                      <p className="text-xs mt-1 opacity-70">
-                        {message.timestamp.toLocaleTimeString()}
-                      </p>
-                    </div>
-                    {message.sender === 'user' && (
-                      <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                        <User className="w-4 h-4 text-gray-600" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Input Bar */}
           <div className="p-4">
@@ -161,42 +122,6 @@ export default function AIAgentBar() {
                   <Send className="w-4 h-4" />
                 </Button>
               </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setInput('Help me debug this issue')}
-                className="text-xs"
-              >
-                Debug Help
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setInput('Explain this code')}
-                className="text-xs"
-              >
-                Explain Code
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setInput('Suggest improvements')}
-                className="text-xs"
-              >
-                Improve
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setInput('Generate tests')}
-                className="text-xs"
-              >
-                Generate Tests
-              </Button>
             </div>
           </div>
         </div>
