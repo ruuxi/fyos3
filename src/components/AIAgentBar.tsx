@@ -105,6 +105,35 @@ export default function AIAgentBar() {
               addToolResult({ tool: 'create_app', toolCallId: toolCall.toolCallId, output: { id, path: base } });
               break;
             }
+            case 'rename_app': {
+              const { id, name } = toolCall.input as any;
+              const regRaw = await readFile('apps/registry.json', 'utf-8');
+              const registry = JSON.parse(regRaw);
+              const idx = registry.findIndex((r: any) => r.id === id);
+              if (idx === -1) throw new Error('App not found in registry');
+              registry[idx].name = name;
+              await writeFile('apps/registry.json', JSON.stringify(registry, null, 2));
+              addToolResult({ tool: 'rename_app', toolCallId: toolCall.toolCallId, output: { ok: true } });
+              break;
+            }
+            case 'remove_app': {
+              const { id } = toolCall.input as any;
+              // Remove from registry
+              let reg = [] as any[];
+              try {
+                const regRaw = await readFile('apps/registry.json', 'utf-8');
+                reg = JSON.parse(regRaw);
+              } catch {}
+              const next = reg.filter((r: any) => r.id !== id);
+              await writeFile('apps/registry.json', JSON.stringify(next, null, 2));
+              // Remove folder: try apps/<id> first, then apps/app-<id>
+              const p1 = `apps/${id}`;
+              const p2 = `apps/app-${id}`;
+              try { await remove(p1, { recursive: true }); } catch {}
+              try { await remove(p2, { recursive: true }); } catch {}
+              addToolResult({ tool: 'remove_app', toolCallId: toolCall.toolCallId, output: { ok: true } });
+              break;
+            }
             default:
               // Unknown tool on client
               addToolResult({ tool: toolCall.toolName as any, toolCallId: toolCall.toolCallId, output: { error: `Unhandled client tool: ${toolCall.toolName}` } });

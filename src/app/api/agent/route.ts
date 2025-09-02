@@ -77,6 +77,21 @@ export async function POST(req: Request) {
           icon: z.string().optional().describe('Icon character or SVG string'),
         }),
       },
+      // Update registry: rename an app by id
+      rename_app: {
+        description: 'Rename an app in registry.json by id (does not change id or folder).',
+        inputSchema: z.object({
+          id: z.string().describe('App id to rename'),
+          name: z.string().describe('New display name'),
+        }),
+      },
+      // Remove an app from disk and registry
+      remove_app: {
+        description: 'Remove an app from apps/<id> (or app-<id>) and registry.json by id.',
+        inputSchema: z.object({
+          id: z.string().describe('App id to remove'),
+        }),
+      },
       // Planning helper – capture a plan before execution
       submit_plan: tool({
         description: 'Submit a structured execution plan before making changes.',
@@ -90,4 +105,3 @@ export async function POST(req: Request) {
 
   return result.toUIMessageStreamResponse();
 }
-
