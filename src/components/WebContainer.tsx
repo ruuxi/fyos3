@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { WebContainer as WebContainerAPI } from '@webcontainer/api';
 import { getFiles } from '../utils/webcontainer-snapshot';
+import { useWebContainer } from './WebContainerProvider';
 
 export default function WebContainer() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -10,6 +11,7 @@ export default function WebContainer() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStage, setLoadingStage] = useState<string>('Initializing...');
   const [error, setError] = useState<string | null>(null);
+  const { setInstance } = useWebContainer();
 
   useEffect(() => {
     let mounted = true;
@@ -28,6 +30,7 @@ export default function WebContainer() {
         
         if (!mounted) return;
         setWebcontainerInstance(instance);
+        setInstance(instance);
         setLoadingStage('Mounting project files...');
 
         // Mount files
@@ -87,6 +90,7 @@ export default function WebContainer() {
 
     return () => {
       mounted = false;
+      setInstance(null);
     };
   }, []);
 

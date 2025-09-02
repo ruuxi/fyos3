@@ -27,6 +27,16 @@ export const files: FileSystemTree = {
 }`,
     },
   },
+  'apps': {
+    directory: {
+      '.gitkeep': { file: { contents: '' } },
+    },
+  },
+  'desktop': {
+    directory: {
+      'README.md': { file: { contents: '# Desktop\n\nPlace desktop-level configuration here.' } },
+    },
+  },
   'package-lock.json': {
     file: {
       contents: `{
