@@ -9,7 +9,8 @@ interface App {
   top?: number
   width?: number
   height?: number
-  closing?: boolean
+  minimized?: boolean
+  anim?: 'open' | 'close' | 'minimize' | 'restore'
 }
 
 interface MenuBarProps {
@@ -20,6 +21,7 @@ interface WindowProps {
   app: App
   zIndex: number
   onClose: () => void
+  onMinimize: () => void
   onFocus: () => void
   onMove: (pos: { left: number; top: number }) => void
   onResize: (size: { width: number; height: number }) => void
@@ -36,7 +38,7 @@ function MenuBar({ appName }: MenuBarProps){
   )
 }
 
-function Window({ app, zIndex, onClose, onFocus, onMove, onResize }: WindowProps){
+function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }: WindowProps){
   const [Comp, setComp] = useState<React.ComponentType | null>(null)
   const draggingRef = useRef<{
     type: 'move' | 'resize' | null
@@ -139,12 +141,18 @@ function Window({ app, zIndex, onClose, onFocus, onMove, onResize }: WindowProps
       }
     }
   }
+  const classes = ['window']
+  if (app.anim === 'open' || app.anim === 'restore') classes.push('opening')
+  if (app.anim === 'close') classes.push('closing')
+  if (app.anim === 'minimize') classes.push('minimizing')
+  if (app.minimized && !app.anim) classes.push('minimized')
+
   return (
-    <div className={`window${app.closing ? ' closing' : ' opening'}`} style={{left: app.left ?? 90, top: app.top ?? 90, width: app.width ?? 560, height: app.height ?? 360, zIndex}} onMouseDown={onFocus}>
+    <div className={classes.join(' ')} style={{left: app.left ?? 90, top: app.top ?? 90, width: app.width ?? 560, height: app.height ?? 360, zIndex}} onMouseDown={onFocus}>
       <div className="titlebar" onMouseDown={startMove}>
         <div className="traffic" onMouseDown={(e)=>e.stopPropagation()}>
           <div className="b red" onClick={onClose} title="Close" />
-          <div className="b yellow" title="Minimize" />
+          <div className="b yellow" onClick={onMinimize} title="Minimize" />
           <div className="b green" title="Zoom" />
         </div>
         <div className="title">{app.name}</div>
@@ -165,6 +173,7 @@ export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
   const [open, setOpen] = useState<App[]>([])
   const [iconPositions, setIconPositions] = useState<Record<string,{left:number;top:number}>>({})
+  const [windowGeometries, setWindowGeometries] = useState<Record<string,{left:number;top:number;width:number;height:number}>>({})
   const dragIconRef = useRef<{
     id: string | null
     startX: number
@@ -202,6 +211,11 @@ export default function Desktop(){
             })
             setIconPositions(pos)
           }
+          const savedGeom = localStorage.getItem('desktop.windowGeometries')
+          if (savedGeom){
+            const parsed = JSON.parse(savedGeom) as Record<string,{left:number;top:number;width:number;height:number}>
+            setWindowGeometries(parsed)
+          }
         } catch {}
       })
       .catch(()=> setApps([]))
@@ -212,17 +226,51 @@ export default function Desktop(){
   function launch(app: App){
     setOpen(prev => {
       const idx = prev.findIndex(w => w.id === app.id)
-      if (idx >= 0) return [...prev.slice(0, idx), ...prev.slice(idx+1), prev[idx]]
-      return [...prev, { ...app, left: app.left ?? 90, top: app.top ?? 90, width: app.width ?? 600, height: app.height ?? 380 }]
+      if (idx >= 0) {
+        const exists = prev[idx]
+        // If minimized, restore with animation
+        if (exists.minimized){
+          const DURATION = 340
+          const updated = { ...exists, minimized: false, anim: 'restore' as const }
+          const next = [...prev]
+          next.splice(idx, 1) // bring to front
+          next.push(updated)
+          setTimeout(()=>{
+            setOpen(p=> p.map(w=> w.id===app.id ? { ...w, anim: undefined } : w))
+          }, DURATION)
+          return next
+        }
+        // otherwise just bring to front
+        return [...prev.slice(0, idx), ...prev.slice(idx+1), prev[idx]]
+      }
+      const geom = windowGeometries[app.id]
+      const left = geom?.left ?? app.left ?? 90
+      const top = geom?.top ?? app.top ?? 90
+      const width = geom?.width ?? app.width ?? 600
+      const height = geom?.height ?? app.height ?? 380
+      const created: App = { ...app, left, top, width, height, minimized: false, anim: 'open' }
+      const DURATION = 340
+      setTimeout(()=>{
+        setOpen(p=> p.map(w=> w.id===app.id ? { ...w, anim: undefined } : w))
+      }, DURATION)
+      return [...prev, created]
     })
   }
 
   function close(appId: string){
     // Animate close before removing
     const DURATION = 220
-    setOpen(prev => prev.map(w => w.id === appId ? { ...w, closing: true } : w))
+    setOpen(prev => prev.map(w => w.id === appId ? { ...w, anim: 'close' } : w))
     setTimeout(()=>{
       setOpen(prev => prev.filter(w => w.id !== appId))
+    }, DURATION)
+  }
+
+  function minimize(appId: string){
+    const DURATION = 220
+    setOpen(prev => prev.map(w => w.id === appId ? { ...w, anim: 'minimize' } : w))
+    setTimeout(()=>{
+      setOpen(prev => prev.map(w => w.id === appId ? { ...w, minimized: true, anim: undefined } : w))
     }, DURATION)
   }
 
@@ -234,8 +282,22 @@ export default function Desktop(){
     })
   }
 
+  const saveGeometries = (updater: (g: Record<string,{left:number;top:number;width:number;height:number}>)=>Record<string,{left:number;top:number;width:number;height:number}>) => {
+    setWindowGeometries(prev => {
+      const next = updater(prev)
+      try{ localStorage.setItem('desktop.windowGeometries', JSON.stringify(next)) } catch{}
+      return next
+    })
+  }
+
   function updateWindow(appId: string, partial: Partial<App>){
     setOpen(prev => prev.map(w => w.id === appId ? { ...w, ...partial } : w))
+    if ('left' in partial || 'top' in partial || 'width' in partial || 'height' in partial){
+      saveGeometries(prev => {
+        const cur = prev[appId] || { left: 90, top: 90, width: 600, height: 380 }
+        return { ...prev, [appId]: { left: partial.left ?? cur.left, top: partial.top ?? cur.top, width: partial.width ?? cur.width, height: partial.height ?? cur.height } }
+      })
+    }
   }
 
   useEffect(()=>{
@@ -324,6 +386,7 @@ export default function Desktop(){
           app={app}
           zIndex={100 + idx}
           onClose={()=>close(app.id)}
+          onMinimize={()=>minimize(app.id)}
           onFocus={()=>focus(app.id)}
           onMove={(pos)=>updateWindow(app.id, pos)}
           onResize={(size)=>updateWindow(app.id, size)}

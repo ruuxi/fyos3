@@ -28,8 +28,10 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 
 /* Window */
 .window{position:absolute;top:90px;left:90px;min-width:280px;min-height:160px;background:white;border-radius:10px;box-shadow:0 15px 40px rgba(0,0,0,.25);overflow:hidden;border:1px solid rgba(0,0,0,.08);will-change:transform,opacity}
-.window.opening{animation:mac-window-open .22s cubic-bezier(.2,.8,.2,1)}
+.window.opening{animation:mac-window-open-spring .34s cubic-bezier(.2,.8,.2,1)}
 .window.closing{animation:mac-window-close .22s cubic-bezier(.2,.8,.2,1) forwards}
+.window.minimizing{animation:mac-window-minimize .22s cubic-bezier(.2,.8,.2,1) forwards}
+.window.minimized{opacity:0;transform:translateY(8px) scale(.92);pointer-events:none;visibility:hidden}
 .window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(255,255,255,.9),rgba(255,255,255,.65));border-bottom:1px solid rgba(0,0,0,.07);cursor:move}
 .traffic{display:flex;gap:6px;margin-right:6px}
 .traffic .b{width:12px;height:12px;border-radius:50%}
@@ -39,13 +41,18 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .window .title{font-weight:600;font-size:12px;color:#222}
 .window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:12px;font-size:14px;color:#1f2937;overflow:auto}
 
-@keyframes mac-window-open{
-  0%{opacity:0;transform:translateY(8px) scale(.98)}
+@keyframes mac-window-open-spring{
+  0%{opacity:0;transform:translateY(10px) scale(.92)}
+  55%{opacity:1;transform:translateY(0) scale(1.04)}
   100%{opacity:1;transform:translateY(0) scale(1)}
 }
 @keyframes mac-window-close{
   0%{opacity:1;transform:translateY(0) scale(1)}
   100%{opacity:0;transform:translateY(6px) scale(.98)}
+}
+@keyframes mac-window-minimize{
+  0%{opacity:1;transform:translateY(0) scale(1)}
+  100%{opacity:0;transform:translateY(12px) scale(.85)}
 }
 
 /* Resize handles (corners) */
