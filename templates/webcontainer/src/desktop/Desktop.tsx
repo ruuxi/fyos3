@@ -59,13 +59,31 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
   }, [app.path])
 
   useEffect(()=>{
+    // Allow partial off-screen but keep window reachable
+    const minVisibleX = 64 // keep at least 64px visible horizontally
+    const minVisibleY = 48 // keep at least 48px visible vertically
+    const menubarH = 28
+    const titlebarH = 32
+    function clamp(left: number, top: number, width: number, height: number){
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const minLeft = -(width - minVisibleX)
+      const maxLeft = vw - minVisibleX
+      const minTop = menubarH - (titlebarH - 16) // keep ~16px of titlebar visible under menubar
+      const maxTop = vh - minVisibleY
+      return {
+        left: Math.min(Math.max(left, minLeft), maxLeft),
+        top: Math.min(Math.max(top, minTop), maxTop)
+      }
+    }
     function onMoveDoc(e: MouseEvent){
       const d = draggingRef.current
       if (!d.active || !d.type) return
       if (d.type === 'move'){
         const dx = e.clientX - d.startX
         const dy = e.clientY - d.startY
-        onMove({ left: Math.max(0, d.startLeft + dx), top: Math.max(28, d.startTop + dy) })
+        const pos = clamp(d.startLeft + dx, d.startTop + dy, d.startWidth, d.startHeight)
+        onMove(pos)
       } else if (d.type === 'resize'){
         const dx = e.clientX - d.startX
         const dy = e.clientY - d.startY
@@ -97,7 +115,11 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
             newT = d.startTop + dy
             break
         }
-        onMove({ left: newL, top: newT })
+        // Relaxed: allow oversize beyond viewport; keep window reachable via clamp on position
+        if (newW < minW) newW = minW
+        if (newH < minH) newH = minH
+        const pos = clamp(newL, newT, newW, newH)
+        onMove(pos)
         onResize({ width: newW, height: newH })
       }
     }
@@ -231,7 +253,17 @@ export default function Desktop(){
         // If minimized, restore with animation
         if (exists.minimized){
           const DURATION = 340
-          const updated = { ...exists, minimized: false, anim: 'restore' as const }
+          // ensure geometry is clamped on restore (relaxed clamp)
+          const minVisibleX = 64, minVisibleY = 48, menubarH = 28, titlebarH = 32
+          const vw = window.innerWidth, vh = window.innerHeight
+          const width = exists.width ?? 600, height = exists.height ?? 380
+          const minLeft = -(width - minVisibleX)
+          const maxLeft = vw - minVisibleX
+          const minTop = menubarH - (titlebarH - 16)
+          const maxTop = vh - minVisibleY
+          const left = Math.min(Math.max(exists.left ?? 90, minLeft), maxLeft)
+          const top = Math.min(Math.max(exists.top ?? 90, minTop), maxTop)
+          const updated = { ...exists, left, top, minimized: false, anim: 'restore' as const }
           const next = [...prev]
           next.splice(idx, 1) // bring to front
           next.push(updated)
@@ -244,10 +276,19 @@ export default function Desktop(){
         return [...prev.slice(0, idx), ...prev.slice(idx+1), prev[idx]]
       }
       const geom = windowGeometries[app.id]
-      const left = geom?.left ?? app.left ?? 90
-      const top = geom?.top ?? app.top ?? 90
+      let left = geom?.left ?? app.left ?? 90
+      let top = geom?.top ?? app.top ?? 90
       const width = geom?.width ?? app.width ?? 600
       const height = geom?.height ?? app.height ?? 380
+      // clamp initial geometry to viewport (relaxed)
+      const minVisibleX = 64, minVisibleY = 48, menubarH = 28, titlebarH = 32
+      const vw = window.innerWidth, vh = window.innerHeight
+      const minLeft = -(width - minVisibleX)
+      const maxLeft = vw - minVisibleX
+      const minTop = menubarH - (titlebarH - 16)
+      const maxTop = vh - minVisibleY
+      left = Math.min(Math.max(left, minLeft), maxLeft)
+      top = Math.min(Math.max(top, minTop), maxTop)
       const created: App = { ...app, left, top, width, height, minimized: false, anim: 'open' }
       const DURATION = 340
       setTimeout(()=>{
@@ -332,9 +373,26 @@ export default function Desktop(){
     }
     document.addEventListener('mousemove', onMoveDoc)
     document.addEventListener('mouseup', onUp)
+    function onResize(){
+      // Re-clamp all windows into viewport on viewport resize (relaxed)
+      const vw = window.innerWidth, vh = window.innerHeight
+      const minVisibleX = 64, minVisibleY = 48, menubarH = 28, titlebarH = 32
+      setOpen(prev => prev.map(w => {
+        const width = w.width ?? 600, height = w.height ?? 380
+        const minLeft = -(width - minVisibleX)
+        const maxLeft = vw - minVisibleX
+        const minTop = menubarH - (titlebarH - 16)
+        const maxTop = vh - minVisibleY
+        let left = Math.min(Math.max(w.left ?? 90, minLeft), maxLeft)
+        let top = Math.min(Math.max(w.top ?? 90, minTop), maxTop)
+        return { ...w, left, top }
+      }))
+    }
+    window.addEventListener('resize', onResize)
     return ()=>{
       document.removeEventListener('mousemove', onMoveDoc)
       document.removeEventListener('mouseup', onUp)
+      window.removeEventListener('resize', onResize)
     }
   }, [])
 
