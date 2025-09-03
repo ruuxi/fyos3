@@ -245,6 +245,23 @@ export default function Desktop(){
 
   // Dock removed for now.
 
+  // Periodically refresh registry so newly created apps appear without iframe reload
+  const appsRef = useRef<App[]>(apps)
+  useEffect(()=>{ appsRef.current = apps }, [apps])
+  useEffect(()=>{
+    const iv = setInterval(()=>{
+      fetch('/apps/registry.json?_=' + Date.now())
+        .then(r=>r.json())
+        .then((list: App[])=>{
+          const curr = JSON.stringify(appsRef.current?.map(a=>({id:a.id,name:a.name,icon:a.icon,path:a.path})) ?? [])
+          const next = JSON.stringify(list?.map(a=>({id:a.id,name:a.name,icon:a.icon,path:a.path})) ?? [])
+          if (curr !== next) setApps(list)
+        })
+        .catch(()=>{})
+    }, 2500)
+    return ()=> clearInterval(iv)
+  }, [])
+
   function launch(app: App){
     setOpen(prev => {
       const idx = prev.findIndex(w => w.id === app.id)

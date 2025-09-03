@@ -7,7 +7,12 @@ export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
   const result = streamText({
-    model: 'anthropic/claude-sonnet-4',
+    model: 'alibaba/qwen3-coder',
+    providerOptions: {
+      gateway: {
+        order: ['cerebras', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
+      },
+    },
     messages: convertToModelMessages(messages),
     stopWhen: stepCountIs(8),
     system:
