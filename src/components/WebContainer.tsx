@@ -31,6 +31,11 @@ export default function WebContainer() {
         if (!mounted) return;
         setWebcontainerInstance(instance);
         setInstance(instance);
+        
+        // Store instance globally for API access
+        if (typeof window !== 'undefined') {
+          (global as any).webcontainerInstance = instance;
+        }
         setLoadingStage('Mounting project files...');
 
         // Mount files
