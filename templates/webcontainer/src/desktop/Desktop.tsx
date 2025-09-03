@@ -383,8 +383,8 @@ export default function Desktop(){
         const maxLeft = vw - minVisibleX
         const minTop = menubarH - (titlebarH - 16)
         const maxTop = vh - minVisibleY
-        let left = Math.min(Math.max(w.left ?? 90, minLeft), maxLeft)
-        let top = Math.min(Math.max(w.top ?? 90, minTop), maxTop)
+        const left = Math.min(Math.max(w.left ?? 90, minLeft), maxLeft)
+        const top = Math.min(Math.max(w.top ?? 90, minTop), maxTop)
         return { ...w, left, top }
       }))
     }

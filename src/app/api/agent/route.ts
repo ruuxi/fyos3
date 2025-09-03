@@ -16,7 +16,8 @@ export async function POST(req: Request) {
         'You can read and modify files, create apps, and run package installs/commands.',
         'Always follow this loop: 1) find files 2) plan 3) execute 4) report.',
         'Prefer minimal changes. Keep changes focused and consistent with the codebase.',
-        'When creating apps: desktop and apps are separate folders, each app in apps/<id> with metadata and an icon.'
+        'Project is a Vite React app with: source in src/, public files in public/.',
+        'When creating apps: place code in src/apps/<id>/index.tsx and update public/apps/registry.json with path /src/apps/<id>/index.tsx.'
       ].join(' '),
     tools: {
       // Step 1 – file discovery

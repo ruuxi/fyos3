@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, ChevronDown, MessageCircle } from 'lucide-react';
@@ -14,6 +14,20 @@ export default function AIAgentBar() {
   const pendingToolPromises = useRef(new Set<Promise<void>>());
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
 
+  // Keep latest instance and fs helpers in refs so tool callbacks don't capture stale closures
+  const instanceRef = useRef(instance);
+  const fnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
+  useEffect(() => { instanceRef.current = instance; }, [instance]);
+  useEffect(() => { fnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
+
+  async function waitForInstance(timeoutMs = 4000, intervalMs = 100) {
+    const start = Date.now();
+    while (!instanceRef.current && Date.now() - start < timeoutMs) {
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+    return instanceRef.current;
+  }
+
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id: 'agent-chat',
     transport: new DefaultChatTransport({ api: '/api/agent' }),
@@ -22,124 +36,131 @@ export default function AIAgentBar() {
       if (toolCall.dynamic) return; // not expected here, but keep safe
 
       // Guard: WebContainer must be ready for client tools
-      if (!instance) {
-        // Immediately fail tool if container is not ready
+      if (!instanceRef.current) {
+        // wait briefly for initialization to complete
+        await waitForInstance(6000, 120);
+      }
+      if (!instanceRef.current) {
         addToolResult({
-          tool: toolCall.toolName as any,
+          tool: toolCall.toolName as string,
           toolCallId: toolCall.toolCallId,
-          output: { error: 'WebContainer is not ready yet.' },
+          output: { error: 'WebContainer is not ready yet. Still initializing, try again in a moment.' },
         });
         return;
       }
 
+      type ToolCall = { toolName: string; toolCallId: string; input: unknown };
+      const tc = toolCall as ToolCall;
+
       const p = (async () => {
         try {
-          switch (toolCall.toolName) {
+          switch (tc.toolName) {
             case 'web_fs_find': {
-              const { root = '.', maxDepth = 10 } = toolCall.input as any;
-              const results = await readdirRecursive(root, maxDepth);
-              addToolResult({ tool: 'web_fs_find', toolCallId: toolCall.toolCallId, output: results });
+              const { root = '.', maxDepth = 10 } = (tc.input as { root?: string; maxDepth?: number }) ?? {};
+              const results = await fnsRef.current.readdirRecursive(root, maxDepth);
+              addToolResult({ tool: 'web_fs_find', toolCallId: tc.toolCallId, output: results });
               break;
             }
             case 'web_fs_read': {
-              const { path, encoding = 'utf-8' } = toolCall.input as any;
-              const content = await readFile(path, encoding);
-              addToolResult({ tool: 'web_fs_read', toolCallId: toolCall.toolCallId, output: content });
+              const { path, encoding = 'utf-8' } = tc.input as { path: string; encoding?: 'utf-8' | 'base64' };
+              const content = await fnsRef.current.readFile(path, encoding);
+              addToolResult({ tool: 'web_fs_read', toolCallId: tc.toolCallId, output: content });
               break;
             }
             case 'web_fs_write': {
-              const { path, content, createDirs = true } = toolCall.input as any;
+              const { path, content, createDirs = true } = tc.input as { path: string; content: string; createDirs?: boolean };
               if (createDirs) {
                 const dir = path.split('/').slice(0, -1).join('/') || '.';
-                await mkdir(dir, true);
+                await fnsRef.current.mkdir(dir, true);
               }
-              await writeFile(path, content);
-              addToolResult({ tool: 'web_fs_write', toolCallId: toolCall.toolCallId, output: { ok: true } });
+              await fnsRef.current.writeFile(path, content);
+              addToolResult({ tool: 'web_fs_write', toolCallId: tc.toolCallId, output: { ok: true } });
               break;
             }
             case 'web_fs_mkdir': {
-              const { path, recursive = true } = toolCall.input as any;
-              await mkdir(path, recursive);
-              addToolResult({ tool: 'web_fs_mkdir', toolCallId: toolCall.toolCallId, output: { ok: true } });
+              const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
+              await fnsRef.current.mkdir(path, recursive);
+              addToolResult({ tool: 'web_fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true } });
               break;
             }
             case 'web_fs_rm': {
-              const { path, recursive = true } = toolCall.input as any;
-              await remove(path, { recursive });
-              addToolResult({ tool: 'web_fs_rm', toolCallId: toolCall.toolCallId, output: { ok: true } });
+              const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
+              await fnsRef.current.remove(path, { recursive });
+              addToolResult({ tool: 'web_fs_rm', toolCallId: tc.toolCallId, output: { ok: true } });
               break;
             }
             case 'web_exec': {
-              const { command, args = [], cwd } = toolCall.input as any;
-              const result = await spawn(command, args, { cwd });
-              addToolResult({ tool: 'web_exec', toolCallId: toolCall.toolCallId, output: result });
+              const { command, args = [], cwd } = tc.input as { command: string; args?: string[]; cwd?: string };
+              const result = await fnsRef.current.spawn(command, args, { cwd });
+              addToolResult({ tool: 'web_exec', toolCallId: tc.toolCallId, output: result });
               break;
             }
             case 'create_app': {
-              const { name, icon } = toolCall.input as any;
+              const { name, icon } = tc.input as { name: string; icon?: string };
               const id = crypto.randomUUID();
-              const base = `apps/${id}`;
-              await mkdir(base, true);
+              const base = `src/apps/${id}`;
+              await fnsRef.current.mkdir(base, true);
               const metadata = {
                 id,
                 name,
                 icon: icon ?? '📦',
                 createdAt: Date.now(),
               };
-              await writeFile(`${base}/metadata.json`, JSON.stringify(metadata, null, 2));
-              // minimal entry file
-              const appIndex = `export default function App(){return React.createElement('div', null, '${name}');}`;
-              await writeFile(`${base}/index.js`, appIndex);
+              await fnsRef.current.writeFile(`${base}/metadata.json`, JSON.stringify(metadata, null, 2));
+              // minimal entry file (tsx)
+              const appIndexTsx = `export default function App(){ return <div>${name}</div>; }`;
+              await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
               // update registry
               try {
-                const regRaw = await readFile('apps/registry.json', 'utf-8');
-                const registry = JSON.parse(regRaw);
-                registry.push({ id, name, icon: metadata.icon, path: `/${base}/index.js` });
-                await writeFile('apps/registry.json', JSON.stringify(registry, null, 2));
+                const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
+                const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>
+                registry.push({ id, name, icon: metadata.icon, path: `/${base}/index.tsx` });
+                await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
               } catch (e) {
                 // If registry missing, create it
-                await writeFile('apps/registry.json', JSON.stringify([
-                  { id, name, icon: metadata.icon, path: `/${base}/index.js` }
+                await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify([
+                  { id, name, icon: metadata.icon, path: `/${base}/index.tsx` }
                 ], null, 2));
               }
-              addToolResult({ tool: 'create_app', toolCallId: toolCall.toolCallId, output: { id, path: base } });
+              addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base } });
               break;
             }
             case 'rename_app': {
-              const { id, name } = toolCall.input as any;
-              const regRaw = await readFile('apps/registry.json', 'utf-8');
-              const registry = JSON.parse(regRaw);
-              const idx = registry.findIndex((r: any) => r.id === id);
+              const { id, name } = tc.input as { id: string; name: string };
+              const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
+              const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>;
+              const idx = registry.findIndex((r) => r.id === id);
               if (idx === -1) throw new Error('App not found in registry');
               registry[idx].name = name;
-              await writeFile('apps/registry.json', JSON.stringify(registry, null, 2));
-              addToolResult({ tool: 'rename_app', toolCallId: toolCall.toolCallId, output: { ok: true } });
+              await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
+              addToolResult({ tool: 'rename_app', toolCallId: tc.toolCallId, output: { ok: true } });
               break;
             }
             case 'remove_app': {
-              const { id } = toolCall.input as any;
+              const { id } = tc.input as { id: string };
               // Remove from registry
-              let reg = [] as any[];
+              let reg: Array<{ id: string; name: string; icon?: string; path: string }> = [];
               try {
-                const regRaw = await readFile('apps/registry.json', 'utf-8');
+                const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
                 reg = JSON.parse(regRaw);
               } catch {}
-              const next = reg.filter((r: any) => r.id !== id);
-              await writeFile('apps/registry.json', JSON.stringify(next, null, 2));
-              // Remove folder: try apps/<id> first, then apps/app-<id>
-              const p1 = `apps/${id}`;
-              const p2 = `apps/app-${id}`;
-              try { await remove(p1, { recursive: true }); } catch {}
-              try { await remove(p2, { recursive: true }); } catch {}
-              addToolResult({ tool: 'remove_app', toolCallId: toolCall.toolCallId, output: { ok: true } });
+              const next = reg.filter((r) => r.id !== id);
+              await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(next, null, 2));
+              // Remove folder: try src/apps/<id> first, then src/apps/app-<id>
+              const p1 = `src/apps/${id}`;
+              const p2 = `src/apps/app-${id}`;
+              try { await fnsRef.current.remove(p1, { recursive: true }); } catch {}
+              try { await fnsRef.current.remove(p2, { recursive: true }); } catch {}
+              addToolResult({ tool: 'remove_app', toolCallId: tc.toolCallId, output: { ok: true } });
               break;
             }
             default:
               // Unknown tool on client
-              addToolResult({ tool: toolCall.toolName as any, toolCallId: toolCall.toolCallId, output: { error: `Unhandled client tool: ${toolCall.toolName}` } });
+              addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output: { error: `Unhandled client tool: ${tc.toolName}` } });
           }
-        } catch (err: any) {
-          addToolResult({ tool: toolCall.toolName as any, toolCallId: toolCall.toolCallId, output: { error: String(err?.message ?? err) } });
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output: { error: message } });
         }
       })();
       pendingToolPromises.current.add(p);
@@ -209,13 +230,13 @@ export default function AIAgentBar() {
                           <div key={index} className="whitespace-pre-wrap text-gray-800">{part.text}</div>
                         );
                       case 'tool-submit_plan': {
-                        const id = part.toolCallId;
+                        const id = (part as { toolCallId: string }).toolCallId;
                         if (part.state === 'output-available') {
                           return (
                             <div key={id} className="rounded-md border border-blue-200 bg-blue-50 text-blue-900 p-2">
                               <div className="font-medium">Plan</div>
                               <ul className="list-disc pl-5 text-sm">
-                                {(part.output as any).steps?.map((s: string, i: number) => (
+                                {(part.output as { steps?: string[] } | undefined)?.steps?.map((s: string, i: number) => (
                                   <li key={i}>{s}</li>
                                 ))}
                               </ul>
@@ -231,21 +252,21 @@ export default function AIAgentBar() {
                       case 'tool-web_fs_rm':
                       case 'tool-web_exec':
                       case 'tool-create_app': {
-                        const id = (part as any).toolCallId;
+                        const id = (part as { toolCallId: string }).toolCallId;
                         const label = part.type.replace('tool-', '');
                         switch (part.state) {
                           case 'input-streaming':
                             return <div key={id} className="text-xs text-gray-500">{label}...</div>;
                           case 'input-available':
                             return (
-                              <pre key={id} className="text-xs bg-gray-50 border rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as any).input, null, 2)}</pre>
+                              <pre key={id} className="text-xs bg-gray-50 border rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as { input?: unknown }).input, null, 2)}</pre>
                             );
                           case 'output-available':
                             return (
-                              <pre key={id} className="text-xs bg-green-50 border border-green-200 rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as any).output, null, 2)}</pre>
+                              <pre key={id} className="text-xs bg-green-50 border border-green-200 rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as { output?: unknown }).output, null, 2)}</pre>
                             );
                           case 'output-error':
-                            return <div key={id} className="text-xs text-red-600">Error: {(part as any).errorText}</div>;
+                            return <div key={id} className="text-xs text-red-600">Error: {(part as { errorText?: string }).errorText}</div>;
                         }
                       }
                     }
