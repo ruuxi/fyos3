@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { WebContainer as WebContainerAPI } from '@webcontainer/api';
-import { getFiles } from '../utils/webcontainer-snapshot';
+// Binary snapshot approach for faster mounting
 import { useWebContainer } from './WebContainerProvider';
 
 export default function WebContainer() {
@@ -38,10 +38,14 @@ export default function WebContainer() {
         }
         setLoadingStage('Mounting project files...');
 
-        // Mount files
-        const Files = getFiles();
-        await instance.mount(Files);
-        console.log('WebContainer mounted with file tree');
+        // Mount files using binary snapshot for faster loading
+        const snapshotResponse = await fetch('/api/webcontainer-snapshot');
+        if (!snapshotResponse.ok) {
+          throw new Error('Binary snapshot not available. Run `pnpm generate:snapshot` first.');
+        }
+        const snapshot = await snapshotResponse.arrayBuffer();
+        await instance.mount(snapshot);
+        console.log('WebContainer mounted with binary snapshot');
 
         setLoadingStage('Installing dependencies...');
         // Use pnpm for faster dependency installation
