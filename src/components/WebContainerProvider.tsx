@@ -71,9 +71,12 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
   const readdirRecursive = useCallback(async (root: string = '.', maxDepth: number = 10) => {
     if (!instance) throw new Error('WebContainer not ready');
     const results: Array<{ path: string; type: 'file' | 'dir' }> = [];
+    const excluded = new Set(['node_modules', '.pnpm', '.vite', '.git', 'dist', 'build', '.next', 'out', 'coverage']);
+    const hardLimit = 1500;
 
     async function walk(dir: string, depth: number) {
       if (depth > maxDepth) return;
+      if (results.length >= hardLimit) return;
       let items: string[] = [];
       try {
         items = await instance!.fs.readdir(dir);
@@ -81,6 +84,7 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
         return;
       }
       for (const name of items) {
+        if (excluded.has(name)) continue;
         const p = dir === '.' ? name : `${dir}/${name}`;
         // try to read as directory first
         try {
@@ -91,6 +95,7 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
         } catch {}
         // else file
         results.push({ path: p, type: 'file' });
+        if (results.length >= hardLimit) return;
       }
     }
 
