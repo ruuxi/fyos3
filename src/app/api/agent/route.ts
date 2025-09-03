@@ -6,6 +6,12 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
+  console.log('🔵 [AGENT] Incoming request with messages:', messages.map(m => ({
+    role: m.role,
+    content: 'content' in m && typeof m.content === 'string' ? (m.content.length > 100 ? m.content.substring(0, 100) + '...' : m.content) : '[non-text content]',
+    toolCalls: 'toolCalls' in m && Array.isArray(m.toolCalls) ? m.toolCalls.length : 0
+  })));
+
   const result = streamText({
     model: 'alibaba/qwen3-coder',
     providerOptions: {
@@ -15,6 +21,29 @@ export async function POST(req: Request) {
     },
     messages: convertToModelMessages(messages),
     stopWhen: stepCountIs(8),
+    onFinish: (event) => {
+      console.log('🎯 [AI] Response finished:', {
+        finishReason: event.finishReason,
+        usage: event.usage,
+        text: event.text?.length > 200 ? event.text.substring(0, 200) + '...' : event.text,
+        toolCalls: event.toolCalls?.length || 0,
+        toolResults: event.toolResults?.length || 0
+      });
+
+      if (event.toolCalls?.length) {
+        console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc: any) => ({
+          name: tc.toolName,
+          args: tc.args
+        })));
+      }
+
+      if (event.toolResults?.length) {
+        console.log('📋 [AI] Tool results received:', event.toolResults.map((tr: any) => ({
+          name: tr.toolName,
+          result: tr.result
+        })));
+      }
+    },
     system:
       [
         'You are a proactive engineering agent operating inside a WebContainer-powered workspace.',
@@ -103,11 +132,15 @@ export async function POST(req: Request) {
         description: 'Submit a structured execution plan before making changes.',
         inputSchema: z.object({ steps: z.array(z.string()) }),
         async execute({ steps }) {
-          return { accepted: true, steps };
+          console.log('🛠️ [TOOL] submit_plan executed with steps:', steps);
+          const result = { accepted: true, steps };
+          console.log('✅ [TOOL] submit_plan result:', result);
+          return result;
         },
       }),
     },
   });
 
+  console.log('📤 [AGENT] Returning streaming response');
   return result.toUIMessageStreamResponse();
 }

@@ -7,6 +7,7 @@ import { Send, ChevronDown, MessageCircle } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
+import { enqueuePersist, persistNow } from '@/utils/vfs-persistence';
 
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
@@ -75,24 +76,36 @@ export default function AIAgentBar() {
               }
               await fnsRef.current.writeFile(path, content);
               addToolResult({ tool: 'web_fs_write', toolCallId: tc.toolCallId, output: { ok: true } });
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
             case 'web_fs_mkdir': {
               const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
               await fnsRef.current.mkdir(path, recursive);
               addToolResult({ tool: 'web_fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true } });
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
             case 'web_fs_rm': {
               const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
               await fnsRef.current.remove(path, { recursive });
               addToolResult({ tool: 'web_fs_rm', toolCallId: tc.toolCallId, output: { ok: true } });
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
             case 'web_exec': {
               const { command, args = [], cwd } = tc.input as { command: string; args?: string[]; cwd?: string };
               const result = await fnsRef.current.spawn(command, args, { cwd });
               addToolResult({ tool: 'web_exec', toolCallId: tc.toolCallId, output: result });
+              // Heuristically persist after package manager or file-changing commands
+              try {
+                if (instanceRef.current) {
+                  const cmd = `${command} ${args.join(' ')}`;
+                  if (/(pnpm|npm|yarn|bun)\s+(add|install|remove|uninstall|update)|git\s+(checkout|switch|merge|apply)/i.test(cmd)) {
+                    enqueuePersist(instanceRef.current);
+                  }
+                }
+              } catch {}
               break;
             }
             case 'create_app': {
@@ -123,6 +136,7 @@ export default function AIAgentBar() {
                 ], null, 2));
               }
               addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base } });
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
             case 'rename_app': {
@@ -134,6 +148,7 @@ export default function AIAgentBar() {
               registry[idx].name = name;
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
               addToolResult({ tool: 'rename_app', toolCallId: tc.toolCallId, output: { ok: true } });
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
             case 'remove_app': {
@@ -152,6 +167,7 @@ export default function AIAgentBar() {
               try { await fnsRef.current.remove(p1, { recursive: true }); } catch {}
               try { await fnsRef.current.remove(p2, { recursive: true }); } catch {}
               addToolResult({ tool: 'remove_app', toolCallId: tc.toolCallId, output: { ok: true } });
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
             default:
