@@ -22,3 +22,8 @@ export async function getSnapshotFromAPI(): Promise<ArrayBuffer> {
   }
   return response.arrayBuffer();
 }
+
+/**
+ * Note: Runtime now prefers restoring from persisted VFS when available.
+ * This module remains for fallback snapshot loading and server-side usage.
+ */

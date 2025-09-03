@@ -5,6 +5,7 @@ import { WebContainer as WebContainerAPI } from '@webcontainer/api';
 // Binary snapshot approach for faster mounting
 import { useWebContainer } from './WebContainerProvider';
 import BootScreen from './BootScreen';
+import { hasPersistedVfs, restoreFromPersistence, enqueuePersist, persistNow } from '@/utils/vfs-persistence';
 
 export default function WebContainer() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -18,6 +19,9 @@ export default function WebContainer() {
   useEffect(() => {
     let mounted = true;
     let cleanupMessageListener: (() => void) | null = null;
+    let autosaveIntervalId: ReturnType<typeof setInterval> | null = null;
+    let visibilityHandler: (() => void) | null = null;
+    let beforeUnloadHandler: (() => void) | null = null;
 
     const initWebContainer = async () => {
       try {
@@ -34,7 +38,6 @@ export default function WebContainer() {
         
         if (!mounted) return;
         setWebcontainerInstance(instance);
-        setInstance(instance);
         setProgress((p) => Math.max(p, 18));
         
         // Store instance globally for API access
@@ -44,14 +47,30 @@ export default function WebContainer() {
         setLoadingStage('Preparing workspace…');
         setProgress((p) => Math.max(p, 26));
 
-        // Mount files using binary snapshot for faster loading
-        const snapshotResponse = await fetch('/api/webcontainer-snapshot');
-        if (!snapshotResponse.ok) {
-          throw new Error('Binary snapshot not available. Run `pnpm generate:snapshot` first.');
+        // Prefer restoring the user's persisted VFS if available; otherwise mount default snapshot
+        let restored = false;
+        try {
+          const hasSaved = await hasPersistedVfs();
+          if (hasSaved) {
+            setLoadingStage('Restoring your workspace…');
+            setProgress((p) => Math.max(p, 32));
+            restored = await restoreFromPersistence(instance);
+            if (restored) {
+              console.log('[WebContainer] Restored from persisted VFS');
+            }
+          }
+        } catch {}
+
+        if (!restored) {
+          // Mount files using binary snapshot for faster cold start
+          const snapshotResponse = await fetch('/api/webcontainer-snapshot');
+          if (!snapshotResponse.ok) {
+            throw new Error('Binary snapshot not available. Run `pnpm generate:snapshot` first.');
+          }
+          const snapshot = await snapshotResponse.arrayBuffer();
+          await instance.mount(snapshot);
+          console.log('[WebContainer] Mounted default snapshot');
         }
-        const snapshot = await snapshotResponse.arrayBuffer();
-        await instance.mount(snapshot);
-        console.log('Mounted snapshot');
 
         // Try to inject a First Contentful Paint notifier into common HTML entrypoints
         try {
@@ -89,6 +108,30 @@ export default function WebContainer() {
         if (installExitCode !== 0) {
           throw new Error('Failed to install dependencies');
         }
+
+        // Expose the instance to tools only after dependencies are installed
+        setInstance(instance);
+
+        // Start lightweight periodic autosave after instance is ready
+        autosaveIntervalId = setInterval(() => {
+          try {
+            enqueuePersist(instance);
+          } catch {}
+        }, 5000);
+
+        // Save on tab hide or before unload
+        const handleVisibility = () => {
+          if (document.visibilityState === 'hidden') {
+            void persistNow(instance);
+          }
+        };
+        const handleBeforeUnload = () => {
+          void persistNow(instance);
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+        visibilityHandler = handleVisibility;
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        beforeUnloadHandler = handleBeforeUnload;
 
         setLoadingStage('Almost there…');
         setProgress((p) => Math.max(p, 78));
@@ -173,6 +216,14 @@ export default function WebContainer() {
       mounted = false;
       setInstance(null);
       if (cleanupMessageListener) cleanupMessageListener();
+      if (autosaveIntervalId) clearInterval(autosaveIntervalId);
+      if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
+      if (beforeUnloadHandler) window.removeEventListener('beforeunload', beforeUnloadHandler);
+      try {
+        if (webcontainerInstance) {
+          void persistNow(webcontainerInstance);
+        }
+      } catch {}
     };
   }, []);
 
