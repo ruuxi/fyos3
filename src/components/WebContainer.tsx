@@ -178,17 +178,17 @@ export default function WebContainer() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full bg-red-50 border border-red-200 rounded-lg">
+      <div className="flex items-center justify-center h-full bg-red-950/20 border border-red-800/30 rounded-lg">
         <div className="text-center">
-          <div className="text-red-600 font-semibold mb-2">Error</div>
-          <div className="text-red-500 text-sm">{error}</div>
+          <div className="text-red-400 font-semibold mb-2">Error</div>
+          <div className="text-red-300 text-sm">{error}</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full relative bg-white overflow-hidden">
+    <div className="w-full h-full relative bg-transparent overflow-hidden">
       {isLoading && (
         <BootScreen
           message={loadingStage || 'Preparing…'}

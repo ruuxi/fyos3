@@ -18,8 +18,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} antialiased`}>
+    <html lang="en" className="dark">
+      <body className={`${inter.className} antialiased`} style={{
+        background: 'radial-gradient(120% 120% at 50% 0%, #0a0d12 0%, #070a0f 55%, #05070b 100%)',
+        minHeight: '100vh'
+      }}>
         {children}
       </body>
     </html>

@@ -54,28 +54,28 @@ export default function ExtractLockfileButton() {
   };
 
   return (
-    <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-      <h3 className="text-lg font-semibold mb-2">Extract Lockfile</h3>
-      <p className="text-sm text-gray-600 mb-4">
+    <div className="p-4 border border-border rounded-lg bg-card">
+      <h3 className="text-lg font-semibold mb-2 text-foreground">Extract Lockfile</h3>
+      <p className="text-sm text-muted-foreground mb-4">
         Extract pnpm-lock.yaml from WebContainer and save to templates/webcontainer/
       </p>
       
       <button
         onClick={extractLockfile}
         disabled={!instance || isExtracting}
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
       >
         {isExtracting ? 'Extracting...' : 'Extract Lockfile'}
       </button>
 
       {message && (
-        <div className="mt-3 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+        <div className="mt-3 p-3 bg-muted/30 border border-border text-foreground rounded">
           ✅ {message}
         </div>
       )}
 
       {error && (
-        <div className="mt-3 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+        <div className="mt-3 p-3 bg-destructive/20 border border-destructive text-destructive rounded">
           ❌ {error}
         </div>
       )}
