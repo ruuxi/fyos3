@@ -9,7 +9,8 @@
     "lint": "eslint",
     "verify:webcontainer": "node scripts/verify-webcontainer.mjs",
     "migrate:webcontainer": "node scripts/migrate-webcontainer-to-templates.mjs",
-    "generate:webcontainer": "node scripts/generate-webcontainer-files.mjs"
+    "generate:snapshot": "node scripts/generate-webcontainer-snapshot.mjs",
+    "extract:lockfile": "node scripts/extract-webcontainer-lockfile.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.23",
