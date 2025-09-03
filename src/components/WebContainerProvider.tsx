@@ -108,10 +108,16 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
     const proc = await instance.spawn(command, args, { cwd: opts?.cwd });
     let output = '';
     const reader = proc.output.getReader();
+    const decoder = new TextDecoder();
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
-      output += value;
+      if (typeof value === 'string') {
+        output += value;
+      } else if (value) {
+        // value is likely a Uint8Array from the stream
+        output += decoder.decode(value as Uint8Array, { stream: true });
+      }
     }
     const exitCode = await proc.exit;
     return { exitCode, output } as SpawnResult;

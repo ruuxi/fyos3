@@ -34,7 +34,6 @@ export default function WebContainer() {
         
         if (!mounted) return;
         setWebcontainerInstance(instance);
-        setInstance(instance);
         setProgress((p) => Math.max(p, 18));
         
         // Store instance globally for API access
@@ -89,6 +88,9 @@ export default function WebContainer() {
         if (installExitCode !== 0) {
           throw new Error('Failed to install dependencies');
         }
+
+        // Expose the instance to tools only after dependencies are installed
+        setInstance(instance);
 
         setLoadingStage('Almost there…');
         setProgress((p) => Math.max(p, 78));
