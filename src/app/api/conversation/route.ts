@@ -109,55 +109,12 @@ export async function POST(req: Request) {
         throw new Error(`Coding model returned ${response.status}: ${response.statusText}`);
       }
 
-      // Stream the coding model response through conversation layer
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body from coding model');
-      }
-
-      const decoder = new TextDecoder();
-      let codingResponse = '';
-
-      // Collect the full response from coding model
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        const chunk = decoder.decode(value);
-        codingResponse += chunk;
-      }
-
-      // Now process the coding response with conversation model
-      const conversationMessages = [
-        {
-          role: 'user',
-          content: `Original user request: ${lastMessageText}
-
-Coding model response: ${codingResponse}
-
-Please present this response to the user in a natural, conversational way.`
-        }
-      ];
-
-      const result = streamText({
-        model: 'google/gemini-2.0-flash',
-        providerOptions: {
-          gateway: {
-            order: ['google', 'vertex'], // Use same gateway pattern
-          },
-        },
-        system: CODING_RESPONSE_PROCESSOR_PROMPT,
-        messages: conversationMessages as any,
-        onFinish: (event) => {
-          console.log('💬 [CONVERSATION] Response finished:', {
-            finishReason: event.finishReason,
-            usage: event.usage,
-            text: event.text?.length > 200 ? event.text.substring(0, 200) + '...' : event.text,
-          });
-        },
+      // For now, pass through the response to preserve tool calls
+      // TODO: Implement proper conversational processing after tool execution
+      console.log('🔗 [CONVERSATION] Passing through agent response with tool calls intact');
+      return new Response(response.body, {
+        headers: response.headers,
       });
-
-      return result.toUIMessageStreamResponse();
 
     } catch (error) {
       console.error('❌ [CONVERSATION] Error calling coding model:', error);

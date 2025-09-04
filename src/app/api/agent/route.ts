@@ -56,9 +56,12 @@ export async function POST(req: Request) {
       if (event.toolCalls?.length) {
         console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc: any) => ({
           name: tc.toolName,
-          args: tc.args,
+          args: tc.args || tc.input, // Use input if args is undefined
           id: tc.toolCallId?.substring(0, 8)
         })));
+        
+        // Debug: Log the raw tool call structure
+        console.log('🔍 [AI] Raw tool calls:', JSON.stringify(event.toolCalls, null, 2));
         
         // Log file operation details
         event.toolCalls.forEach((tc: any) => {

@@ -102,6 +102,7 @@ export default function AIAgentBar() {
     transport: new DefaultChatTransport({ api: '/api/conversation' }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     async onToolCall({ toolCall }) {
+      console.log('🛠️ [CLIENT] Tool call received:', { name: toolCall.toolName, id: toolCall.toolCallId, input: toolCall.input });
       if (toolCall.dynamic) return; // not expected here, but keep safe
 
       // Guard: WebContainer must be ready for client tools
@@ -729,22 +730,8 @@ export default function AIAgentBar() {
                       case 'tool-web_fs_rm':
                       case 'tool-web_exec':
                       case 'tool-create_app': {
-                        const id = (part as { toolCallId: string }).toolCallId;
-                        const label = part.type.replace('tool-', '');
-                        switch (part.state) {
-                          case 'input-streaming':
-                            return <div key={id} className="text-xs text-white/60">{label}...</div>;
-                          case 'input-available':
-                            return (
-                              <pre key={id} className="text-xs bg-[rgba(5,7,11,0.6)] border border-white/10 rounded p-2 overflow-auto max-h-40 text-white/80">{JSON.stringify((part as { input?: unknown }).input, null, 2)}</pre>
-                            );
-                          case 'output-available':
-                            return (
-                              <pre key={id} className="text-xs bg-[rgba(96,165,250,0.1)] border border-[#60a5fa]/30 rounded p-2 overflow-auto max-h-40 text-white/90">{JSON.stringify((part as { output?: unknown }).output, null, 2)}</pre>
-                            );
-                          case 'output-error':
-                            return <div key={id} className="text-xs text-[#ff5f57]">Error: {(part as { errorText?: string }).errorText}</div>;
-                        }
+                        // Hide tool calls from user - they execute silently in background
+                        return null;
                       }
                     }
                   })}
