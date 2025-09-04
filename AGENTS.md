@@ -31,6 +31,17 @@
 - Keep COEP/COOP headers in `next.config.ts` (required for WebContainer) unless you know the implications.
 - Agent changes live in `src/app/api/agent/route.ts`: document new tools, keep the system prompt focused.
 
+### AI Providers (FAL, ElevenLabs)
+- Add `FAL_API_KEY` and `ELEVENLABS_API_KEY` to your `.env.local`.
+- Server proxies:
+  - `POST /api/ai/fal` → proxies to `https://fal.run/<model>`
+  - `POST /api/ai/eleven` → proxies to `https://api.elevenlabs.io/v1/music`
+- In WebContainer apps, import helpers from `/src/ai` instead of calling providers directly:
+  - `callFluxSchnell(input)` → FLUX.1 [schnell] via FAL
+  - `callFal(model, input)` → generic FAL model call
+  - `composeMusic(params)` → ElevenLabs Music
+These route through a message bridge and keep keys on the server.
+
 ## Agent Tools
 - web_fs_find: List files/folders in WebContainer
 - web_fs_read: Read a file
