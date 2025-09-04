@@ -112,7 +112,7 @@ export async function POST(req: Request) {
         'Always follow this loop: 1) find files 2) plan 3) execute 4) report.',
         'Project is a Vite React app: source in src/, public assets in public/.',
         'When creating apps: place code in src/apps/<id>/index.tsx and update public/apps/registry.json with path /src/apps/<id>/index.tsx.',
-        'AI bridge for apps (FAL, ElevenLabs): DO NOT call remote APIs or embed secrets in app code. Instead, import { callFal, callFluxSchnell, composeMusic } from \"/src/ai\" and use those helpers inside apps to request AI via the host bridge.',
+        'HOW TO USE AI IN APPS:\n- Image (FAL): import { callFluxSchnell } from "/src/ai"; await callFluxSchnell({ prompt: "a cat photo" }).\n- Explicit model: import { callFal } from "/src/ai"; await callFal("fal-ai/flux-1/schnell", { prompt: "..." }).\n- Music (ElevenLabs): import { composeMusic } from "/src/ai"; await composeMusic({ prompt: "intense electronic track", musicLengthMs: 60000 }).\nThese route through the message bridge and server proxies (/api/ai/fal, /api/ai/eleven); keys stay on the server.',
         'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.',
         'When you need dependencies, use the web_exec tool to run package manager commands (e.g., pnpm add <pkg>, pnpm install). Wait for the web_exec result (which includes exitCode) before proceeding to the next step.',
         'If an install command fails (non-zero exitCode), report the error and suggest a fix or an alternative.'
