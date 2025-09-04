@@ -1,5 +1,15 @@
+/* Technical execution engine
+  - Model: alibaba/qwen3-coder (specialized coding AI)
+  - Responsibilities:
+    - Handles actual coding/development tasks
+    - Has 15+ WebContainer tools (file system, process
+  execution, app creation)
+    - Operates as a "proactive engineering agent"
+    - Returns raw technical responses */
+
 import { convertToModelMessages, streamText, UIMessage, stepCountIs, tool } from 'ai';
 import { z } from 'zod';
+import { CODING_AGENT_SYSTEM_PROMPT } from '@/lib/aiPrompts';
 
 export const maxDuration = 30;
 
@@ -56,15 +66,7 @@ export async function POST(req: Request) {
         })));
       }
     },
-    system:
-      [
-        'You are a proactive engineering agent operating inside a WebContainer-powered workspace.',
-        'You can read and modify files, create apps, and run package installs/commands.',
-        'Always follow this loop: 1) find files 2) plan 3) execute 4) report.',
-        'Project is a Vite React app: source in src/, public assets in public/.',
-        'When creating apps: place code in src/apps/<id>/index.tsx and update public/apps/registry.json with path /src/apps/<id>/index.tsx.',
-        'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.'
-      ].join(' '),
+    system: CODING_AGENT_SYSTEM_PROMPT,
     tools: {
       // Step 1 – file discovery
       web_fs_find: {

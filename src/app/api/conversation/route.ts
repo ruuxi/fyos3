@@ -1,5 +1,20 @@
+/* File Role: Entry point, traffic director, and user interface layer
+  
+  - Model: openai/gpt-4o-mini (conversational AI)
+  - Responsibilities:
+    - Receives ALL user requests from frontend
+    - Performs intent detection (conversational vs coding)
+    - Routes coding requests to /api/agent
+    - Processes responses into natural conversation
+    - Always provides the final response to users */
+    
 import { convertToModelMessages, streamText, UIMessage } from 'ai';
 import { z } from 'zod';
+import { 
+  CONVERSATIONAL_SYSTEM_PROMPT, 
+  CODING_RESPONSE_PROCESSOR_PROMPT, 
+  FALLBACK_SYSTEM_PROMPT 
+} from '@/lib/aiPrompts';
 
 export const maxDuration = 30;
 
@@ -113,7 +128,7 @@ export async function POST(req: Request) {
       }
 
       // Now process the coding response with conversation model
-      const conversationMessages: UIMessage[] = [
+      const conversationMessages = [
         {
           role: 'user',
           content: `Original user request: ${lastMessageText}
@@ -121,18 +136,18 @@ export async function POST(req: Request) {
 Coding model response: ${codingResponse}
 
 Please present this response to the user in a natural, conversational way.`
-        } as UIMessage
+        }
       ];
 
       const result = streamText({
-        model: 'openai/gpt-4o-mini',
+        model: 'google/gemini-2.0-flash',
         providerOptions: {
           gateway: {
-            order: ['cerebras', 'google'], // Use same gateway pattern
+            order: ['google', 'vertex'], // Use same gateway pattern
           },
         },
-        system: 'You are Gemini 2.0 Flash, a helpful conversational AI assistant. A coding model has just processed a technical request and provided the response below. Your job is to present this information to the user in a natural, conversational way while preserving all the technical details and any tool outputs. Be friendly and helpful, but maintain the technical accuracy of the original response.',
-        messages: conversationMessages,
+        system: CODING_RESPONSE_PROCESSOR_PROMPT,
+        messages: conversationMessages as any,
         onFinish: (event) => {
           console.log('💬 [CONVERSATION] Response finished:', {
             finishReason: event.finishReason,
@@ -149,14 +164,14 @@ Please present this response to the user in a natural, conversational way.`
       
       // Fallback to direct conversational response
       const result = streamText({
-        model: 'openai/gpt-4o-mini',
+        model: 'google/gemini-2.0-flash',
         providerOptions: {
           gateway: {
-            order: ['cerebras', 'google'],
+            order: ['google', 'vertex'], // Use same gateway pattern
           },
         },
-        system: 'You are a helpful AI assistant. The user made a technical request, but there was an issue accessing the specialized coding tools. Please provide the best assistance you can with the information available.',
-        messages: messages,
+        system: FALLBACK_SYSTEM_PROMPT,
+        messages: convertToModelMessages(messages),
       });
 
       return result.toUIMessageStreamResponse();
@@ -167,14 +182,14 @@ Please present this response to the user in a natural, conversational way.`
     console.log('💬 [CONVERSATION] Handling conversational request directly');
     
     const result = streamText({
-      model: 'openai/gpt-4o-mini',
+      model: 'google/gemini-2.0-flash',
       providerOptions: {
         gateway: {
-          order: ['cerebras', 'google'],
+          order: ['google', 'vertex'], // Use same gateway pattern
         },
       },
-      system: 'You are Gemini 2.0 Flash, a helpful and friendly conversational AI assistant. You are part of a development environment called FYOS that includes WebContainer functionality for creating and running applications. When users ask conversational questions, respond naturally and helpfully. If they need technical assistance with coding, file operations, or development tasks, encourage them to be more specific about what they want to build or accomplish.',
-      messages: messages,
+      system: CONVERSATIONAL_SYSTEM_PROMPT,
+      messages: convertToModelMessages(messages),
       onFinish: (event) => {
         console.log('💬 [CONVERSATION] Conversational response finished:', {
           finishReason: event.finishReason,
