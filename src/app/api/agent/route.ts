@@ -1,7 +1,8 @@
 import { convertToModelMessages, streamText, UIMessage, stepCountIs, tool } from 'ai';
 import { z } from 'zod';
 
-export const maxDuration = 30;
+// Some tool actions (like package installs) may take longer than 30s
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
@@ -33,15 +34,75 @@ export async function POST(req: Request) {
       if (event.toolCalls?.length) {
         console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc: any) => ({
           name: tc.toolName,
-          args: tc.args
+          args: tc.args,
+          id: tc.toolCallId?.substring(0, 8)
         })));
+        
+        // Log file operation details
+        event.toolCalls.forEach((tc: any) => {
+          if (tc.toolName.startsWith('web_fs_') || ['create_app', 'remove_app', 'rename_app'].includes(tc.toolName)) {
+            const args = tc.args || {};
+            switch (tc.toolName) {
+              case 'web_fs_write':
+                console.log(`📝 [AI-Tool] WRITE: ${args.path} (${args.content?.length || 0} chars)`);
+                break;
+              case 'web_fs_read':
+                console.log(`👁️ [AI-Tool] READ: ${args.path}`);
+                break;
+              case 'web_fs_mkdir':
+                console.log(`📁 [AI-Tool] MKDIR: ${args.path}`);
+                break;
+              case 'web_fs_rm':
+                console.log(`🗑️ [AI-Tool] REMOVE: ${args.path}`);
+                break;
+              case 'create_app':
+                console.log(`🆕 [AI-Tool] CREATE_APP: "${args.name}" (${args.icon || '📦'})`);
+                break;
+              case 'remove_app':
+                console.log(`❌ [AI-Tool] REMOVE_APP: ${args.id}`);
+                break;
+              case 'rename_app':
+                console.log(`✏️ [AI-Tool] RENAME_APP: ${args.id} -> "${args.name}"`);
+                break;
+            }
+          }
+        });
       }
 
       if (event.toolResults?.length) {
         console.log('📋 [AI] Tool results received:', event.toolResults.map((tr: any) => ({
           name: tr.toolName,
-          result: tr.result
+          success: !tr.result?.error,
+          id: tr.toolCallId?.substring(0, 8)
         })));
+        
+        // Log file operation results
+        event.toolResults.forEach((tr: any) => {
+          if (tr.toolName.startsWith('web_fs_') || ['create_app', 'remove_app', 'rename_app'].includes(tr.toolName)) {
+            const result = tr.result || {};
+            if (result.error) {
+              console.error(`❌ [AI-Result] ${tr.toolName.toUpperCase()} FAILED:`, result.error);
+            } else {
+              switch (tr.toolName) {
+                case 'web_fs_write':
+                  console.log(`✅ [AI-Result] WRITE SUCCESS: ${result.path} (${result.size || 'unknown size'})`);
+                  break;
+                case 'web_fs_read':
+                  console.log(`✅ [AI-Result] READ SUCCESS: ${result.path} (${result.size || 'unknown size'})`);
+                  break;
+                case 'create_app':
+                  console.log(`✅ [AI-Result] APP CREATED: "${result.name}" at ${result.path}`);
+                  break;
+                case 'remove_app':
+                  console.log(`✅ [AI-Result] APP REMOVED: "${result.name}" (${result.id})`);
+                  break;
+                case 'rename_app':
+                  console.log(`✅ [AI-Result] APP RENAMED: "${result.oldName}" -> "${result.newName}"`);
+                  break;
+              }
+            }
+          }
+        });
       }
     },
     system:
@@ -51,7 +112,11 @@ export async function POST(req: Request) {
         'Always follow this loop: 1) find files 2) plan 3) execute 4) report.',
         'Project is a Vite React app: source in src/, public assets in public/.',
         'When creating apps: place code in src/apps/<id>/index.tsx and update public/apps/registry.json with path /src/apps/<id>/index.tsx.',
-        'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.'
+        'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.',
+        // Package install + feedback (mimic bolt-diy):
+        'When you need dependencies, use the web_exec tool to run package manager commands (e.g., pnpm add <pkg>, pnpm install). Wait for the web_exec result (which includes exitCode) before proceeding to the next step.',
+        'If an install command fails (non-zero exitCode), report the error and suggest a fix or an alternative.',
+        'After a successful install, immediately proceed to generate the required files and update public/apps/registry.json in the same turn whenever possible.'
       ].join(' '),
     tools: {
       // Step 1 – file discovery

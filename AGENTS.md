@@ -31,3 +31,14 @@
 - Keep COEP/COOP headers in `next.config.ts` (required for WebContainer) unless you know the implications.
 - Agent changes live in `src/app/api/agent/route.ts`: document new tools, keep the system prompt focused.
 
+## Agent Tools
+- web_fs_find: List files/folders in WebContainer
+- web_fs_read: Read a file
+- web_fs_write: Write a file (creates dirs)
+- web_fs_mkdir: Create a directory
+- web_fs_rm: Remove a file/folder
+- web_exec: Spawn a process (e.g., `pnpm add react`)
+- install_packages: Install npm packages; input: `{ packages: string[], dev?: boolean, manager?: 'pnpm'|'npm'|'yarn'|'bun' }`
+- create_app: Scaffold an app entry in `src/apps/<id>` and update registry
+- rename_app: Rename app in registry by id
+- remove_app: Remove app folder and registry entry

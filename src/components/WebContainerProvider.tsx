@@ -29,22 +29,55 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
 
   const writeFile = useCallback(async (path: string, content: string) => {
     if (!instance) throw new Error('WebContainer not ready');
-    await instance.fs.writeFile(path, content);
+    const startTime = Date.now();
+    const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
+    
+    try {
+      await instance.fs.writeFile(path, content);
+      const duration = Date.now() - startTime;
+      console.log(`📝 [FileOp] WRITE: ${path} (${sizeKB}KB, ${duration}ms)`);
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(`❌ [FileOp] WRITE FAILED: ${path} (${duration}ms)`, error);
+      throw error;
+    }
   }, [instance]);
 
   const readFile = useCallback(async (path: string, encoding: 'utf-8' | 'base64' = 'utf-8') => {
     if (!instance) throw new Error('WebContainer not ready');
-    const data = await instance.fs.readFile(path);
-    if (encoding === 'base64') return btoa(String.fromCharCode(...Array.from(data)));
-    return new TextDecoder().decode(data);
+    const startTime = Date.now();
+    
+    try {
+      const data = await instance.fs.readFile(path);
+      const sizeKB = (data.length / 1024).toFixed(1);
+      const duration = Date.now() - startTime;
+      console.log(`👁️ [FileOp] READ: ${path} (${sizeKB}KB, ${duration}ms)`);
+      
+      if (encoding === 'base64') return btoa(String.fromCharCode(...Array.from(data)));
+      return new TextDecoder().decode(data);
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(`❌ [FileOp] READ FAILED: ${path} (${duration}ms)`, error);
+      throw error;
+    }
   }, [instance]);
 
   const mkdir = useCallback(async (path: string, recursive = true) => {
     if (!instance) throw new Error('WebContainer not ready');
-    if (recursive) {
-      await instance.fs.mkdir(path, { recursive: true });
-    } else {
-      await instance.fs.mkdir(path);
+    const startTime = Date.now();
+    
+    try {
+      if (recursive) {
+        await instance.fs.mkdir(path, { recursive: true });
+      } else {
+        await instance.fs.mkdir(path);
+      }
+      const duration = Date.now() - startTime;
+      console.log(`📁 [FileOp] MKDIR: ${path} ${recursive ? '(recursive)' : ''} (${duration}ms)`);
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(`❌ [FileOp] MKDIR FAILED: ${path} (${duration}ms)`, error);
+      throw error;
     }
   }, [instance]);
 
@@ -65,7 +98,18 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
 
   const remove = useCallback(async (path: string, opts?: { recursive?: boolean }) => {
     if (!instance) throw new Error('WebContainer not ready');
-    await instance.fs.rm(path, { recursive: opts?.recursive ?? true });
+    const startTime = Date.now();
+    const isRecursive = opts?.recursive ?? true;
+    
+    try {
+      await instance.fs.rm(path, { recursive: isRecursive });
+      const duration = Date.now() - startTime;
+      console.log(`🗑️ [FileOp] REMOVE: ${path} ${isRecursive ? '(recursive)' : ''} (${duration}ms)`);
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(`❌ [FileOp] REMOVE FAILED: ${path} (${duration}ms)`, error);
+      throw error;
+    }
   }, [instance]);
 
   const readdirRecursive = useCallback(async (root: string = '.', maxDepth: number = 10) => {
@@ -105,22 +149,52 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
 
   const spawn = useCallback(async (command: string, args: string[] = [], opts?: { cwd?: string }) => {
     if (!instance) throw new Error('WebContainer not ready');
-    const proc = await instance.spawn(command, args, { cwd: opts?.cwd });
-    let output = '';
-    const reader = proc.output.getReader();
-    const decoder = new TextDecoder();
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (typeof value === 'string') {
-        output += value;
-      } else if (value) {
-        // value is likely a Uint8Array from the stream
-        output += decoder.decode(value as Uint8Array, { stream: true });
+    const startTime = Date.now();
+    const fullCommand = `${command} ${args.join(' ')}`.trim();
+    const cwd = opts?.cwd || '.';
+    
+    try {
+      console.log(`⚡ [FileOp] SPAWN: ${fullCommand} (cwd: ${cwd})`);
+      const proc = await instance.spawn(command, args, { cwd: opts?.cwd });
+      let output = '';
+      const reader = proc.output.getReader();
+      const decoder = new TextDecoder();
+
+      // Read output concurrently, but don’t block exit if the stream misbehaves
+      const readLoop = (async () => {
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (typeof value === 'string') {
+              output += value;
+            } else if (value) {
+              output += decoder.decode(value as Uint8Array, { stream: true });
+            }
+          }
+        } catch (e) {
+          // Ignore read cancellation/errors; we still return what we have
+        }
+      })();
+
+      const exitCode = await proc.exit;
+      // Ensure we don’t hang if the output stream doesn’t close cleanly
+      try { await reader.cancel(); } catch {}
+      try { await readLoop; } catch {}
+      const duration = Date.now() - startTime;
+      
+      if (exitCode === 0) {
+        console.log(`✅ [FileOp] SPAWN SUCCESS: ${fullCommand} (${duration}ms, exit: ${exitCode})`);
+      } else {
+        console.warn(`⚠️ [FileOp] SPAWN WARNING: ${fullCommand} (${duration}ms, exit: ${exitCode})`);
       }
+      
+      return { exitCode, output } as SpawnResult;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(`❌ [FileOp] SPAWN FAILED: ${fullCommand} (${duration}ms)`, error);
+      throw error;
     }
-    const exitCode = await proc.exit;
-    return { exitCode, output } as SpawnResult;
   }, [instance]);
 
   const value = useMemo<WebContainerCtx>(() => ({

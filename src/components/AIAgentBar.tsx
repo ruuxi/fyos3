@@ -13,6 +13,8 @@ export default function AIAgentBar() {
   const [input, setInput] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pendingToolPromises = useRef(new Set<Promise<void>>());
+  // Ensure tool calls execute sequentially (mimics bolt-diy action runner queue)
+  const execQueueRef = useRef<Promise<void>>(Promise.resolve());
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
 
   // Keep latest instance and fs helpers in refs so tool callbacks don't capture stale closures
@@ -53,55 +55,170 @@ export default function AIAgentBar() {
       type ToolCall = { toolName: string; toolCallId: string; input: unknown };
       const tc = toolCall as ToolCall;
 
-      const p = (async () => {
+      const task = async () => {
         try {
           switch (tc.toolName) {
             case 'web_fs_find': {
               const { root = '.', maxDepth = 10 } = (tc.input as { root?: string; maxDepth?: number }) ?? {};
+              console.log(`🔧 [Agent] web_fs_find: ${root} (depth: ${maxDepth})`);
               const results = await fnsRef.current.readdirRecursive(root, maxDepth);
-              addToolResult({ tool: 'web_fs_find', toolCallId: tc.toolCallId, output: results });
+              console.log(`📊 [Agent] Found ${results.length} items in ${root}`);
+              addToolResult({ tool: 'web_fs_find', toolCallId: tc.toolCallId, output: { files: results, count: results.length, root } });
               break;
             }
             case 'web_fs_read': {
               const { path, encoding = 'utf-8' } = tc.input as { path: string; encoding?: 'utf-8' | 'base64' };
+              console.log(`🔧 [Agent] web_fs_read: ${path} (${encoding})`);
               const content = await fnsRef.current.readFile(path, encoding);
-              addToolResult({ tool: 'web_fs_read', toolCallId: tc.toolCallId, output: content });
+              const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
+              addToolResult({ tool: 'web_fs_read', toolCallId: tc.toolCallId, output: { content, path, size: `${sizeKB}KB` } });
               break;
             }
             case 'web_fs_write': {
               const { path, content, createDirs = true } = tc.input as { path: string; content: string; createDirs?: boolean };
+              const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
+              console.log(`🔧 [Agent] web_fs_write: ${path} (${sizeKB}KB)`);
+              
               if (createDirs) {
                 const dir = path.split('/').slice(0, -1).join('/') || '.';
                 await fnsRef.current.mkdir(dir, true);
               }
               await fnsRef.current.writeFile(path, content);
-              addToolResult({ tool: 'web_fs_write', toolCallId: tc.toolCallId, output: { ok: true } });
+              addToolResult({ tool: 'web_fs_write', toolCallId: tc.toolCallId, output: { ok: true, path, size: `${sizeKB}KB` } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
             case 'web_fs_mkdir': {
               const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
+              console.log(`🔧 [Agent] web_fs_mkdir: ${path} ${recursive ? '(recursive)' : ''}`);
               await fnsRef.current.mkdir(path, recursive);
-              addToolResult({ tool: 'web_fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true } });
+              addToolResult({ tool: 'web_fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
             case 'web_fs_rm': {
               const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
+              console.log(`🔧 [Agent] web_fs_rm: ${path} ${recursive ? '(recursive)' : ''}`);
               await fnsRef.current.remove(path, { recursive });
-              addToolResult({ tool: 'web_fs_rm', toolCallId: tc.toolCallId, output: { ok: true } });
+              addToolResult({ tool: 'web_fs_rm', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
             case 'web_exec': {
-              const { command, args = [], cwd } = tc.input as { command: string; args?: string[]; cwd?: string };
-              const result = await fnsRef.current.spawn(command, args, { cwd });
-              addToolResult({ tool: 'web_exec', toolCallId: tc.toolCallId, output: result });
+              let { command, args = [], cwd } = tc.input as { command: string; args?: string[]; cwd?: string };
+
+              // If the model sent the entire command as a single string, split into cmd + argv
+              const splitCommandLine = (line: string): string[] => {
+                const out: string[] = [];
+                let cur = '';
+                let quote: '"' | "'" | null = null;
+                for (let i = 0; i < line.length; i++) {
+                  const ch = line[i];
+                  if (quote) {
+                    if (ch === quote) {
+                      quote = null;
+                    } else if (ch === '\\' && i + 1 < line.length) {
+                      // handle simple escapes inside quotes
+                      i++;
+                      cur += line[i];
+                    } else {
+                      cur += ch;
+                    }
+                  } else {
+                    if (ch === '"' || ch === "'") {
+                      quote = ch as '"' | "'";
+                    } else if (/\s/.test(ch)) {
+                      if (cur) {
+                        out.push(cur);
+                        cur = '';
+                      }
+                    } else if (ch === '\\' && i + 1 < line.length) {
+                      i++;
+                      cur += line[i];
+                    } else {
+                      cur += ch;
+                    }
+                  }
+                }
+                if (cur) out.push(cur);
+                return out;
+              };
+
+              if ((!args || args.length === 0) && /\s/.test(command)) {
+                const tokens = splitCommandLine(command);
+                if (tokens.length > 0) {
+                  command = tokens[0];
+                  args = tokens.slice(1);
+                }
+              }
+              // Normalize and add non-interactive flags for popular package managers
+              const cmdLower = command.toLowerCase();
+              const firstArg = (args[0] || '').toLowerCase();
+              const isPkgMgr = /^(pnpm|npm|yarn|bun)$/.test(cmdLower);
+              const isInstallLike = /^(add|install|update|remove|uninstall|i)$/i.test(firstArg);
+              if (isPkgMgr && isInstallLike) {
+                if (cmdLower === 'pnpm' && !args.some(a => a.startsWith('--reporter='))) {
+                  args = [...args, '--reporter=silent', '--color=false'];
+                } else if (cmdLower === 'npm' && !args.includes('--silent')) {
+                  args = [...args, '--silent', '--no-progress', '--color=false'];
+                } else if (cmdLower === 'yarn' && !args.includes('--silent')) {
+                  args = [...args, '--silent', '--no-progress', '--color=false'];
+                } else if (cmdLower === 'bun' && !args.includes('--silent')) {
+                  args = [...args, '--silent'];
+                }
+              }
+              const fullCommand = `${command} ${args.join(' ')}`.trim();
+              console.log(`🔧 [Agent] web_exec: ${fullCommand} ${cwd ? `(cwd: ${cwd})` : ''}`);
+              let result = await fnsRef.current.spawn(command, args, { cwd });
+
+              // Fallback: if command not found (exit 127), try mapping pnpm->npm where possible
+              if (result.exitCode === 127 && /^(pnpm)$/i.test(command) && isInstallLike) {
+                console.warn('⚠️ [Agent] pnpm not found; retrying with npm');
+                const mapped = ['install', ...args.slice(1)];
+                command = 'npm';
+                args = mapped;
+                result = await fnsRef.current.spawn(command, args, { cwd });
+              }
+              console.log(`📊 [Agent] web_exec result: exit ${result.exitCode}, output ${result.output.length} chars`);
+
+              // Avoid flooding LLM with huge logs; compact install/update outputs
+              const isPkgMgrCmd = /(pnpm|npm|yarn|bun)\s+(add|install|remove|uninstall|update)/i.test(fullCommand);
+              const maxChars = 8000;
+              const maxLines = 120;
+              const splitLines = (s: string) => s.split(/\r?\n/);
+              const lastLines = (s: string, n: number) => {
+                const lines = splitLines(s);
+                return lines.slice(Math.max(0, lines.length - n)).join('\n');
+              };
+              const trimChars = (s: string) => (s.length > maxChars ? `${s.slice(0, 2000)}\n...\n${s.slice(-6000)}` : s);
+
+              if (isPkgMgrCmd) {
+                addToolResult({
+                  tool: 'web_exec',
+                  toolCallId: tc.toolCallId,
+                  output: {
+                    command: fullCommand,
+                    exitCode: result.exitCode,
+                    ok: result.exitCode === 0,
+                    outputTail: trimChars(lastLines(result.output, maxLines)),
+                  },
+                });
+              } else {
+                addToolResult({
+                  tool: 'web_exec',
+                  toolCallId: tc.toolCallId,
+                  output: {
+                    command: fullCommand,
+                    exitCode: result.exitCode,
+                    output: trimChars(result.output),
+                    cwd,
+                  },
+                });
+              }
               // Heuristically persist after package manager or file-changing commands
               try {
                 if (instanceRef.current) {
-                  const cmd = `${command} ${args.join(' ')}`;
-                  if (/(pnpm|npm|yarn|bun)\s+(add|install|remove|uninstall|update)|git\s+(checkout|switch|merge|apply)/i.test(cmd)) {
+                  if (/(pnpm|npm|yarn|bun)\s+(add|install|remove|uninstall|update)|git\s+(checkout|switch|merge|apply)/i.test(fullCommand)) {
                     enqueuePersist(instanceRef.current);
                   }
                 }
@@ -112,6 +229,8 @@ export default function AIAgentBar() {
               const { name, icon } = tc.input as { name: string; icon?: string };
               const id = crypto.randomUUID();
               const base = `src/apps/${id}`;
+              console.log(`🔧 [Agent] create_app: "${name}" -> ${base} (${icon ?? '📦'})`);
+              
               await fnsRef.current.mkdir(base, true);
               const metadata = {
                 id,
@@ -135,29 +254,37 @@ export default function AIAgentBar() {
                   { id, name, icon: metadata.icon, path: `/${base}/index.tsx` }
                 ], null, 2));
               }
-              addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base } });
+              console.log(`✅ [Agent] App created: ${name} (${id})`);
+              addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base, name, icon: metadata.icon } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
             case 'rename_app': {
               const { id, name } = tc.input as { id: string; name: string };
+              console.log(`🔧 [Agent] rename_app: ${id} -> "${name}"`);
               const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
               const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>;
               const idx = registry.findIndex((r) => r.id === id);
               if (idx === -1) throw new Error('App not found in registry');
+              const oldName = registry[idx].name;
               registry[idx].name = name;
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
-              addToolResult({ tool: 'rename_app', toolCallId: tc.toolCallId, output: { ok: true } });
+              console.log(`✅ [Agent] App renamed: "${oldName}" -> "${name}"`);
+              addToolResult({ tool: 'rename_app', toolCallId: tc.toolCallId, output: { ok: true, id, oldName, newName: name } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
             case 'remove_app': {
               const { id } = tc.input as { id: string };
+              console.log(`🔧 [Agent] remove_app: ${id}`);
               // Remove from registry
               let reg: Array<{ id: string; name: string; icon?: string; path: string }> = [];
+              let appName = 'Unknown';
               try {
                 const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
                 reg = JSON.parse(regRaw);
+                const app = reg.find(r => r.id === id);
+                if (app) appName = app.name;
               } catch {}
               const next = reg.filter((r) => r.id !== id);
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(next, null, 2));
@@ -166,7 +293,8 @@ export default function AIAgentBar() {
               const p2 = `src/apps/app-${id}`;
               try { await fnsRef.current.remove(p1, { recursive: true }); } catch {}
               try { await fnsRef.current.remove(p2, { recursive: true }); } catch {}
-              addToolResult({ tool: 'remove_app', toolCallId: tc.toolCallId, output: { ok: true } });
+              console.log(`✅ [Agent] App removed: "${appName}" (${id})`);
+              addToolResult({ tool: 'remove_app', toolCallId: tc.toolCallId, output: { ok: true, id, name: appName, removedPaths: [p1, p2] } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               break;
             }
@@ -178,9 +306,18 @@ export default function AIAgentBar() {
           const message = err instanceof Error ? err.message : String(err);
           addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output: { error: message } });
         }
-      })();
+      };
+
+      // Chain into a single execution queue so tools run one at a time
+      const p = execQueueRef.current = execQueueRef.current
+        .catch(() => {})
+        .then(task)
+        .finally(() => {
+          // remove resolved task handle from local tracker
+          pendingToolPromises.current.delete(p);
+        });
+
       pendingToolPromises.current.add(p);
-      p.finally(() => pendingToolPromises.current.delete(p));
     },
   });
 
