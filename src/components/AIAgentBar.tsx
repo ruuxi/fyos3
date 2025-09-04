@@ -74,32 +74,24 @@ export default function AIAgentBar() {
               if (isBroad) {
                 console.log('🔧 [Agent] web_fs_find: returning curated workspace map');
                 const map = {
-                  appRoutes: 'src/app',
-                  agentAPI: 'src/app/api/agent/route.ts',
-                  components: 'src/components',
-                  agentBar: 'src/components/AIAgentBar.tsx',
-                  webContainer: 'src/components/WebContainer.tsx',
-                  appsRoot: 'src/apps',
-                  desktopShell: 'templates/webcontainer/src/desktop/Desktop.tsx',
-                  registry: 'public/apps/registry.json',
-                  utils: 'src/utils',
-                  lib: 'src/lib',
-                  data: 'src/data',
+                  entryHtml: '/index.html',
+                  publicDir: '/public',
+                  registry: '/public/apps/registry.json',
+                  srcDir: '/src',
+                  appsRoot: '/src/apps',
+                  desktopShell: '/src/desktop/Desktop.tsx',
+                  aiHelper: '/src/ai.ts',
                 } as const;
                 const curatedFiles = [
-                  map.appRoutes,
-                  map.agentAPI,
-                  map.components,
-                  map.agentBar,
-                  map.webContainer,
+                  map.entryHtml,
+                  map.publicDir,
+                  map.registry,
+                  map.srcDir,
                   map.appsRoot,
                   map.desktopShell,
-                  map.registry,
-                  map.utils,
-                  map.lib,
-                  map.data,
+                  map.aiHelper,
                 ];
-                addToolResult({ tool: 'web_fs_find', toolCallId: tc.toolCallId, output: { curated: true, root, files: curatedFiles, count: curatedFiles.length, map } });
+                addToolResult({ tool: 'web_fs_find', toolCallId: tc.toolCallId, output: { curated: true, root: '/', files: curatedFiles, count: curatedFiles.length, map } });
               } else {
                 console.log(`🔧 [Agent] web_fs_find: ${root} (depth: ${maxDepth})`);
                 const results = await fnsRef.current.readdirRecursive(root, maxDepth);
