@@ -12,18 +12,11 @@ export function getSnapshot(): Uint8Array {
 }
 
 /**
- * Get the WebContainer files via API endpoint
- * This fetches the binary snapshot from the server
+ * Legacy function - kept for compatibility
+ * @deprecated Use getSnapshot() for better performance
  */
-export async function getSnapshotFromAPI(): Promise<ArrayBuffer> {
-  const response = await fetch('/api/webcontainer-snapshot');
-  if (!response.ok) {
-    throw new Error('Failed to fetch WebContainer snapshot');
-  }
-  return response.arrayBuffer();
+export function getFiles() {
+  // For development, we can still fall back to the tree-based approach
+  // but in production, prefer using the binary snapshot
+  throw new Error('Use getSnapshot() instead for better performance');
 }
-
-/**
- * Note: Runtime now prefers restoring from persisted VFS when available.
- * This module remains for fallback snapshot loading and server-side usage.
- */
