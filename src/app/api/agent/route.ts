@@ -12,6 +12,18 @@ export async function POST(req: Request) {
     toolCalls: 'toolCalls' in m && Array.isArray(m.toolCalls) ? m.toolCalls.length : 0
   })));
 
+  // Ensure messages is an array
+  if (!Array.isArray(messages)) {
+    console.error('❌ [AGENT] Messages is not an array:', messages);
+    return new Response('Invalid messages format', { status: 400 });
+  }
+
+  // Filter out system messages that were added by conversation layer
+  const filteredMessages = messages.filter(m => 
+    !(m.role === 'system' && 'content' in m && typeof m.content === 'string' && 
+      m.content.includes('receiving this request through a conversation layer'))
+  );
+
   const result = streamText({
     model: 'alibaba/qwen3-coder',
     providerOptions: {
@@ -19,7 +31,7 @@ export async function POST(req: Request) {
         order: ['cerebras', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
       },
     },
-    messages: convertToModelMessages(messages),
+    messages: convertToModelMessages(filteredMessages),
     stopWhen: stepCountIs(8),
     onFinish: (event) => {
       console.log('🎯 [AI] Response finished:', {

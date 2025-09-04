@@ -86,7 +86,7 @@ export default function AIAgentBar() {
 
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id: 'agent-chat',
-    transport: new DefaultChatTransport({ api: '/api/agent' }),
+    transport: new DefaultChatTransport({ api: '/api/conversation' }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     async onToolCall({ toolCall }) {
       if (toolCall.dynamic) return; // not expected here, but keep safe
@@ -415,7 +415,15 @@ export default function AIAgentBar() {
                 <Textarea
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  placeholder="Ask the AI agent… Try: ‘Create a Notes app on the desktop and install zustand’"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.shiftKey) {
+                      e.preventDefault();
+                      if (!input.trim()) return;
+                      sendMessage({ text: input });
+                      setInput('');
+                    }
+                  }}
+                  placeholder="Ask the AI agent… Try: 'Create a Notes app on the desktop and install zustand'"
                   className="min-h-[40px] max-h-32 resize-none pr-12 bg-[rgba(5,7,11,0.5)] border-white/20 text-white placeholder:text-white/50 focus-visible:border-[#60a5fa]/50 focus-visible:ring-[#60a5fa]/20"
                   rows={1}
                   disabled={status === 'submitted' || status === 'streaming'}
