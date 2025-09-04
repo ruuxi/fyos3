@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>App</title>
+    <style>
+      html,body,#mount{height:100%;margin:0}
+      body{background:transparent}
+    </style>
+  </head>
+  <body>
+    <div id="mount"></div>
+    <script type="module">
+      // Disable Vite error overlay in iframe
+      if (import.meta.hot) {
+        import.meta.hot.on('vite:error', (payload) => {
+          // Prevent Vite error overlay from showing
+          console.error('[App iframe] Vite error:', payload);
+        });
+      }
+      
+      // Block vite-error-overlay custom element
+      const originalDefine = customElements.define;
+      customElements.define = function(name, constructor, options) {
+        if (name === 'vite-error-overlay') {
+          console.log('[App iframe] Blocked vite-error-overlay');
+          return;
+        }
+        return originalDefine.call(this, name, constructor, options);
+      };
+
+      // Watch for and remove any vite-error-overlay elements
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeName === 'VITE-ERROR-OVERLAY' || 
+                (node.tagName && node.tagName.toLowerCase() === 'vite-error-overlay')) {
+              console.log('[App iframe] Removing vite-error-overlay');
+              node.remove();
+            }
+          });
+        });
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+
+      // Immediately isolate this iframe from parent errors
+      window.addEventListener('error', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        console.error('[App iframe] window error:', e.error || e.message);
+        showOverlay(String(e?.error?.message || e?.message || 'Unknown error'));
+      }, true);
+      
+      window.addEventListener('unhandledrejection', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        console.error('[App iframe] unhandledrejection:', e.reason);
+        showOverlay(String(e?.reason?.message || e?.reason || 'Unhandled promise rejection'));
+      }, true);
+
+      // Prevent errors from bubbling to parent
+      const originalConsoleError = console.error;
+      console.error = function(...args) {
+        try {
+          originalConsoleError.apply(console, ['[App iframe]', ...args]);
+        } catch {}
+      };
+
+      import { createRoot } from '/src/iframe-root.js';
+      // Expect query: ?path=/src/apps/xxx/index.tsx&name=...&id=...
+      const params = new URLSearchParams(location.search)
+      const path = params.get('path')
+      const name = params.get('name') || 'App'
+      const mountEl = document.getElementById('mount')
+      
+      // Global error isolation inside iframe
+      const overlay = document.createElement('div')
+      overlay.style.cssText = 'position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.85);color:#991b1b;text-align:center;z-index:99999;padding:16px'
+      overlay.innerHTML = '<div style="max-width:560px"><div style="font-weight:600;margin-bottom:6px">This app encountered an error</div><div id="errMsg" style="font-size:12px;color:#7f1d1d;white-space:pre-wrap"></div><button id="reloadBtn" style="margin-top:12px;padding:6px 10px;border-radius:6px;border:1px solid #fecaca;background:#fee2e2;color:#7f1d1d">Reload app</button></div>'
+      document.body.appendChild(overlay)
+      overlay.querySelector('#reloadBtn')?.addEventListener('click', ()=> location.reload())
+      
+      function showOverlay(msg){
+        const el = overlay.querySelector('#errMsg')
+        if (el) el.textContent = msg
+        overlay.style.display = 'flex'
+      }
+      if (!path){
+        mountEl.textContent = 'Missing app path'
+      } else {
+        // Wrap everything in try-catch to prevent errors from bubbling up
+        try {
+          // Load the module and mount default export as a React component
+          import(/* @vite-ignore */ path).then(mod => {
+            try {
+              const Comp = mod?.default
+              createRoot(mountEl, Comp, name)
+            } catch (renderErr) {
+              console.error('[App iframe] component render error:', renderErr)
+              showOverlay('App render error: ' + renderErr.message)
+            }
+          }).catch(err => {
+            console.error('[App iframe] module load error:', err)
+            showOverlay('Failed to load app: ' + err)
+          })
+        } catch (err) {
+          console.error('[App iframe] setup error:', err)
+          showOverlay('App setup error: ' + err)
+        }
+      }
+    </script>
+  </body>
+  </html>

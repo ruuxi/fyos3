@@ -11,7 +11,8 @@ import { convertToModelMessages, streamText, UIMessage, stepCountIs, tool } from
 import { z } from 'zod';
 import { CODING_AGENT_SYSTEM_PROMPT } from '@/lib/aiPrompts';
 
-export const maxDuration = 30;
+// Some tool actions (like package installs) may take longer than 30s
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
@@ -55,14 +56,46 @@ export async function POST(req: Request) {
       if (event.toolCalls?.length) {
         console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc: any) => ({
           name: tc.toolName,
-          args: tc.args
+          args: tc.args,
+          id: tc.toolCallId?.substring(0, 8)
         })));
+        
+        // Log file operation details
+        event.toolCalls.forEach((tc: any) => {
+          if (tc.toolName.startsWith('web_fs_') || ['create_app', 'remove_app', 'rename_app'].includes(tc.toolName)) {
+            const args = tc.args || {};
+            switch (tc.toolName) {
+              case 'web_fs_write':
+                console.log(`📝 [AI-Tool] WRITE: ${args.path} (${args.content?.length || 0} chars)`);
+                break;
+              case 'web_fs_read':
+                console.log(`👁️ [AI-Tool] READ: ${args.path}`);
+                break;
+              case 'web_fs_mkdir':
+                console.log(`📁 [AI-Tool] MKDIR: ${args.path}`);
+                break;
+              case 'web_fs_rm':
+                console.log(`🗑️ [AI-Tool] REMOVE: ${args.path}`);
+                break;
+              case 'create_app':
+                console.log(`🆕 [AI-Tool] CREATE_APP: "${args.name}" (${args.icon || '📦'})`);
+                break;
+              case 'remove_app':
+                console.log(`❌ [AI-Tool] REMOVE_APP: ${args.id}`);
+                break;
+              case 'rename_app':
+                console.log(`✏️ [AI-Tool] RENAME_APP: ${args.id} -> "${args.name}"`);
+                break;
+            }
+          }
+        });
       }
 
       if (event.toolResults?.length) {
         console.log('📋 [AI] Tool results received:', event.toolResults.map((tr: any) => ({
           name: tr.toolName,
-          result: tr.result
+          success: !tr.result?.error,
+          id: tr.toolCallId?.substring(0, 8)
         })));
       }
     },
@@ -139,6 +172,15 @@ export async function POST(req: Request) {
         description: 'Remove an app from apps/<id> (or app-<id>) and registry.json by id.',
         inputSchema: z.object({
           id: z.string().describe('App id to remove'),
+        }),
+      },
+      // Validate project health (typecheck/lint/build quick checks)
+      validate_project: {
+        description:
+          'Run validation checks on the project (TypeScript noEmit, and optionally ESLint on specific files). Use after non-trivial edits.',
+        inputSchema: z.object({
+          scope: z.enum(['quick', 'full']).optional().default('quick'),
+          files: z.array(z.string()).optional().describe('Files to lint specifically (optional)'),
         }),
       },
       // Planning helper – capture a plan before execution

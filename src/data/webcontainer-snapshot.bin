@@ -1,4 +1,118 @@
-Å°dÜ™index.htmlÅ°fÅ°c≈d<!doctype html>
+Å°dâ®app.htmlÅ°fÅ°c≈§<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>App</title>
+    <style>
+      html,body,#mount{height:100%;margin:0}
+      body{background:transparent}
+    </style>
+  </head>
+  <body>
+    <div id="mount"></div>
+    <script type="module">
+      // Disable Vite error overlay in iframe
+      if (import.meta.hot) {
+        import.meta.hot.on('vite:error', (payload) => {
+          // Prevent Vite error overlay from showing
+          console.error('[App iframe] Vite error:', payload);
+        });
+      }
+      
+      // Block vite-error-overlay custom element
+      const originalDefine = customElements.define;
+      customElements.define = function(name, constructor, options) {
+        if (name === 'vite-error-overlay') {
+          console.log('[App iframe] Blocked vite-error-overlay');
+          return;
+        }
+        return originalDefine.call(this, name, constructor, options);
+      };
+
+      // Watch for and remove any vite-error-overlay elements
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeName === 'VITE-ERROR-OVERLAY' || 
+                (node.tagName && node.tagName.toLowerCase() === 'vite-error-overlay')) {
+              console.log('[App iframe] Removing vite-error-overlay');
+              node.remove();
+            }
+          });
+        });
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+
+      // Immediately isolate this iframe from parent errors
+      window.addEventListener('error', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        console.error('[App iframe] window error:', e.error || e.message);
+        showOverlay(String(e?.error?.message || e?.message || 'Unknown error'));
+      }, true);
+      
+      window.addEventListener('unhandledrejection', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        console.error('[App iframe] unhandledrejection:', e.reason);
+        showOverlay(String(e?.reason?.message || e?.reason || 'Unhandled promise rejection'));
+      }, true);
+
+      // Prevent errors from bubbling to parent
+      const originalConsoleError = console.error;
+      console.error = function(...args) {
+        try {
+          originalConsoleError.apply(console, ['[App iframe]', ...args]);
+        } catch {}
+      };
+
+      import { createRoot } from '/src/iframe-root.js';
+      // Expect query: ?path=/src/apps/xxx/index.tsx&name=...&id=...
+      const params = new URLSearchParams(location.search)
+      const path = params.get('path')
+      const name = params.get('name') || 'App'
+      const mountEl = document.getElementById('mount')
+      
+      // Global error isolation inside iframe
+      const overlay = document.createElement('div')
+      overlay.style.cssText = 'position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.85);color:#991b1b;text-align:center;z-index:99999;padding:16px'
+      overlay.innerHTML = '<div style="max-width:560px"><div style="font-weight:600;margin-bottom:6px">This app encountered an error</div><div id="errMsg" style="font-size:12px;color:#7f1d1d;white-space:pre-wrap"></div><button id="reloadBtn" style="margin-top:12px;padding:6px 10px;border-radius:6px;border:1px solid #fecaca;background:#fee2e2;color:#7f1d1d">Reload app</button></div>'
+      document.body.appendChild(overlay)
+      overlay.querySelector('#reloadBtn')?.addEventListener('click', ()=> location.reload())
+      
+      function showOverlay(msg){
+        const el = overlay.querySelector('#errMsg')
+        if (el) el.textContent = msg
+        overlay.style.display = 'flex'
+      }
+      if (!path){
+        mountEl.textContent = 'Missing app path'
+      } else {
+        // Wrap everything in try-catch to prevent errors from bubbling up
+        try {
+          // Load the module and mount default export as a React component
+          import(/* @vite-ignore */ path).then(mod => {
+            try {
+              const Comp = mod?.default
+              createRoot(mountEl, Comp, name)
+            } catch (renderErr) {
+              console.error('[App iframe] component render error:', renderErr)
+              showOverlay('App render error: ' + renderErr.message)
+            }
+          }).catch(err => {
+            console.error('[App iframe] module load error:', err)
+            showOverlay('Failed to load app: ' + err)
+          })
+        } catch (err) {
+          console.error('[App iframe] setup error:', err)
+          showOverlay('App setup error: ' + err)
+        }
+      }
+    </script>
+  </body>
+  </html>
+™index.htmlÅ°fÅ°c≈d<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -10,7 +124,30 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
-</html>Æpnpm-lock.yamlÅ°fÅ°c≈|ilockfileVersion: '6.0'
+</html>¨package.jsonÅ°fÅ°c≈˜{
+  "name": "mac-desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.10",
+    "vite": "^5.0.8"
+  }
+}Æpnpm-lock.yamlÅ°fÅ°c≈|ilockfileVersion: '6.0'
 
 settings:
   autoInstallPeers: true
@@ -958,27 +1095,15 @@ packages:
   /yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
     dev: true
-¨package.jsonÅ°fÅ°c≈ü{
-  "name": "mac-desktop",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+±postcss.config.jsÅ°fÅ°cƒRexport default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
   },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.0.8"
-  }
-}¶publicÅ°dÅ§appsÅ°dÅ≠registry.jsonÅ°fÅ°c≈~[
+}
+
+
+¶publicÅ°dÅ§appsÅ°dÅ≠registry.jsonÅ°fÅ°c≈~[
   {
     "id": "00000000-0000-0000-0000-000000000001",
     "name": "Finder",
@@ -1010,7 +1135,7 @@ packages:
     "path": "/src/apps/app-00000000-0000-0000-0000-000000000005/index.tsx"
   }
 ]
-£srcÅ°dÜßApp.cssÅ°fÅ°c≈]#root {
+£srcÅ°dàßApp.cssÅ°fÅ°c≈]#root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
@@ -1149,7 +1274,7 @@ export default function Settings(){
     </div>
   )
 }
-¶assetsÅ°dÅ©react.svgÅ°fÅ°c≈<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈Dpimport React, { useEffect, useRef, useState } from 'react'
+¶assetsÅ°dÅ©react.svgÅ°fÅ°c≈<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈D⁄import React, { useEffect, useRef, useState } from 'react'
 
 interface App {
   id: string
@@ -1190,7 +1315,6 @@ function MenuBar({ appName }: MenuBarProps){
 }
 
 function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }: WindowProps){
-  const [Comp, setComp] = useState<React.ComponentType | null>(null)
   const draggingRef = useRef<{
     type: 'move' | 'resize' | null
     startX: number
@@ -1202,12 +1326,6 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
     handle?: 'nw'|'ne'|'sw'|'se'
     active: boolean
   }>({ type: null, startX: 0, startY: 0, startLeft: 0, startTop: 0, startWidth: 0, startHeight: 0, active: false })
-
-  useEffect(()=>{
-    let mounted = true
-    import(/* @vite-ignore */ app.path).then(m=>{ if(mounted) setComp(()=>m.default) })
-    return ()=>{ mounted = false }
-  }, [app.path])
 
   useEffect(()=>{
     // Allow partial off-screen but keep window reachable
@@ -1332,7 +1450,15 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         <div style={{marginLeft:'auto'}} className="badge">{app.id.slice(0,8)}</div>
       </div>
       <div className="content">
-        {Comp ? <Comp /> : <div className="muted">Loading {app.name}‚Ä¶</div>}
+        <iframe
+          title={app.name}
+          src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}`}
+          style={{ width: '100%', height: '100%', border: 0, background: 'transparent' }}
+          sandbox="allow-scripts allow-same-origin"
+          onError={(e) => {
+            console.warn('Iframe error for app:', app.name, e);
+          }}
+        />
       </div>
       <div className="resize-handle nw" onMouseDown={startResize('nw')} />
       <div className="resize-handle ne" onMouseDown={startResize('ne')} />
@@ -1621,14 +1747,14 @@ export default function Desktop(){
     </div>
   )
 }
-™styles.cssÅ°fÅ°c≈/* Base variables and layout */
-:root{--bar:#0a0d12;--text:#f5f5f5;--muted:#9ca3af;--bg:#0a0d12;--glass:rgba(255,255,255,0.1);--dock:rgba(255,255,255,0.1);}
+™styles.cssÅ°fÅ°c≈‹/* Base variables and layout */
+:root{--bar:#f6f6f6;--text:#111;--muted:#6b7280;--bg:#0b1020;--glass:rgba(255,255,255,0.25);--dock:rgba(255,255,255,0.3);}
 *{box-sizing:border-box}
 body{font-family:Inter,ui-sans-serif,system-ui,Arial}
-.desktop{height:100%;position:relative;color:#f5f5f5;overflow:hidden}
-.wallpaper{position:absolute;inset:0;background:radial-gradient(120% 120% at 50% 0%, #0a0d12 0%, #070a0f 55%, #05070b 100%)}
-.menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(10,13,18,.85),rgba(7,10,15,.65));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.15)}
-.menubar .title{font-weight:600;font-size:12px;color:var(--text)}
+.desktop{height:100%;position:relative;color:#111;overflow:hidden}
+.wallpaper{position:absolute;inset:0;background:linear-gradient(135deg,#0b1020 0%,#1e2760 60%,#462e7e 100%)}
+.menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(255,255,255,.65),rgba(255,255,255,.3));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.35)}
+.menubar .title{font-weight:600;font-size:12px}
 .menubar .right{margin-left:auto;font-size:12px;color:var(--muted)}
 
 /* Dock removed */
@@ -1650,19 +1776,19 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .desktop-icon .glyph{font-size:36px;line-height:36px}
 
 /* Window */
-.window{position:absolute;top:90px;left:90px;min-width:280px;min-height:160px;background:#12151b;border-radius:10px;box-shadow:0 15px 40px rgba(0,0,0,.45);overflow:hidden;border:1px solid rgba(255,255,255,.1);will-change:transform,opacity}
+.window{position:absolute;top:90px;left:90px;min-width:280px;min-height:160px;background:white;border-radius:10px;box-shadow:0 15px 40px rgba(0,0,0,.25);overflow:hidden;border:1px solid rgba(0,0,0,.08);will-change:transform,opacity}
 .window.opening{animation:mac-window-open-spring .34s cubic-bezier(.2,.8,.2,1)}
 .window.closing{animation:mac-window-close .22s cubic-bezier(.2,.8,.2,1) forwards}
 .window.minimizing{animation:mac-window-minimize .22s cubic-bezier(.2,.8,.2,1) forwards}
 .window.minimized{opacity:0;transform:translateY(8px) scale(.92);pointer-events:none;visibility:hidden}
-.window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(10,13,18,.9),rgba(7,10,15,.75));border-bottom:1px solid rgba(255,255,255,.1);cursor:move}
+.window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(255,255,255,.9),rgba(255,255,255,.65));border-bottom:1px solid rgba(0,0,0,.07);cursor:move}
 .traffic{display:flex;gap:6px;margin-right:6px}
 .traffic .b{width:12px;height:12px;border-radius:50%}
 .b.red{background:#ff5f57}
 .b.yellow{background:#febc2e}
 .b.green{background:#28c840}
-.window .title{font-weight:600;font-size:12px;color:#f5f5f5}
-.window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:12px;font-size:14px;color:#e5e7eb;overflow:auto}
+.window .title{font-weight:600;font-size:12px;color:#222}
+.window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:12px;font-size:14px;color:#1f2937;overflow:auto}
 
 @keyframes mac-window-open-spring{
   0%{opacity:0;transform:translateY(10px) scale(.92)}
@@ -1689,24 +1815,64 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .badge{font-size:11px;color:#374151;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px}
 .muted{color:#6b7280}
 .list{padding-left:16px}
-®main.tsxÅ°fÅ°cƒ˛import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import Desktop from './desktop/Desktop'
-import './desktop/styles.css'
+Æiframe-root.jsÅ°fÅ°c≈ˆimport React, { StrictMode } from 'react'
+import { createRoot as createReactRoot } from 'react-dom/client'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <Desktop />
-  </StrictMode>
-)
-©index.cssÅ°fÅ°c≈◊:root {
+class ErrorBoundary extends React.Component {
+  constructor(props){
+    super(props)
+    this.state = { error: null }
+  }
+  static getDerivedStateFromError(error){
+    return { error }
+  }
+  componentDidCatch(error, info){
+    try{ console.error('[App iframe] render error:', error, info) } catch{}
+  }
+  render(){
+    const { error } = this.state
+    if (error){
+      const message = (error && (error.message || String(error))) || 'Unknown error'
+      return React.createElement('div', {
+        style: {
+          height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(255,255,255,0.75)', color: '#991b1b', padding: 16, textAlign: 'center'
+        }, role: 'alert'
+      },
+      React.createElement('div', { style: { fontWeight: 600, marginBottom: 6 } }, 'This app crashed'),
+      React.createElement('div', { style: { fontSize: 12, color: '#7f1d1d', whiteSpace: 'pre-wrap' } }, message),
+      React.createElement('button', { onClick: ()=> location.reload(), style: { marginTop: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid #fecaca', background: '#fee2e2', color: '#7f1d1d' } }, 'Reload app')
+      )
+    }
+    return this.props.children
+  }
+}
+
+export function createRoot(mountEl, Comp, name){
+  const root = createReactRoot(mountEl)
+  function Wrapper(){
+    if (!Comp) return React.createElement('div', null, `Missing component: ${name || 'App'}`)
+    return React.createElement(Comp)
+  }
+  root.render(
+    React.createElement(StrictMode, null,
+      React.createElement(ErrorBoundary, { name },
+        React.createElement(Wrapper)
+      )
+    )
+  )
+  return root
+}
+
+
+©index.cssÅ°fÅ°c≈ö:root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: dark;
+  color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #0a0d12;
+  background-color: #242424;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -1754,13 +1920,67 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
-}Ævite.config.jsÅ°fÅ°cƒ≥import { defineConfig } from 'vite'
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}®main.tsxÅ°fÅ°c≈import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import Desktop from './desktop/Desktop'
+import './desktop/styles.css'
+import './tailwind.css'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <Desktop />
+  </StrictMode>
+)
+¨tailwind.cssÅ°fÅ°cƒ=@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+≤tailwind.config.jsÅ°fÅ°cƒ∏/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+
+
+Ævite.config.jsÅ°fÅ°c≈simport { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    noDiscovery: true,
+    include: [
+      'react',
+      'react-dom',
+      'react-dom/client',
+      'react/jsx-runtime'
+    ]
+  },
   server: {
     host: true,
-    port: 3000
+    port: 3000,
+    hmr: {
+      overlay: false
+    }
   }
 })

@@ -7,6 +7,7 @@ import { Send, ChevronDown, MessageCircle, ArrowDown, Square } from 'lucide-reac
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
+import ChatAlert from './ChatAlert';
 import { enqueuePersist, persistNow } from '@/utils/vfs-persistence';
 
 export default function AIAgentBar() {
@@ -84,6 +85,18 @@ export default function AIAgentBar() {
     return instanceRef.current;
   }
 
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function scheduleDevRefresh(delayMs = 800) {
+    try {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(() => {
+        refreshTimerRef.current = null;
+        try { (globalThis as any).devServerControls?.refreshPreview?.(); } catch {}
+      }, delayMs);
+    } catch {}
+  }
+
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id: 'agent-chat',
     transport: new DefaultChatTransport({ api: '/api/conversation' }),
@@ -108,55 +121,171 @@ export default function AIAgentBar() {
       type ToolCall = { toolName: string; toolCallId: string; input: unknown };
       const tc = toolCall as ToolCall;
 
-      const p = (async () => {
+      const task = async () => {
         try {
           switch (tc.toolName) {
             case 'web_fs_find': {
               const { root = '.', maxDepth = 10 } = (tc.input as { root?: string; maxDepth?: number }) ?? {};
+              console.log(`🔧 [Agent] web_fs_find: ${root} (depth: ${maxDepth})`);
               const results = await fnsRef.current.readdirRecursive(root, maxDepth);
-              addToolResult({ tool: 'web_fs_find', toolCallId: tc.toolCallId, output: results });
+              console.log(`📊 [Agent] Found ${results.length} items in ${root}`);
+              addToolResult({ tool: 'web_fs_find', toolCallId: tc.toolCallId, output: { files: results, count: results.length, root } });
               break;
             }
             case 'web_fs_read': {
               const { path, encoding = 'utf-8' } = tc.input as { path: string; encoding?: 'utf-8' | 'base64' };
+              console.log(`🔧 [Agent] web_fs_read: ${path} (${encoding})`);
               const content = await fnsRef.current.readFile(path, encoding);
-              addToolResult({ tool: 'web_fs_read', toolCallId: tc.toolCallId, output: content });
+              const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
+              addToolResult({ tool: 'web_fs_read', toolCallId: tc.toolCallId, output: { content, path, size: `${sizeKB}KB` } });
               break;
             }
             case 'web_fs_write': {
               const { path, content, createDirs = true } = tc.input as { path: string; content: string; createDirs?: boolean };
+              const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
+              console.log(`🔧 [Agent] web_fs_write: ${path} (${sizeKB}KB)`);
+              
               if (createDirs) {
                 const dir = path.split('/').slice(0, -1).join('/') || '.';
                 await fnsRef.current.mkdir(dir, true);
               }
               await fnsRef.current.writeFile(path, content);
-              addToolResult({ tool: 'web_fs_write', toolCallId: tc.toolCallId, output: { ok: true } });
+              addToolResult({ tool: 'web_fs_write', toolCallId: tc.toolCallId, output: { ok: true, path, size: `${sizeKB}KB` } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              // schedule validation and preview refresh
+              recordChange(path);
+              scheduleDevRefresh(600);
               break;
             }
             case 'web_fs_mkdir': {
               const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
+              console.log(`🔧 [Agent] web_fs_mkdir: ${path} ${recursive ? '(recursive)' : ''}`);
               await fnsRef.current.mkdir(path, recursive);
-              addToolResult({ tool: 'web_fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true } });
+              addToolResult({ tool: 'web_fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange(path);
               break;
             }
             case 'web_fs_rm': {
               const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
+              console.log(`🔧 [Agent] web_fs_rm: ${path} ${recursive ? '(recursive)' : ''}`);
               await fnsRef.current.remove(path, { recursive });
-              addToolResult({ tool: 'web_fs_rm', toolCallId: tc.toolCallId, output: { ok: true } });
+              addToolResult({ tool: 'web_fs_rm', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange(path);
               break;
             }
             case 'web_exec': {
-              const { command, args = [], cwd } = tc.input as { command: string; args?: string[]; cwd?: string };
-              const result = await fnsRef.current.spawn(command, args, { cwd });
-              addToolResult({ tool: 'web_exec', toolCallId: tc.toolCallId, output: result });
+              let { command, args = [], cwd } = tc.input as { command: string; args?: string[]; cwd?: string };
+
+              // If the model sent the entire command as a single string, split into cmd + argv
+              const splitCommandLine = (line: string): string[] => {
+                const out: string[] = [];
+                let cur = '';
+                let quote: '"' | "'" | null = null;
+                for (let i = 0; i < line.length; i++) {
+                  const ch = line[i];
+                  if (quote) {
+                    if (ch === quote) {
+                      quote = null;
+                    } else if (ch === '\\' && i + 1 < line.length) {
+                      // handle simple escapes inside quotes
+                      i++;
+                      cur += line[i];
+                    } else {
+                      cur += ch;
+                    }
+                  } else {
+                    if (ch === '"' || ch === "'") {
+                      quote = ch as '"' | "'";
+                    } else if (/\s/.test(ch)) {
+                      if (cur) {
+                        out.push(cur);
+                        cur = '';
+                      }
+                    } else if (ch === '\\' && i + 1 < line.length) {
+                      i++;
+                      cur += line[i];
+                    } else {
+                      cur += ch;
+                    }
+                  }
+                }
+                if (cur) out.push(cur);
+                return out;
+              };
+
+              if ((!args || args.length === 0) && /\s/.test(command)) {
+                const tokens = splitCommandLine(command);
+                if (tokens.length > 0) {
+                  command = tokens[0];
+                  args = tokens.slice(1);
+                }
+              }
+              // Normalize and add non-interactive flags for popular package managers
+              const cmdLower = command.toLowerCase();
+              const firstArg = (args[0] || '').toLowerCase();
+              const isPkgMgr = /^(pnpm|npm|yarn|bun)$/.test(cmdLower);
+              const isInstallLike = /^(add|install|update|remove|uninstall|i)$/i.test(firstArg);
+              if (isPkgMgr && isInstallLike) {
+                if (cmdLower === 'pnpm' && !args.some(a => a.startsWith('--reporter='))) {
+                  args = [...args, '--reporter=silent', '--color=false'];
+                } else if (cmdLower === 'npm' && !args.includes('--silent')) {
+                  args = [...args, '--silent', '--no-progress', '--color=false'];
+                } else if (cmdLower === 'yarn' && !args.includes('--silent')) {
+                  args = [...args, '--silent', '--no-progress', '--color=false'];
+                } else if (cmdLower === 'bun' && !args.includes('--silent')) {
+                  args = [...args, '--silent'];
+                }
+              }
+              const fullCommand = `${command} ${args.join(' ')}`.trim();
+              console.log(`🔧 [Agent] web_exec: ${fullCommand} ${cwd ? `(cwd: ${cwd})` : ''}`);
+              let result = await fnsRef.current.spawn(command, args, { cwd });
+
+              // No package manager fallback to keep behavior strict
+              console.log(`📊 [Agent] web_exec result: exit ${result.exitCode}, output ${result.output.length} chars`);
+
+              // Avoid flooding LLM with huge logs; compact install/update outputs
+              const isPkgMgrCmd = /(pnpm|npm|yarn|bun)\s+(add|install|remove|uninstall|update)/i.test(fullCommand);
+              const maxChars = 8000;
+              const maxLines = 120;
+              const splitLines = (s: string) => s.split(/\r?\n/);
+              const lastLines = (s: string, n: number) => {
+                const lines = splitLines(s);
+                return lines.slice(Math.max(0, lines.length - n)).join('\n');
+              };
+              const trimChars = (s: string) => (s.length > maxChars ? `${s.slice(0, 2000)}\n...\n${s.slice(-6000)}` : s);
+
+              if (isPkgMgrCmd) {
+                addToolResult({
+                  tool: 'web_exec',
+                  toolCallId: tc.toolCallId,
+                  output: {
+                    command: fullCommand,
+                    exitCode: result.exitCode,
+                    ok: result.exitCode === 0,
+                    outputTail: trimChars(lastLines(result.output, maxLines)),
+                  },
+                });
+                if (result.exitCode === 0) {
+                  scheduleDevRefresh(800);
+                }
+              } else {
+                addToolResult({
+                  tool: 'web_exec',
+                  toolCallId: tc.toolCallId,
+                  output: {
+                    command: fullCommand,
+                    exitCode: result.exitCode,
+                    output: trimChars(result.output),
+                    cwd,
+                  },
+                });
+              }
               // Heuristically persist after package manager or file-changing commands
               try {
                 if (instanceRef.current) {
-                  const cmd = `${command} ${args.join(' ')}`;
-                  if (/(pnpm|npm|yarn|bun)\s+(add|install|remove|uninstall|update)|git\s+(checkout|switch|merge|apply)/i.test(cmd)) {
+                  if (/(pnpm|npm|yarn|bun)\s+(add|install|remove|uninstall|update)|git\s+(checkout|switch|merge|apply)/i.test(fullCommand)) {
                     enqueuePersist(instanceRef.current);
                   }
                 }
@@ -167,6 +296,8 @@ export default function AIAgentBar() {
               const { name, icon } = tc.input as { name: string; icon?: string };
               const id = crypto.randomUUID();
               const base = `src/apps/${id}`;
+              console.log(`🔧 [Agent] create_app: "${name}" -> ${base} (${icon ?? '📦'})`);
+              
               await fnsRef.current.mkdir(base, true);
               const metadata = {
                 id,
@@ -190,29 +321,41 @@ export default function AIAgentBar() {
                   { id, name, icon: metadata.icon, path: `/${base}/index.tsx` }
                 ], null, 2));
               }
-              addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base } });
+              console.log(`✅ [Agent] App created: ${name} (${id})`);
+              addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base, name, icon: metadata.icon } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange(`${base}/index.tsx`);
+              recordChange('public/apps/registry.json');
+              scheduleDevRefresh(800);
               break;
             }
             case 'rename_app': {
               const { id, name } = tc.input as { id: string; name: string };
+              console.log(`🔧 [Agent] rename_app: ${id} -> "${name}"`);
               const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
               const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>;
               const idx = registry.findIndex((r) => r.id === id);
               if (idx === -1) throw new Error('App not found in registry');
+              const oldName = registry[idx].name;
               registry[idx].name = name;
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
-              addToolResult({ tool: 'rename_app', toolCallId: tc.toolCallId, output: { ok: true } });
+              console.log(`✅ [Agent] App renamed: "${oldName}" -> "${name}"`);
+              addToolResult({ tool: 'rename_app', toolCallId: tc.toolCallId, output: { ok: true, id, oldName, newName: name } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange('public/apps/registry.json');
               break;
             }
             case 'remove_app': {
               const { id } = tc.input as { id: string };
+              console.log(`🔧 [Agent] remove_app: ${id}`);
               // Remove from registry
               let reg: Array<{ id: string; name: string; icon?: string; path: string }> = [];
+              let appName = 'Unknown';
               try {
                 const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
                 reg = JSON.parse(regRaw);
+                const app = reg.find(r => r.id === id);
+                if (app) appName = app.name;
               } catch {}
               const next = reg.filter((r) => r.id !== id);
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(next, null, 2));
@@ -221,8 +364,17 @@ export default function AIAgentBar() {
               const p2 = `src/apps/app-${id}`;
               try { await fnsRef.current.remove(p1, { recursive: true }); } catch {}
               try { await fnsRef.current.remove(p2, { recursive: true }); } catch {}
-              addToolResult({ tool: 'remove_app', toolCallId: tc.toolCallId, output: { ok: true } });
+              console.log(`✅ [Agent] App removed: "${appName}" (${id})`);
+              addToolResult({ tool: 'remove_app', toolCallId: tc.toolCallId, output: { ok: true, id, name: appName, removedPaths: [p1, p2] } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange('public/apps/registry.json');
+              break;
+            }
+            case 'validate_project': {
+              const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
+              console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
+              await runValidation(scope, files);
+              addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true } });
               break;
             }
             default:
@@ -233,37 +385,233 @@ export default function AIAgentBar() {
           const message = err instanceof Error ? err.message : String(err);
           addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output: { error: message } });
         }
-      })();
+      };
+
+      // Run tool asynchronously without global queueing
+      const p = (async () => { await task(); })();
       pendingToolPromises.current.add(p);
       p.finally(() => pendingToolPromises.current.delete(p));
     },
   });
 
-  // Auto-scroll for new messages when user is near bottom
-  useEffect(() => {
-    if (messages.length > previousMessageCount.current) {
-      const lastMessage = messages[messages.length - 1];
-      const hasNewAgentMessage = lastMessage?.role === 'assistant';
-      
-      if (hasNewAgentMessage) {
-        setHasNewMessage(true);
-        setLatestMessageId(lastMessage.id);
-        
-        // Auto-scroll if user is near bottom, otherwise just show indicator
-        if (isNearBottom) {
-          setTimeout(() => scrollToBottom(), 100);
-        }
-        
-        // Clear highlight after 3 seconds
-        setTimeout(() => setLatestMessageId(null), 3000);
-      }
-      
-      previousMessageCount.current = messages.length;
-    }
-  }, [messages, isNearBottom, scrollToBottom]);
+  // === Automatic diagnostics ===
+  // Preview error -> show alert and auto-post to AI once per unique error
+  const [previewAlert, setPreviewAlert] = useState<{
+    source: 'preview';
+    title: string;
+    description?: string;
+    content: string;
+  } | null>(null);
 
-  const onSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
+  const changedFilesRef = useRef<Set<string>>(new Set());
+  const validateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const validateRunningRef = useRef(false);
+  const lastErrorHashRef = useRef<string | null>(null);
+  const autoPostBusyRef = useRef(false);
+
+  function stableHash(s: string): string {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = (h << 5) - h + s.charCodeAt(i);
+      h |= 0;
+    }
+    return String(h);
+  }
+
+  async function autoPostDiagnostic(content: string) {
+    if (autoPostBusyRef.current) return;
+    autoPostBusyRef.current = true;
+    try {
+      await sendMessage({ text: content });
+    } finally {
+      const release = () => {
+        if (status === 'ready') {
+          autoPostBusyRef.current = false;
+        } else {
+          setTimeout(release, 300);
+        }
+      };
+      release();
+    }
+  }
+
+  // Listen for preview runtime errors
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (ce?.detail?.source === 'preview') {
+        const detail = ce.detail as any;
+        setPreviewAlert(detail);
+        const payload = detail?.content || detail?.description || '';
+        if (payload) {
+          const hash = stableHash(String(payload));
+          if (hash !== lastErrorHashRef.current) {
+            lastErrorHashRef.current = hash;
+            void autoPostDiagnostic(
+              `Preview runtime error detected automatically. Please diagnose and fix.\n\n\`\`\`txt\n${payload}\n\`\`\`\n`,
+            );
+          }
+        }
+      }
+    };
+    window.addEventListener('wc-preview-error', handler as EventListener);
+    return () => window.removeEventListener('wc-preview-error', handler as EventListener);
+  }, [status]);
+
+  function recordChange(path: string) {
+    if (!path) return;
+    changedFilesRef.current.add(path);
+    try {
+      if (validateTimerRef.current) clearTimeout(validateTimerRef.current);
+    } catch {}
+    const scheduleRun = () => {
+      // Defer validation if the agent is mid-fix to avoid spamming
+      if (autoPostBusyRef.current || status !== 'ready') {
+        validateTimerRef.current = setTimeout(scheduleRun, 700);
+        return;
+      }
+      const paths = Array.from(changedFilesRef.current);
+      changedFilesRef.current.clear();
+      void runValidation('quick', paths);
+    };
+    validateTimerRef.current = setTimeout(scheduleRun, 700);
+  }
+
+  async function runValidation(scope: 'quick' | 'full', changed: string[] = []) {
+    if (!instanceRef.current) return;
+    if (validateRunningRef.current) return;
+    validateRunningRef.current = true;
+    try {
+      const logs: string[] = [];
+      // TypeScript quick check (only surface likely breaking diagnostics)
+      try {
+        const tsc = await fnsRef.current.spawn('pnpm', ['exec', 'tsc', '--noEmit', '--pretty', 'false']);
+        if (tsc.exitCode !== 0) {
+          const breakingTS = extractBreakingTSErrors(tsc.output);
+          if (breakingTS) {
+            logs.push(`[TypeScript] ${breakingTS}`);
+          }
+        }
+      } catch (e) {
+        logs.push(`[TypeScript] failed to run: ${e instanceof Error ? e.message : String(e)}`);
+      }
+
+      // ESLint for changed files only
+      const lintTargets = changed.filter((p) => /\.(ts|tsx|js|jsx)$/.test(p));
+      if (lintTargets.length > 0) {
+        try {
+          const eslint = await fnsRef.current.spawn('pnpm', [
+            'exec',
+            'eslint',
+            '--format',
+            'json',
+            '--max-warnings=0',
+            ...lintTargets,
+          ]);
+          if (eslint.exitCode !== 0) {
+            const breakingLint = extractBreakingESLint(JSONSafe(eslint.output));
+            if (breakingLint) {
+              logs.push(`[ESLint] ${breakingLint}`);
+            }
+          }
+        } catch (e) {
+          logs.push(`[ESLint] failed to run: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      // Optional full build (heavier)
+      if (scope === 'full') {
+        try {
+          const build = await fnsRef.current.spawn('pnpm', ['run', 'build']);
+          if (build.exitCode !== 0) {
+            logs.push(`[Build] exit=${build.exitCode}\n${trimForChat(build.output)}`);
+          }
+        } catch (e: unknown) {
+          logs.push(`[Build] failed to run: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      const final = logs.filter(Boolean).join('\n\n');
+      if (final.trim().length > 0) {
+        const hash = stableHash(final);
+        if (hash !== lastErrorHashRef.current) {
+          lastErrorHashRef.current = hash;
+          await autoPostDiagnostic(
+            `Automatic checks found issues after recent changes (${changed.join(', ')}). Please fix.\n\n\`\`\`txt\n${final}\n\`\`\`\n`,
+          );
+        }
+      }
+    } finally {
+      validateRunningRef.current = false;
+    }
+  }
+
+  function trimForChat(s: string): string {
+    const maxChars = 8000;
+    return s.length > maxChars ? `${s.slice(0, 4000)}\n...\n${s.slice(-3500)}` : s;
+  }
+
+  function JSONSafe(output: string): string {
+    // Some tools may print leading logs; attempt to locate JSON array start
+    const start = output.indexOf('[');
+    const end = output.lastIndexOf(']');
+    if (start !== -1 && end !== -1 && end > start) {
+      return output.slice(start, end + 1);
+    }
+    return '[]';
+  }
+
+  function extractBreakingESLint(jsonOutput: string): string | null {
+    try {
+      const reports: Array<{
+        filePath: string;
+        messages: Array<{ ruleId: string | null; fatal?: boolean; severity: number; message: string; line?: number; column?: number }>;
+      }> = JSON.parse(jsonOutput);
+      const breaking: string[] = [];
+      for (const rep of reports) {
+        for (const m of rep.messages) {
+          const isParsing = m.fatal === true || m.ruleId === null || /Parsing error/i.test(m.message);
+          if (isParsing) {
+            breaking.push(`${rep.filePath}:${m.line ?? 0}:${m.column ?? 0} ${m.message}`);
+          }
+        }
+      }
+      if (breaking.length > 0) {
+        const body = breaking.slice(0, 25).join('\n');
+        return `Parsing errors detected (likely breaking):\n${trimForChat(body)}`;
+      }
+      return null;
+    } catch {
+      // Fallback: if JSON parse fails, do not surface to avoid noise
+      return null;
+    }
+  }
+
+  function extractBreakingTSErrors(tscOutput: string): string | null {
+    // Only promote syntax/parse and module resolution errors; ignore style/type-safety (e.g., noImplicitAny)
+    // Syntax-like TS codes commonly in 1000-1199 range; also include TS2307 (Cannot find module)
+    const lines = tscOutput.split(/\r?\n/);
+    const selected: string[] = [];
+    const codeRe = /error\s+TS(\d+):\s*(.*)/i;
+    for (const line of lines) {
+      const m = line.match(codeRe);
+      if (!m) continue;
+      const code = parseInt(m[1], 10);
+      const msg = m[2] || '';
+      const isSyntax = code >= 1000 && code < 1200; // rough bucket for parsing errors
+      const isModule = code === 2307; // Cannot find module
+      if (isSyntax || isModule) {
+        selected.push(`TS${code}: ${msg}`);
+      }
+    }
+    if (selected.length > 0) {
+      return selected.slice(0, 25).join('\n');
+    }
+    return null;
+  }
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!input.trim()) return;
     sendMessage({ text: input });
     setInput('');
@@ -319,6 +667,20 @@ export default function AIAgentBar() {
                 <ChevronDown className="w-4 h-4" />
               </Button>
             </div>
+          </div>
+
+          {/* Alerts */}
+          <div className="px-4 pt-2 space-y-2">
+            {previewAlert && (
+              <ChatAlert
+                alert={previewAlert}
+                onAsk={(msg) => {
+                  void sendMessage({ text: msg });
+                  setPreviewAlert(null);
+                }}
+                onDismiss={() => setPreviewAlert(null)}
+              />
+            )}
           </div>
 
           {/* Messages */}

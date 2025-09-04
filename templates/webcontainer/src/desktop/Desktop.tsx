@@ -39,7 +39,6 @@ function MenuBar({ appName }: MenuBarProps){
 }
 
 function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }: WindowProps){
-  const [Comp, setComp] = useState<React.ComponentType | null>(null)
   const draggingRef = useRef<{
     type: 'move' | 'resize' | null
     startX: number
@@ -51,12 +50,6 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
     handle?: 'nw'|'ne'|'sw'|'se'
     active: boolean
   }>({ type: null, startX: 0, startY: 0, startLeft: 0, startTop: 0, startWidth: 0, startHeight: 0, active: false })
-
-  useEffect(()=>{
-    let mounted = true
-    import(/* @vite-ignore */ app.path).then(m=>{ if(mounted) setComp(()=>m.default) })
-    return ()=>{ mounted = false }
-  }, [app.path])
 
   useEffect(()=>{
     // Allow partial off-screen but keep window reachable
@@ -181,7 +174,15 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         <div style={{marginLeft:'auto'}} className="badge">{app.id.slice(0,8)}</div>
       </div>
       <div className="content">
-        {Comp ? <Comp /> : <div className="muted">Loading {app.name}…</div>}
+        <iframe
+          title={app.name}
+          src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}`}
+          style={{ width: '100%', height: '100%', border: 0, background: 'transparent' }}
+          sandbox="allow-scripts allow-same-origin"
+          onError={(e) => {
+            console.warn('Iframe error for app:', app.name, e);
+          }}
+        />
       </div>
       <div className="resize-handle nw" onMouseDown={startResize('nw')} />
       <div className="resize-handle ne" onMouseDown={startResize('ne')} />
