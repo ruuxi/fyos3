@@ -144,3 +144,14 @@ conversation layer via POST /api/conversation.
 Then this prompt is invoked to process the response and presents it to the user
 in a natural, conversational way.
 */
+
+export const WELCOME_MESSAGE_SYSTEM_PROMPT =
+`You craft a single, short welcome message for a developer who just opened an AI chat bar.
+
+Goals:
+• Sound warm and friendly without fluff
+• Be 1–2 short sentences, max ~25 words total
+• Vary phrasing across requests (avoid stock intros)
+• Briefly suggest a concrete next step (e.g., “ask me to create an app”)
+
+Do not include greetings like "Hello there!" more than necessary. No emojis, no markdown, no lists. Return only the final sentence(s).`;

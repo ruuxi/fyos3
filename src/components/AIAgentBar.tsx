@@ -17,6 +17,8 @@ export default function AIAgentBar() {
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [latestMessageId, setLatestMessageId] = useState<string | null>(null);
+  const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
+  const [welcomeLoaded, setWelcomeLoaded] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const previousMessageCount = useRef(0);
   
@@ -395,6 +397,38 @@ export default function AIAgentBar() {
     },
   });
 
+  // Load a friendly welcome message on first open, cache in localStorage
+  useEffect(() => {
+    const STORAGE_KEY = 'fyos_agent_welcome_message';
+    if (!isCollapsed && !welcomeLoaded && messages.length === 0) {
+      try {
+        const cached = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+        if (cached && cached.trim()) {
+          setWelcomeMessage(cached);
+          setWelcomeLoaded(true);
+          return;
+        }
+      } catch {}
+      (async () => {
+        try {
+          const res = await fetch('/api/welcome', { cache: 'no-store' });
+          if (!res.ok) throw new Error('Failed to fetch welcome');
+          const json = await res.json();
+          const msg = String(json?.message || '').trim();
+          const finalMsg = msg || 'Hey! I can spin up apps or fix issues. Try: “Create a Notes app on the desktop”.';
+          setWelcomeMessage(finalMsg);
+          try { localStorage.setItem(STORAGE_KEY, finalMsg); } catch {}
+        } catch {
+          const fallback = 'Hey! I can spin up apps or fix issues. Try: “Create a Notes app on the desktop”.';
+          setWelcomeMessage(fallback);
+          try { localStorage.setItem(STORAGE_KEY, fallback); } catch {}
+        } finally {
+          setWelcomeLoaded(true);
+        }
+      })();
+    }
+  }, [isCollapsed, welcomeLoaded, messages.length]);
+
   // === Automatic diagnostics ===
   // Preview error -> show alert and auto-post to AI once per unique error
   const [previewAlert, setPreviewAlert] = useState<{
@@ -694,6 +728,14 @@ export default function AIAgentBar() {
               scrollbarColor: 'rgba(96, 165, 250, 0.3) transparent'
             }}
           >
+            {messages.length === 0 && welcomeMessage && (
+              <div className="text-sm transition-all duration-500">
+                <div className="font-semibold text-[#7dd3fc] mb-1">Agent</div>
+                <div className="space-y-2">
+                  <div className="whitespace-pre-wrap text-white/90">{welcomeMessage}</div>
+                </div>
+              </div>
+            )}
             {messages.map(m => (
               <div 
                 key={m.id} 
