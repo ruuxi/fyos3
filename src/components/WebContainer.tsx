@@ -14,6 +14,7 @@ export default function WebContainer() {
   const [loadingStage, setLoadingStage] = useState<string>('Initializing…');
   const [progress, setProgress] = useState<number>(2);
   const [error, setError] = useState<string | null>(null);
+  const [isReloading, setIsReloading] = useState(false);
   const { setInstance } = useWebContainer();
   const devProcRef = useRef<any>(null);
   const devUrlRef = useRef<string | null>(null);
@@ -27,6 +28,7 @@ export default function WebContainer() {
         if (isDevBusyRef.current) return true; // already refreshing
         isDevBusyRef.current = true;
         try {
+          setIsReloading(true);
           const url = new URL(devUrlRef.current);
           url.searchParams.set('r', String(Date.now()));
           const awaitFCP = new Promise<boolean>((resolve) => {
@@ -38,6 +40,7 @@ export default function WebContainer() {
               } catch {}
               if (e.data && e.data.type === 'webcontainer:fcp') {
                 window.removeEventListener('message', onMsg);
+                setIsReloading(false);
                 resolve(true);
               }
             };
@@ -64,6 +67,7 @@ export default function WebContainer() {
         if (isDevBusyRef.current) return true;
         isDevBusyRef.current = true;
         try {
+          setIsReloading(true);
           // Try to kill existing dev process
           try { await (devProcRef.current as any)?.kill?.(); } catch {}
           // Spawn new dev server
@@ -94,6 +98,7 @@ export default function WebContainer() {
               } catch {}
               if (e.data && e.data.type === 'webcontainer:fcp') {
                 window.removeEventListener('message', onMsg);
+                setIsReloading(false);
                 resolve(true);
               }
             };
@@ -236,6 +241,17 @@ export default function WebContainer() {
         devProcess.output.pipeTo(new WritableStream({
           write(data) {
             console.log('[WebContainer Dev]:', data);
+            // Detect Vite dependency re-optimization and cover the iframe to avoid white flash
+            try {
+              const text = typeof data === 'string' ? data : new TextDecoder().decode(data as any);
+              if (
+                text.includes('new dependencies optimized') ||
+                text.includes('optimized dependencies changed') ||
+                text.toLowerCase().includes('reloading')
+              ) {
+                setIsReloading(true);
+              }
+            } catch {}
             // Nudge progress as server boots
             setProgress((prev) => (prev < 88 ? prev + 0.15 : prev));
           }
@@ -263,6 +279,7 @@ export default function WebContainer() {
                 // Ensure iframe is visible before overlay exit
                 iframeRef.current.classList.add('iframe-ready');
                 void iframeRef.current.offsetHeight;
+                setIsReloading(false);
                 setTimeout(() => setIsLoading(false), 120);
               }
             };
@@ -288,6 +305,7 @@ export default function WebContainer() {
                 if (e.data && e.data.type === 'webcontainer:fcp') {
                   window.clearTimeout(fallbackTimer);
                   window.removeEventListener('message', clearOnFCP);
+                  setIsReloading(false);
                 }
               };
               window.addEventListener('message', clearOnFCP);
@@ -335,6 +353,9 @@ export default function WebContainer() {
 
   return (
     <div className="w-full h-full relative bg-white overflow-hidden">
+      {isReloading && (
+        <div className="absolute inset-0 z-10 pointer-events-none bg-[rgb(12,12,12)]/90 transition-opacity duration-200" />
+      )}
       {isLoading && (
         <BootScreen
           message={loadingStage || 'Preparing…'}
