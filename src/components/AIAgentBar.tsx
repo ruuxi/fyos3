@@ -71,10 +71,42 @@ export default function AIAgentBar() {
           switch (tc.toolName) {
             case 'web_fs_find': {
               const { root = '.', maxDepth = 10 } = (tc.input as { root?: string; maxDepth?: number }) ?? {};
-              console.log(`🔧 [Agent] web_fs_find: ${root} (depth: ${maxDepth})`);
-              const results = await fnsRef.current.readdirRecursive(root, maxDepth);
-              console.log(`📊 [Agent] Found ${results.length} items in ${root}`);
-              addToolResult({ tool: 'web_fs_find', toolCallId: tc.toolCallId, output: { files: results, count: results.length, root } });
+              const isBroad = (!root || root === '.' || root === '/') && maxDepth >= 5;
+              if (isBroad) {
+                console.log('🔧 [Agent] web_fs_find: returning curated workspace map');
+                const map = {
+                  appRoutes: 'src/app',
+                  agentAPI: 'src/app/api/agent/route.ts',
+                  components: 'src/components',
+                  agentBar: 'src/components/AIAgentBar.tsx',
+                  webContainer: 'src/components/WebContainer.tsx',
+                  appsRoot: 'src/apps',
+                  desktopShell: 'templates/webcontainer/src/desktop/Desktop.tsx',
+                  registry: 'public/apps/registry.json',
+                  utils: 'src/utils',
+                  lib: 'src/lib',
+                  data: 'src/data',
+                } as const;
+                const curatedFiles = [
+                  map.appRoutes,
+                  map.agentAPI,
+                  map.components,
+                  map.agentBar,
+                  map.webContainer,
+                  map.appsRoot,
+                  map.desktopShell,
+                  map.registry,
+                  map.utils,
+                  map.lib,
+                  map.data,
+                ];
+                addToolResult({ tool: 'web_fs_find', toolCallId: tc.toolCallId, output: { curated: true, root, files: curatedFiles, count: curatedFiles.length, map } });
+              } else {
+                console.log(`🔧 [Agent] web_fs_find: ${root} (depth: ${maxDepth})`);
+                const results = await fnsRef.current.readdirRecursive(root, maxDepth);
+                console.log(`📊 [Agent] Found ${results.length} items in ${root}`);
+                addToolResult({ tool: 'web_fs_find', toolCallId: tc.toolCallId, output: { files: results, count: results.length, root } });
+              }
               break;
             }
             case 'web_fs_read': {
@@ -83,6 +115,23 @@ export default function AIAgentBar() {
               const content = await fnsRef.current.readFile(path, encoding);
               const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
               addToolResult({ tool: 'web_fs_read', toolCallId: tc.toolCallId, output: { content, path, size: `${sizeKB}KB` } });
+              break;
+            }
+            case 'web_fs_read_many': {
+              const { paths, encoding = 'utf-8', ignoreMissing = false } = tc.input as { paths: string[]; encoding?: 'utf-8' | 'base64'; ignoreMissing?: boolean };
+              console.log(`🔧 [Agent] web_fs_read_many: count=${paths.length} (${encoding})`);
+              const results: Array<{ path: string; ok: boolean; content?: string; error?: string; size?: string }> = [];
+              for (const p of paths) {
+                try {
+                  const content = await fnsRef.current.readFile(p, encoding as any);
+                  const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
+                  results.push({ path: p, ok: true, content, size: `${sizeKB}KB` });
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  if (!ignoreMissing) results.push({ path: p, ok: false, error: msg });
+                }
+              }
+              addToolResult({ tool: 'web_fs_read_many', toolCallId: tc.toolCallId, output: { results, count: results.length } });
               break;
             }
             case 'web_fs_write': {
@@ -100,6 +149,39 @@ export default function AIAgentBar() {
               // schedule validation and preview refresh
               recordChange(path);
               scheduleDevRefresh(600);
+              break;
+            }
+            case 'web_fs_write_many': {
+              const { files, dedupeByContent = true } = tc.input as { files: Array<{ path: string; content: string; createDirs?: boolean }>; dedupeByContent?: boolean };
+              console.log(`🔧 [Agent] web_fs_write_many: count=${files.length} dedupe=${dedupeByContent}`);
+              const outputs: Array<{ path: string; written: boolean; skipped?: boolean; reason?: string; size?: string }> = [];
+              for (const f of files) {
+                try {
+                  if (f.createDirs !== false) {
+                    const dir = f.path.split('/').slice(0, -1).join('/') || '.';
+                    await fnsRef.current.mkdir(dir, true);
+                  }
+                  if (dedupeByContent) {
+                    try {
+                      const existing = await fnsRef.current.readFile(f.path, 'utf-8');
+                      if (existing === f.content) {
+                        outputs.push({ path: f.path, written: false, skipped: true, reason: 'identical-content' });
+                        continue;
+                      }
+                    } catch {}
+                  }
+                  await fnsRef.current.writeFile(f.path, f.content);
+                  const sizeKB = (new TextEncoder().encode(f.content).length / 1024).toFixed(1);
+                  outputs.push({ path: f.path, written: true, size: `${sizeKB}KB` });
+                  recordChange(f.path);
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  outputs.push({ path: f.path, written: false, reason: msg });
+                }
+              }
+              addToolResult({ tool: 'web_fs_write_many', toolCallId: tc.toolCallId, output: { results: outputs } });
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              scheduleDevRefresh(700);
               break;
             }
             case 'web_fs_mkdir': {
@@ -254,20 +336,21 @@ export default function AIAgentBar() {
               // minimal entry file (tsx)
               const appIndexTsx = `export default function App(){ return <div>${name}</div>; }`;
               await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
+              const registryItem = { id, name, icon: metadata.icon, path: `/${base}/index.tsx` };
               // update registry
               try {
                 const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
                 const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>
-                registry.push({ id, name, icon: metadata.icon, path: `/${base}/index.tsx` });
+                registry.push(registryItem);
                 await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
               } catch (e) {
                 // If registry missing, create it
                 await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify([
-                  { id, name, icon: metadata.icon, path: `/${base}/index.tsx` }
+                  registryItem
                 ], null, 2));
               }
               console.log(`✅ [Agent] App created: ${name} (${id})`);
-              addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base, name, icon: metadata.icon } });
+              addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base, name, icon: metadata.icon, registryUpdated: true, registryItem, registryPath: 'public/apps/registry.json' } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
               recordChange(`${base}/index.tsx`);
               recordChange('public/apps/registry.json');
@@ -648,7 +731,9 @@ export default function AIAgentBar() {
                       }
                       case 'tool-web_fs_find':
                       case 'tool-web_fs_read':
+                      case 'tool-web_fs_read_many':
                       case 'tool-web_fs_write':
+                      case 'tool-web_fs_write_many':
                       case 'tool-web_fs_mkdir':
                       case 'tool-web_fs_rm':
                       case 'tool-web_exec':
