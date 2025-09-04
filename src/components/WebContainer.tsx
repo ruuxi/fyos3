@@ -15,6 +15,99 @@ export default function WebContainer() {
   const [progress, setProgress] = useState<number>(2);
   const [error, setError] = useState<string | null>(null);
   const { setInstance } = useWebContainer();
+  const devProcRef = useRef<any>(null);
+  const devUrlRef = useRef<string | null>(null);
+  const isDevBusyRef = useRef(false);
+
+  // Expose lightweight dev controls globally for sibling components (agent) to use
+  useEffect(() => {
+    (globalThis as any).devServerControls = {
+      refreshPreview: async () => {
+        if (!iframeRef.current || !devUrlRef.current) return false;
+        if (isDevBusyRef.current) return true; // already refreshing
+        isDevBusyRef.current = true;
+        try {
+          const url = new URL(devUrlRef.current);
+          url.searchParams.set('r', String(Date.now()));
+          const awaitFCP = new Promise<boolean>((resolve) => {
+            const onMsg = (e: MessageEvent) => {
+              try {
+                if (!iframeRef.current) return;
+                const iframeOrigin = new URL(iframeRef.current.src).origin;
+                if (e.origin !== iframeOrigin) return;
+              } catch {}
+              if (e.data && e.data.type === 'webcontainer:fcp') {
+                window.removeEventListener('message', onMsg);
+                resolve(true);
+              }
+            };
+            window.addEventListener('message', onMsg);
+            // Hard timeout fallback
+            setTimeout(() => {
+              window.removeEventListener('message', onMsg);
+              resolve(false);
+            }, 8000);
+          });
+          iframeRef.current.src = url.toString();
+          const ok = await awaitFCP;
+          if (!ok) {
+            // Could not confirm FCP; try a full restart
+            return await (globalThis as any).devServerControls.restartDevServer();
+          }
+          return true;
+        } finally {
+          isDevBusyRef.current = false;
+        }
+      },
+      restartDevServer: async () => {
+        if (!webcontainerInstance) return false;
+        if (isDevBusyRef.current) return true;
+        isDevBusyRef.current = true;
+        try {
+          // Try to kill existing dev process
+          try { await (devProcRef.current as any)?.kill?.(); } catch {}
+          // Spawn new dev server
+          const devProcess = await webcontainerInstance.spawn('pnpm', ['run', 'dev']);
+          devProcRef.current = devProcess;
+          // Update output stream (optional logging)
+          devProcess.output.pipeTo(new WritableStream({ write(data) { console.log('[WebContainer Dev]:', data); } })).catch(()=>{});
+          // Wait for server-ready; the global listener will update iframe src
+          const serverReady = await new Promise<boolean>((resolve) => {
+            const handler = (port: number, url: string) => {
+              devUrlRef.current = url;
+              if (iframeRef.current) {
+                iframeRef.current.src = url;
+              }
+              resolve(true);
+            };
+            (webcontainerInstance as any).on('server-ready', handler);
+            setTimeout(() => resolve(false), 15000);
+          });
+          if (!serverReady) return false;
+          // Wait for FCP again
+          const ok = await new Promise<boolean>((resolve) => {
+            const onMsg = (e: MessageEvent) => {
+              try {
+                if (!iframeRef.current) return;
+                const iframeOrigin = new URL(iframeRef.current.src).origin;
+                if (e.origin !== iframeOrigin) return;
+              } catch {}
+              if (e.data && e.data.type === 'webcontainer:fcp') {
+                window.removeEventListener('message', onMsg);
+                resolve(true);
+              }
+            };
+            window.addEventListener('message', onMsg);
+            setTimeout(() => { window.removeEventListener('message', onMsg); resolve(false); }, 12000);
+          });
+          return ok;
+        } finally {
+          isDevBusyRef.current = false;
+        }
+      },
+    };
+    return () => { try { delete (globalThis as any).devServerControls; } catch {} };
+  }, [webcontainerInstance]);
 
   useEffect(() => {
     let mounted = true;
@@ -137,6 +230,7 @@ export default function WebContainer() {
         setProgress((p) => Math.max(p, 78));
         // Start dev server
         const devProcess = await instance.spawn('pnpm', ['run', 'dev']);
+        devProcRef.current = devProcess;
         
         // Stream dev server output
         devProcess.output.pipeTo(new WritableStream({
@@ -150,6 +244,7 @@ export default function WebContainer() {
         // Wait for server-ready event
         instance.on('server-ready', (port: number, url: string) => {
           console.log(`Server ready on port ${port}: ${url}`);
+          devUrlRef.current = url;
           setLoadingStage('Final touches…');
           setProgress(92);
           if (iframeRef.current) {

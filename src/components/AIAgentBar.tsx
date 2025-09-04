@@ -29,6 +29,18 @@ export default function AIAgentBar() {
     return instanceRef.current;
   }
 
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function scheduleDevRefresh(delayMs = 800) {
+    try {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(() => {
+        refreshTimerRef.current = null;
+        try { (globalThis as any).devServerControls?.refreshPreview?.(); } catch {}
+      }, delayMs);
+    } catch {}
+  }
+
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id: 'agent-chat',
     transport: new DefaultChatTransport({ api: '/api/agent' }),
@@ -194,6 +206,9 @@ export default function AIAgentBar() {
                     outputTail: trimChars(lastLines(result.output, maxLines)),
                   },
                 });
+                if (result.exitCode === 0) {
+                  scheduleDevRefresh(800);
+                }
               } else {
                 addToolResult({
                   tool: 'web_exec',
