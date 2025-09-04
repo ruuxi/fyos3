@@ -1,261 +1,290 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { WebContainer as WebContainerAPI } from '@webcontainer/api';
-// Binary snapshot approach for faster mounting
-import { useWebContainer } from './WebContainerProvider';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useWebContainer, useAppContainer } from './WebContainerProvider';
 import BootScreen from './BootScreen';
-import { hasPersistedVfs, restoreFromPersistence, enqueuePersist, persistNow } from '@/utils/vfs-persistence';
+import { multiAppPersistence, autoSaveManager } from '@/utils/multi-app-persistence';
+import type { ContainerInstance } from '@/services/WebContainerOrchestrator';
 
-export default function WebContainer() {
+interface WebContainerProps {
+  appId?: string;
+  displayName?: string;
+  onReady?: (container: ContainerInstance) => void;
+  onError?: (error: Error) => void;
+  className?: string;
+  autoSuspend?: boolean;
+  suspendAfterMs?: number;
+  mountSnapshot?: boolean; // Whether to mount default snapshot
+}
+
+export default function WebContainer({
+  appId = 'default',
+  displayName,
+  onReady,
+  onError,
+  className = '',
+  autoSuspend = true,
+  suspendAfterMs = 5 * 60 * 1000,
+  mountSnapshot = true,
+}: WebContainerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [webcontainerInstance, setWebcontainerInstance] = useState<WebContainerAPI | null>(null);
+  const [containerInstance, setContainerInstance] = useState<ContainerInstance | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStage, setLoadingStage] = useState<string>('Initializing…');
   const [progress, setProgress] = useState<number>(2);
   const [error, setError] = useState<string | null>(null);
-  const { setInstance } = useWebContainer();
+  const [serverUrl, setServerUrl] = useState<string | null>(null);
+  
+  const { createApp, getContainer } = useWebContainer();
+  const { ensureContainer } = useAppContainer(appId);
+
+  const initContainer = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setLoadingStage('Waking up…');
+      setProgress(8);
+
+      // Check if container already exists
+      let container = getContainer(appId);
+      
+      if (!container) {
+        setLoadingStage('Creating container…');
+        setProgress(15);
+        
+        // Create new container
+        container = await createApp({
+          appId,
+          displayName: displayName || appId,
+          autoSuspend,
+          suspendAfterMs,
+        });
+      } else if (container.state === 'suspended') {
+        setLoadingStage('Resuming container…');
+        await container.resume();
+      }
+
+      setContainerInstance(container);
+      setProgress(25);
+
+      // Get the actual WebContainer instance
+      const webcontainer = container.container;
+      if (!webcontainer) {
+        throw new Error('WebContainer instance not available');
+      }
+
+      setLoadingStage('Preparing workspace…');
+      setProgress(35);
+
+      // Check if we should restore from persisted VFS or mount snapshot
+      const hasSavedState = await multiAppPersistence.hasAppState(appId);
+      
+      if (hasSavedState) {
+        setLoadingStage('Restoring your workspace…');
+        setProgress(40);
+        
+        const vfs = await multiAppPersistence.loadAppState(appId);
+        if (vfs) {
+          const { restoreAppVfs } = await import('@/utils/multi-app-persistence');
+          const restored = await restoreAppVfs(webcontainer, vfs);
+          if (restored) {
+            console.log(`[WebContainer ${appId}] Restored from persisted VFS`);
+          }
+        }
+      } else if (mountSnapshot) {
+        setLoadingStage('Loading template…');
+        setProgress(40);
+        
+        // Mount default snapshot for new containers
+        const snapshotResponse = await fetch('/api/webcontainer-snapshot');
+        if (!snapshotResponse.ok) {
+          console.warn('Binary snapshot not available. Starting with empty container.');
+        } else {
+          const snapshot = await snapshotResponse.arrayBuffer();
+          await webcontainer.mount(snapshot);
+          console.log(`[WebContainer ${appId}] Mounted default snapshot`);
+        }
+      }
+
+      setLoadingStage('Installing dependencies…');
+      setProgress(50);
+
+      // Install dependencies
+      const installProcess = await webcontainer.spawn('pnpm', ['install']);
+      
+      // Stream installation output
+      installProcess.output.pipeTo(new WritableStream({
+        write(data) {
+          console.log(`[WebContainer ${appId} Install]:`, data);
+          setProgress((prev) => Math.min(prev + 0.5, 70));
+        }
+      }));
+
+      const installExitCode = await installProcess.exit;
+      if (installExitCode !== 0) {
+        console.warn(`[WebContainer ${appId}] Install exited with code ${installExitCode}`);
+      }
+
+      setLoadingStage('Starting development server…');
+      setProgress(75);
+
+      // Start dev server
+      const devProcess = await webcontainer.spawn('pnpm', ['run', 'dev']);
+      
+      // Stream dev server output
+      devProcess.output.pipeTo(new WritableStream({
+        write(data) {
+          console.log(`[WebContainer ${appId} Dev]:`, data);
+          setProgress((prev) => Math.min(prev + 0.2, 88));
+        }
+      }));
+
+      // Wait for server-ready event
+      const handleServerReady = ({ port, url }: { port: number; url: string }) => {
+        console.log(`[WebContainer ${appId}] Server ready on port ${port}: ${url}`);
+        setLoadingStage('Final touches…');
+        setProgress(92);
+        setServerUrl(url);
+        
+        if (iframeRef.current) {
+          iframeRef.current.src = url;
+        }
+      };
+
+      // Listen for server ready
+      container.once('server-ready', handleServerReady);
+
+      // Setup auto-save
+      const saveInterval = setInterval(async () => {
+        if (container && container.container) {
+          autoSaveManager.enqueue(appId, container.container, displayName);
+        }
+      }, 30000); // Auto-save every 30 seconds
+
+      // Setup FCP detection
+      const handleMessage = (event: MessageEvent) => {
+        if (!iframeRef.current) return;
+        
+        try {
+          const iframeOrigin = new URL(iframeRef.current.src).origin;
+          if (event.origin !== iframeOrigin) return;
+        } catch {}
+
+        if (event.data?.type === 'webcontainer:fcp') {
+          setProgress(100);
+          setLoadingStage('Ready!');
+          setTimeout(() => {
+            setIsLoading(false);
+            if (onReady) onReady(container!);
+          }, 300);
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+
+      // Cleanup function
+      return () => {
+        window.removeEventListener('message', handleMessage);
+        clearInterval(saveInterval);
+        container?.off('server-ready', handleServerReady);
+      };
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`[WebContainer ${appId}] Error:`, err);
+      setError(errorMessage);
+      setIsLoading(false);
+      if (onError) onError(err instanceof Error ? err : new Error(errorMessage));
+    }
+  }, [appId, displayName, autoSuspend, suspendAfterMs, mountSnapshot, createApp, getContainer, onReady, onError]);
 
   useEffect(() => {
-    let mounted = true;
-    let cleanupMessageListener: (() => void) | null = null;
-    let autosaveIntervalId: ReturnType<typeof setInterval> | null = null;
-    let visibilityHandler: (() => void) | null = null;
-    let beforeUnloadHandler: (() => void) | null = null;
+    let cleanup: (() => void) | undefined;
 
-    const initWebContainer = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        setLoadingStage('Waking up…');
-        setProgress((p) => Math.max(p, 8));
+    initContainer().then(cleanupFn => {
+      cleanup = cleanupFn;
+    });
 
-        // Boot WebContainer
-        const instance = await WebContainerAPI.boot({
-          coep: 'credentialless', 
-          workdirName: 'project' 
-        });
-        
-        if (!mounted) return;
-        setWebcontainerInstance(instance);
-        setProgress((p) => Math.max(p, 18));
-        
-        // Store instance globally for API access
-        if (typeof window !== 'undefined') {
-          (global as any).webcontainerInstance = instance;
-        }
-        setLoadingStage('Preparing workspace…');
-        setProgress((p) => Math.max(p, 26));
+    return () => {
+      if (cleanup) cleanup();
+      
+      // Save state on unmount
+      if (containerInstance?.container) {
+        autoSaveManager.saveNow(appId, containerInstance.container, displayName).catch(console.error);
+      }
+    };
+  }, [appId, initContainer, containerInstance, displayName]);
 
-        // Prefer restoring the user's persisted VFS if available; otherwise mount default snapshot
-        let restored = false;
-        try {
-          const hasSaved = await hasPersistedVfs();
-          if (hasSaved) {
-            setLoadingStage('Restoring your workspace…');
-            setProgress((p) => Math.max(p, 32));
-            restored = await restoreFromPersistence(instance);
-            if (restored) {
-              console.log('[WebContainer] Restored from persisted VFS');
-            }
-          }
-        } catch {}
-
-        if (!restored) {
-          // Mount files using binary snapshot for faster cold start
-          const snapshotResponse = await fetch('/api/webcontainer-snapshot');
-          if (!snapshotResponse.ok) {
-            throw new Error('Binary snapshot not available. Run `pnpm generate:snapshot` first.');
-          }
-          const snapshot = await snapshotResponse.arrayBuffer();
-          await instance.mount(snapshot);
-          console.log('[WebContainer] Mounted default snapshot');
-        }
-
-        // Try to inject a First Contentful Paint notifier into common HTML entrypoints
-        try {
-          const injectInto = async (path: string) => {
-            try {
-              const buf = await instance.fs.readFile(path);
-              const html = new TextDecoder().decode(buf as any);
-              if (html.includes('webcontainer-fcp-notify')) return;
-              const snippet = `\n<script id="webcontainer-fcp-notify">(function(){try{var sent=false;function send(msg){if(sent)return;sent=true;try{parent.postMessage({type:'webcontainer:fcp'},'*');}catch(e){}}if('PerformanceObserver'in window){try{var obs=new PerformanceObserver(function(list){for(var e of list.getEntries()){if(e.name==='first-contentful-paint'){send();obs.disconnect();break;}}});obs.observe({type:'paint',buffered:true});}catch(e){}}window.addEventListener('load',function(){requestAnimationFrame(function(){send();});});}catch(e){}})();</script>\n`;
-              const injected = html.includes('</head>') ? html.replace('</head>', snippet + '</head>') : (html.includes('</body>') ? html.replace('</body>', snippet + '</body>') : (html + snippet));
-              await instance.fs.writeFile(path, injected as any);
-              console.log('[WebContainer] Injected FCP notifier into', path);
-            } catch {}
-          };
-          await injectInto('/index.html');
-          await injectInto('/public/index.html');
-        } catch {}
-
-        setLoadingStage('Getting things ready…');
-        setProgress((p) => Math.max(p, 42));
-        // Use pnpm for faster dependency installation
-        const installProcess = await instance.spawn('pnpm', ['install']);
-        
-        // Stream installation output for better UX
-        installProcess.output.pipeTo(new WritableStream({
-          write(data) {
-            console.log('[WebContainer Install]:', data);
-            // Heuristically increase progress during install
-            setProgress((prev) => (prev < 72 ? prev + 0.25 : prev));
-          }
-        }));
-
-        const installExitCode = await installProcess.exit;
-
-        if (installExitCode !== 0) {
-          throw new Error('Failed to install dependencies');
-        }
-
-        // Expose the instance to tools only after dependencies are installed
-        setInstance(instance);
-
-        // Start lightweight periodic autosave after instance is ready
-        autosaveIntervalId = setInterval(() => {
-          try {
-            enqueuePersist(instance);
-          } catch {}
-        }, 5000);
-
-        // Save on tab hide or before unload
-        const handleVisibility = () => {
-          if (document.visibilityState === 'hidden') {
-            void persistNow(instance);
-          }
-        };
-        const handleBeforeUnload = () => {
-          void persistNow(instance);
-        };
-        document.addEventListener('visibilitychange', handleVisibility);
-        visibilityHandler = handleVisibility;
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        beforeUnloadHandler = handleBeforeUnload;
-
-        setLoadingStage('Almost there…');
-        setProgress((p) => Math.max(p, 78));
-        // Start dev server
-        const devProcess = await instance.spawn('pnpm', ['run', 'dev']);
-        
-        // Stream dev server output
-        devProcess.output.pipeTo(new WritableStream({
-          write(data) {
-            console.log('[WebContainer Dev]:', data);
-            // Nudge progress as server boots
-            setProgress((prev) => (prev < 88 ? prev + 0.15 : prev));
-          }
-        }));
-
-        // Wait for server-ready event
-        instance.on('server-ready', (port: number, url: string) => {
-          console.log(`Server ready on port ${port}: ${url}`);
-          setLoadingStage('Final touches…');
-          setProgress(92);
-          if (iframeRef.current) {
-            iframeRef.current.src = url;
-            // Listen for FCP message from the iframe content
-            const onMessage = (event: MessageEvent) => {
-              if (!iframeRef.current) return;
-              // Optionally, verify origin matches iframe origin
-              try {
-                const iframeOrigin = new URL(iframeRef.current.src).origin;
-                if (event.origin !== iframeOrigin) return;
-              } catch {}
-              if (event.data && event.data.type === 'webcontainer:fcp') {
-                setLoadingStage('Ready');
-                setProgress(100);
-                // Ensure iframe is visible before overlay exit
-                iframeRef.current.classList.add('iframe-ready');
-                void iframeRef.current.offsetHeight;
-                setTimeout(() => setIsLoading(false), 120);
-              }
-            };
-            window.addEventListener('message', onMessage);
-            cleanupMessageListener = () => window.removeEventListener('message', onMessage);
-
-            // Fallback: if we never receive FCP within a grace period after load, proceed
-            const handleLoad = () => {
-              const fallbackTimer = window.setTimeout(() => {
-                if (!iframeRef.current) return;
-                setLoadingStage('Ready');
-                setProgress(100);
-                iframeRef.current.classList.add('iframe-ready');
-                void iframeRef.current.offsetHeight;
-                setTimeout(() => setIsLoading(false), 150);
-              }, 1500);
-              // Clear if FCP arrives
-              const clearOnFCP = (e: MessageEvent) => {
-                try {
-                  const iframeOrigin = new URL(iframeRef.current!.src).origin;
-                  if (e.origin !== iframeOrigin) return;
-                } catch {}
-                if (e.data && e.data.type === 'webcontainer:fcp') {
-                  window.clearTimeout(fallbackTimer);
-                  window.removeEventListener('message', clearOnFCP);
-                }
-              };
-              window.addEventListener('message', clearOnFCP);
-            };
-            iframeRef.current.addEventListener('load', handleLoad, { once: true });
-          }
-        });
-
-      } catch (err) {
-        if (mounted) {
-          console.error('Initialization error:', err);
-          setError(err instanceof Error ? err.message : 'Failed to initialize sandbox');
-          setIsLoading(false);
-        }
+  // Handle visibility changes for auto-save
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && containerInstance?.container) {
+        autoSaveManager.saveNow(appId, containerInstance.container, displayName).catch(console.error);
       }
     };
 
-    initWebContainer();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [appId, containerInstance, displayName]);
 
-    return () => {
-      mounted = false;
-      setInstance(null);
-      if (cleanupMessageListener) cleanupMessageListener();
-      if (autosaveIntervalId) clearInterval(autosaveIntervalId);
-      if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
-      if (beforeUnloadHandler) window.removeEventListener('beforeunload', beforeUnloadHandler);
-      try {
-        if (webcontainerInstance) {
-          void persistNow(webcontainerInstance);
-        }
-      } catch {}
+  // Handle before unload for auto-save
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (containerInstance?.container) {
+        // Try to save synchronously (best effort)
+        const { exportAppVfs } = require('@/utils/multi-app-persistence');
+        exportAppVfs(containerInstance.container).then(vfs => {
+          multiAppPersistence.saveAppState(appId, vfs, displayName);
+        }).catch(() => {});
+      }
     };
-  }, []);
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [appId, containerInstance, displayName]);
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full bg-red-950/20 border border-red-800/30 rounded-lg">
-        <div className="text-center">
-          <div className="text-red-400 font-semibold mb-2">Error</div>
-          <div className="text-red-300 text-sm">{error}</div>
-        </div>
+      <div className={`flex flex-col items-center justify-center h-full bg-black text-white ${className}`}>
+        <div className="text-xl mb-4">⚠️ Container Error</div>
+        <div className="text-sm text-gray-400 max-w-md text-center">{error}</div>
+        <button
+          onClick={() => {
+            setError(null);
+            initContainer();
+          }}
+          className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded"
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full relative bg-transparent overflow-hidden">
-      {isLoading && (
-        <BootScreen
-          message={loadingStage || 'Preparing…'}
-          progress={progress}
-          complete={!isLoading && progress >= 100}
-        />
-      )}
-      <iframe
-        ref={iframeRef}
-        className={`w-full h-full border-0 opacity-0 will-change-[opacity,transform] transition-[opacity,transform] duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${isLoading ? 'scale-[0.995]' : 'opacity-100 scale-100'}`}
-        title="Preview"
-        sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts allow-downloads"
+    <>
+      <BootScreen
+        message={loadingStage}
+        progress={progress}
+        complete={!isLoading}
+        onExited={() => {
+          // Optional: any cleanup after boot screen exits
+        }}
       />
-      <style jsx>{`
-        .iframe-ready { opacity: 1; }
-      `}</style>
-    </div>
+      <div className={`w-full h-full ${isLoading ? 'invisible' : 'visible'} ${className}`}>
+        <iframe
+          ref={iframeRef}
+          className="w-full h-full border-0"
+          allow="cross-origin-isolated"
+          sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts allow-downloads"
+          title={`WebContainer App: ${displayName || appId}`}
+        />
+      </div>
+    </>
   );
+}
+
+// Legacy default export for backward compatibility
+export function DefaultWebContainer() {
+  return <WebContainer appId="default" displayName="Default Application" />;
 }
