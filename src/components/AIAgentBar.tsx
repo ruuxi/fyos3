@@ -770,6 +770,8 @@ export default function AIAgentBar() {
                       if (!input.trim()) return;
                       sendMessage({ text: input });
                       setInput('');
+                    } else if (e.key === 'Enter' && !e.shiftKey) {
+                      // Allow default behavior (new line)
                     }
                   }}
                   placeholder="Ask the AI agent… Try: 'Create a Notes app on the desktop and install zustand'"
