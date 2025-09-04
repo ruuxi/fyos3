@@ -59,5 +59,5 @@ These route through a message bridge and keep keys on the server.
   - TypeScript: `pnpm exec tsc --noEmit`
   - ESLint: for changed files only `pnpm exec eslint --max-warnings=0 <changed files>`
 - On failures, a diagnostic message with condensed logs is auto‑posted to the agent (no user click required). The agent can then fix the errors.
-- Preview errors: WebContainer is booted with `forwardPreviewErrors` and `src/components/WebContainer.tsx` dispatches a `wc-preview-error` event on uncaught exceptions/unhandled rejections. These are also auto‑posted (once per unique error) to the agent, and additionally shown as a compact UI alert.
+- Preview errors: WebContainer is booted with `forwardPreviewErrors` and `src/components/WebContainer.tsx` dispatches a `wc-preview-error` event on uncaught exceptions/unhandled rejections. These are auto‑posted (once per unique error) to the agent silently (no UI alert).
 - Manual trigger: The agent can explicitly call the `validate_project` tool (scope: `quick` or `full`) to run checks on demand.

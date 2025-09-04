@@ -7,7 +7,6 @@ import { Send, ChevronDown, MessageCircle } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
-import ChatAlert from './ChatAlert';
 import { enqueuePersist, persistNow } from '@/utils/vfs-persistence';
 
 export default function AIAgentBar() {
@@ -423,13 +422,7 @@ export default function AIAgentBar() {
   });
 
   // === Automatic diagnostics ===
-  // Preview error -> show alert and auto-post to AI once per unique error
-  const [previewAlert, setPreviewAlert] = useState<{
-    source: 'preview';
-    title: string;
-    description?: string;
-    content: string;
-  } | null>(null);
+  // Preview runtime errors are auto-posted (silent) once per unique error
 
   const changedFilesRef = useRef<Set<string>>(new Set());
   const validateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -463,13 +456,12 @@ export default function AIAgentBar() {
     }
   }
 
-  // Listen for preview runtime errors
+  // Listen for preview runtime errors (silent auto-post)
   useEffect(() => {
     const handler = (e: Event) => {
       const ce = e as CustomEvent;
       if (ce?.detail?.source === 'preview') {
         const detail = ce.detail as any;
-        setPreviewAlert(detail);
         const payload = detail?.content || detail?.description || '';
         if (payload) {
           const hash = stableHash(String(payload));
@@ -685,20 +677,6 @@ export default function AIAgentBar() {
                 <ChevronDown className="w-4 h-4" />
               </Button>
             </div>
-          </div>
-
-          {/* Alerts */}
-          <div className="px-4 pt-2 space-y-2">
-            {previewAlert && (
-              <ChatAlert
-                alert={previewAlert}
-                onAsk={(msg) => {
-                  void sendMessage({ text: msg });
-                  setPreviewAlert(null);
-                }}
-                onDismiss={() => setPreviewAlert(null)}
-              />
-            )}
           </div>
 
           {/* Messages */}
