@@ -1,5 +1,15 @@
+/* Technical execution engine
+  - Model: alibaba/qwen3-coder (specialized coding AI)
+  - Responsibilities:
+    - Handles actual coding/development tasks
+    - Has 15+ WebContainer tools (file system, process
+  execution, app creation)
+    - Operates as a "proactive engineering agent"
+    - Returns raw technical responses */
+
 import { convertToModelMessages, streamText, UIMessage, stepCountIs, tool } from 'ai';
 import { z } from 'zod';
+import { CODING_AGENT_SYSTEM_PROMPT } from '@/lib/aiPrompts';
 
 // Some tool actions (like package installs) may take longer than 30s
 export const maxDuration = 300;
@@ -13,6 +23,18 @@ export async function POST(req: Request) {
     toolCalls: 'toolCalls' in m && Array.isArray(m.toolCalls) ? m.toolCalls.length : 0
   })));
 
+  // Ensure messages is an array
+  if (!Array.isArray(messages)) {
+    console.error('❌ [AGENT] Messages is not an array:', messages);
+    return new Response('Invalid messages format', { status: 400 });
+  }
+
+  // Filter out system messages that were added by conversation layer
+  const filteredMessages = messages.filter(m => 
+    !(m.role === 'system' && 'content' in m && typeof m.content === 'string' && 
+      m.content.includes('receiving this request through a conversation layer'))
+  );
+
   const result = streamText({
     model: 'alibaba/qwen3-coder',
     providerOptions: {
@@ -20,7 +42,7 @@ export async function POST(req: Request) {
         order: ['cerebras', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
       },
     },
-    messages: convertToModelMessages(messages),
+    messages: convertToModelMessages(filteredMessages),
     stopWhen: stepCountIs(8),
     onFinish: (event) => {
       console.log('🎯 [AI] Response finished:', {
@@ -34,9 +56,12 @@ export async function POST(req: Request) {
       if (event.toolCalls?.length) {
         console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc: any) => ({
           name: tc.toolName,
-          args: tc.args,
+          args: tc.args || tc.input, // Use input if args is undefined
           id: tc.toolCallId?.substring(0, 8)
         })));
+        
+        // Debug: Log the raw tool call structure
+        console.log('🔍 [AI] Raw tool calls:', JSON.stringify(event.toolCalls, null, 2));
         
         // Log file operation details
         event.toolCalls.forEach((tc: any) => {
@@ -75,48 +100,9 @@ export async function POST(req: Request) {
           success: !tr.result?.error,
           id: tr.toolCallId?.substring(0, 8)
         })));
-        
-        // Log file operation results
-        event.toolResults.forEach((tr: any) => {
-          if (tr.toolName.startsWith('web_fs_') || ['create_app', 'remove_app', 'rename_app'].includes(tr.toolName)) {
-            const result = tr.result || {};
-            if (result.error) {
-              console.error(`❌ [AI-Result] ${tr.toolName.toUpperCase()} FAILED:`, result.error);
-            } else {
-              switch (tr.toolName) {
-                case 'web_fs_write':
-                  console.log(`✅ [AI-Result] WRITE SUCCESS: ${result.path} (${result.size || 'unknown size'})`);
-                  break;
-                case 'web_fs_read':
-                  console.log(`✅ [AI-Result] READ SUCCESS: ${result.path} (${result.size || 'unknown size'})`);
-                  break;
-                case 'create_app':
-                  console.log(`✅ [AI-Result] APP CREATED: "${result.name}" at ${result.path}`);
-                  break;
-                case 'remove_app':
-                  console.log(`✅ [AI-Result] APP REMOVED: "${result.name}" (${result.id})`);
-                  break;
-                case 'rename_app':
-                  console.log(`✅ [AI-Result] APP RENAMED: "${result.oldName}" -> "${result.newName}"`);
-                  break;
-              }
-            }
-          }
-        });
       }
     },
-    system:
-      [
-        'You are a proactive engineering agent operating inside a WebContainer-powered workspace.',
-        'You can read and modify files, create apps, and run package installs/commands.',
-        'Always follow this loop: 1) find files 2) plan 3) execute 4) report.',
-        'Project is a Vite React app: source in src/, public assets in public/.',
-        'When creating apps: place code in src/apps/<id>/index.tsx and update public/apps/registry.json with path /src/apps/<id>/index.tsx.',
-        'HOW TO USE AI IN APPS:\n- Image (FAL): import { callFluxSchnell } from "/src/ai"; await callFluxSchnell({ prompt: "a cat photo" }).\n- Explicit model: import { callFal } from "/src/ai"; await callFal("fal-ai/flux-1/schnell", { prompt: "..." }).\n- Music (ElevenLabs): import { composeMusic } from "/src/ai"; await composeMusic({ prompt: "intense electronic track", musicLengthMs: 60000 }).\nThese route through the message bridge and server proxies (/api/ai/fal, /api/ai/eleven); keys stay on the server.',
-        'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.',
-        'When you need dependencies, use the web_exec tool to run package manager commands (e.g., pnpm add <pkg>, pnpm install). Wait for the web_exec result (which includes exitCode) before proceeding to the next step.',
-        'If an install command fails (non-zero exitCode), report the error and suggest a fix or an alternative.'
-      ].join(' '),
+    system: CODING_AGENT_SYSTEM_PROMPT,
     tools: {
       // Step 1 – file discovery
       web_fs_find: {

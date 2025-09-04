@@ -1,11 +1,11 @@
 /* Base variables and layout */
-:root{--bar:#f6f6f6;--text:#111;--muted:#6b7280;--bg:#0b1020;--glass:rgba(255,255,255,0.25);--dock:rgba(255,255,255,0.3);}
+:root{--bar:#0a0d12;--text:#f5f5f5;--muted:#9ca3af;--bg:#0a0d12;--glass:rgba(255,255,255,0.1);--dock:rgba(255,255,255,0.1);}
 *{box-sizing:border-box}
 body{font-family:Inter,ui-sans-serif,system-ui,Arial}
-.desktop{height:100%;position:relative;color:#111;overflow:hidden}
-.wallpaper{position:absolute;inset:0;background:linear-gradient(135deg,#0b1020 0%,#1e2760 60%,#462e7e 100%)}
-.menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(255,255,255,.65),rgba(255,255,255,.3));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.35)}
-.menubar .title{font-weight:600;font-size:12px}
+.desktop{height:100%;position:relative;color:#f5f5f5;overflow:hidden}
+.wallpaper{position:absolute;inset:0;background:radial-gradient(120% 120% at 50% 0%, #0a0d12 0%, #070a0f 55%, #05070b 100%)}
+.menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(10,13,18,.85),rgba(7,10,15,.65));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.15)}
+.menubar .title{font-weight:600;font-size:12px;color:var(--text)}
 .menubar .right{margin-left:auto;font-size:12px;color:var(--muted)}
 
 /* Dock removed */
@@ -27,19 +27,19 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .desktop-icon .glyph{font-size:36px;line-height:36px}
 
 /* Window */
-.window{position:absolute;top:90px;left:90px;min-width:280px;min-height:160px;background:white;border-radius:10px;box-shadow:0 15px 40px rgba(0,0,0,.25);overflow:hidden;border:1px solid rgba(0,0,0,.08);will-change:transform,opacity}
+.window{position:absolute;top:90px;left:90px;min-width:280px;min-height:160px;background:#12151b;border-radius:10px;box-shadow:0 15px 40px rgba(0,0,0,.45);overflow:hidden;border:1px solid rgba(255,255,255,.1);will-change:transform,opacity}
 .window.opening{animation:mac-window-open-spring .34s cubic-bezier(.2,.8,.2,1)}
 .window.closing{animation:mac-window-close .22s cubic-bezier(.2,.8,.2,1) forwards}
 .window.minimizing{animation:mac-window-minimize .22s cubic-bezier(.2,.8,.2,1) forwards}
 .window.minimized{opacity:0;transform:translateY(8px) scale(.92);pointer-events:none;visibility:hidden}
-.window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(255,255,255,.9),rgba(255,255,255,.65));border-bottom:1px solid rgba(0,0,0,.07);cursor:move}
+.window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(10,13,18,.9),rgba(7,10,15,.75));border-bottom:1px solid rgba(255,255,255,.1);cursor:move}
 .traffic{display:flex;gap:6px;margin-right:6px}
 .traffic .b{width:12px;height:12px;border-radius:50%}
 .b.red{background:#ff5f57}
 .b.yellow{background:#febc2e}
 .b.green{background:#28c840}
-.window .title{font-weight:600;font-size:12px;color:#222}
-.window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:12px;font-size:14px;color:#1f2937;overflow:auto}
+.window .title{font-weight:600;font-size:12px;color:#f5f5f5}
+.window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:12px;font-size:14px;color:#e5e7eb;overflow:auto}
 
 @keyframes mac-window-open-spring{
   0%{opacity:0;transform:translateY(10px) scale(.92)}
