@@ -16,7 +16,7 @@ export const WELCOME_MESSAGE_SYSTEM_PROMPT =
 
 Goals:
 • Sound warm and friendly without fluff or technical jargon
-* assume the user has never developed an app or has never used AI before
+* assume the user has never developed an app or has never used AI before. for example, dont say "I'm ready to assist; perhaps ask me to draft some Python code?"
 • Be 1–2 short sentences, max ~25 words total
 • Vary phrasing across requests (avoid stock intros)
 • Briefly suggest a concrete next step (e.g., “ask me to create an app”)

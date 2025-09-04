@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, ChevronDown, MessageCircle, ArrowDown, Square } from 'lucide-react';
+import { Send, ChevronDown, MessageCircle, ArrowDown, Square, MoreHorizontal } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
@@ -19,8 +19,11 @@ export default function AIAgentBar() {
   const [latestMessageId, setLatestMessageId] = useState<string | null>(null);
   const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
   const [welcomeLoaded, setWelcomeLoaded] = useState(false);
+  const [showAllMessages, setShowAllMessages] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const previousMessageCount = useRef(0);
+  const MESSAGE_LIMIT = 15;
   
   // TODO(human): Add user preference learning system here
   // Consider implementing adaptive scroll behavior based on user patterns:
@@ -397,6 +400,37 @@ export default function AIAgentBar() {
     },
   });
 
+  // Track typing status based on streaming state
+  useEffect(() => {
+    setIsTyping(status === 'streaming' || status === 'submitted');
+  }, [status]);
+
+  // Enhanced messages with timestamps
+  const enhancedMessages = useMemo(() => {
+    return messages.map(msg => ({
+      ...msg,
+      timestamp: new Date().toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      })
+    }));
+  }, [messages]);
+
+  // Messages to display (limited or all)
+  const displayMessages = useMemo(() => {
+    if (showAllMessages || enhancedMessages.length <= MESSAGE_LIMIT) {
+      return enhancedMessages;
+    }
+    return enhancedMessages.slice(-MESSAGE_LIMIT);
+  }, [enhancedMessages, showAllMessages]);
+
+  // Check if messages are from the same sender and within 1 minute
+  const shouldGroupMessage = (currentMsg: any, prevMsg: any) => {
+    if (!prevMsg) return false;
+    return currentMsg.role === prevMsg.role;
+  };
+
   // Load a friendly welcome message on first open, cache in localStorage
   useEffect(() => {
     const STORAGE_KEY = 'fyos_agent_welcome_message';
@@ -722,82 +756,142 @@ export default function AIAgentBar() {
           <div 
             ref={messagesContainerRef}
             onScroll={checkScrollPosition}
-            className="max-h-72 overflow-auto px-4 pt-2 space-y-3 relative custom-scrollbar"
+            className="max-h-96 overflow-auto px-4 pt-3 pb-2 relative custom-scrollbar"
             style={{
               scrollbarWidth: 'thin',
-              scrollbarColor: 'rgba(96, 165, 250, 0.3) transparent'
+              scrollbarColor: 'rgba(255, 255, 255, 0.1) transparent'
             }}
           >
-            {messages.length === 0 && welcomeMessage && (
-              <div className="text-sm transition-all duration-500">
-                <div className="font-semibold text-[#7dd3fc] mb-1">Agent</div>
-                <div className="space-y-2">
-                  <div className="whitespace-pre-wrap text-white/90">{welcomeMessage}</div>
-                </div>
-              </div>
-            )}
-            {messages.map(m => (
-              <div 
-                key={m.id} 
-                className={`text-sm transition-all duration-500 ${m.id === latestMessageId && m.role === 'assistant' ? 'bg-[rgba(96,165,250,0.1)] -mx-2 px-2 py-1 rounded-lg border-l-2 border-[#60a5fa]' : ''}`}
-              >
-                <div className="font-semibold text-[#7dd3fc] mb-1">{m.role === 'user' ? 'You' : 'Agent'}</div>
-                <div className="space-y-2">
-                  {m.parts.map((part, index) => {
-                    switch (part.type) {
-                      case 'text':
-                        return (
-                          <div key={index} className="whitespace-pre-wrap text-white/90">{part.text}</div>
-                        );
-                      case 'tool-submit_plan': {
-                        const id = (part as { toolCallId: string }).toolCallId;
-                        if (part.state === 'output-available') {
-                          return (
-                            <div key={id} className="rounded-md border border-white/20 bg-[rgba(125,211,252,0.1)] text-white p-2">
-                              <div className="font-medium text-[#7dd3fc]">Plan</div>
-                              <ul className="list-disc pl-5 text-sm text-white/90">
-                                {(part.output as { steps?: string[] } | undefined)?.steps?.map((s: string, i: number) => (
-                                  <li key={i}>{s}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }
-                      case 'tool-web_fs_find':
-                      case 'tool-web_fs_read':
-                      case 'tool-web_fs_write':
-                      case 'tool-web_fs_mkdir':
-                      case 'tool-web_fs_rm':
-                      case 'tool-web_exec':
-                      case 'tool-create_app': {
-                        // Hide tool calls from user - they execute silently in background
-                        return null;
-                      }
-                    }
-                  })}
-                </div>
-              </div>
-            ))}
-            
-            {/* Scroll to bottom button */}
-            {showScrollToBottom && (
-              <div className="sticky bottom-2 right-2 flex justify-end pointer-events-none">
-                <Button
-                  onClick={() => scrollToBottom()}
-                  variant="ghost"
-                  size="sm"
-                  className={`pointer-events-auto p-2 h-auto bg-[#60a5fa]/90 text-white hover:bg-[#7dd3fc] shadow-[0_0_12px_rgba(96,165,250,0.5)] border-0 rounded-full transition-all duration-200 hover:scale-105 ${hasNewMessage ? 'animate-pulse' : ''}`}
+            {/* Load earlier messages button */}
+            {!showAllMessages && enhancedMessages.length > MESSAGE_LIMIT && (
+              <div className="flex justify-center mb-4">
+                <button
+                  onClick={() => setShowAllMessages(true)}
+                  className="text-xs text-white/50 hover:text-white/70 transition-colors duration-200 flex items-center gap-1"
                 >
-                  <ArrowDown className="w-4 h-4" />
-                  {hasNewMessage && (
-                    <span className="absolute -top-1 -right-1 bg-[#7dd3fc] text-xs rounded-full w-2 h-2 animate-pulse" />
-                  )}
-                </Button>
+                  <MoreHorizontal className="w-3 h-3" />
+                  Load earlier messages
+                </button>
               </div>
             )}
+
+            {/* Welcome message */}
+            {messages.length === 0 && welcomeMessage && (
+              <div className="flex justify-start mb-4 animate-in fade-in duration-500">
+                <div className="max-w-[70%]">
+                  <div className="bg-white/5 rounded-2xl rounded-tl-sm px-4 py-2.5 backdrop-blur-sm border border-white/10">
+                    <div className="text-sm text-white/90 leading-relaxed">{welcomeMessage}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Messages */}
+            <div className="space-y-2">
+              {displayMessages.map((m, idx) => {
+                const prevMessage = displayMessages[idx - 1];
+                const isGrouped = shouldGroupMessage(m, prevMessage);
+                const isUser = m.role === 'user';
+                
+                return (
+                  <div
+                    key={m.id}
+                    className={`flex ${isUser ? 'justify-end' : 'justify-start'} ${isGrouped ? 'mt-0.5' : 'mt-3'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+                  >
+                    <div className={`group max-w-[70%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
+                      <div 
+                        className={`
+                          relative px-4 py-2.5 rounded-2xl backdrop-blur-sm
+                          ${isUser 
+                            ? 'bg-[#60a5fa]/90 text-white rounded-br-sm' 
+                            : 'bg-white/5 text-white/90 rounded-tl-sm border border-white/10'
+                          }
+                          ${m.id === latestMessageId && !isUser ? 'ring-1 ring-[#60a5fa]/30' : ''}
+                        `}
+                      >
+                        {/* Message content */}
+                        <div className="space-y-2">
+                          {m.parts.map((part, index) => {
+                            switch (part.type) {
+                              case 'text':
+                                return (
+                                  <div key={index} className="text-sm leading-relaxed whitespace-pre-wrap">
+                                    {part.text}
+                                  </div>
+                                );
+                              case 'tool-submit_plan': {
+                                const id = (part as { toolCallId: string }).toolCallId;
+                                if (part.state === 'output-available') {
+                                  return (
+                                    <div key={id} className="rounded-lg bg-black/20 p-3 mt-2">
+                                      <div className="font-medium text-[#7dd3fc] text-xs mb-2">Plan</div>
+                                      <ul className="list-disc pl-4 text-xs space-y-1 text-white/80">
+                                        {(part.output as { steps?: string[] } | undefined)?.steps?.map((s: string, i: number) => (
+                                          <li key={i}>{s}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }
+                              case 'tool-web_fs_find':
+                              case 'tool-web_fs_read':
+                              case 'tool-web_fs_write':
+                              case 'tool-web_fs_mkdir':
+                              case 'tool-web_fs_rm':
+                              case 'tool-web_exec':
+                              case 'tool-create_app': {
+                                return null;
+                              }
+                            }
+                          })}
+                        </div>
+                      </div>
+                      {/* Timestamp on hover */}
+                      <div className={`
+                        mt-1 text-[10px] text-white/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                        ${isUser ? 'text-right pr-1' : 'text-left pl-1'}
+                      `}>
+                        {(m as any).timestamp}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Typing indicator */}
+            {isTyping && (
+              <div className="flex justify-start mt-2 animate-in fade-in duration-300">
+                <div className="bg-white/5 rounded-2xl rounded-tl-sm px-4 py-3 backdrop-blur-sm border border-white/10">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
           </div>
+
+          {/* Scroll to bottom button - outside messages container */}
+          {showScrollToBottom && (
+            <div className="absolute bottom-20 right-6 z-10">
+              <Button
+                onClick={() => scrollToBottom()}
+                variant="ghost"
+                size="sm"
+                className={`p-2 h-auto bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 border border-white/20 rounded-full transition-all duration-200 hover:scale-105 ${hasNewMessage ? 'animate-pulse' : ''}`}
+              >
+                <ArrowDown className="w-3 h-3" />
+                {hasNewMessage && (
+                  <span className="absolute -top-1 -right-1 bg-[#60a5fa] text-xs rounded-full w-2 h-2 animate-pulse" />
+                )}
+              </Button>
+            </div>
+          )}
 
           {/* Input Bar */}
           <form onSubmit={onSubmit} className="p-4 border-t border-white/10">
@@ -816,14 +910,11 @@ export default function AIAgentBar() {
                       // Allow default behavior (new line)
                     }
                   }}
-                  placeholder="Ask the AI agent… Try: 'Create a Notes app on the desktop and install zustand'"
-                  className="min-h-[40px] max-h-32 resize-none pr-12 bg-[rgba(5,7,11,0.5)] border-white/20 text-white placeholder:text-white/50 focus-visible:border-[#60a5fa]/50 focus-visible:ring-[#60a5fa]/20"
+                  placeholder="Type a message..."
+                  className="min-h-[40px] max-h-32 resize-none bg-[rgba(5,7,11,0.5)] border-white/20 text-white placeholder:text-white/40 focus-visible:border-[#60a5fa]/50 focus-visible:ring-[#60a5fa]/20 transition-all duration-200"
                   rows={1}
                   disabled={status === 'submitted' || status === 'streaming'}
                 />
-                <div className="absolute right-2 bottom-2 text-xs text-gray-400">
-                  {input.length > 0 && status === 'ready' ? `${input.length} chars` : ''}
-                </div>
               </div>
 
               <Button 
