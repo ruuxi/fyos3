@@ -113,10 +113,8 @@ export async function POST(req: Request) {
         'Project is a Vite React app: source in src/, public assets in public/.',
         'When creating apps: place code in src/apps/<id>/index.tsx and update public/apps/registry.json with path /src/apps/<id>/index.tsx.',
         'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.',
-        // Package install + feedback (mimic bolt-diy):
         'When you need dependencies, use the web_exec tool to run package manager commands (e.g., pnpm add <pkg>, pnpm install). Wait for the web_exec result (which includes exitCode) before proceeding to the next step.',
-        'If an install command fails (non-zero exitCode), report the error and suggest a fix or an alternative.',
-        'After a successful install, immediately proceed to generate the required files and update public/apps/registry.json in the same turn whenever possible.'
+        'If an install command fails (non-zero exitCode), report the error and suggest a fix or an alternative.'
       ].join(' '),
     tools: {
       // Step 1 – file discovery

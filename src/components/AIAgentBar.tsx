@@ -13,8 +13,6 @@ export default function AIAgentBar() {
   const [input, setInput] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pendingToolPromises = useRef(new Set<Promise<void>>());
-  // Ensure tool calls execute sequentially (mimics bolt-diy action runner queue)
-  const execQueueRef = useRef<Promise<void>>(Promise.resolve());
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
 
   // Keep latest instance and fs helpers in refs so tool callbacks don't capture stale closures
@@ -171,14 +169,7 @@ export default function AIAgentBar() {
               console.log(`🔧 [Agent] web_exec: ${fullCommand} ${cwd ? `(cwd: ${cwd})` : ''}`);
               let result = await fnsRef.current.spawn(command, args, { cwd });
 
-              // Fallback: if command not found (exit 127), try mapping pnpm->npm where possible
-              if (result.exitCode === 127 && /^(pnpm)$/i.test(command) && isInstallLike) {
-                console.warn('⚠️ [Agent] pnpm not found; retrying with npm');
-                const mapped = ['install', ...args.slice(1)];
-                command = 'npm';
-                args = mapped;
-                result = await fnsRef.current.spawn(command, args, { cwd });
-              }
+              // No package manager fallback to keep behavior strict
               console.log(`📊 [Agent] web_exec result: exit ${result.exitCode}, output ${result.output.length} chars`);
 
               // Avoid flooding LLM with huge logs; compact install/update outputs
@@ -308,16 +299,10 @@ export default function AIAgentBar() {
         }
       };
 
-      // Chain into a single execution queue so tools run one at a time
-      const p = execQueueRef.current = execQueueRef.current
-        .catch(() => {})
-        .then(task)
-        .finally(() => {
-          // remove resolved task handle from local tracker
-          pendingToolPromises.current.delete(p);
-        });
-
+      // Run tool asynchronously without global queueing
+      const p = (async () => { await task(); })();
       pendingToolPromises.current.add(p);
+      p.finally(() => pendingToolPromises.current.delete(p));
     },
   });
 
