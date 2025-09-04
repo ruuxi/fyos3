@@ -409,11 +409,17 @@ export default function AIAgentBar() {
     try {
       if (validateTimerRef.current) clearTimeout(validateTimerRef.current);
     } catch {}
-    validateTimerRef.current = setTimeout(() => {
+    const scheduleRun = () => {
+      // Defer validation if the agent is mid-fix to avoid spamming
+      if (autoPostBusyRef.current || status !== 'ready') {
+        validateTimerRef.current = setTimeout(scheduleRun, 700);
+        return;
+      }
       const paths = Array.from(changedFilesRef.current);
       changedFilesRef.current.clear();
       void runValidation('quick', paths);
-    }, 700);
+    };
+    validateTimerRef.current = setTimeout(scheduleRun, 700);
   }
 
   async function runValidation(scope: 'quick' | 'full', changed: string[] = []) {
@@ -422,26 +428,39 @@ export default function AIAgentBar() {
     validateRunningRef.current = true;
     try {
       const logs: string[] = [];
-      // TypeScript quick check
+      // TypeScript quick check (only surface likely breaking diagnostics)
       try {
-        const tsc = await fnsRef.current.spawn('pnpm', ['exec', 'tsc', '--noEmit']);
+        const tsc = await fnsRef.current.spawn('pnpm', ['exec', 'tsc', '--noEmit', '--pretty', 'false']);
         if (tsc.exitCode !== 0) {
-          logs.push(`[TypeScript] exit=${tsc.exitCode}\n${trimForChat(tsc.output)}`);
+          const breakingTS = extractBreakingTSErrors(tsc.output);
+          if (breakingTS) {
+            logs.push(`[TypeScript] ${breakingTS}`);
+          }
         }
-      } catch (e: any) {
-        logs.push(`[TypeScript] failed to run: ${e?.message || String(e)}`);
+      } catch (e) {
+        logs.push(`[TypeScript] failed to run: ${e instanceof Error ? e.message : String(e)}`);
       }
 
       // ESLint for changed files only
       const lintTargets = changed.filter((p) => /\.(ts|tsx|js|jsx)$/.test(p));
       if (lintTargets.length > 0) {
         try {
-          const eslint = await fnsRef.current.spawn('pnpm', ['exec', 'eslint', '--max-warnings=0', ...lintTargets]);
+          const eslint = await fnsRef.current.spawn('pnpm', [
+            'exec',
+            'eslint',
+            '--format',
+            'json',
+            '--max-warnings=0',
+            ...lintTargets,
+          ]);
           if (eslint.exitCode !== 0) {
-            logs.push(`[ESLint] exit=${eslint.exitCode}\n${trimForChat(eslint.output)}`);
+            const breakingLint = extractBreakingESLint(JSONSafe(eslint.output));
+            if (breakingLint) {
+              logs.push(`[ESLint] ${breakingLint}`);
+            }
           }
-        } catch (e: any) {
-          logs.push(`[ESLint] failed to run: ${e?.message || String(e)}`);
+        } catch (e) {
+          logs.push(`[ESLint] failed to run: ${e instanceof Error ? e.message : String(e)}`);
         }
       }
 
@@ -475,6 +494,65 @@ export default function AIAgentBar() {
   function trimForChat(s: string): string {
     const maxChars = 8000;
     return s.length > maxChars ? `${s.slice(0, 4000)}\n...\n${s.slice(-3500)}` : s;
+  }
+
+  function JSONSafe(output: string): string {
+    // Some tools may print leading logs; attempt to locate JSON array start
+    const start = output.indexOf('[');
+    const end = output.lastIndexOf(']');
+    if (start !== -1 && end !== -1 && end > start) {
+      return output.slice(start, end + 1);
+    }
+    return '[]';
+  }
+
+  function extractBreakingESLint(jsonOutput: string): string | null {
+    try {
+      const reports: Array<{
+        filePath: string;
+        messages: Array<{ ruleId: string | null; fatal?: boolean; severity: number; message: string; line?: number; column?: number }>;
+      }> = JSON.parse(jsonOutput);
+      const breaking: string[] = [];
+      for (const rep of reports) {
+        for (const m of rep.messages) {
+          const isParsing = m.fatal === true || m.ruleId === null || /Parsing error/i.test(m.message);
+          if (isParsing) {
+            breaking.push(`${rep.filePath}:${m.line ?? 0}:${m.column ?? 0} ${m.message}`);
+          }
+        }
+      }
+      if (breaking.length > 0) {
+        const body = breaking.slice(0, 25).join('\n');
+        return `Parsing errors detected (likely breaking):\n${trimForChat(body)}`;
+      }
+      return null;
+    } catch {
+      // Fallback: if JSON parse fails, do not surface to avoid noise
+      return null;
+    }
+  }
+
+  function extractBreakingTSErrors(tscOutput: string): string | null {
+    // Only promote syntax/parse and module resolution errors; ignore style/type-safety (e.g., noImplicitAny)
+    // Syntax-like TS codes commonly in 1000-1199 range; also include TS2307 (Cannot find module)
+    const lines = tscOutput.split(/\r?\n/);
+    const selected: string[] = [];
+    const codeRe = /error\s+TS(\d+):\s*(.*)/i;
+    for (const line of lines) {
+      const m = line.match(codeRe);
+      if (!m) continue;
+      const code = parseInt(m[1], 10);
+      const msg = m[2] || '';
+      const isSyntax = code >= 1000 && code < 1200; // rough bucket for parsing errors
+      const isModule = code === 2307; // Cannot find module
+      if (isSyntax || isModule) {
+        selected.push(`TS${code}: ${msg}`);
+      }
+    }
+    if (selected.length > 0) {
+      return selected.slice(0, 25).join('\n');
+    }
+    return null;
   }
 
   const onSubmit = (e: React.FormEvent) => {
