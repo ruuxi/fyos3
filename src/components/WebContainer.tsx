@@ -130,18 +130,51 @@ export default function WebContainer() {
 
         // Boot WebContainer
         const instance = await WebContainerAPI.boot({
-          coep: 'credentialless', 
-          workdirName: 'project' 
-        });
+          coep: 'credentialless',
+          workdirName: 'project',
+          // Forward uncaught exceptions/unhandled rejections from preview iframes
+          // so we can surface them in the chat and ask the AI to fix
+          forwardPreviewErrors: true as any,
+        } as any);
         
         if (!mounted) return;
         setWebcontainerInstance(instance);
         setProgress((p) => Math.max(p, 18));
-        
+
         // Store instance globally for API access
         if (typeof window !== 'undefined') {
           (global as any).webcontainerInstance = instance;
         }
+
+        // Listen for preview errors (uncaught exceptions / unhandled promise rejections)
+        try {
+          (instance as any).on?.('preview-message', (message: any) => {
+            try {
+              if (
+                message?.type === 'PREVIEW_UNCAUGHT_EXCEPTION' ||
+                message?.type === 'PREVIEW_UNHANDLED_REJECTION'
+              ) {
+                const isPromise = message?.type === 'PREVIEW_UNHANDLED_REJECTION';
+                const title = isPromise ? 'Unhandled Promise Rejection' : 'Uncaught Exception';
+                const description = message?.message || 'Unknown error';
+                const loc = `${message?.pathname || ''}${message?.search || ''}${message?.hash || ''}`;
+                const port = message?.port ? `Port: ${message.port}` : '';
+                const stack = message?.stack || '';
+
+                const detail = {
+                  source: 'preview' as const,
+                  title,
+                  description,
+                  content: `Error at ${loc}\n${port}\n\nStack trace:\n${stack}`,
+                };
+                // Dispatch a DOM event so other components (Agent bar) can show an alert
+                window.dispatchEvent(
+                  new CustomEvent('wc-preview-error', { detail })
+                );
+              }
+            } catch {}
+          });
+        } catch {}
         setLoadingStage('Preparing workspace…');
         setProgress((p) => Math.max(p, 26));
 

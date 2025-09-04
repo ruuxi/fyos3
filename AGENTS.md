@@ -42,3 +42,11 @@
 - create_app: Scaffold an app entry in `src/apps/<id>` and update registry
 - rename_app: Rename app in registry by id
 - remove_app: Remove app folder and registry entry
+
+## Automatic Validation & Self‑Healing
+- After any file change (`web_fs_write`, `web_fs_mkdir`, `web_fs_rm`, app scaffold edits), a debounced validator runs:
+  - TypeScript: `pnpm exec tsc --noEmit`
+  - ESLint: for changed files only `pnpm exec eslint --max-warnings=0 <changed files>`
+- On failures, a diagnostic message with condensed logs is auto‑posted to the agent (no user click required). The agent can then fix the errors.
+- Preview errors: WebContainer is booted with `forwardPreviewErrors` and `src/components/WebContainer.tsx` dispatches a `wc-preview-error` event on uncaught exceptions/unhandled rejections. These are also auto‑posted (once per unique error) to the agent, and additionally shown as a compact UI alert.
+- Manual trigger: The agent can explicitly call the `validate_project` tool (scope: `quick` or `full`) to run checks on demand.

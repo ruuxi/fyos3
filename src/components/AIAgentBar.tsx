@@ -7,6 +7,7 @@ import { Send, ChevronDown, MessageCircle } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
+import ChatAlert from './ChatAlert';
 import { enqueuePersist, persistNow } from '@/utils/vfs-persistence';
 
 export default function AIAgentBar() {
@@ -96,6 +97,9 @@ export default function AIAgentBar() {
               await fnsRef.current.writeFile(path, content);
               addToolResult({ tool: 'web_fs_write', toolCallId: tc.toolCallId, output: { ok: true, path, size: `${sizeKB}KB` } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              // schedule validation and preview refresh
+              recordChange(path);
+              scheduleDevRefresh(600);
               break;
             }
             case 'web_fs_mkdir': {
@@ -104,6 +108,7 @@ export default function AIAgentBar() {
               await fnsRef.current.mkdir(path, recursive);
               addToolResult({ tool: 'web_fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange(path);
               break;
             }
             case 'web_fs_rm': {
@@ -112,6 +117,7 @@ export default function AIAgentBar() {
               await fnsRef.current.remove(path, { recursive });
               addToolResult({ tool: 'web_fs_rm', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange(path);
               break;
             }
             case 'web_exec': {
@@ -263,6 +269,9 @@ export default function AIAgentBar() {
               console.log(`✅ [Agent] App created: ${name} (${id})`);
               addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base, name, icon: metadata.icon } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange(`${base}/index.tsx`);
+              recordChange('public/apps/registry.json');
+              scheduleDevRefresh(800);
               break;
             }
             case 'rename_app': {
@@ -278,6 +287,7 @@ export default function AIAgentBar() {
               console.log(`✅ [Agent] App renamed: "${oldName}" -> "${name}"`);
               addToolResult({ tool: 'rename_app', toolCallId: tc.toolCallId, output: { ok: true, id, oldName, newName: name } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange('public/apps/registry.json');
               break;
             }
             case 'remove_app': {
@@ -302,6 +312,14 @@ export default function AIAgentBar() {
               console.log(`✅ [Agent] App removed: "${appName}" (${id})`);
               addToolResult({ tool: 'remove_app', toolCallId: tc.toolCallId, output: { ok: true, id, name: appName, removedPaths: [p1, p2] } });
               try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange('public/apps/registry.json');
+              break;
+            }
+            case 'validate_project': {
+              const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
+              console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
+              await runValidation(scope, files);
+              addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true } });
               break;
             }
             default:
@@ -320,6 +338,144 @@ export default function AIAgentBar() {
       p.finally(() => pendingToolPromises.current.delete(p));
     },
   });
+
+  // === Automatic diagnostics ===
+  // Preview error -> show alert and auto-post to AI once per unique error
+  const [previewAlert, setPreviewAlert] = useState<{
+    source: 'preview';
+    title: string;
+    description?: string;
+    content: string;
+  } | null>(null);
+
+  const changedFilesRef = useRef<Set<string>>(new Set());
+  const validateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const validateRunningRef = useRef(false);
+  const lastErrorHashRef = useRef<string | null>(null);
+  const autoPostBusyRef = useRef(false);
+
+  function stableHash(s: string): string {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = (h << 5) - h + s.charCodeAt(i);
+      h |= 0;
+    }
+    return String(h);
+  }
+
+  async function autoPostDiagnostic(content: string) {
+    if (autoPostBusyRef.current) return;
+    autoPostBusyRef.current = true;
+    try {
+      await sendMessage({ text: content });
+    } finally {
+      const release = () => {
+        if (status === 'ready') {
+          autoPostBusyRef.current = false;
+        } else {
+          setTimeout(release, 300);
+        }
+      };
+      release();
+    }
+  }
+
+  // Listen for preview runtime errors
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (ce?.detail?.source === 'preview') {
+        const detail = ce.detail as any;
+        setPreviewAlert(detail);
+        const payload = detail?.content || detail?.description || '';
+        if (payload) {
+          const hash = stableHash(String(payload));
+          if (hash !== lastErrorHashRef.current) {
+            lastErrorHashRef.current = hash;
+            void autoPostDiagnostic(
+              `Preview runtime error detected automatically. Please diagnose and fix.\n\n\`\`\`txt\n${payload}\n\`\`\`\n`,
+            );
+          }
+        }
+      }
+    };
+    window.addEventListener('wc-preview-error', handler as EventListener);
+    return () => window.removeEventListener('wc-preview-error', handler as EventListener);
+  }, [status]);
+
+  function recordChange(path: string) {
+    if (!path) return;
+    changedFilesRef.current.add(path);
+    try {
+      if (validateTimerRef.current) clearTimeout(validateTimerRef.current);
+    } catch {}
+    validateTimerRef.current = setTimeout(() => {
+      const paths = Array.from(changedFilesRef.current);
+      changedFilesRef.current.clear();
+      void runValidation('quick', paths);
+    }, 700);
+  }
+
+  async function runValidation(scope: 'quick' | 'full', changed: string[] = []) {
+    if (!instanceRef.current) return;
+    if (validateRunningRef.current) return;
+    validateRunningRef.current = true;
+    try {
+      const logs: string[] = [];
+      // TypeScript quick check
+      try {
+        const tsc = await fnsRef.current.spawn('pnpm', ['exec', 'tsc', '--noEmit']);
+        if (tsc.exitCode !== 0) {
+          logs.push(`[TypeScript] exit=${tsc.exitCode}\n${trimForChat(tsc.output)}`);
+        }
+      } catch (e: any) {
+        logs.push(`[TypeScript] failed to run: ${e?.message || String(e)}`);
+      }
+
+      // ESLint for changed files only
+      const lintTargets = changed.filter((p) => /\.(ts|tsx|js|jsx)$/.test(p));
+      if (lintTargets.length > 0) {
+        try {
+          const eslint = await fnsRef.current.spawn('pnpm', ['exec', 'eslint', '--max-warnings=0', ...lintTargets]);
+          if (eslint.exitCode !== 0) {
+            logs.push(`[ESLint] exit=${eslint.exitCode}\n${trimForChat(eslint.output)}`);
+          }
+        } catch (e: any) {
+          logs.push(`[ESLint] failed to run: ${e?.message || String(e)}`);
+        }
+      }
+
+      // Optional full build (heavier)
+      if (scope === 'full') {
+        try {
+          const build = await fnsRef.current.spawn('pnpm', ['run', 'build']);
+          if (build.exitCode !== 0) {
+            logs.push(`[Build] exit=${build.exitCode}\n${trimForChat(build.output)}`);
+          }
+        } catch (e: unknown) {
+          logs.push(`[Build] failed to run: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      const final = logs.filter(Boolean).join('\n\n');
+      if (final.trim().length > 0) {
+        const hash = stableHash(final);
+        if (hash !== lastErrorHashRef.current) {
+          lastErrorHashRef.current = hash;
+          await autoPostDiagnostic(
+            `Automatic checks found issues after recent changes (${changed.join(', ')}). Please fix.\n\n\`\`\`txt\n${final}\n\`\`\`\n`,
+          );
+        }
+      }
+    } finally {
+      validateRunningRef.current = false;
+    }
+  }
+
+  function trimForChat(s: string): string {
+    const maxChars = 8000;
+    return s.length > maxChars ? `${s.slice(0, 4000)}\n...\n${s.slice(-3500)}` : s;
+  }
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -368,6 +524,20 @@ export default function AIAgentBar() {
                 <ChevronDown className="w-4 h-4" />
               </Button>
             </div>
+          </div>
+
+          {/* Alerts */}
+          <div className="px-4 pt-2 space-y-2">
+            {previewAlert && (
+              <ChatAlert
+                alert={previewAlert}
+                onAsk={(msg) => {
+                  void sendMessage({ text: msg });
+                  setPreviewAlert(null);
+                }}
+                onDismiss={() => setPreviewAlert(null)}
+              />
+            )}
           </div>
 
           {/* Messages */}
