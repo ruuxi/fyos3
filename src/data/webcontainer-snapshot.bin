@@ -1,4 +1,4 @@
-¡d‡¨app.html¡f¡cÅ¤<!doctype html>
+¡d‰¨app.html¡f¡cÅ¤<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -124,7 +124,7 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
-</html>¬package.json¡f¡cÅŸ{
+</html>¬package.json¡f¡cÅ÷{
   "name": "mac-desktop",
   "private": true,
   "version": "0.0.0",
@@ -142,6 +142,9 @@
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.10",
     "vite": "^5.0.8"
   }
 }®pnpm-lock.yaml¡f¡cÅ|ilockfileVersion: '6.0'
@@ -1092,6 +1095,14 @@ packages:
   /yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
     dev: true
+±postcss.config.js¡f¡cÄRexport default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+
+
 ¦public¡d¤apps¡d­registry.json¡f¡cÅ~[
   {
     "id": "00000000-0000-0000-0000-000000000001",
@@ -1124,7 +1135,7 @@ packages:
     "path": "/src/apps/app-00000000-0000-0000-0000-000000000005/index.tsx"
   }
 ]
-£src¡d‡§App.css¡f¡cÅ]#root {
+£src¡dˆ§App.css¡f¡cÅ]#root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
@@ -1922,16 +1933,35 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
-}¨main.tsx¡f¡cÄşimport { StrictMode } from 'react'
+}¨main.tsx¡f¡cÅimport { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import Desktop from './desktop/Desktop'
 import './desktop/styles.css'
+import './tailwind.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Desktop />
   </StrictMode>
 )
+¬tailwind.css¡f¡cÄ=@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+²tailwind.config.js¡f¡cÄ¸/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+
+
 ®vite.config.js¡f¡cÅsimport { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 

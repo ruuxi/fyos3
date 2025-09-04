@@ -109,13 +109,10 @@ export async function POST(req: Request) {
       [
         'You are a proactive engineering agent operating inside a WebContainer-powered workspace.',
         'You can read and modify files, create apps, and run package installs/commands.',
-        'Follow a minimal loop: plan → execute → report. Only discover files when necessary; avoid directory listing for known paths.',
-        'Project is a Vite React app: source in /src, public assets in /public.',
-        'Workspace map (WebContainer VFS): /index.html (entry), /public (static, e.g., /public/apps/registry.json served at /apps/registry.json), /src (app code), /src/apps/<id>/index.tsx (desktop apps), /src/desktop/Desktop.tsx (desktop shell), /src/ai.ts (AI bridge for apps).',
-        'When creating apps: place code in /src/apps/<id>/index.tsx and update /public/apps/registry.json with path /src/apps/<id>/index.tsx.',
-        'Tool usage policy: prefer direct file targets using this VFS map over calling web_fs_find; for multi-file operations, use batch tools (web_fs_read_many, web_fs_write_many); when writing, skip if content is unchanged.',
-        'AI bridge for apps (FAL, ElevenLabs): DO NOT call remote APIs or embed secrets in app code. Instead, import { callFal, callFluxSchnell, composeMusic } from "/src/ai" and use those helpers inside apps to request AI via the host bridge.',
-        'HOW TO USE AI IN APPS:\n- Image (FAL): import { callFluxSchnell } from "/src/ai"; await callFluxSchnell({ prompt: "a cat photo" }).\n- Explicit model: import { callFal } from "/src/ai"; await callFal("fal-ai/flux-1/schnell", { prompt: "..." }).\n- Music (ElevenLabs): import { composeMusic } from "/src/ai"; await composeMusic({ prompt: "intense electronic track", musicLengthMs: 60000 }).\nThese route through the message bridge and server proxies (/api/ai/fal, /api/ai/eleven); keys stay on the server.',
+        'Always follow this loop: 1) find files 2) plan 3) execute 4) report.',
+        'Project is a Vite React app: source in src/, public assets in public/.',
+        'When creating apps: place code in src/apps/<id>/index.tsx and update public/apps/registry.json with path /src/apps/<id>/index.tsx.',
+        'AI bridge for apps (FAL, ElevenLabs): DO NOT call remote APIs or embed secrets in app code. Instead, import { callFal, callFluxSchnell, composeMusic } from \"/src/ai\" and use those helpers inside apps to request AI via the host bridge.',
         'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.',
         'When you need dependencies, use the web_exec tool to run package manager commands (e.g., pnpm add <pkg>, pnpm install). Wait for the web_exec result (which includes exitCode) before proceeding to the next step.',
         'If an install command fails (non-zero exitCode), report the error and suggest a fix or an alternative.'
@@ -137,15 +134,6 @@ export async function POST(req: Request) {
           encoding: z.enum(['utf-8', 'base64']).optional().default('utf-8'),
         }),
       },
-      // Batch file reads
-      web_fs_read_many: {
-        description: 'Read multiple files at once to reduce tool roundtrips.',
-        inputSchema: z.object({
-          paths: z.array(z.string()).min(1),
-          encoding: z.enum(['utf-8', 'base64']).optional().default('utf-8'),
-          ignoreMissing: z.boolean().optional().default(false),
-        }),
-      },
       // Writes and mkdirs
       web_fs_write: {
         description: 'Write file contents to a path. Creates folders if needed.',
@@ -153,18 +141,6 @@ export async function POST(req: Request) {
           path: z.string(),
           content: z.string().describe('Full new file content'),
           createDirs: z.boolean().optional().default(true),
-        }),
-      },
-      // Batch writes with optional de-duplication by current content
-      web_fs_write_many: {
-        description: 'Write multiple files in one call; creates folders and skips identical content.',
-        inputSchema: z.object({
-          files: z.array(z.object({
-            path: z.string(),
-            content: z.string(),
-            createDirs: z.boolean().optional().default(true),
-          })).min(1),
-          dedupeByContent: z.boolean().optional().default(true),
         }),
       },
       web_fs_mkdir: {
