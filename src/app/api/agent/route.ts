@@ -192,14 +192,14 @@ export async function POST(req: Request) {
         }),
       },
       // Validate project health (typecheck/lint/build quick checks)
-      validate_project: {
-        description:
-          'Run validation checks on the project (TypeScript noEmit, and optionally ESLint on specific files). Use after non-trivial edits.',
-        inputSchema: z.object({
-          scope: z.enum(['quick', 'full']).optional().default('quick'),
-          files: z.array(z.string()).optional().describe('Files to lint specifically (optional)'),
-        }),
-      },
+      // validate_project: {
+      //   description:
+      //     'Run validation checks on the project (TypeScript noEmit, and optionally ESLint on specific files). Use after non-trivial edits.',
+      //   inputSchema: z.object({
+      //     scope: z.enum(['quick', 'full']).optional().default('quick'),
+      //     files: z.array(z.string()).optional().describe('Files to lint specifically (optional)'),
+      //   }),
+      // },
       // Planning helper – capture a plan before execution
       submit_plan: tool({
         description: 'Submit a structured execution plan before making changes.',
