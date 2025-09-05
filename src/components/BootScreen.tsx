@@ -7,9 +7,10 @@ type BootScreenProps = {
   progress: number; // 0..100
   complete?: boolean; // triggers exit animation
   onExited?: () => void; // called after exit animation completes
+  waitingForContent?: boolean; // indicates we're waiting for FCP
 };
 
-export default function BootScreen({ message = 'Preparing…', progress, complete = false, onExited }: BootScreenProps) {
+export default function BootScreen({ message = 'Preparing…', progress, complete = false, onExited, waitingForContent = false }: BootScreenProps) {
   const clamped = Math.max(0, Math.min(100, progress));
   const [exiting, setExiting] = useState(false);
 
@@ -37,11 +38,15 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
         <div className="mx-auto w-[280px] md:w-[520px]">
           <div className="h-2.5 rounded-full bg-white/10 ring-1 ring-white/10 overflow-hidden relative">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-[#7dd3fc] via-[#60a5fa] to-[#a78bfa] shadow-[0_0_24px_rgba(96,165,250,0.35)] transition-[width] duration-[520ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+              className={`h-full rounded-full bg-gradient-to-r from-[#7dd3fc] via-[#60a5fa] to-[#a78bfa] shadow-[0_0_24px_rgba(96,165,250,0.35)] transition-[width] duration-[520ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                waitingForContent && clamped >= 85 ? 'animate-pulse' : ''
+              }`}
               style={widthStyle}
             >
               <div className="absolute inset-0 opacity-70">
-                <div className="h-full w-full bg-[linear-gradient(115deg,transparent_0%,rgba(255,255,255,0.35)_50%,transparent_100%)] [mask-image:linear-gradient(to_right,transparent,black_20%,black_80%,transparent)] animate-[shimmer_1.8s_ease_infinite]" />
+                <div className={`h-full w-full bg-[linear-gradient(115deg,transparent_0%,rgba(255,255,255,0.35)_50%,transparent_100%)] [mask-image:linear-gradient(to_right,transparent,black_20%,black_80%,transparent)] ${
+                  waitingForContent && clamped >= 85 ? 'animate-[shimmer_0.9s_ease_infinite]' : 'animate-[shimmer_1.8s_ease_infinite]'
+                }`} />
               </div>
             </div>
           </div>

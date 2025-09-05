@@ -14,10 +14,13 @@ export default function WebContainer() {
   const [loadingStage, setLoadingStage] = useState<string>('Initializing…');
   const [progress, setProgress] = useState<number>(2);
   const [error, setError] = useState<string | null>(null);
+  const [fcpDetected, setFcpDetected] = useState(false);
+  const [serverReady, setServerReady] = useState(false);
+  const [shouldExitBoot, setShouldExitBoot] = useState(false);
   const { setInstance } = useWebContainer();
   const devProcRef = useRef<any>(null);
   const devUrlRef = useRef<string | null>(null);
-  // Lean reloads: rely on server-ready + HMR; no global dev controls
+  // Wait for both server-ready AND FCP before hiding boot screen
 
   useEffect(() => {
     let mounted = true;
@@ -108,9 +111,220 @@ export default function WebContainer() {
           console.log('[WebContainer] Mounted default snapshot');
         }
 
-        // Removed FCP notifier injection for leaner reloads
+        // Inject FCP notifier to detect when content is actually rendered
+        setLoadingStage('Setting up content detection…');
+        setProgress((p) => Math.max(p, 38));
+        
+        const fcpNotifierScript = `
+// FCP Notifier - detects when content is actually painted
+(function() {
+  let fcpDetected = false;
+  let observer;
+  
+  function notifyFCP() {
+    if (fcpDetected) return;
+    fcpDetected = true;
+    
+    // Clean up observer
+    if (observer) {
+      observer.disconnect();
+    }
+    
+    // Notify parent about FCP
+    try {
+      window.parent.postMessage({ type: 'FCP_DETECTED' }, '*');
+    } catch (e) {
+      console.log('[FCP] Could not notify parent:', e);
+    }
+  }
+  
+  // Method 1: Use PerformanceObserver for FCP if available
+  if ('PerformanceObserver' in window) {
+    try {
+      const perfObserver = new PerformanceObserver((list) => {
+        const entries = list.getEntries();
+        for (const entry of entries) {
+          if (entry.name === 'first-contentful-paint') {
+            console.log('[FCP] Detected via PerformanceObserver:', entry.startTime + 'ms');
+            notifyFCP();
+            return;
+          }
+        }
+      });
+      perfObserver.observe({ entryTypes: ['paint'] });
+    } catch (e) {
+      console.log('[FCP] PerformanceObserver failed:', e);
+    }
+  }
+  
+  // Method 2: Fallback - watch for DOM content and visible elements
+  function checkForVisibleContent() {
+    const body = document.body;
+    if (!body) return false;
+    
+    // Check if body has visible content
+    const bodyRect = body.getBoundingClientRect();
+    if (bodyRect.width === 0 || bodyRect.height === 0) return false;
+    
+    // Look for visible elements with content
+    const elements = document.querySelectorAll('*');
+    for (let el of elements) {
+      if (el === document.body || el === document.documentElement) continue;
+      
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      
+      // Check if element is visible and has dimensions
+      if (rect.width > 0 && rect.height > 0 && 
+          style.visibility !== 'hidden' && 
+          style.display !== 'none' &&
+          style.opacity !== '0') {
+        
+        // Check if it has text content or background/border
+        const hasText = el.textContent && el.textContent.trim().length > 0;
+        const hasBackground = style.backgroundColor !== 'rgba(0, 0, 0, 0)' && 
+                            style.backgroundColor !== 'transparent';
+        const hasBorder = style.borderWidth !== '0px';
+        const hasImage = el.tagName === 'IMG' && el.complete;
+        
+        if (hasText || hasBackground || hasBorder || hasImage) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  
+  // Method 3: Watch for DOM mutations and check content
+  if ('MutationObserver' in window) {
+    observer = new MutationObserver(() => {
+      if (checkForVisibleContent()) {
+        console.log('[FCP] Detected via DOM content check');
+        notifyFCP();
+      }
+    });
+    
+    // Start observing when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        observer.observe(document.body || document.documentElement, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['style', 'class']
+        });
+      });
+    } else {
+      observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class']
+      });
+    }
+  }
+  
+  // Method 4: Fallback timeout (in case nothing else works)
+  setTimeout(() => {
+    if (!fcpDetected && checkForVisibleContent()) {
+      console.log('[FCP] Detected via timeout fallback');
+      notifyFCP();
+    }
+  }, 2000);
+  
+  // Method 5: Load event fallback
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      if (!fcpDetected) {
+        console.log('[FCP] Detected via load event fallback');
+        notifyFCP();
+      }
+    }, 100);
+  });
+})();
+`;
 
-        // Removed AI helper boot injection
+        await instance.fs.writeFile('/fcp-notifier.js', fcpNotifierScript);
+        
+        // Inject the FCP notifier into HTML files
+        try {
+          const packageJsonContent = await instance.fs.readFile('/package.json', 'utf8');
+          const packageJson = JSON.parse(packageJsonContent);
+          
+          // Check if it's a React/Next.js app and inject into public/index.html or pages/_document.tsx
+          const publicIndexPath = '/public/index.html';
+          const appIndexPath = '/app/layout.tsx';
+          const srcIndexPath = '/src/index.html';
+          
+          let injected = false;
+          
+          // Try different common HTML entry points
+          const htmlPaths = [publicIndexPath, srcIndexPath, '/index.html'];
+          
+          for (const htmlPath of htmlPaths) {
+            try {
+              const htmlContent = await instance.fs.readFile(htmlPath, 'utf8');
+              if (htmlContent.includes('<head>') && !htmlContent.includes('fcp-notifier.js')) {
+                const updatedContent = htmlContent.replace(
+                  '<head>',
+                  '<head>\n    <script src="/fcp-notifier.js"></script>'
+                );
+                await instance.fs.writeFile(htmlPath, updatedContent);
+                console.log(`[WebContainer] Injected FCP notifier into ${htmlPath}`);
+                injected = true;
+                break;
+              }
+            } catch {}
+          }
+          
+          // For Next.js apps, we might need to inject into _document.tsx or create a custom head
+          if (!injected) {
+            try {
+              // Try to create or update a Next.js _document.tsx file
+              const documentPath = '/pages/_document.tsx';
+              const nextDocumentContent = `import { Html, Head, Main, NextScript } from 'next/document';
+
+export default function Document() {
+  return (
+    <Html>
+      <Head>
+        <script src="/fcp-notifier.js"></script>
+      </Head>
+      <body>
+        <Main />
+        <NextScript />
+      </body>
+    </Html>
+  );
+}`;
+              await instance.fs.writeFile(documentPath, nextDocumentContent);
+              console.log('[WebContainer] Created _document.tsx with FCP notifier');
+              injected = true;
+            } catch {}
+          }
+          
+          // Fallback: inject into any HTML file we can find
+          if (!injected) {
+            try {
+              const files = await instance.fs.readdir('/', { withFileTypes: true });
+              for (const file of files) {
+                if (file.name.endsWith('.html')) {
+                  try {
+                    const content = await instance.fs.readFile(`/${file.name}`, 'utf8');
+                    if (content.includes('<head>') && !content.includes('fcp-notifier.js')) {
+                      const updated = content.replace('<head>', '<head>\n    <script src="/fcp-notifier.js"></script>');
+                      await instance.fs.writeFile(`/${file.name}`, updated);
+                      console.log(`[WebContainer] Injected FCP notifier into ${file.name}`);
+                      break;
+                    }
+                  } catch {}
+                }
+              }
+            } catch {}
+          }
+        } catch (e) {
+          console.warn('[WebContainer] Could not inject FCP notifier:', e);
+        }
 
         setLoadingStage('Getting things ready…');
         setProgress((p) => Math.max(p, 42));
@@ -169,42 +383,43 @@ export default function WebContainer() {
         instance.on('server-ready', (port: number, url: string) => {
           console.log(`Server ready on port ${port}: ${url}`);
           devUrlRef.current = url;
-          setLoadingStage('Final touches…');
-          setProgress(92);
+          setServerReady(true);
+          setLoadingStage('Waiting for content to render…');
+          setProgress(88);
           if (iframeRef.current) {
             iframeRef.current.src = url;
-            const onLoad = () => {
-              setLoadingStage('Ready');
-              setProgress(100);
-              iframeRef.current?.classList.add('iframe-ready');
-              setTimeout(() => setIsLoading(false), 120);
-            };
-            iframeRef.current.addEventListener('load', onLoad, { once: true });
           }
-          // Optional: message bridge for AI requests coming from preview iframes
-          const onMessage = async (event: MessageEvent) => {
-            if (event.data && event.data.type === 'AI_REQUEST') {
-              const { id, provider, model, input } = event.data as any;
-              const srcWin = (event.source as Window | null);
-              const reply = (payload: any) => { try { srcWin?.postMessage(payload, event.origin); } catch {} };
-              try {
-                if (provider === 'fal') {
-                  const res = await fetch('/api/ai/fal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, input }) });
-                  if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
-                  reply({ type: 'AI_RESPONSE', id, ok: true, result: await res.json() });
-                } else if (provider === 'eleven') {
-                  const res = await fetch('/api/ai/eleven', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input || {}) });
-                  if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
-                  reply({ type: 'AI_RESPONSE', id, ok: true, result: await res.json() });
-                }
-              } catch (e: any) {
-                reply({ type: 'AI_RESPONSE', id, ok: false, error: e?.message || 'Request failed' });
-              }
-            }
-          };
-          window.addEventListener('message', onMessage);
-          cleanupMessageListener = () => window.removeEventListener('message', onMessage);
         });
+
+        // Message bridge for AI requests and FCP detection from preview iframes
+        const onMessage = async (event: MessageEvent) => {
+          if (event.data && event.data.type === 'FCP_DETECTED') {
+            console.log('[WebContainer] FCP detected in preview');
+            setFcpDetected(true);
+            return;
+          }
+          
+          if (event.data && event.data.type === 'AI_REQUEST') {
+            const { id, provider, model, input } = event.data as any;
+            const srcWin = (event.source as Window | null);
+            const reply = (payload: any) => { try { srcWin?.postMessage(payload, event.origin); } catch {} };
+            try {
+              if (provider === 'fal') {
+                const res = await fetch('/api/ai/fal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, input }) });
+                if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
+                reply({ type: 'AI_RESPONSE', id, ok: true, result: await res.json() });
+              } else if (provider === 'eleven') {
+                const res = await fetch('/api/ai/eleven', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input || {}) });
+                if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
+                reply({ type: 'AI_RESPONSE', id, ok: true, result: await res.json() });
+              }
+            } catch (e: any) {
+              reply({ type: 'AI_RESPONSE', id, ok: false, error: e?.message || 'Request failed' });
+            }
+          }
+        };
+        window.addEventListener('message', onMessage);
+        cleanupMessageListener = () => window.removeEventListener('message', onMessage);
 
       } catch (err) {
         if (mounted) {
@@ -231,6 +446,45 @@ export default function WebContainer() {
     };
   }, []);
 
+  // Effect to handle completion when both server is ready AND FCP is detected
+  useEffect(() => {
+    if (!(serverReady && fcpDetected && isLoading)) return;
+
+    console.log('[WebContainer] Both server ready and FCP detected, revealing preview');
+    setLoadingStage('Ready');
+    setProgress(100);
+
+    const iframe = iframeRef.current;
+    if (!iframe) {
+      // If no iframe ref, exit overlay immediately as a fallback
+      setShouldExitBoot(true);
+      return;
+    }
+
+    // Start iframe fade-in
+    iframe.classList.add('iframe-ready');
+
+    // When iframe opacity transition finishes, trigger boot overlay exit
+    const onTransitionEnd = (ev: TransitionEvent) => {
+      if (ev.propertyName === 'opacity') {
+        iframe.removeEventListener('transitionend', onTransitionEnd);
+        setShouldExitBoot(true);
+      }
+    };
+    iframe.addEventListener('transitionend', onTransitionEnd);
+
+    // Fallback in case transitionend doesn't fire
+    const fallbackId = window.setTimeout(() => {
+      try { iframe.removeEventListener('transitionend', onTransitionEnd); } catch {}
+      setShouldExitBoot(true);
+    }, 700);
+
+    return () => {
+      window.clearTimeout(fallbackId);
+      try { iframe.removeEventListener('transitionend', onTransitionEnd); } catch {}
+    };
+  }, [serverReady, fcpDetected, isLoading]);
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-full bg-red-50 border border-red-200 rounded-lg">
@@ -248,7 +502,9 @@ export default function WebContainer() {
         <BootScreen
           message={loadingStage || 'Preparing…'}
           progress={progress}
-          complete={!isLoading && progress >= 100}
+          complete={shouldExitBoot}
+          onExited={() => setIsLoading(false)}
+          waitingForContent={serverReady && !fcpDetected}
         />
       )}
       <iframe
