@@ -73,10 +73,6 @@
         } catch {}
       };
 
-      // Import CSS for styling
-      import '/src/index.css';          // Base styles, typography, buttons
-      import '/src/desktop/styles.css'; // Desktop-specific classes (.badge, .muted, etc.)
-      import '/src/tailwind.css';       // Tailwind utilities
       
       import { createRoot } from '/src/iframe-root.js';
       // Expect query: ?path=/src/apps/xxx/index.tsx&name=...&id=...
@@ -84,6 +80,22 @@
       const path = params.get('path')
       const name = params.get('name') || 'App'
       const mountEl = document.getElementById('mount')
+      
+      // Import CSS for styling (opt-in via URL flags)
+      // Flags: base=1 (index.css), ui=1 (desktop/ui classes), tw=1 (tailwind)
+      try {
+        if (params.get('base') === '1') {
+          await import('/src/index.css')
+        }
+        if (params.get('ui') === '1') {
+          await import('/src/desktop/styles.css')
+        }
+        if (params.get('tw') === '1') {
+          await import('/src/tailwind.css')
+        }
+      } catch (e) {
+        console.error('[App iframe] CSS import error:', e)
+      }
       
       // Global error isolation inside iframe
       const overlay = document.createElement('div')
