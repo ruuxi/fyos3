@@ -18,6 +18,12 @@
           // Prevent Vite error overlay from showing
           console.error('[App iframe] Vite error:', payload);
         });
+        
+        // Force iframe reload on CSS changes for HMR
+        import.meta.hot.on('vite:beforeUpdate', () => {
+          console.log('[App iframe] CSS updated, reloading iframe');
+          location.reload();
+        });
       }
       
       // Block vite-error-overlay custom element
@@ -67,6 +73,11 @@
         } catch {}
       };
 
+      // Import CSS for styling
+      import '/src/index.css';          // Base styles, typography, buttons
+      import '/src/desktop/styles.css'; // Desktop-specific classes (.badge, .muted, etc.)
+      import '/src/tailwind.css';       // Tailwind utilities
+      
       import { createRoot } from '/src/iframe-root.js';
       // Expect query: ?path=/src/apps/xxx/index.tsx&name=...&id=...
       const params = new URLSearchParams(location.search)
