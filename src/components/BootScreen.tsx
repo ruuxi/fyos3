@@ -38,7 +38,7 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
         <div className="mx-auto w-[280px] md:w-[520px]">
           <div className="h-2.5 rounded-full bg-white/10 ring-1 ring-white/10 overflow-hidden relative">
             <div
-              className={`h-full rounded-full bg-gradient-to-r from-[#7dd3fc] via-[#60a5fa] to-[#a78bfa] shadow-[0_0_24px_rgba(96,165,250,0.35)] transition-[width] duration-[520ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              className={`h-full rounded-full bg-gradient-to-r from-[#7dd3fc] via-[#60a5fa] to-[#a78bfa] shadow-[0_0_24px_rgba(96,165,250,0.35)] transition-[width] duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] [will-change:width] ${
                 waitingForContent && clamped >= 85 ? 'animate-pulse' : ''
               }`}
               style={widthStyle}

@@ -12,7 +12,10 @@ export default function WebContainer() {
   const [webcontainerInstance, setWebcontainerInstance] = useState<WebContainerAPI | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStage, setLoadingStage] = useState<string>('Initializing…');
-  const [progress, setProgress] = useState<number>(2);
+  const [displayProgress, setDisplayProgress] = useState<number>(2);
+  const [targetProgress, setTargetProgress] = useState<number>(2);
+  const progressTargetRef = useRef<number>(2);
+  const lastFrameTsRef = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fcpDetected, setFcpDetected] = useState(false);
   const [serverReady, setServerReady] = useState(false);
@@ -34,7 +37,7 @@ export default function WebContainer() {
         setIsLoading(true);
         setError(null);
         setLoadingStage('Waking up…');
-        setProgress((p) => Math.max(p, 8));
+        setTargetProgress((p) => Math.max(p, 8));
 
         // Boot WebContainer
         const instance = await WebContainerAPI.boot({
@@ -47,7 +50,7 @@ export default function WebContainer() {
         
         if (!mounted) return;
         setWebcontainerInstance(instance);
-        setProgress((p) => Math.max(p, 18));
+        setTargetProgress((p) => Math.max(p, 18));
 
         // Store instance globally for API access
         if (typeof window !== 'undefined') {
@@ -84,7 +87,7 @@ export default function WebContainer() {
           });
         } catch {}
         setLoadingStage('Preparing workspace…');
-        setProgress((p) => Math.max(p, 26));
+        setTargetProgress((p) => Math.max(p, 26));
 
         // Prefer restoring the user's persisted VFS if available; otherwise mount default snapshot
         let restored = false;
@@ -92,7 +95,7 @@ export default function WebContainer() {
           const hasSaved = await hasPersistedVfs();
           if (hasSaved) {
             setLoadingStage('Restoring your workspace…');
-            setProgress((p) => Math.max(p, 32));
+            setTargetProgress((p) => Math.max(p, 32));
             restored = await restoreFromPersistence(instance);
             if (restored) {
               console.log('[WebContainer] Restored from persisted VFS');
@@ -113,7 +116,7 @@ export default function WebContainer() {
 
         // Inject FCP notifier to detect when content is actually rendered
         setLoadingStage('Setting up content detection…');
-        setProgress((p) => Math.max(p, 38));
+        setTargetProgress((p) => Math.max(p, 38));
         
         const fcpNotifierScript = `
 // FCP Notifier - detects when content is actually painted
@@ -327,7 +330,7 @@ export default function Document() {
         }
 
         setLoadingStage('Getting things ready…');
-        setProgress((p) => Math.max(p, 42));
+        setTargetProgress((p) => Math.max(p, 42));
         // Use pnpm for faster dependency installation
         const installProcess = await instance.spawn('pnpm', ['install']);
         
@@ -336,7 +339,7 @@ export default function Document() {
           write(data) {
             console.log('[WebContainer Install]:', data);
             // Heuristically increase progress during install
-            setProgress((prev) => (prev < 72 ? prev + 0.25 : prev));
+            setTargetProgress((prev) => (prev < 72 ? prev + 0.25 : prev));
           }
         }));
 
@@ -366,7 +369,7 @@ export default function Document() {
         beforeUnloadHandler = handleBeforeUnload;
 
         setLoadingStage('Almost there…');
-        setProgress((p) => Math.max(p, 78));
+        setTargetProgress((p) => Math.max(p, 78));
         // Start dev server
         const devProcess = await instance.spawn('pnpm', ['run', 'dev']);
         devProcRef.current = devProcess;
@@ -375,7 +378,7 @@ export default function Document() {
         devProcess.output.pipeTo(new WritableStream({
           write(data) {
             console.log('[WebContainer Dev]:', data);
-            setProgress((prev) => (prev < 88 ? prev + 0.15 : prev));
+            setTargetProgress((prev) => (prev < 88 ? prev + 0.15 : prev));
           }
         }));
 
@@ -385,7 +388,7 @@ export default function Document() {
           devUrlRef.current = url;
           setServerReady(true);
           setLoadingStage('Waiting for content to render…');
-          setProgress(88);
+          setTargetProgress(88);
           if (iframeRef.current) {
             iframeRef.current.src = url;
           }
@@ -446,13 +449,55 @@ export default function Document() {
     };
   }, []);
 
+  // Keep a ref in sync with the latest target for stable reads inside rAF loop
+  useEffect(() => {
+    const clamped = Math.max(0, Math.min(100, targetProgress));
+    progressTargetRef.current = clamped;
+  }, [targetProgress]);
+
+  // Smoothly animate displayProgress toward targetProgress
+  useEffect(() => {
+    if (!isLoading) {
+      return;
+    }
+
+    let rafId: number;
+
+    const animate = (timestamp: number) => {
+      if (!isLoading) return;
+
+      if (lastFrameTsRef.current == null) {
+        lastFrameTsRef.current = timestamp;
+      }
+      const elapsedMs = Math.min(100, timestamp - (lastFrameTsRef.current || timestamp));
+      lastFrameTsRef.current = timestamp;
+
+      setDisplayProgress((prev) => {
+        const target = progressTargetRef.current;
+        if (Math.abs(target - prev) < 0.05) return target;
+        // Exponential smoothing factor based on frame time for consistent feel
+        const alpha = 1 - Math.pow(0.001, elapsedMs / 200);
+        const next = prev + (target - prev) * alpha;
+        return Math.max(0, Math.min(100, next));
+      });
+
+      rafId = requestAnimationFrame(animate);
+    };
+
+    rafId = requestAnimationFrame(animate);
+    return () => {
+      try { cancelAnimationFrame(rafId); } catch {}
+      lastFrameTsRef.current = null;
+    };
+  }, [isLoading]);
+
   // Effect to handle completion when both server is ready AND FCP is detected
   useEffect(() => {
     if (!(serverReady && fcpDetected && isLoading)) return;
 
     console.log('[WebContainer] Both server ready and FCP detected, revealing preview');
     setLoadingStage('Ready');
-    setProgress(100);
+    setTargetProgress(100);
 
     const iframe = iframeRef.current;
     if (!iframe) {
@@ -501,7 +546,7 @@ export default function Document() {
       {isLoading && (
         <BootScreen
           message={loadingStage || 'Preparing…'}
-          progress={progress}
+          progress={displayProgress}
           complete={shouldExitBoot}
           onExited={() => setIsLoading(false)}
           waitingForContent={serverReady && !fcpDetected}
