@@ -8,7 +8,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
 import ChatAlert from './ChatAlert';
-import { enqueuePersist, persistNow } from '@/utils/vfs-persistence';
+// Persistence is handled by WebContainer visibility/unload hooks
 
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
@@ -87,17 +87,7 @@ export default function AIAgentBar() {
     return instanceRef.current;
   }
 
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function scheduleDevRefresh(delayMs = 800) {
-    try {
-      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-      refreshTimerRef.current = setTimeout(() => {
-        refreshTimerRef.current = null;
-        try { (globalThis as any).devServerControls?.refreshPreview?.(); } catch {}
-      }, delayMs);
-    } catch {}
-  }
+  // Lean reloads: rely on dev server HMR; no manual refresh orchestration
 
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id: 'agent-chat',
@@ -154,10 +144,6 @@ export default function AIAgentBar() {
               }
               await fnsRef.current.writeFile(path, content);
               addToolResult({ tool: 'web_fs_write', toolCallId: tc.toolCallId, output: { ok: true, path, size: `${sizeKB}KB` } });
-              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
-              // schedule validation and preview refresh
-              recordChange(path);
-              scheduleDevRefresh(600);
               break;
             }
             case 'web_fs_mkdir': {
@@ -165,8 +151,6 @@ export default function AIAgentBar() {
               console.log(`🔧 [Agent] web_fs_mkdir: ${path} ${recursive ? '(recursive)' : ''}`);
               await fnsRef.current.mkdir(path, recursive);
               addToolResult({ tool: 'web_fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
-              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
-              recordChange(path);
               break;
             }
             case 'web_fs_rm': {
@@ -174,8 +158,6 @@ export default function AIAgentBar() {
               console.log(`🔧 [Agent] web_fs_rm: ${path} ${recursive ? '(recursive)' : ''}`);
               await fnsRef.current.remove(path, { recursive });
               addToolResult({ tool: 'web_fs_rm', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
-              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
-              recordChange(path);
               break;
             }
             case 'web_exec': {
@@ -270,9 +252,6 @@ export default function AIAgentBar() {
                     outputTail: trimChars(lastLines(result.output, maxLines)),
                   },
                 });
-                if (result.exitCode === 0) {
-                  scheduleDevRefresh(800);
-                }
               } else {
                 addToolResult({
                   tool: 'web_exec',
@@ -285,14 +264,6 @@ export default function AIAgentBar() {
                   },
                 });
               }
-              // Heuristically persist after package manager or file-changing commands
-              try {
-                if (instanceRef.current) {
-                  if (/(pnpm|npm|yarn|bun)\s+(add|install|remove|uninstall|update)|git\s+(checkout|switch|merge|apply)/i.test(fullCommand)) {
-                    enqueuePersist(instanceRef.current);
-                  }
-                }
-              } catch {}
               break;
             }
             case 'create_app': {
@@ -326,10 +297,6 @@ export default function AIAgentBar() {
               }
               console.log(`✅ [Agent] App created: ${name} (${id})`);
               addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base, name, icon: metadata.icon } });
-              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
-              recordChange(`${base}/index.tsx`);
-              recordChange('public/apps/registry.json');
-              scheduleDevRefresh(800);
               break;
             }
             case 'rename_app': {
@@ -344,8 +311,6 @@ export default function AIAgentBar() {
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
               console.log(`✅ [Agent] App renamed: "${oldName}" -> "${name}"`);
               addToolResult({ tool: 'rename_app', toolCallId: tc.toolCallId, output: { ok: true, id, oldName, newName: name } });
-              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
-              recordChange('public/apps/registry.json');
               break;
             }
             case 'remove_app': {
@@ -369,17 +334,15 @@ export default function AIAgentBar() {
               try { await fnsRef.current.remove(p2, { recursive: true }); } catch {}
               console.log(`✅ [Agent] App removed: "${appName}" (${id})`);
               addToolResult({ tool: 'remove_app', toolCallId: tc.toolCallId, output: { ok: true, id, name: appName, removedPaths: [p1, p2] } });
-              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
-              recordChange('public/apps/registry.json');
               break;
             }
-            case 'validate_project': {
-              const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
-              console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
-              await runValidation(scope, files);
-              addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true } });
-              break;
-            }
+            // case 'validate_project': {
+            //   const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
+            //   console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
+            //   await runValidation(scope, files);
+            //   addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true } });
+            //   break;
+            // }
             default:
               // Unknown tool on client
               addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output: { error: `Unhandled client tool: ${tc.toolName}` } });
@@ -438,8 +401,7 @@ export default function AIAgentBar() {
     content: string;
   } | null>(null);
 
-  const changedFilesRef = useRef<Set<string>>(new Set());
-  const validateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Removed automatic validation loop; validation runs only via validate_project tool
   const validateRunningRef = useRef(false);
   const lastErrorHashRef = useRef<string | null>(null);
   const autoPostBusyRef = useRef(false);
@@ -493,24 +455,7 @@ export default function AIAgentBar() {
     return () => window.removeEventListener('wc-preview-error', handler as EventListener);
   }, [status]);
 
-  function recordChange(path: string) {
-    if (!path) return;
-    changedFilesRef.current.add(path);
-    try {
-      if (validateTimerRef.current) clearTimeout(validateTimerRef.current);
-    } catch {}
-    const scheduleRun = () => {
-      // Defer validation if the agent is mid-fix to avoid spamming
-      if (autoPostBusyRef.current || status !== 'ready') {
-        validateTimerRef.current = setTimeout(scheduleRun, 700);
-        return;
-      }
-      const paths = Array.from(changedFilesRef.current);
-      changedFilesRef.current.clear();
-      void runValidation('quick', paths);
-    };
-    validateTimerRef.current = setTimeout(scheduleRun, 700);
-  }
+  // No per-change validation debounce
 
   async function runValidation(scope: 'quick' | 'full', changed: string[] = []) {
     if (!instanceRef.current) return;

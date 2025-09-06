@@ -5,114 +5,25 @@ import { WebContainer as WebContainerAPI } from '@webcontainer/api';
 // Binary snapshot approach for faster mounting
 import { useWebContainer } from './WebContainerProvider';
 import BootScreen from './BootScreen';
-import { hasPersistedVfs, restoreFromPersistence, enqueuePersist, persistNow } from '@/utils/vfs-persistence';
+import { hasPersistedVfs, restoreFromPersistence, persistNow } from '@/utils/vfs-persistence';
 
 export default function WebContainer() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [webcontainerInstance, setWebcontainerInstance] = useState<WebContainerAPI | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStage, setLoadingStage] = useState<string>('Initializing…');
-  const [progress, setProgress] = useState<number>(2);
+  const [displayProgress, setDisplayProgress] = useState<number>(2);
+  const [targetProgress, setTargetProgress] = useState<number>(2);
+  const progressTargetRef = useRef<number>(2);
+  const lastFrameTsRef = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isReloading, setIsReloading] = useState(false);
+  const [fcpDetected, setFcpDetected] = useState(false);
+  const [serverReady, setServerReady] = useState(false);
+  const [shouldExitBoot, setShouldExitBoot] = useState(false);
   const { setInstance } = useWebContainer();
   const devProcRef = useRef<any>(null);
   const devUrlRef = useRef<string | null>(null);
-  const isDevBusyRef = useRef(false);
-
-  // Expose lightweight dev controls globally for sibling components (agent) to use
-  useEffect(() => {
-    (globalThis as any).devServerControls = {
-      refreshPreview: async () => {
-        if (!iframeRef.current || !devUrlRef.current) return false;
-        if (isDevBusyRef.current) return true; // already refreshing
-        isDevBusyRef.current = true;
-        try {
-          setIsReloading(true);
-          const url = new URL(devUrlRef.current);
-          url.searchParams.set('r', String(Date.now()));
-          const awaitFCP = new Promise<boolean>((resolve) => {
-            const onMsg = (e: MessageEvent) => {
-              try {
-                if (!iframeRef.current) return;
-                const iframeOrigin = new URL(iframeRef.current.src).origin;
-                if (e.origin !== iframeOrigin) return;
-              } catch {}
-              if (e.data && e.data.type === 'webcontainer:fcp') {
-                window.removeEventListener('message', onMsg);
-                setIsReloading(false);
-                resolve(true);
-              }
-            };
-            window.addEventListener('message', onMsg);
-            // Hard timeout fallback
-            setTimeout(() => {
-              window.removeEventListener('message', onMsg);
-              resolve(false);
-            }, 8000);
-          });
-          iframeRef.current.src = url.toString();
-          const ok = await awaitFCP;
-          if (!ok) {
-            // Could not confirm FCP; try a full restart
-            return await (globalThis as any).devServerControls.restartDevServer();
-          }
-          return true;
-        } finally {
-          isDevBusyRef.current = false;
-        }
-      },
-      restartDevServer: async () => {
-        if (!webcontainerInstance) return false;
-        if (isDevBusyRef.current) return true;
-        isDevBusyRef.current = true;
-        try {
-          setIsReloading(true);
-          // Try to kill existing dev process
-          try { await (devProcRef.current as any)?.kill?.(); } catch {}
-          // Spawn new dev server
-          const devProcess = await webcontainerInstance.spawn('pnpm', ['run', 'dev']);
-          devProcRef.current = devProcess;
-          // Update output stream (optional logging)
-          devProcess.output.pipeTo(new WritableStream({ write(data) { console.log('[WebContainer Dev]:', data); } })).catch(()=>{});
-          // Wait for server-ready; the global listener will update iframe src
-          const serverReady = await new Promise<boolean>((resolve) => {
-            const handler = (port: number, url: string) => {
-              devUrlRef.current = url;
-              if (iframeRef.current) {
-                iframeRef.current.src = url;
-              }
-              resolve(true);
-            };
-            (webcontainerInstance as any).on('server-ready', handler);
-            setTimeout(() => resolve(false), 15000);
-          });
-          if (!serverReady) return false;
-          // Wait for FCP again
-          const ok = await new Promise<boolean>((resolve) => {
-            const onMsg = (e: MessageEvent) => {
-              try {
-                if (!iframeRef.current) return;
-                const iframeOrigin = new URL(iframeRef.current.src).origin;
-                if (e.origin !== iframeOrigin) return;
-              } catch {}
-              if (e.data && e.data.type === 'webcontainer:fcp') {
-                window.removeEventListener('message', onMsg);
-                setIsReloading(false);
-                resolve(true);
-              }
-            };
-            window.addEventListener('message', onMsg);
-            setTimeout(() => { window.removeEventListener('message', onMsg); resolve(false); }, 12000);
-          });
-          return ok;
-        } finally {
-          isDevBusyRef.current = false;
-        }
-      },
-    };
-    return () => { try { delete (globalThis as any).devServerControls; } catch {} };
-  }, [webcontainerInstance]);
+  // Wait for both server-ready AND FCP before hiding boot screen
 
   useEffect(() => {
     let mounted = true;
@@ -126,7 +37,7 @@ export default function WebContainer() {
         setIsLoading(true);
         setError(null);
         setLoadingStage('Waking up…');
-        setProgress((p) => Math.max(p, 8));
+        setTargetProgress((p) => Math.max(p, 8));
 
         // Boot WebContainer
         const instance = await WebContainerAPI.boot({
@@ -139,7 +50,7 @@ export default function WebContainer() {
         
         if (!mounted) return;
         setWebcontainerInstance(instance);
-        setProgress((p) => Math.max(p, 18));
+        setTargetProgress((p) => Math.max(p, 18));
 
         // Store instance globally for API access
         if (typeof window !== 'undefined') {
@@ -176,7 +87,7 @@ export default function WebContainer() {
           });
         } catch {}
         setLoadingStage('Preparing workspace…');
-        setProgress((p) => Math.max(p, 26));
+        setTargetProgress((p) => Math.max(p, 26));
 
         // Prefer restoring the user's persisted VFS if available; otherwise mount default snapshot
         let restored = false;
@@ -184,7 +95,7 @@ export default function WebContainer() {
           const hasSaved = await hasPersistedVfs();
           if (hasSaved) {
             setLoadingStage('Restoring your workspace…');
-            setProgress((p) => Math.max(p, 32));
+            setTargetProgress((p) => Math.max(p, 32));
             restored = await restoreFromPersistence(instance);
             if (restored) {
               console.log('[WebContainer] Restored from persisted VFS');
@@ -203,101 +114,223 @@ export default function WebContainer() {
           console.log('[WebContainer] Mounted default snapshot');
         }
 
-        // Try to inject a First Contentful Paint notifier into common HTML entrypoints
-        try {
-          const injectInto = async (path: string) => {
-            try {
-              const buf = await instance.fs.readFile(path);
-              const html = new TextDecoder().decode(buf as any);
-              if (html.includes('webcontainer-fcp-notify')) return;
-              const snippet = `\n<script id="webcontainer-fcp-notify">(function(){try{var sent=false;function send(msg){if(sent)return;sent=true;try{parent.postMessage({type:'webcontainer:fcp'},'*');}catch(e){}}if('PerformanceObserver'in window){try{var obs=new PerformanceObserver(function(list){for(var e of list.getEntries()){if(e.name==='first-contentful-paint'){send();obs.disconnect();break;}}});obs.observe({type:'paint',buffered:true});}catch(e){}}window.addEventListener('load',function(){requestAnimationFrame(function(){send();});});}catch(e){}})();</script>\n`;
-              const injected = html.includes('</head>') ? html.replace('</head>', snippet + '</head>') : (html.includes('</body>') ? html.replace('</body>', snippet + '</body>') : (html + snippet));
-              await instance.fs.writeFile(path, injected as any);
-              console.log('[WebContainer] Injected FCP notifier into', path);
-            } catch {}
-          };
-          await injectInto('/index.html');
-          await injectInto('/public/index.html');
-        } catch {}
-
-        // Ensure AI helper exists inside the WebContainer VFS for apps to import
-        try {
-          await instance.fs.readFile('/src/ai.ts');
-        } catch {
-          const aiHelper = `// AI helpers for FYOS apps (client-side, runs inside Vite iframe)
-export type AIProvider = 'fal' | 'eleven';
-
-function generateRequestId(): string {
-  return 'ai_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
-}
-
-export async function aiRequest(provider: AIProvider, model: string, input: any): Promise<any> {
-  const id = generateRequestId();
-  return new Promise((resolve, reject) => {
-    const onMessage = (e: MessageEvent) => {
-      try {
-        const d: any = (e as any).data;
-        if (!d || d.type !== 'AI_RESPONSE' || d.id !== id) return;
-        window.removeEventListener('message', onMessage as any);
-        if (d.ok) resolve(d.result);
-        else reject(new Error(d.error || 'AI request failed'));
-      } catch (err) {
-        window.removeEventListener('message', onMessage as any);
-        reject(err);
-      }
-    };
-    window.addEventListener('message', onMessage as any);
-    try {
-      const payload = { type: 'AI_REQUEST', id, provider, model, input } as const;
-      // Post directly to the top-level Next.js host to avoid needing a desktop relay
-      window.top?.postMessage(payload, '*');
-    } catch (err) {
-      window.removeEventListener('message', onMessage as any);
-      reject(err);
-      return;
+        // Inject FCP notifier to detect when content is actually rendered
+        setLoadingStage('Setting up content detection…');
+        setTargetProgress((p) => Math.max(p, 38));
+        
+        const fcpNotifierScript = `
+// FCP Notifier - detects when content is actually painted
+(function() {
+  let fcpDetected = false;
+  let observer;
+  
+  function notifyFCP() {
+    if (fcpDetected) return;
+    fcpDetected = true;
+    
+    // Clean up observer
+    if (observer) {
+      observer.disconnect();
     }
-    // Timeout after 60s
-    setTimeout(() => {
-      try { window.removeEventListener('message', onMessage as any); } catch {}
-      reject(new Error('AI request timeout'));
-    }, 60000);
-  });
-}
-
-export async function callFal(model: string, input: any): Promise<any> {
-  return aiRequest('fal', model, input);
-}
-
-export async function callFluxSchnell(input: any): Promise<any> {
-  return aiRequest('fal', 'fal-ai/flux-1/schnell', input);
-}
-
-export interface ComposeMusicParams {
-  prompt?: string;
-  compositionPlan?: any;
-  musicLengthMs?: number;
-  outputFormat?: string;
-  model?: string;
-}
-
-export async function composeMusic(params: ComposeMusicParams): Promise<any> {
-  const input: any = {};
-  if (params && typeof params === 'object') {
-    if (typeof (params as any).prompt === 'string') input.prompt = (params as any).prompt;
-    if ((params as any).compositionPlan) input.composition_plan = (params as any).compositionPlan;
-    if (typeof (params as any).musicLengthMs === 'number') input.music_length_ms = (params as any).musicLengthMs;
-    if (typeof (params as any).outputFormat === 'string') input.output_format = (params as any).outputFormat;
-    if (typeof (params as any).model === 'string') input.model = (params as any).model;
+    
+    // Notify parent about FCP
+    try {
+      window.parent.postMessage({ type: 'FCP_DETECTED' }, '*');
+    } catch (e) {
+      console.log('[FCP] Could not notify parent:', e);
+    }
   }
-  return aiRequest('eleven', input.model || '', input);
-}
+  
+  // Method 1: Use PerformanceObserver for FCP if available
+  if ('PerformanceObserver' in window) {
+    try {
+      const perfObserver = new PerformanceObserver((list) => {
+        const entries = list.getEntries();
+        for (const entry of entries) {
+          if (entry.name === 'first-contentful-paint') {
+            console.log('[FCP] Detected via PerformanceObserver:', entry.startTime + 'ms');
+            notifyFCP();
+            return;
+          }
+        }
+      });
+      perfObserver.observe({ entryTypes: ['paint'] });
+    } catch (e) {
+      console.log('[FCP] PerformanceObserver failed:', e);
+    }
+  }
+  
+  // Method 2: Fallback - watch for DOM content and visible elements
+  function checkForVisibleContent() {
+    const body = document.body;
+    if (!body) return false;
+    
+    // Check if body has visible content
+    const bodyRect = body.getBoundingClientRect();
+    if (bodyRect.width === 0 || bodyRect.height === 0) return false;
+    
+    // Look for visible elements with content
+    const elements = document.querySelectorAll('*');
+    for (let el of elements) {
+      if (el === document.body || el === document.documentElement) continue;
+      
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      
+      // Check if element is visible and has dimensions
+      if (rect.width > 0 && rect.height > 0 && 
+          style.visibility !== 'hidden' && 
+          style.display !== 'none' &&
+          style.opacity !== '0') {
+        
+        // Check if it has text content or background/border
+        const hasText = el.textContent && el.textContent.trim().length > 0;
+        const hasBackground = style.backgroundColor !== 'rgba(0, 0, 0, 0)' && 
+                            style.backgroundColor !== 'transparent';
+        const hasBorder = style.borderWidth !== '0px';
+        const hasImage = el.tagName === 'IMG' && el.complete;
+        
+        if (hasText || hasBackground || hasBorder || hasImage) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  
+  // Method 3: Watch for DOM mutations and check content
+  if ('MutationObserver' in window) {
+    observer = new MutationObserver(() => {
+      if (checkForVisibleContent()) {
+        console.log('[FCP] Detected via DOM content check');
+        notifyFCP();
+      }
+    });
+    
+    // Start observing when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        observer.observe(document.body || document.documentElement, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['style', 'class']
+        });
+      });
+    } else {
+      observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class']
+      });
+    }
+  }
+  
+  // Method 4: Fallback timeout (in case nothing else works)
+  setTimeout(() => {
+    if (!fcpDetected && checkForVisibleContent()) {
+      console.log('[FCP] Detected via timeout fallback');
+      notifyFCP();
+    }
+  }, 2000);
+  
+  // Method 5: Load event fallback
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      if (!fcpDetected) {
+        console.log('[FCP] Detected via load event fallback');
+        notifyFCP();
+      }
+    }, 100);
+  });
+})();
 `;
-          await instance.fs.writeFile('/src/ai.ts', aiHelper as any);
-          console.log('[WebContainer] Wrote /src/ai.ts helper');
+
+        await instance.fs.writeFile('/fcp-notifier.js', fcpNotifierScript);
+        
+        // Inject the FCP notifier into HTML files
+        try {
+          const packageJsonContent = await instance.fs.readFile('/package.json', 'utf8');
+          const packageJson = JSON.parse(packageJsonContent);
+          
+          // Check if it's a React/Next.js app and inject into public/index.html or pages/_document.tsx
+          const publicIndexPath = '/public/index.html';
+          const appIndexPath = '/app/layout.tsx';
+          const srcIndexPath = '/src/index.html';
+          
+          let injected = false;
+          
+          // Try different common HTML entry points
+          const htmlPaths = [publicIndexPath, srcIndexPath, '/index.html'];
+          
+          for (const htmlPath of htmlPaths) {
+            try {
+              const htmlContent = await instance.fs.readFile(htmlPath, 'utf8');
+              if (htmlContent.includes('<head>') && !htmlContent.includes('fcp-notifier.js')) {
+                const updatedContent = htmlContent.replace(
+                  '<head>',
+                  '<head>\n    <script src="/fcp-notifier.js"></script>'
+                );
+                await instance.fs.writeFile(htmlPath, updatedContent);
+                console.log(`[WebContainer] Injected FCP notifier into ${htmlPath}`);
+                injected = true;
+                break;
+              }
+            } catch {}
+          }
+          
+          // For Next.js apps, we might need to inject into _document.tsx or create a custom head
+          if (!injected) {
+            try {
+              // Try to create or update a Next.js _document.tsx file
+              const documentPath = '/pages/_document.tsx';
+              const nextDocumentContent = `import { Html, Head, Main, NextScript } from 'next/document';
+
+export default function Document() {
+  return (
+    <Html>
+      <Head>
+        <script src="/fcp-notifier.js"></script>
+      </Head>
+      <body>
+        <Main />
+        <NextScript />
+      </body>
+    </Html>
+  );
+}`;
+              await instance.fs.writeFile(documentPath, nextDocumentContent);
+              console.log('[WebContainer] Created _document.tsx with FCP notifier');
+              injected = true;
+            } catch {}
+          }
+          
+          // Fallback: inject into any HTML file we can find
+          if (!injected) {
+            try {
+              const files = await instance.fs.readdir('/', { withFileTypes: true });
+              for (const file of files) {
+                if (file.name.endsWith('.html')) {
+                  try {
+                    const content = await instance.fs.readFile(`/${file.name}`, 'utf8');
+                    if (content.includes('<head>') && !content.includes('fcp-notifier.js')) {
+                      const updated = content.replace('<head>', '<head>\n    <script src="/fcp-notifier.js"></script>');
+                      await instance.fs.writeFile(`/${file.name}`, updated);
+                      console.log(`[WebContainer] Injected FCP notifier into ${file.name}`);
+                      break;
+                    }
+                  } catch {}
+                }
+              }
+            } catch {}
+          }
+        } catch (e) {
+          console.warn('[WebContainer] Could not inject FCP notifier:', e);
         }
 
         setLoadingStage('Getting things ready…');
-        setProgress((p) => Math.max(p, 42));
+        setTargetProgress((p) => Math.max(p, 42));
         // Use pnpm for faster dependency installation
         const installProcess = await instance.spawn('pnpm', ['install']);
         
@@ -306,7 +339,7 @@ export async function composeMusic(params: ComposeMusicParams): Promise<any> {
           write(data) {
             console.log('[WebContainer Install]:', data);
             // Heuristically increase progress during install
-            setProgress((prev) => (prev < 72 ? prev + 0.25 : prev));
+            setTargetProgress((prev) => (prev < 72 ? prev + 0.25 : prev));
           }
         }));
 
@@ -319,12 +352,7 @@ export async function composeMusic(params: ComposeMusicParams): Promise<any> {
         // Expose the instance to tools only after dependencies are installed
         setInstance(instance);
 
-        // Start lightweight periodic autosave after instance is ready
-        autosaveIntervalId = setInterval(() => {
-          try {
-            enqueuePersist(instance);
-          } catch {}
-        }, 5000);
+        // Removed periodic autosave; persist on visibility/unload only
 
         // Save on tab hide or before unload
         const handleVisibility = () => {
@@ -341,28 +369,16 @@ export async function composeMusic(params: ComposeMusicParams): Promise<any> {
         beforeUnloadHandler = handleBeforeUnload;
 
         setLoadingStage('Almost there…');
-        setProgress((p) => Math.max(p, 78));
+        setTargetProgress((p) => Math.max(p, 78));
         // Start dev server
         const devProcess = await instance.spawn('pnpm', ['run', 'dev']);
         devProcRef.current = devProcess;
         
-        // Stream dev server output
+        // Stream dev server output (optional logging + progress)
         devProcess.output.pipeTo(new WritableStream({
           write(data) {
             console.log('[WebContainer Dev]:', data);
-            // Detect Vite dependency re-optimization and cover the iframe to avoid white flash
-            try {
-              const text = typeof data === 'string' ? data : new TextDecoder().decode(data as any);
-              if (
-                text.includes('new dependencies optimized') ||
-                text.includes('optimized dependencies changed') ||
-                text.toLowerCase().includes('reloading')
-              ) {
-                setIsReloading(true);
-              }
-            } catch {}
-            // Nudge progress as server boots
-            setProgress((prev) => (prev < 88 ? prev + 0.15 : prev));
+            setTargetProgress((prev) => (prev < 88 ? prev + 0.15 : prev));
           }
         }));
 
@@ -370,99 +386,43 @@ export async function composeMusic(params: ComposeMusicParams): Promise<any> {
         instance.on('server-ready', (port: number, url: string) => {
           console.log(`Server ready on port ${port}: ${url}`);
           devUrlRef.current = url;
-          setLoadingStage('Final touches…');
-          setProgress(92);
+          setServerReady(true);
+          setLoadingStage('Waiting for content to render…');
+          setTargetProgress(88);
           if (iframeRef.current) {
             iframeRef.current.src = url;
-            // Listen for FCP message from the iframe content
-            const onMessage = async (event: MessageEvent) => {
-              if (!iframeRef.current) return;
-              // Optionally, verify origin matches iframe origin
-              try {
-                const iframeOrigin = new URL(iframeRef.current.src).origin;
-                if (event.origin !== iframeOrigin) return;
-              } catch {}
-              if (event.data && event.data.type === 'webcontainer:fcp') {
-                setLoadingStage('Ready');
-                setProgress(100);
-                // Ensure iframe is visible before overlay exit
-                iframeRef.current.classList.add('iframe-ready');
-                void iframeRef.current.offsetHeight;
-                setIsReloading(false);
-                setTimeout(() => setIsLoading(false), 120);
-                return;
-              }
-
-              // AI bridge: handle AI requests coming from apps (nested iframes) inside the Vite iframe
-              if (event.data && event.data.type === 'AI_REQUEST') {
-                const { id, provider, model, input } = event.data as any;
-                const srcWin = (event.source as Window | null);
-                const reply = (payload: any) => {
-                  try { srcWin?.postMessage(payload, event.origin); } catch {}
-                };
-                try {
-                  if (provider === 'fal') {
-                    const res = await fetch('/api/ai/fal', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ model, input }),
-                    });
-                    if (!res.ok) {
-                      const errText = await res.text();
-                      reply({ type: 'AI_RESPONSE', id, ok: false, error: errText });
-                      return;
-                    }
-                    const json = await res.json();
-                    reply({ type: 'AI_RESPONSE', id, ok: true, result: json });
-                  } else if (provider === 'eleven') {
-                    const res = await fetch('/api/ai/eleven', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(input || {}),
-                    });
-                    if (!res.ok) {
-                      const errText = await res.text();
-                      reply({ type: 'AI_RESPONSE', id, ok: false, error: errText });
-                      return;
-                    }
-                    const json = await res.json();
-                    reply({ type: 'AI_RESPONSE', id, ok: true, result: json });
-                  }
-                } catch (e: any) {
-                  reply({ type: 'AI_RESPONSE', id, ok: false, error: e?.message || 'Request failed' });
-                }
-              }
-            };
-            window.addEventListener('message', onMessage);
-            cleanupMessageListener = () => window.removeEventListener('message', onMessage);
-
-            // Fallback: if we never receive FCP within a grace period after load, proceed
-            const handleLoad = () => {
-              const fallbackTimer = window.setTimeout(() => {
-                if (!iframeRef.current) return;
-                setLoadingStage('Ready');
-                setProgress(100);
-                iframeRef.current.classList.add('iframe-ready');
-                void iframeRef.current.offsetHeight;
-                setTimeout(() => setIsLoading(false), 150);
-              }, 1500);
-              // Clear if FCP arrives
-              const clearOnFCP = (e: MessageEvent) => {
-                try {
-                  const iframeOrigin = new URL(iframeRef.current!.src).origin;
-                  if (e.origin !== iframeOrigin) return;
-                } catch {}
-                if (e.data && e.data.type === 'webcontainer:fcp') {
-                  window.clearTimeout(fallbackTimer);
-                  window.removeEventListener('message', clearOnFCP);
-                  setIsReloading(false);
-                }
-              };
-              window.addEventListener('message', clearOnFCP);
-            };
-            iframeRef.current.addEventListener('load', handleLoad, { once: true });
           }
         });
+
+        // Message bridge for AI requests and FCP detection from preview iframes
+        const onMessage = async (event: MessageEvent) => {
+          if (event.data && event.data.type === 'FCP_DETECTED') {
+            console.log('[WebContainer] FCP detected in preview');
+            setFcpDetected(true);
+            return;
+          }
+          
+          if (event.data && event.data.type === 'AI_REQUEST') {
+            const { id, provider, model, input } = event.data as any;
+            const srcWin = (event.source as Window | null);
+            const reply = (payload: any) => { try { srcWin?.postMessage(payload, event.origin); } catch {} };
+            try {
+              if (provider === 'fal') {
+                const res = await fetch('/api/ai/fal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, input }) });
+                if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
+                reply({ type: 'AI_RESPONSE', id, ok: true, result: await res.json() });
+              } else if (provider === 'eleven') {
+                const res = await fetch('/api/ai/eleven', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input || {}) });
+                if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
+                reply({ type: 'AI_RESPONSE', id, ok: true, result: await res.json() });
+              }
+            } catch (e: any) {
+              reply({ type: 'AI_RESPONSE', id, ok: false, error: e?.message || 'Request failed' });
+            }
+          }
+        };
+        window.addEventListener('message', onMessage);
+        cleanupMessageListener = () => window.removeEventListener('message', onMessage);
 
       } catch (err) {
         if (mounted) {
@@ -479,7 +439,6 @@ export async function composeMusic(params: ComposeMusicParams): Promise<any> {
       mounted = false;
       setInstance(null);
       if (cleanupMessageListener) cleanupMessageListener();
-      if (autosaveIntervalId) clearInterval(autosaveIntervalId);
       if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
       if (beforeUnloadHandler) window.removeEventListener('beforeunload', beforeUnloadHandler);
       try {
@@ -489,6 +448,87 @@ export async function composeMusic(params: ComposeMusicParams): Promise<any> {
       } catch {}
     };
   }, []);
+
+  // Keep a ref in sync with the latest target for stable reads inside rAF loop
+  useEffect(() => {
+    const clamped = Math.max(0, Math.min(100, targetProgress));
+    progressTargetRef.current = clamped;
+  }, [targetProgress]);
+
+  // Smoothly animate displayProgress toward targetProgress
+  useEffect(() => {
+    if (!isLoading) {
+      return;
+    }
+
+    let rafId: number;
+
+    const animate = (timestamp: number) => {
+      if (!isLoading) return;
+
+      if (lastFrameTsRef.current == null) {
+        lastFrameTsRef.current = timestamp;
+      }
+      const elapsedMs = Math.min(100, timestamp - (lastFrameTsRef.current || timestamp));
+      lastFrameTsRef.current = timestamp;
+
+      setDisplayProgress((prev) => {
+        const target = progressTargetRef.current;
+        if (Math.abs(target - prev) < 0.05) return target;
+        // Exponential smoothing factor based on frame time for consistent feel
+        const alpha = 1 - Math.pow(0.001, elapsedMs / 200);
+        const next = prev + (target - prev) * alpha;
+        return Math.max(0, Math.min(100, next));
+      });
+
+      rafId = requestAnimationFrame(animate);
+    };
+
+    rafId = requestAnimationFrame(animate);
+    return () => {
+      try { cancelAnimationFrame(rafId); } catch {}
+      lastFrameTsRef.current = null;
+    };
+  }, [isLoading]);
+
+  // Effect to handle completion when both server is ready AND FCP is detected
+  useEffect(() => {
+    if (!(serverReady && fcpDetected && isLoading)) return;
+
+    console.log('[WebContainer] Both server ready and FCP detected, revealing preview');
+    setLoadingStage('Ready');
+    setTargetProgress(100);
+
+    const iframe = iframeRef.current;
+    if (!iframe) {
+      // If no iframe ref, exit overlay immediately as a fallback
+      setShouldExitBoot(true);
+      return;
+    }
+
+    // Start iframe fade-in
+    iframe.classList.add('iframe-ready');
+
+    // When iframe opacity transition finishes, trigger boot overlay exit
+    const onTransitionEnd = (ev: TransitionEvent) => {
+      if (ev.propertyName === 'opacity') {
+        iframe.removeEventListener('transitionend', onTransitionEnd);
+        setShouldExitBoot(true);
+      }
+    };
+    iframe.addEventListener('transitionend', onTransitionEnd);
+
+    // Fallback in case transitionend doesn't fire
+    const fallbackId = window.setTimeout(() => {
+      try { iframe.removeEventListener('transitionend', onTransitionEnd); } catch {}
+      setShouldExitBoot(true);
+    }, 700);
+
+    return () => {
+      window.clearTimeout(fallbackId);
+      try { iframe.removeEventListener('transitionend', onTransitionEnd); } catch {}
+    };
+  }, [serverReady, fcpDetected, isLoading]);
 
   if (error) {
     return (
@@ -503,14 +543,13 @@ export async function composeMusic(params: ComposeMusicParams): Promise<any> {
 
   return (
     <div className="w-full h-full relative bg-white overflow-hidden">
-      {isReloading && (
-        <div className="absolute inset-0 z-10 pointer-events-none bg-[rgb(12,12,12)]/90 transition-opacity duration-200" />
-      )}
       {isLoading && (
         <BootScreen
           message={loadingStage || 'Preparing…'}
-          progress={progress}
-          complete={!isLoading && progress >= 100}
+          progress={displayProgress}
+          complete={shouldExitBoot}
+          onExited={() => setIsLoading(false)}
+          waitingForContent={serverReady && !fcpDetected}
         />
       )}
       <iframe

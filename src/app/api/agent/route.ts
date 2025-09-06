@@ -100,9 +100,48 @@ export async function POST(req: Request) {
           success: !tr.result?.error,
           id: tr.toolCallId?.substring(0, 8)
         })));
+        
+        // Log file operation results
+        event.toolResults.forEach((tr: any) => {
+          if (tr.toolName.startsWith('web_fs_') || ['create_app', 'remove_app', 'rename_app'].includes(tr.toolName)) {
+            const result = tr.result || {};
+            if (result.error) {
+              console.error(`❌ [AI-Result] ${tr.toolName.toUpperCase()} FAILED:`, result.error);
+            } else {
+              switch (tr.toolName) {
+                case 'web_fs_write':
+                  console.log(`✅ [AI-Result] WRITE SUCCESS: ${result.path} (${result.size || 'unknown size'})`);
+                  break;
+                case 'web_fs_read':
+                  console.log(`✅ [AI-Result] READ SUCCESS: ${result.path} (${result.size || 'unknown size'})`);
+                  break;
+                case 'create_app':
+                  console.log(`✅ [AI-Result] APP CREATED: "${result.name}" at ${result.path}`);
+                  break;
+                case 'remove_app':
+                  console.log(`✅ [AI-Result] APP REMOVED: "${result.name}" (${result.id})`);
+                  break;
+                case 'rename_app':
+                  console.log(`✅ [AI-Result] APP RENAMED: "${result.oldName}" -> "${result.newName}"`);
+                  break;
+              }
+            }
+          }
+        });
       }
     },
-    system: CODING_AGENT_SYSTEM_PROMPT,
+    system:
+      [
+        'You are a proactive engineering agent operating inside a WebContainer-powered workspace.',
+        'You can read and modify files, create apps, and run package installs/commands. Never run dev or start server commands.',
+        'Always follow this loop: 1) find files 2) plan 3) execute 4) report.',
+        'Project is a Vite React app: source in src/, public assets in public/.',
+        'When creating apps: place code in src/apps/<id>/index.tsx and update public/apps/registry.json with path /src/apps/<id>/index.tsx.',
+        'HOW TO USE AI IN APPS:\n- Image (FAL): import { callFluxSchnell } from "/src/ai"; await callFluxSchnell({ prompt: "a cat photo" }).\n- Explicit model: import { callFal } from "/src/ai"; await callFal("fal-ai/flux-1/schnell", { prompt: "..." }).\n- Music (ElevenLabs): import { composeMusic } from "/src/ai"; await composeMusic({ prompt: "intense electronic track", musicLengthMs: 60000 }).\nThese route through the message bridge and server proxies (/api/ai/fal, /api/ai/eleven); keys stay on the server.',
+        'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.',
+        'When you need dependencies, use the web_exec tool to run package manager commands (e.g., pnpm add <pkg>, pnpm install). Wait for the web_exec result (which includes exitCode) before proceeding to the next step.',
+        'If an install command fails (non-zero exitCode), report the error and suggest a fix or an alternative.'
+      ].join(' '),
     tools: {
       // Step 1 – file discovery
       web_fs_find: {
@@ -178,14 +217,14 @@ export async function POST(req: Request) {
         }),
       },
       // Validate project health (typecheck/lint/build quick checks)
-      validate_project: {
-        description:
-          'Run validation checks on the project (TypeScript noEmit, and optionally ESLint on specific files). Use after non-trivial edits.',
-        inputSchema: z.object({
-          scope: z.enum(['quick', 'full']).optional().default('quick'),
-          files: z.array(z.string()).optional().describe('Files to lint specifically (optional)'),
-        }),
-      },
+      // validate_project: {
+      //   description:
+      //     'Run validation checks on the project (TypeScript noEmit, and optionally ESLint on specific files). Use after non-trivial edits.',
+      //   inputSchema: z.object({
+      //     scope: z.enum(['quick', 'full']).optional().default('quick'),
+      //     files: z.array(z.string()).optional().describe('Files to lint specifically (optional)'),
+      //   }),
+      // },
       // Planning helper – capture a plan before execution
       submit_plan: tool({
         description: 'Submit a structured execution plan before making changes.',

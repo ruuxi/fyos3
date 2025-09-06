@@ -18,6 +18,12 @@
           // Prevent Vite error overlay from showing
           console.error('[App iframe] Vite error:', payload);
         });
+        
+        // Force iframe reload on CSS changes for HMR
+        import.meta.hot.on('vite:beforeUpdate', () => {
+          console.log('[App iframe] CSS updated, reloading iframe');
+          location.reload();
+        });
       }
       
       // Block vite-error-overlay custom element
@@ -67,12 +73,29 @@
         } catch {}
       };
 
+      
       import { createRoot } from '/src/iframe-root.js';
       // Expect query: ?path=/src/apps/xxx/index.tsx&name=...&id=...
       const params = new URLSearchParams(location.search)
       const path = params.get('path')
       const name = params.get('name') || 'App'
       const mountEl = document.getElementById('mount')
+      
+      // Import CSS for styling (opt-in via URL flags)
+      // Flags: base=1 (index.css), ui=1 (desktop/ui classes), tw=1 (tailwind)
+      try {
+        if (params.get('base') === '1') {
+          await import('/src/index.css')
+        }
+        if (params.get('ui') === '1') {
+          await import('/src/desktop/styles.css')
+        }
+        if (params.get('tw') === '1') {
+          await import('/src/tailwind.css')
+        }
+      } catch (e) {
+        console.error('[App iframe] CSS import error:', e)
+      }
       
       // Global error isolation inside iframe
       const overlay = document.createElement('div')
