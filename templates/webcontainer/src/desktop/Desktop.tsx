@@ -177,7 +177,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         <iframe
           title={app.name}
           src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}&ui=1`}
-          style={{ width: '100%', height: '100%', border: 0, background: 'transparent' }}
+          style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'transparent' }}
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads-without-user-activation"
           onError={(e) => {
             console.warn('Iframe error for app:', app.name, e);
@@ -194,6 +194,21 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
 
 export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
+  // Ensure root container stretches full viewport
+  useEffect(()=>{
+    try{
+      const root = document.getElementById('root')
+      if (root){
+        root.style.height = '100%'
+        root.style.width = '100%'
+      }
+      document.documentElement.style.height = '100%'
+      document.documentElement.style.width = '100%'
+      document.body.style.height = '100%'
+      document.body.style.width = '100%'
+      document.body.style.margin = '0'
+    } catch {}
+  }, [])
   const [open, setOpen] = useState<App[]>([])
   const [iconPositions, setIconPositions] = useState<Record<string,{left:number;top:number}>>({})
   const [windowGeometries, setWindowGeometries] = useState<Record<string,{left:number;top:number;width:number;height:number}>>({})
