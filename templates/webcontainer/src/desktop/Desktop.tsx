@@ -176,7 +176,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
       <div className="content">
         <iframe
           title={app.name}
-          src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}&base=1&ui=1&tw=1`}
+          src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}&base=0&ui=1&tw=1`}
           style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'transparent' }}
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads"
           onError={(e) => {

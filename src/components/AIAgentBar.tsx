@@ -347,7 +347,7 @@ export default function AIAgentBar() {
               };
               await fnsRef.current.writeFile(`${base}/metadata.json`, JSON.stringify(metadata, null, 2));
               // minimal entry file (tsx)
-              const appIndexTsx = `export default function App(){ return <div>${finalName}</div>; }`;
+              const appIndexTsx = `import React from 'react'\nexport default function App(){\n  return (\n    <div className=\"h-full overflow-auto\">\n      <div className=\"sticky top-0 bg-white/70 backdrop-blur border-b px-3 py-2\">\n        <div className=\"font-semibold\">${finalName}</div>\n      </div>\n      <div className=\"p-3 space-y-3\">\n        <p className=\"text-gray-600 text-sm\">This is a new app. Build your UI here. The container fills the window and scrolls as needed.</p>\n      </div>\n    </div>\n  )\n}`;
               await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
               // update registry
               try {
