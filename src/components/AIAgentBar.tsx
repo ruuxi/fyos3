@@ -361,6 +361,13 @@ export default function AIAgentBar() {
                   { id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` }
                 ], null, 2));
               }
+              // Notify desktop to open the newly created app immediately
+              try {
+                const appIndexPath = `/${base}/index.tsx`;
+                if (typeof window !== 'undefined') {
+                  window.postMessage({ type: 'FYOS_OPEN_APP', app: { id: finalId, name: finalName, icon: metadata.icon, path: appIndexPath } }, '*');
+                }
+              } catch {}
               console.log(`✅ [Agent] App created: ${finalName} (${finalId})`);
               addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id: finalId, path: base, name: finalName, icon: metadata.icon } });
               break;

@@ -23,6 +23,7 @@ export default function WebContainer() {
   const { setInstance } = useWebContainer();
   const devProcRef = useRef<any>(null);
   const devUrlRef = useRef<string | null>(null);
+  const pendingOpenAppsRef = useRef<any[]>([]);
   // Wait for both server-ready AND FCP before hiding boot screen
 
   useEffect(() => {
@@ -402,7 +403,7 @@ export default function Document() {
           }
         });
 
-        // Message bridge for AI requests and FCP detection from preview iframes
+        // Message bridge for AI requests, auto-open app, and FCP/desktop readiness from preview iframes
         const onMessage = async (event: MessageEvent) => {
           if (event.data && event.data.type === 'FCP_DETECTED') {
             console.log('[WebContainer] FCP detected in preview');
@@ -427,6 +428,35 @@ export default function Document() {
             } catch (e: any) {
               reply({ type: 'AI_RESPONSE', id, ok: false, error: e?.message || 'Request failed' });
             }
+            return;
+          }
+
+          // Desktop iframe announced readiness; flush any queued opens
+          if (event.data && event.data.type === 'FYOS_DESKTOP_READY') {
+            const target = iframeRef.current?.contentWindow;
+            if (target && pendingOpenAppsRef.current.length > 0) {
+              try {
+                pendingOpenAppsRef.current.forEach(payload => {
+                  try { target.postMessage(payload, '*'); } catch {}
+                });
+                pendingOpenAppsRef.current = [];
+              } catch {}
+            }
+            return;
+          }
+
+          // Forward auto-open app signals to the desktop iframe; always queue and try to send
+          if (event.data && event.data.type === 'FYOS_OPEN_APP') {
+            const payload = event.data;
+            try {
+              const idx = pendingOpenAppsRef.current.findIndex(p => p?.app?.id === payload?.app?.id);
+              if (idx === -1) pendingOpenAppsRef.current.push(payload);
+            } catch { pendingOpenAppsRef.current.push(payload); }
+            const target = iframeRef.current?.contentWindow;
+            if (target) {
+              try { target.postMessage(payload, '*'); } catch {}
+            }
+            return;
           }
         };
         window.addEventListener('message', onMessage);
@@ -513,6 +543,17 @@ export default function Document() {
       setShouldExitBoot(true);
       return;
     }
+
+    // Best-effort: attempt to forward queued auto-open messages on FCP,
+    // but do NOT clear the queue here. We'll clear only after desktop signals readiness.
+    try {
+      const target = iframe.contentWindow;
+      if (target && pendingOpenAppsRef.current.length > 0) {
+        pendingOpenAppsRef.current.forEach(payload => {
+          try { target.postMessage(payload, '*'); } catch {}
+        });
+      }
+    } catch {}
 
     // Start iframe fade-in
     iframe.classList.add('iframe-ready');

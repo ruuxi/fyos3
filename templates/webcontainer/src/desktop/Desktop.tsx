@@ -194,6 +194,11 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
 
 export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
+  const appsByIdRef = useRef<Record<string, App>>({})
+  // Announce readiness to host so it can flush any pending open-app messages
+  useEffect(()=>{
+    try { window.parent?.postMessage({ type: 'FYOS_DESKTOP_READY' }, '*') } catch {}
+  }, [])
   // Ensure root container stretches full viewport
   useEffect(()=>{
     try{
@@ -298,6 +303,8 @@ export default function Desktop(){
             }
           } catch {}
           
+          // build quick lookup
+          try { appsByIdRef.current = Object.fromEntries(list.map(a=>[a.id,a])) } catch {}
           return list
         })
       })
@@ -316,7 +323,10 @@ export default function Desktop(){
         .then((list: App[])=>{
           const curr = JSON.stringify(appsRef.current?.map(a=>({id:a.id,name:a.name,icon:a.icon,path:a.path})) ?? [])
           const next = JSON.stringify(list?.map(a=>({id:a.id,name:a.name,icon:a.icon,path:a.path})) ?? [])
-          if (curr !== next) setApps(list)
+          if (curr !== next) {
+            setApps(list)
+            try { appsByIdRef.current = Object.fromEntries(list.map(a=>[a.id,a])) } catch {}
+          }
         })
         .catch(()=>{})
     }, 2500)
@@ -524,6 +534,35 @@ export default function Desktop(){
   useEffect(()=>{ iconPositionsRef.current = iconPositions }, [iconPositions])
 
   const [launchingIconId, setLaunchingIconId] = useState<string | null>(null)
+
+  // Listen for requests to auto-open an app
+  useEffect(()=>{
+    function onMessage(e: MessageEvent){
+      const d: any = (e as any).data
+      if (!d || d.type !== 'FYOS_OPEN_APP') return
+      const app: App | null = (d.app && typeof d.app === 'object') ? d.app as App : null
+      if (!app || !app.id) return
+      // If app exists in registry, prefer that canonical entry
+      const existing = appsByIdRef.current[app.id]
+      const toLaunch = existing || app
+      // Ensure it has a reasonable path shape
+      if (!toLaunch.path) return
+      // visually bounce icon if present
+      setLaunchingIconId(toLaunch.id)
+      setTimeout(()=> setLaunchingIconId(prev => prev===toLaunch.id ? null : prev), 600)
+      launch(toLaunch)
+      // If icon position missing, assign one and persist
+      setIconPositions(prev => {
+        if (prev[toLaunch.id]) return prev
+        const nextPos = findNextIconPosition(prev, appsRef.current || [])
+        const next = { ...prev, [toLaunch.id]: nextPos }
+        try{ localStorage.setItem('desktop.iconPositions', JSON.stringify(next)) } catch{}
+        return next
+      })
+    }
+    window.addEventListener('message', onMessage)
+    return ()=> window.removeEventListener('message', onMessage)
+  }, [])
 
   return (
     <div className="desktop">
