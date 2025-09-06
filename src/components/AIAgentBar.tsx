@@ -44,12 +44,13 @@ export default function AIAgentBar() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            welcome: true,
             messages: [{
               id: crypto.randomUUID(),
               role: 'user',
               parts: [{
                 type: 'text',
-                text: 'Generate a brief welcome message (1-2 sentences) with a specific app suggestion. Vary the tone and suggestion each time.'
+                text: 'You are a friendly welcoming agent that greets the user the first time that they open the AI Agent bar. Your task is to generate a brief welcome message (1-2 sentences) to greet the user and seed ideas for what to do. For example: Hey! What are we building today? / Whats on your mind? / Hi! Ready to customize your desktop? Describe your vision, and I\'ll make it happen!. These are only examples, be genuine and creative. Vary the tone and suggestion each.'
               }]
             }]
           })
