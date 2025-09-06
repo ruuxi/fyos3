@@ -21,6 +21,7 @@ export default function AIAgentBar() {
   const [welcomeLoaded, setWelcomeLoaded] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const previousMessageCount = useRef(0);
+  const autoScrollEnabled = useRef(true);
   const pendingToolPromises = useRef(new Set<Promise<void>>());
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
 
@@ -49,6 +50,81 @@ export default function AIAgentBar() {
       }, delayMs);
     } catch {}
   }
+
+  // Scroll management functions
+  const scrollToBottom = (smooth = true) => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: smooth ? 'smooth' : 'auto'
+    });
+  };
+
+  const checkScrollPosition = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const threshold = 50; // pixels from bottom
+    const nearBottom = scrollHeight - scrollTop - clientHeight <= threshold;
+    
+    setIsNearBottom(nearBottom);
+    setShowScrollToBottom(!nearBottom);
+    
+    // Update auto-scroll preference based on user behavior
+    autoScrollEnabled.current = nearBottom;
+  };
+
+  // Handle scroll events
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      checkScrollPosition();
+      // Clear new message indicator when user scrolls
+      if (hasNewMessage) {
+        setHasNewMessage(false);
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [hasNewMessage]);
+
+  // Auto-scroll when new messages arrive
+  useEffect(() => {
+    if (messages.length === 0) return;
+    
+    const currentMessageCount = messages.length;
+    const hasNewMessages = currentMessageCount > previousMessageCount.current;
+    
+    if (hasNewMessages) {
+      // Track the latest message
+      const latestMessage = messages[messages.length - 1];
+      if (latestMessage.id !== latestMessageId) {
+        setLatestMessageId(latestMessage.id);
+        
+        // Only auto-scroll if user is near bottom or if it's the first message
+        if (autoScrollEnabled.current || previousMessageCount.current === 0) {
+          // Small delay to ensure DOM is updated
+          setTimeout(() => scrollToBottom(true), 50);
+        } else {
+          // Show new message indicator if user is scrolled up
+          setHasNewMessage(true);
+        }
+      }
+    }
+    
+    previousMessageCount.current = currentMessageCount;
+  }, [messages, latestMessageId]);
+
+  // Initial scroll position check
+  useEffect(() => {
+    checkScrollPosition();
+  }, []);
 
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id: 'agent-chat',
@@ -570,6 +646,10 @@ export default function AIAgentBar() {
     if (!input.trim()) return;
     sendMessage({ text: input });
     setInput('');
+    
+    // Enable auto-scroll and scroll to bottom when user sends a message
+    autoScrollEnabled.current = true;
+    setTimeout(() => scrollToBottom(true), 50);
   };
 
   if (isCollapsed) {
@@ -694,7 +774,11 @@ export default function AIAgentBar() {
             {showScrollToBottom && (
               <div className="sticky bottom-2 right-2 flex justify-end pointer-events-none">
                 <Button
-                  onClick={() => {}}
+                  onClick={() => {
+                    scrollToBottom(true);
+                    setHasNewMessage(false);
+                    autoScrollEnabled.current = true;
+                  }}
                   variant="ghost"
                   size="sm"
                   className={`pointer-events-auto p-2 h-auto bg-[#60a5fa]/90 text-white hover:bg-[#7dd3fc] shadow-[0_0_12px_rgba(96,165,250,0.5)] border-0 rounded-full transition-all duration-200 hover:scale-105 ${hasNewMessage ? 'animate-pulse' : ''}`}
@@ -742,6 +826,10 @@ export default function AIAgentBar() {
                     if (!input.trim()) return;
                     sendMessage({ text: input });
                     setInput('');
+                    
+                    // Enable auto-scroll and scroll to bottom when user sends a message
+                    autoScrollEnabled.current = true;
+                    setTimeout(() => scrollToBottom(true), 50);
                   }
                 }}
                 disabled={(status === 'ready' && !input.trim())}
