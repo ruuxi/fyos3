@@ -8,6 +8,9 @@
       html,body,#mount{height:100%;margin:0}
       body{background:transparent}
     </style>
+    <!-- Preload Tailwind CSS to ensure it's available immediately -->
+    <link rel="preload" href="/src/tailwind.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/src/tailwind.css"></noscript>
   </head>
   <body>
     <div id="mount" style="height:100%"></div>
@@ -81,17 +84,25 @@
       const name = params.get('name') || 'App'
       const mountEl = document.getElementById('mount')
       
-      // Import CSS for styling (opt-in via URL flags)
-      // Flags: base=1 (index.css), ui=1 (desktop/ui classes), tw=1 (tailwind)
+      // Import CSS for styling (always load; URL flags can disable if set to 0)
+      // Flags: base=0 (disable index.css), ui=0 (disable desktop/ui), tw=0 (disable tailwind)
       try {
-        if (params.get('base') === '1') {
-          await import('/src/index.css')
-        }
-        if (params.get('ui') === '1') {
-          await import('/src/desktop/styles.css')
-        }
-        if (params.get('tw') === '1') {
+        const loadBase = params.get('base') !== '0'
+        const loadUi = params.get('ui') !== '0'
+        const loadTw = params.get('tw') !== '0'
+        
+        // Always load Tailwind first to ensure utilities are available
+        if (loadTw) {
           await import('/src/tailwind.css')
+          console.log('[App iframe] Tailwind CSS loaded')
+        }
+        if (loadBase) {
+          await import('/src/index.css')
+          console.log('[App iframe] Base CSS loaded')
+        }
+        if (loadUi) {
+          await import('/src/desktop/styles.css')
+          console.log('[App iframe] Desktop UI CSS loaded')
         }
       } catch (e) {
         console.error('[App iframe] CSS import error:', e)

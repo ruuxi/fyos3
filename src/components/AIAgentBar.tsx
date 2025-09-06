@@ -797,7 +797,15 @@ export default function AIAgentBar() {
                 <Textarea
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  placeholder="Ask the AI agent… Try: ‘Create a Notes app on the desktop and install zustand’"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (input.trim() && status === 'ready') {
+                        onSubmit(e as any);
+                      }
+                    }
+                  }}
+                  placeholder="Ask the AI agent… Try: 'Create a Notes app on the desktop and install zustand'"
                   className="min-h-[40px] max-h-32 resize-none pr-12"
                   rows={1}
                   disabled={status === 'submitted' || status === 'streaming'}
