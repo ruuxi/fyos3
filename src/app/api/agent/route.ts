@@ -1,15 +1,5 @@
-/* Technical execution engine
-  - Model: alibaba/qwen3-coder (specialized coding AI)
-  - Responsibilities:
-    - Handles actual coding/development tasks
-    - Has 15+ WebContainer tools (file system, process
-  execution, app creation)
-    - Operates as a "proactive engineering agent"
-    - Returns raw technical responses */
-
 import { convertToModelMessages, streamText, UIMessage, stepCountIs, tool } from 'ai';
 import { z } from 'zod';
-import { CODING_AGENT_SYSTEM_PROMPT } from '@/lib/aiPrompts';
 
 // Some tool actions (like package installs) may take longer than 30s
 export const maxDuration = 300;
@@ -20,20 +10,9 @@ export async function POST(req: Request) {
   console.log('🔵 [AGENT] Incoming request with messages:', messages.map(m => ({
     role: m.role,
     content: 'content' in m && typeof m.content === 'string' ? (m.content.length > 100 ? m.content.substring(0, 100) + '...' : m.content) : '[non-text content]',
+
     toolCalls: 'toolCalls' in m && Array.isArray(m.toolCalls) ? m.toolCalls.length : 0
   })));
-
-  // Ensure messages is an array
-  if (!Array.isArray(messages)) {
-    console.error('❌ [AGENT] Messages is not an array:', messages);
-    return new Response('Invalid messages format', { status: 400 });
-  }
-
-  // Filter out system messages that were added by conversation layer
-  const filteredMessages = messages.filter(m => 
-    !(m.role === 'system' && 'content' in m && typeof m.content === 'string' && 
-      m.content.includes('receiving this request through a conversation layer'))
-  );
 
   const result = streamText({
     model: 'alibaba/qwen3-coder',
@@ -42,7 +21,7 @@ export async function POST(req: Request) {
         order: ['cerebras', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
       },
     },
-    messages: convertToModelMessages(filteredMessages),
+    messages: convertToModelMessages(messages),
     stopWhen: stepCountIs(8),
     onFinish: (event) => {
       console.log('🎯 [AI] Response finished:', {
@@ -56,16 +35,14 @@ export async function POST(req: Request) {
       if (event.toolCalls?.length) {
         console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc: any) => ({
           name: tc.toolName,
-          args: tc.args || tc.input, // Use input if args is undefined
+          args: tc.args,
           id: tc.toolCallId?.substring(0, 8)
         })));
-        
-        // Debug: Log the raw tool call structure
-        console.log('🔍 [AI] Raw tool calls:', JSON.stringify(event.toolCalls, null, 2));
         
         // Log file operation details
         event.toolCalls.forEach((tc: any) => {
           if (tc.toolName.startsWith('web_fs_') || ['create_app', 'remove_app', 'rename_app'].includes(tc.toolName)) {
+
             const args = tc.args || {};
             switch (tc.toolName) {
               case 'web_fs_write':
@@ -104,6 +81,7 @@ export async function POST(req: Request) {
         // Log file operation results
         event.toolResults.forEach((tr: any) => {
           if (tr.toolName.startsWith('web_fs_') || ['create_app', 'remove_app', 'rename_app'].includes(tr.toolName)) {
+
             const result = tr.result || {};
             if (result.error) {
               console.error(`❌ [AI-Result] ${tr.toolName.toUpperCase()} FAILED:`, result.error);
@@ -133,13 +111,17 @@ export async function POST(req: Request) {
     system:
       [
         'You are a proactive engineering agent operating inside a WebContainer-powered workspace.',
-        'You can read and modify files, create apps, and run package installs/commands. Never run dev or start server commands.',
+        'You can read and modify files, create apps, and run package installs/commands.',
         'Always follow this loop: 1) find files 2) plan 3) execute 4) report.',
         'Project is a Vite React app: source in src/, public assets in public/.',
-        'When creating apps: place code in src/apps/<id>/index.tsx and update public/apps/registry.json with path /src/apps/<id>/index.tsx.',
-        'HOW TO USE AI IN APPS:\n- Image (FAL): import { callFluxSchnell } from "/src/ai"; await callFluxSchnell({ prompt: "a cat photo" }).\n- Explicit model: import { callFal } from "/src/ai"; await callFal("fal-ai/flux-1/schnell", { prompt: "..." }).\n- Music (ElevenLabs): import { composeMusic } from "/src/ai"; await composeMusic({ prompt: "intense electronic track", musicLengthMs: 60000 }).\nThese route through the message bridge and server proxies (/api/ai/fal, /api/ai/eleven); keys stay on the server.',
+        'When creating apps: place code in src/apps/<id>/index.tsx and update public/apps/registry.json with path\n/src/apps/<id>/index.tsx.',
+
+        'AI bridge for apps (FAL, ElevenLabs): DO NOT call remote APIs or embed secrets in app code. Instead, import { callFal, callFluxSchnell, composeMusic } from "/src/ai" and use those helpers inside apps to request AI via\n the host bridge.',
+
         'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.',
-        'When you need dependencies, use the web_exec tool to run package manager commands (e.g., pnpm add <pkg>, pnpm install). Wait for the web_exec result (which includes exitCode) before proceeding to the next step.',
+
+        'When you need dependencies, use the web_exec tool to run package manager commands (e.g., pnpm add <pkg>,\npnpm install). Wait for the web_exec result (which includes exitCode) before proceeding to the next step.',
+
         'If an install command fails (non-zero exitCode), report the error and suggest a fix or an alternative.'
       ].join(' '),
     tools: {
@@ -217,14 +199,15 @@ export async function POST(req: Request) {
         }),
       },
       // Validate project health (typecheck/lint/build quick checks)
-      // validate_project: {
-      //   description:
-      //     'Run validation checks on the project (TypeScript noEmit, and optionally ESLint on specific files). Use after non-trivial edits.',
-      //   inputSchema: z.object({
-      //     scope: z.enum(['quick', 'full']).optional().default('quick'),
-      //     files: z.array(z.string()).optional().describe('Files to lint specifically (optional)'),
-      //   }),
-      // },
+      validate_project: {
+        description:
+          'Run validation checks on the project (TypeScript noEmit, and optionally ESLint on specific files). Use\nafter non-trivial edits.',
+
+        inputSchema: z.object({
+          scope: z.enum(['quick', 'full']).optional().default('quick'),
+          files: z.array(z.string()).optional().describe('Files to lint specifically (optional)'),
+        }),
+      },
       // Planning helper – capture a plan before execution
       submit_plan: tool({
         description: 'Submit a structured execution plan before making changes.',

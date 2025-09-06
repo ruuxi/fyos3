@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, ChevronDown, MessageCircle, ArrowDown, Square } from 'lucide-react';
@@ -8,7 +8,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
 import ChatAlert from './ChatAlert';
-// Persistence is handled by WebContainer visibility/unload hooks
+import { enqueuePersist } from '@/utils/vfs-persistence';
 
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
@@ -21,14 +21,6 @@ export default function AIAgentBar() {
   const [welcomeLoaded, setWelcomeLoaded] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const previousMessageCount = useRef(0);
-  
-  // TODO(human): Add user preference learning system here
-  // Consider implementing adaptive scroll behavior based on user patterns:
-  // - Track manual scroll frequency vs auto-scroll acceptance
-  // - Adjust "nearBottom" threshold (currently 100px) based on user behavior
-  // - Store preferences in localStorage for session persistence
-  // - Learn from scroll timing patterns (quick scroll = intentional viewing)
-  // This could significantly improve UX by personalizing the scroll experience
   const pendingToolPromises = useRef(new Set<Promise<void>>());
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
 
@@ -38,47 +30,6 @@ export default function AIAgentBar() {
   useEffect(() => { instanceRef.current = instance; }, [instance]);
   useEffect(() => { fnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
 
-  // Scroll management functions
-  const checkScrollPosition = useCallback(() => {
-    if (!messagesContainerRef.current) return;
-    
-    const container = messagesContainerRef.current;
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    
-    const nearBottom = distanceFromBottom <= 100;
-    const shouldShowButton = distanceFromBottom > 50;
-    
-    setIsNearBottom(nearBottom);
-    setShowScrollToBottom(shouldShowButton);
-  }, []);
-
-  const scrollToBottom = useCallback((smooth = true) => {
-    if (!messagesContainerRef.current) return;
-    
-    messagesContainerRef.current.scrollTo({
-      top: messagesContainerRef.current.scrollHeight,
-      behavior: smooth ? 'smooth' : 'auto'
-    });
-    setHasNewMessage(false);
-    setShowScrollToBottom(false);
-  }, []);
-
-  // Keyboard shortcut for scroll to bottom (Ctrl/Cmd + End)
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === 'End') {
-        event.preventDefault();
-        scrollToBottom();
-      }
-    };
-
-    if (!isCollapsed) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isCollapsed, scrollToBottom]);
-
   async function waitForInstance(timeoutMs = 4000, intervalMs = 100) {
     const start = Date.now();
     while (!instanceRef.current && Date.now() - start < timeoutMs) {
@@ -87,14 +38,23 @@ export default function AIAgentBar() {
     return instanceRef.current;
   }
 
-  // Lean reloads: rely on dev server HMR; no manual refresh orchestration
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function scheduleDevRefresh(delayMs = 800) {
+    try {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(() => {
+        refreshTimerRef.current = null;
+        try { (globalThis as any).devServerControls?.refreshPreview?.(); } catch {}
+      }, delayMs);
+    } catch {}
+  }
 
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id: 'agent-chat',
-    transport: new DefaultChatTransport({ api: '/api/conversation' }),
+    transport: new DefaultChatTransport({ api: '/api/agent' }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     async onToolCall({ toolCall }) {
-      console.log('🛠️ [CLIENT] Tool call received:', { name: toolCall.toolName, id: toolCall.toolCallId, input: toolCall.input });
       if (toolCall.dynamic) return; // not expected here, but keep safe
 
       // Guard: WebContainer must be ready for client tools
@@ -144,6 +104,10 @@ export default function AIAgentBar() {
               }
               await fnsRef.current.writeFile(path, content);
               addToolResult({ tool: 'web_fs_write', toolCallId: tc.toolCallId, output: { ok: true, path, size: `${sizeKB}KB` } });
+
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange(path);
+              scheduleDevRefresh(600);
               break;
             }
             case 'web_fs_mkdir': {
@@ -151,6 +115,9 @@ export default function AIAgentBar() {
               console.log(`🔧 [Agent] web_fs_mkdir: ${path} ${recursive ? '(recursive)' : ''}`);
               await fnsRef.current.mkdir(path, recursive);
               addToolResult({ tool: 'web_fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
+
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange(path);
               break;
             }
             case 'web_fs_rm': {
@@ -158,6 +125,9 @@ export default function AIAgentBar() {
               console.log(`🔧 [Agent] web_fs_rm: ${path} ${recursive ? '(recursive)' : ''}`);
               await fnsRef.current.remove(path, { recursive });
               addToolResult({ tool: 'web_fs_rm', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
+
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange(path);
               break;
             }
             case 'web_exec': {
@@ -174,7 +144,6 @@ export default function AIAgentBar() {
                     if (ch === quote) {
                       quote = null;
                     } else if (ch === '\\' && i + 1 < line.length) {
-                      // handle simple escapes inside quotes
                       i++;
                       cur += line[i];
                     } else {
@@ -227,10 +196,8 @@ export default function AIAgentBar() {
               console.log(`🔧 [Agent] web_exec: ${fullCommand} ${cwd ? `(cwd: ${cwd})` : ''}`);
               let result = await fnsRef.current.spawn(command, args, { cwd });
 
-              // No package manager fallback to keep behavior strict
               console.log(`📊 [Agent] web_exec result: exit ${result.exitCode}, output ${result.output.length} chars`);
 
-              // Avoid flooding LLM with huge logs; compact install/update outputs
               const isPkgMgrCmd = /(pnpm|npm|yarn|bun)\s+(add|install|remove|uninstall|update)/i.test(fullCommand);
               const maxChars = 8000;
               const maxLines = 120;
@@ -252,6 +219,9 @@ export default function AIAgentBar() {
                     outputTail: trimChars(lastLines(result.output, maxLines)),
                   },
                 });
+                if (result.exitCode === 0) {
+                  scheduleDevRefresh(800);
+                }
               } else {
                 addToolResult({
                   tool: 'web_exec',
@@ -264,6 +234,14 @@ export default function AIAgentBar() {
                   },
                 });
               }
+              // Heuristically persist after package manager or file-changing commands
+              try {
+                if (instanceRef.current) {
+                  if (/(pnpm|npm|yarn|bun)\s+(add|install|remove|uninstall|update)|git\s+(checkout|switch|merge|apply)/i.test(fullCommand)) {
+                    enqueuePersist(instanceRef.current);
+                  }
+                }
+              } catch {}
               break;
             }
             case 'create_app': {
@@ -289,7 +267,7 @@ export default function AIAgentBar() {
                 const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>
                 registry.push({ id, name, icon: metadata.icon, path: `/${base}/index.tsx` });
                 await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
-              } catch {
+              } catch (e) {
                 // If registry missing, create it
                 await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify([
                   { id, name, icon: metadata.icon, path: `/${base}/index.tsx` }
@@ -297,6 +275,11 @@ export default function AIAgentBar() {
               }
               console.log(`✅ [Agent] App created: ${name} (${id})`);
               addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base, name, icon: metadata.icon } });
+
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange(`${base}/index.tsx`);
+              recordChange('public/apps/registry.json');
+              scheduleDevRefresh(800);
               break;
             }
             case 'rename_app': {
@@ -304,6 +287,7 @@ export default function AIAgentBar() {
               console.log(`🔧 [Agent] rename_app: ${id} -> "${name}"`);
               const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
               const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>;
+              
               const idx = registry.findIndex((r) => r.id === id);
               if (idx === -1) throw new Error('App not found in registry');
               const oldName = registry[idx].name;
@@ -311,6 +295,9 @@ export default function AIAgentBar() {
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
               console.log(`✅ [Agent] App renamed: "${oldName}" -> "${name}"`);
               addToolResult({ tool: 'rename_app', toolCallId: tc.toolCallId, output: { ok: true, id, oldName, newName: name } });
+
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange('public/apps/registry.json');
               break;
             }
             case 'remove_app': {
@@ -334,15 +321,18 @@ export default function AIAgentBar() {
               try { await fnsRef.current.remove(p2, { recursive: true }); } catch {}
               console.log(`✅ [Agent] App removed: "${appName}" (${id})`);
               addToolResult({ tool: 'remove_app', toolCallId: tc.toolCallId, output: { ok: true, id, name: appName, removedPaths: [p1, p2] } });
+
+              try { if (instanceRef.current) enqueuePersist(instanceRef.current); } catch {}
+              recordChange('public/apps/registry.json');
               break;
             }
-            // case 'validate_project': {
-            //   const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
-            //   console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
-            //   await runValidation(scope, files);
-            //   addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true } });
-            //   break;
-            // }
+            case 'validate_project': {
+              const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
+              console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
+              await runValidation(scope, files);
+              addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true } });
+              break;
+            }
             default:
               // Unknown tool on client
               addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output: { error: `Unhandled client tool: ${tc.toolName}` } });
@@ -360,38 +350,6 @@ export default function AIAgentBar() {
     },
   });
 
-  // Load a friendly welcome message on first open, cache in localStorage
-  useEffect(() => {
-    const STORAGE_KEY = 'fyos_agent_welcome_message';
-    if (!isCollapsed && !welcomeLoaded && messages.length === 0) {
-      try {
-        const cached = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-        if (cached && cached.trim()) {
-          setWelcomeMessage(cached);
-          setWelcomeLoaded(true);
-          return;
-        }
-      } catch {}
-      (async () => {
-        try {
-          const res = await fetch('/api/welcome', { cache: 'no-store' });
-          if (!res.ok) throw new Error('Failed to fetch welcome');
-          const json = await res.json();
-          const msg = String(json?.message || '').trim();
-          const finalMsg = msg || 'Hey! I can spin up apps or fix issues. Try: “Create a Notes app on the desktop”.';
-          setWelcomeMessage(finalMsg);
-          try { localStorage.setItem(STORAGE_KEY, finalMsg); } catch {}
-        } catch {
-          const fallback = 'Hey! I can spin up apps or fix issues. Try: “Create a Notes app on the desktop”.';
-          setWelcomeMessage(fallback);
-          try { localStorage.setItem(STORAGE_KEY, fallback); } catch {}
-        } finally {
-          setWelcomeLoaded(true);
-        }
-      })();
-    }
-  }, [isCollapsed, welcomeLoaded, messages.length]);
-
   // === Automatic diagnostics ===
   // Preview error -> show alert and auto-post to AI once per unique error
   const [previewAlert, setPreviewAlert] = useState<{
@@ -401,7 +359,8 @@ export default function AIAgentBar() {
     content: string;
   } | null>(null);
 
-  // Removed automatic validation loop; validation runs only via validate_project tool
+  const changedFilesRef = useRef<Set<string>>(new Set());
+  const validateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const validateRunningRef = useRef(false);
   const lastErrorHashRef = useRef<string | null>(null);
   const autoPostBusyRef = useRef(false);
@@ -455,7 +414,23 @@ export default function AIAgentBar() {
     return () => window.removeEventListener('wc-preview-error', handler as EventListener);
   }, [status]);
 
-  // No per-change validation debounce
+  function recordChange(path: string) {
+    if (!path) return;
+    changedFilesRef.current.add(path);
+    try {
+      if (validateTimerRef.current) clearTimeout(validateTimerRef.current);
+    } catch {}
+    const scheduleRun = () => {
+      if (autoPostBusyRef.current || status !== 'ready') {
+        validateTimerRef.current = setTimeout(scheduleRun, 700);
+        return;
+      }
+      const paths = Array.from(changedFilesRef.current);
+      changedFilesRef.current.clear();
+      void runValidation('quick', paths);
+    };
+    validateTimerRef.current = setTimeout(scheduleRun, 700);
+  }
 
   async function runValidation(scope: 'quick' | 'full', changed: string[] = []) {
     if (!instanceRef.current) return;
@@ -597,16 +572,6 @@ export default function AIAgentBar() {
     setInput('');
   };
 
-  const handleSendStopClick = () => {
-    if (status === 'submitted' || status === 'streaming') {
-      stop();
-    } else {
-      if (!input.trim()) return;
-      sendMessage({ text: input });
-      setInput('');
-    }
-  };
-
   if (isCollapsed) {
     return (
       <div className="flex justify-center">
@@ -666,7 +631,6 @@ export default function AIAgentBar() {
           {/* Messages */}
           <div 
             ref={messagesContainerRef}
-            onScroll={checkScrollPosition}
             className="max-h-72 overflow-auto px-4 pt-2 space-y-3 relative custom-scrollbar"
             style={{
               scrollbarWidth: 'thin',
@@ -730,7 +694,7 @@ export default function AIAgentBar() {
             {showScrollToBottom && (
               <div className="sticky bottom-2 right-2 flex justify-end pointer-events-none">
                 <Button
-                  onClick={() => scrollToBottom()}
+                  onClick={() => {}}
                   variant="ghost"
                   size="sm"
                   className={`pointer-events-auto p-2 h-auto bg-[#60a5fa]/90 text-white hover:bg-[#7dd3fc] shadow-[0_0_12px_rgba(96,165,250,0.5)] border-0 rounded-full transition-all duration-200 hover:scale-105 ${hasNewMessage ? 'animate-pulse' : ''}`}
@@ -773,7 +737,15 @@ export default function AIAgentBar() {
 
               <Button 
                 type="button" 
-                onClick={handleSendStopClick}
+                onClick={() => {
+                  if (status === 'submitted' || status === 'streaming') {
+                    stop();
+                  } else {
+                    if (!input.trim()) return;
+                    sendMessage({ text: input });
+                    setInput('');
+                  }
+                }}
                 disabled={(status === 'ready' && !input.trim())}
                 size="sm" 
                 className="h-10 text-white border-0 transition-all duration-200 bg-[#60a5fa] hover:bg-[#7dd3fc] shadow-[0_0_20px_rgba(96,165,250,0.3)]"

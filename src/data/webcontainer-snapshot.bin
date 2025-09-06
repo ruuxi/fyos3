@@ -1,4 +1,4 @@
-Å°dâ®app.htmlÅ°fÅ°c≈ï<!doctype html>
+Å°dâ®app.htmlÅ°fÅ°c≈ü<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -73,10 +73,6 @@
         } catch {}
       };
 
-      // Import CSS for styling
-      import '/src/index.css';          // Base styles, typography, buttons
-      import '/src/desktop/styles.css'; // Desktop-specific classes (.badge, .muted, etc.)
-      import '/src/tailwind.css';       // Tailwind utilities
       
       import { createRoot } from '/src/iframe-root.js';
       // Expect query: ?path=/src/apps/xxx/index.tsx&name=...&id=...
@@ -84,6 +80,22 @@
       const path = params.get('path')
       const name = params.get('name') || 'App'
       const mountEl = document.getElementById('mount')
+      
+      // Import CSS for styling (opt-in via URL flags)
+      // Flags: base=1 (index.css), ui=1 (desktop/ui classes), tw=1 (tailwind)
+      try {
+        if (params.get('base') === '1') {
+          await import('/src/index.css')
+        }
+        if (params.get('ui') === '1') {
+          await import('/src/desktop/styles.css')
+        }
+        if (params.get('tw') === '1') {
+          await import('/src/tailwind.css')
+        }
+      } catch (e) {
+        console.error('[App iframe] CSS import error:', e)
+      }
       
       // Global error isolation inside iframe
       const overlay = document.createElement('div')
@@ -1187,19 +1199,16 @@ packages:
 
 .read-the-docs {
   color: #888;
-}§appsÅ°dÖŸ(app-00000000-0000-0000-0000-000000000001Å°dÅ©index.tsxÅ°fÅ°c≈‡import React from 'react'
+}§appsÅ°dÖŸ(app-00000000-0000-0000-0000-000000000001Å°dÅ©index.tsxÅ°fÅ°c≈import React from 'react'
 export default function Finder(){
   return (
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-        <h2 style={{margin:0}}>Finder</h2>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Finder</div>
         <span className="badge">Home</span>
       </div>
-      <div className="card">
-        <h3 className="card-title">Installed Applications</h3>
-        <p className="muted">Browse and manage your installed apps</p>
-        <AppsList />
-      </div>
+      <p className="muted">This is a simple Finder. It lists installed apps:</p>
+      <AppsList />
     </div>
   )
 }
@@ -1210,275 +1219,85 @@ function AppsList(){
   const [apps, setApps] = React.useState<App[]>([])
   React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
   return (
-    <div className="grid grid-2" style={{gap:12}}>
-      {apps.map(a=> (
-        <div key={a.id} className="card" style={{padding:12,margin:0}}>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span style={{fontSize:20}}>{a.icon}</span>
-            <div>
-              <div style={{fontWeight:500,fontSize:14}}>{a.name}</div>
-              <code style={{color:'#6b7280',fontSize:11}}>{a.id.slice(0,8)}</code>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
+    <ul className="list">
+      {apps.map(a=> <li key={a.id}>{a.icon} {a.name} <code style={{color:'#6b7280'}}>{a.id.slice(0,8)}</code></li>)}
+    </ul>
   )
 }
-Ÿ(app-00000000-0000-0000-0000-000000000002Å°dÅ©index.tsxÅ°fÅ°c≈Ûimport React from 'react'
-export default function Safari(){
-  const [url, setUrl] = React.useState('https://example.com')
-  const [isLoading, setIsLoading] = React.useState(false)
-  
-  const handleNavigate = () => {
-    setIsLoading(true)
-    setTimeout(() => setIsLoading(false), 1500)
-  }
-  
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-        <h2 style={{margin:0}}>Safari</h2>
-        <span className="badge">Preview</span>
-      </div>
-      
-      <div className="card">
-        <div className="form-group">
-          <label className="form-label">Address Bar</label>
-          <div style={{display:'flex',gap:8}}>
-            <input 
-              value={url}
-              onChange={e=>setUrl(e.target.value)}
-              placeholder="https://example.com"
-              className="form-input"
-              style={{flex:1}}
-            />
-            <button onClick={handleNavigate} className="btn btn-primary" disabled={isLoading}>
-              {isLoading ? 'Loading...' : 'Go'}
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      <div className="card">
-        <div style={{
-          background:'#f9fafb',
-          border:'1px solid #e5e7eb',
-          borderRadius:6,
-          padding:20,
-          textAlign:'center',
-          minHeight:200,
-          display:'flex',
-          flexDirection:'column',
-          alignItems:'center',
-          justifyContent:'center'
-        }}>
-          {isLoading ? (
-            <div>
-              <div style={{marginBottom:8}}>üåê</div>
-              <p>Loading page...</p>
-            </div>
-          ) : (
-            <div>
-              <div style={{fontSize:48,marginBottom:12}}>üåê</div>
-              <h3 style={{color:'#6b7280',fontWeight:500}}>Browser Preview</h3>
-              <p className="muted" style={{maxWidth:300,textAlign:'center'}}>
-                External site navigation is disabled in this preview environment. 
-                This is a demonstration of the Safari app interface.
-              </p>
-              <div className="status status-info" style={{marginTop:12}}>
-                Demo Mode
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-Ÿ(app-00000000-0000-0000-0000-000000000003Å°dÅ©index.tsxÅ°fÅ°c≈Üimport React from 'react'
+Ÿ(app-00000000-0000-0000-0000-000000000003Å°dÅ©index.tsxÅ°fÅ°c≈öimport React from 'react'
 export default function Notes(){
   const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])
   const [t, setT] = React.useState('')
   return (
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-        <h2 style={{margin:0}}>Notes</h2>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Notes</div>
         <span className="badge">Local</span>
       </div>
-      <div className="card">
-        <div className="form-group">
-          <textarea 
-            value={t} 
-            onChange={e=>setT(e.target.value)} 
-            placeholder="Write a note‚Ä¶" 
-            className="form-input form-textarea"
-          />
-        </div>
-        <button 
-          onClick={()=>{ if(t.trim()){ setNotes(n=>[{id:Date.now(),text:t.trim()},...n]); setT('') } }} 
-          className="btn btn-primary"
-        >
-          Add Note
-        </button>
+      <div style={{display:'flex',gap:10,marginTop:10}}>
+        <textarea value={t} onChange={e=>setT(e.target.value)} placeholder="Write a note‚Ä¶" style={{flex:1,height:90,border:'1px solid #e5e7eb',borderRadius:8,padding:8}} />
+        <button onClick={()=>{ if(t.trim()){ setNotes(n=>[{id:Date.now(),text:t.trim()},...n]); setT('') } }} style={{padding:'8px 12px'}}>Add</button>
       </div>
-      {notes.length > 0 && (
-        <div className="card">
-          <h3 className="card-title">Your Notes</h3>
-          <ul className="list">
-            {notes.map(n=> <li key={n.id}>{n.text}</li>)}
-          </ul>
-        </div>
-      )}
+      <ul className="list" style={{marginTop:8}}>
+        {notes.map(n=> <li key={n.id}>{n.text}</li>)}
+      </ul>
     </div>
   )
 }
-Ÿ(app-00000000-0000-0000-0000-000000000004Å°dÅ©index.tsxÅ°fÅ°c≈	bimport React from 'react'
-export default function Terminal(){
-  const [lines, setLines] = React.useState(['Welcome to Terminal', 'Type "help" for available commands'])
-  const [cmd, setCmd] = React.useState('')
-  
-  const handleCommand = () => {
-    if (!cmd.trim()) return
-    const command = cmd.trim()
-    const newLines = [...lines, `$ ${command}`]
-    
-    // Simple command responses
-    switch(command.toLowerCase()) {
-      case 'help':
-        newLines.push('Available commands: help, clear, date, whoami, ls')
-        break
-      case 'clear':
-        setLines(['Welcome to Terminal', 'Type "help" for available commands'])
-        setCmd('')
-        return
-      case 'date':
-        newLines.push(new Date().toString())
-        break
-      case 'whoami':
-        newLines.push('user@webcontainer')
-        break
-      case 'ls':
-        newLines.push('Documents  Downloads  Desktop  Applications')
-        break
-      default:
-        newLines.push(`Command not found: ${command}`)
-    }
-    
-    setLines(newLines)
-    setCmd('')
-  }
-  
+Ÿ(app-00000000-0000-0000-0000-000000000002Å°dÅ©index.tsxÅ°fÅ°c≈–import React from 'react'
+export default function Safari(){
   return (
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-        <h2 style={{margin:0}}>Terminal</h2>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Safari</div>
+        <span className="badge">Preview</span>
+      </div>
+      <p className="muted">Minimal browser placeholder. Open external sites is disabled in this preview.</p>
+      <div style={{background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:8,padding:10}}>
+        <div style={{fontSize:13,color:'#6b7280'}}>Address Bar</div>
+        <input style={{width:'100%',padding:8,borderRadius:6,border:'1px solid #d1d5db'}} placeholder="https://example.com" disabled />
+      </div>
+    </div>
+  )
+}
+Ÿ(app-00000000-0000-0000-0000-000000000004Å°dÅ©index.tsxÅ°fÅ°c≈Øimport React from 'react'
+export default function Terminal(){
+  const [lines, setLines] = React.useState(['Welcome to Terminal'])
+  const [cmd, setCmd] = React.useState('help')
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Terminal</div>
         <span className="badge">Demo</span>
       </div>
-      <div className="card">
-        <div style={{
-          fontFamily:'SF Mono, Monaco, Cascadia Code, Roboto Mono, Consolas, Courier New, monospace',
-          background:'#1f2937',
-          color:'#e5e7eb',
-          borderRadius:6,
-          padding:12,
-          minHeight:200,
-          overflow:'auto',
-          fontSize:13,
-          lineHeight:1.4
-        }}>
-          {lines.map((l,i)=>(
-            <div key={i} style={{marginBottom:2}}>
-              {l.startsWith('$') ? <span style={{color:'#10b981'}}>{l}</span> : l}
-            </div>
-          ))}
-        </div>
-        <div style={{display:'flex',gap:8,marginTop:12}}>
-          <input 
-            value={cmd} 
-            onChange={e=>setCmd(e.target.value)}
-            onKeyPress={e => e.key === 'Enter' && handleCommand()}
-            placeholder="Enter command..."
-            className="form-input"
-            style={{flex:1,fontFamily:'SF Mono, Monaco, monospace',fontSize:13}}
-          />
-          <button onClick={handleCommand} className="btn btn-primary">
-            Run
-          </button>
-        </div>
+      <div style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',background:'#111827',color:'#d1d5db',borderRadius:8,padding:10,marginTop:8}}>
+        {lines.map((l,i)=>(<div key={i}>{'>'} {l}</div>))}
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:8}}>
+        <input value={cmd} onChange={e=>setCmd(e.target.value)} style={{flex:1,border:'1px solid #e5e7eb',borderRadius:6,padding:8}} />
+        <button onClick={()=>{ setLines(l=>[...l, 'executed: '+cmd]); setCmd('') }}>Run</button>
       </div>
     </div>
   )
 }
-Ÿ(app-00000000-0000-0000-0000-000000000005Å°dÅ©index.tsxÅ°fÅ°c≈	Aimport React from 'react'
+Ÿ(app-00000000-0000-0000-0000-000000000005Å°dÅ©index.tsxÅ°fÅ°c≈Bimport React from 'react'
 export default function Settings(){
   const [dark, setDark] = React.useState(false)
-  const [notifications, setNotifications] = React.useState(true)
-  const [autoSave, setAutoSave] = React.useState(true)
-  
   return (
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-        <h2 style={{margin:0}}>Settings</h2>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Settings</div>
         <span className="badge">System</span>
       </div>
-      
-      <div className="card">
-        <h3 className="card-title">Appearance</h3>
-        <div className="form-group">
-          <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
-            <input 
-              type="checkbox" 
-              checked={dark} 
-              onChange={()=>setDark(v=>!v)}
-              style={{marginRight:4}}
-            /> 
-            Dark Mode (demo)
-          </label>
-          <p className="muted" style={{fontSize:12,margin:'4px 0 0 20px'}}>
-            Switch between light and dark themes
-          </p>
-        </div>
-      </div>
-      
-      <div className="card">
-        <h3 className="card-title">Preferences</h3>
-        <div className="form-group">
-          <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
-            <input 
-              type="checkbox" 
-              checked={notifications} 
-              onChange={()=>setNotifications(v=>!v)}
-              style={{marginRight:4}}
-            /> 
-            Enable Notifications
-          </label>
-        </div>
-        <div className="form-group">
-          <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
-            <input 
-              type="checkbox" 
-              checked={autoSave} 
-              onChange={()=>setAutoSave(v=>!v)}
-              style={{marginRight:4}}
-            /> 
-            Auto-save Changes
-          </label>
-        </div>
-      </div>
-      
-      <div className="card">
-        <h3 className="card-title">System Information</h3>
-        <div style={{fontSize:13,color:'#6b7280',lineHeight:1.6}}>
-          <div><strong>Version:</strong> macOS Desktop v1.0.0</div>
-          <div><strong>Environment:</strong> WebContainer</div>
-          <div><strong>Status:</strong> <span className="status status-success">Running</span></div>
-        </div>
+      <div style={{marginTop:10}}>
+        <label style={{display:'flex',alignItems:'center',gap:8}}>
+          <input type="checkbox" checked={dark} onChange={()=>setDark(v=>!v)} /> Dark Mode (demo)
+        </label>
       </div>
     </div>
   )
 }
-¶assetsÅ°dÅ©react.svgÅ°fÅ°c≈<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈D⁄import React, { useEffect, useRef, useState } from 'react'
+¶assetsÅ°dÅ©react.svgÅ°fÅ°c≈<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈EUimport React, { useEffect, useRef, useState } from 'react'
 
 interface App {
   id: string
@@ -1656,9 +1475,9 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
       <div className="content">
         <iframe
           title={app.name}
-          src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}`}
+          src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}&ui=1`}
           style={{ width: '100%', height: '100%', border: 0, background: 'transparent' }}
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads-without-user-activation"
           onError={(e) => {
             console.warn('Iframe error for app:', app.name, e);
           }}
@@ -1951,14 +1770,14 @@ export default function Desktop(){
     </div>
   )
 }
-™styles.cssÅ°fÅ°c≈N/* Base variables and layout */
-:root{--bar:#f6f6f6;--text:#111;--muted:#6b7280;--bg:#0b1020;--glass:rgba(255,255,255,0.25);--dock:rgba(255,255,255,0.3);}
+™styles.cssÅ°fÅ°c≈/* Base variables and layout */
+:root{--bar:#0a0d12;--text:#f5f5f5;--muted:#9ca3af;--bg:#0a0d12;--glass:rgba(255,255,255,0.1);--dock:rgba(255,255,255,0.1);}
 *{box-sizing:border-box}
 body{font-family:Inter,ui-sans-serif,system-ui,Arial}
-.desktop{height:100%;position:relative;color:#111;overflow:hidden}
-.wallpaper{position:absolute;inset:0;background:linear-gradient(135deg,#0b1020 0%,#1e2760 60%,#462e7e 100%)}
-.menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(255,255,255,.65),rgba(255,255,255,.3));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.35)}
-.menubar .title{font-weight:600;font-size:12px}
+.desktop{height:100%;position:relative;color:#f5f5f5;overflow:hidden}
+.wallpaper{position:absolute;inset:0;background:radial-gradient(120% 120% at 50% 0%, #0a0d12 0%, #070a0f 55%, #05070b 100%)}
+.menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(10,13,18,.85),rgba(7,10,15,.65));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.15)}
+.menubar .title{font-weight:600;font-size:12px;color:var(--text)}
 .menubar .right{margin-left:auto;font-size:12px;color:var(--muted)}
 
 /* Dock removed */
@@ -1980,19 +1799,19 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .desktop-icon .glyph{font-size:36px;line-height:36px}
 
 /* Window */
-.window{position:absolute;top:90px;left:90px;min-width:280px;min-height:160px;background:white;border-radius:10px;box-shadow:0 15px 40px rgba(0,0,0,.25);overflow:hidden;border:1px solid rgba(0,0,0,.08);will-change:transform,opacity}
+.window{position:absolute;top:90px;left:90px;min-width:280px;min-height:160px;background:#12151b;border-radius:10px;box-shadow:0 15px 40px rgba(0,0,0,.45);overflow:hidden;border:1px solid rgba(255,255,255,.1);will-change:transform,opacity}
 .window.opening{animation:mac-window-open-spring .34s cubic-bezier(.2,.8,.2,1)}
 .window.closing{animation:mac-window-close .22s cubic-bezier(.2,.8,.2,1) forwards}
 .window.minimizing{animation:mac-window-minimize .22s cubic-bezier(.2,.8,.2,1) forwards}
 .window.minimized{opacity:0;transform:translateY(8px) scale(.92);pointer-events:none;visibility:hidden}
-.window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(255,255,255,.9),rgba(255,255,255,.65));border-bottom:1px solid rgba(0,0,0,.07);cursor:move}
+.window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(10,13,18,.9),rgba(7,10,15,.75));border-bottom:1px solid rgba(255,255,255,.1);cursor:move}
 .traffic{display:flex;gap:6px;margin-right:6px}
 .traffic .b{width:12px;height:12px;border-radius:50%}
 .b.red{background:#ff5f57}
 .b.yellow{background:#febc2e}
 .b.green{background:#28c840}
-.window .title{font-weight:600;font-size:12px;color:#222}
-.window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:12px;font-size:14px;color:#1f2937;overflow:auto}
+.window .title{font-weight:600;font-size:12px;color:#f5f5f5}
+.window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:12px;font-size:14px;color:#e5e7eb;overflow:auto}
 
 @keyframes mac-window-open-spring{
   0%{opacity:0;transform:translateY(10px) scale(.92)}
@@ -2015,51 +1834,10 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .resize-handle.sw{left:-1px;bottom:-1px;cursor:nesw-resize}
 .resize-handle.se{right:-1px;bottom:-1px;cursor:nwse-resize}
 
-/* App content styling */
-.badge{font-size:11px;color:#374151;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px;font-weight:500}
-.muted{color:#6b7280;font-size:14px}
-.list{padding-left:16px;margin:0}
-.list li{padding:4px 0;color:#374151;font-size:14px}
-
-/* Enhanced form styling for apps */
-.form-group{margin-bottom:16px}
-.form-label{display:block;font-weight:500;color:#374151;margin-bottom:4px;font-size:14px}
-.form-input{width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;background:#ffffff;color:#1f2937;transition:border-color 0.2s ease,box-shadow 0.2s ease}
-.form-input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.1)}
-.form-textarea{resize:vertical;min-height:80px}
-
-/* Button variants for apps */
-.btn{display:inline-flex;align-items:center;justify-content:center;padding:8px 16px;font-size:14px;font-weight:500;border-radius:6px;border:1px solid;cursor:pointer;transition:all 0.2s ease;text-decoration:none;font-family:inherit}
-.btn-primary{background:#3b82f6;color:#ffffff;border-color:#3b82f6}
-.btn-primary:hover{background:#2563eb;border-color:#2563eb}
-.btn-secondary{background:#ffffff;color:#374151;border-color:#d1d5db}
-.btn-secondary:hover{background:#f9fafb;border-color:#9ca3af}
-.btn-sm{padding:6px 12px;font-size:13px}
-
-/* Card styling for app layouts */
-.card{background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:16px}
-.card-header{margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #f3f4f6}
-.card-title{font-size:16px;font-weight:600;color:#111827;margin:0}
-.card-content{color:#374151;line-height:1.5}
-
-/* Grid layouts for apps */
-.grid{display:grid;gap:16px}
-.grid-2{grid-template-columns:repeat(2,1fr)}
-.grid-3{grid-template-columns:repeat(3,1fr)}
-.grid-auto{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-
-/* Spacing utilities */
-.p-2{padding:8px}.p-3{padding:12px}.p-4{padding:16px}
-.m-2{margin:8px}.m-3{margin:12px}.m-4{margin:16px}
-.mb-2{margin-bottom:8px}.mb-3{margin-bottom:12px}.mb-4{margin-bottom:16px}
-.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mt-4{margin-top:16px}
-
-/* Status indicators */
-.status{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500}
-.status-success{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
-.status-warning{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
-.status-error{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
-.status-info{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe}
+/* Misc */
+.badge{font-size:11px;color:#374151;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px}
+.muted{color:#6b7280}
+.list{padding-left:16px}
 Æiframe-root.jsÅ°fÅ°c≈ˆimport React, { StrictMode } from 'react'
 import { createRoot as createReactRoot } from 'react-dom/client'
 
@@ -2110,15 +1888,15 @@ export function createRoot(mountEl, Comp, name){
 }
 
 
-©index.cssÅ°fÅ°c≈ /* App base styles - optimized for light theme apps */
+©index.cssÅ°fÅ°c≈/* Use :root (not ::root) to scope CSS variables correctly */
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  
-  /* Light theme optimized for apps */
-  color: #1f2937;
-  background-color: #ffffff;
+
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #0a0d12;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -2126,152 +1904,47 @@ export function createRoot(mountEl, Comp, name){
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Reset body for app iframe */
-body {
-  margin: 0;
-  padding: 0;
-  min-height: 100vh;
-  background: transparent;
-}
-
-/* Typography */
-h1, h2, h3, h4, h5, h6 {
-  margin: 0 0 0.5em 0;
-  font-weight: 600;
-  color: #111827;
-}
-
-h1 { font-size: 1.875rem; line-height: 1.2; }
-h2 { font-size: 1.5rem; line-height: 1.3; }
-h3 { font-size: 1.25rem; line-height: 1.4; }
-
-p {
-  margin: 0 0 1em 0;
-  color: #374151;
-}
-
-/* Links */
 a {
   font-weight: 500;
-  color: #3b82f6;
-  text-decoration: none;
-  transition: color 0.2s ease;
+  color: #646cff;
+  text-decoration: inherit;
 }
 a:hover {
-  color: #2563eb;
-  text-decoration: underline;
+  color: #535bf2;
 }
 
-/* Buttons */
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
 button {
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  padding: 8px 16px;
-  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #ffffff;
-  color: #374151;
+  background-color: #1a1a1a;
+  color: inherit;
   cursor: pointer;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  transition: border-color 0.25s;
 }
-
 button:hover {
-  background-color: #f9fafb;
-  border-color: #9ca3af;
+  border-color: #646cff;
 }
-
 button:focus,
 button:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-
-button:active {
-  background-color: #f3f4f6;
-}
-
-/* Form elements */
-input, textarea, select {
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  padding: 8px 12px;
-  font-size: 14px;
-  font-family: inherit;
-  background-color: #ffffff;
-  color: #1f2937;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-input:focus, textarea:focus, select:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-/* Lists */
-ul, ol {
-  padding-left: 1.5em;
-  margin: 0 0 1em 0;
-}
-
-li {
-  margin-bottom: 0.25em;
-  color: #374151;
-}
-
-/* Code */
-code {
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-  font-size: 0.875em;
-  background-color: #f3f4f6;
-  padding: 2px 4px;
-  border-radius: 3px;
-  color: #1f2937;
-}
-
-pre {
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-  font-size: 0.875em;
-  background-color: #f9fafb;
-  padding: 12px;
-  border-radius: 6px;
-  border: 1px solid #e5e7eb;
-  overflow-x: auto;
-  margin: 0 0 1em 0;
-}
-
-/* Utility classes */
-.text-center { text-align: center; }
-.text-left { text-align: left; }
-.text-right { text-align: right; }
-
-.font-bold { font-weight: 700; }
-.font-semibold { font-weight: 600; }
-.font-medium { font-weight: 500; }
-
-.text-sm { font-size: 0.875rem; }
-.text-xs { font-size: 0.75rem; }
-.text-lg { font-size: 1.125rem; }
-.text-xl { font-size: 1.25rem; }
-
-.mb-2 { margin-bottom: 0.5rem; }
-.mb-4 { margin-bottom: 1rem; }
-.mb-6 { margin-bottom: 1.5rem; }
-.mt-2 { margin-top: 0.5rem; }
-.mt-4 { margin-top: 1rem; }
-.mt-6 { margin-top: 1.5rem; }
-
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.items-center { align-items: center; }
-.justify-center { justify-content: center; }
-.justify-between { justify-content: space-between; }
-.gap-2 { gap: 0.5rem; }
-.gap-4 { gap: 1rem; }®main.tsxÅ°fÅ°c≈import { StrictMode } from 'react'
+  outline: 4px auto -webkit-focus-ring-color;
+}®main.tsxÅ°fÅ°c≈import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import Desktop from './desktop/Desktop'
 import './desktop/styles.css'
