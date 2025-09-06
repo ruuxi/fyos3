@@ -9,6 +9,7 @@ import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } fro
 import { useWebContainer } from './WebContainerProvider';
 import ChatAlert from './ChatAlert';
 import { enqueuePersist } from '@/utils/vfs-persistence';
+ 
 
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
@@ -30,6 +31,30 @@ export default function AIAgentBar() {
   const fnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
   useEffect(() => { instanceRef.current = instance; }, [instance]);
   useEffect(() => { fnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
+
+  // One-time welcome message
+  useEffect(() => {
+    if (welcomeLoaded) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/welcome');
+        if (!res.ok) throw new Error(`welcome ${res.status}`);
+        const json = await res.json();
+        const msg = typeof json?.message === 'string' ? json.message.trim() : '';
+        if (!cancelled && msg) {
+          setWelcomeMessage(msg);
+        }
+      } catch {
+        if (!cancelled) {
+          setWelcomeMessage('Hey! I can spin up apps or fix issues. Try: “Create a Notes app on the desktop”.');
+        }
+      } finally {
+        if (!cancelled) setWelcomeLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [welcomeLoaded]);
 
   async function waitForInstance(timeoutMs = 4000, intervalMs = 100) {
     const start = Date.now();
@@ -760,7 +785,10 @@ export default function AIAgentBar() {
                       case 'tool-web_fs_mkdir':
                       case 'tool-web_fs_rm':
                       case 'tool-web_exec':
-                      case 'tool-create_app': {
+                      case 'tool-create_app':
+                      case 'tool-rename_app':
+                      case 'tool-remove_app':
+                      case 'tool-validate_project': {
                         // Hide tool calls from user - they execute silently in background
                         return null;
                       }
