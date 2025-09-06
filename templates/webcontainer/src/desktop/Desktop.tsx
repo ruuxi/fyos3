@@ -1,5 +1,90 @@
 import React, { useEffect, useRef, useState } from 'react'
 
+// Shared constants
+const DEFAULT_WINDOW_POS = { left: 90, top: 90 }
+const DEFAULT_WINDOW_SIZE = { width: 720, height: 720 }
+const MIN_WINDOW_SIZE = { width: 280, height: 160 }
+
+const MENUBAR_HEIGHT = 28
+const TITLEBAR_HEIGHT = 32
+const MIN_VISIBLE_X = 64
+const MIN_VISIBLE_Y = 48
+
+const OPEN_RESTORE_MS = 340
+const CLOSE_MS = 220
+const MINIMIZE_MS = 220
+
+const LS_ICON_POS_KEY = 'desktop.iconPositions'
+const LS_WINDOW_GEOM_KEY = 'desktop.windowGeometries'
+
+const EVT_OPEN_APP = 'FYOS_OPEN_APP'
+const EVT_DESKTOP_READY = 'FYOS_DESKTOP_READY'
+
+const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: 16, startY: 52, maxPerCol: 6 }
+
+type Geometry = { left: number; top: number; width: number; height: number }
+
+// Helpers
+function clampToViewport(left: number, top: number, width: number, height: number){
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const minLeft = -(width - MIN_VISIBLE_X)
+  const maxLeft = vw - MIN_VISIBLE_X
+  const minTop = MENUBAR_HEIGHT - (TITLEBAR_HEIGHT - 16)
+  const maxTop = vh - MIN_VISIBLE_Y
+  return {
+    left: Math.min(Math.max(left, minLeft), maxLeft),
+    top: Math.min(Math.max(top, minTop), maxTop)
+  }
+}
+
+function resolveAppGeometry(app: App): Geometry{
+  return {
+    left: app.left ?? DEFAULT_WINDOW_POS.left,
+    top: app.top ?? DEFAULT_WINDOW_POS.top,
+    width: app.width ?? DEFAULT_WINDOW_SIZE.width,
+    height: app.height ?? DEFAULT_WINDOW_SIZE.height,
+  }
+}
+
+function resolveInitialGeometry(app: App, stored?: { left: number; top: number; width: number; height: number }): Geometry{
+  const base: Geometry = stored ? stored as Geometry : resolveAppGeometry(app)
+  const pos = clampToViewport(base.left, base.top, base.width, base.height)
+  return { left: pos.left, top: pos.top, width: base.width, height: base.height }
+}
+
+function bounceIcon(setLaunching: React.Dispatch<React.SetStateAction<string | null>>, id: string, ms = 600){
+  setLaunching(id)
+  setTimeout(()=> setLaunching(prev => prev === id ? null : prev), ms)
+}
+
+function loadIconPositions(): Record<string, { left: number; top: number }>{
+  try{
+    const raw = localStorage.getItem(LS_ICON_POS_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch { return {} }
+}
+
+function saveIconPositions(pos: Record<string, { left: number; top: number }>): void{
+  try{ localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(pos)) } catch{}
+}
+
+function loadWindowGeometries(): Record<string, { left: number; top: number; width: number; height: number }>{
+  try{
+    const raw = localStorage.getItem(LS_WINDOW_GEOM_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch { return {} }
+}
+
+function saveWindowGeometries(geoms: Record<string, { left: number; top: number; width: number; height: number }>): void{
+  try{ localStorage.setItem(LS_WINDOW_GEOM_KEY, JSON.stringify(geoms)) } catch{}
+}
+
+async function loadRegistry(): Promise<App[]>{
+  const res = await fetch('/apps/registry.json?_=' + Date.now())
+  return res.ok ? res.json() : []
+}
+
 interface App {
   id: string
   name: string
@@ -52,30 +137,14 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
   }>({ type: null, startX: 0, startY: 0, startLeft: 0, startTop: 0, startWidth: 0, startHeight: 0, active: false })
 
   useEffect(()=>{
-    // Allow partial off-screen but keep window reachable
-    const minVisibleX = 64 // keep at least 64px visible horizontally
-    const minVisibleY = 48 // keep at least 48px visible vertically
-    const menubarH = 28
-    const titlebarH = 32
-    function clamp(left: number, top: number, width: number, height: number){
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-      const minLeft = -(width - minVisibleX)
-      const maxLeft = vw - minVisibleX
-      const minTop = menubarH - (titlebarH - 16) // keep ~16px of titlebar visible under menubar
-      const maxTop = vh - minVisibleY
-      return {
-        left: Math.min(Math.max(left, minLeft), maxLeft),
-        top: Math.min(Math.max(top, minTop), maxTop)
-      }
-    }
+    // Allow partial off-screen but keep window reachable using shared clamp
     function onMoveDoc(e: MouseEvent){
       const d = draggingRef.current
       if (!d.active || !d.type) return
       if (d.type === 'move'){
         const dx = e.clientX - d.startX
         const dy = e.clientY - d.startY
-        const pos = clamp(d.startLeft + dx, d.startTop + dy, d.startWidth, d.startHeight)
+        const pos = clampToViewport(d.startLeft + dx, d.startTop + dy, d.startWidth, d.startHeight)
         onMove(pos)
       } else if (d.type === 'resize'){
         const dx = e.clientX - d.startX
@@ -84,8 +153,8 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         let newH = d.startHeight
         let newL = d.startLeft
         let newT = d.startTop
-        const minW = 280
-        const minH = 160
+        const minW = MIN_WINDOW_SIZE.width
+        const minH = MIN_WINDOW_SIZE.height
         switch(d.handle){
           case 'se':
             newW = Math.max(minW, d.startWidth + dx)
@@ -111,7 +180,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         // Relaxed: allow oversize beyond viewport; keep window reachable via clamp on position
         if (newW < minW) newW = minW
         if (newH < minH) newH = minH
-        const pos = clamp(newL, newT, newW, newH)
+        const pos = clampToViewport(newL, newT, newW, newH)
         onMove(pos)
         onResize({ width: newW, height: newH })
       }
@@ -127,14 +196,15 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
 
   function startMove(e: React.MouseEvent){
     onFocus()
+    const g = resolveAppGeometry(app)
     draggingRef.current = {
       type: 'move',
       startX: e.clientX,
       startY: e.clientY,
-      startLeft: app.left ?? 90,
-      startTop: app.top ?? 90,
-      startWidth: app.width ?? 560,
-      startHeight: app.height ?? 360,
+      startLeft: g.left,
+      startTop: g.top,
+      startWidth: g.width,
+      startHeight: g.height,
       active: true
     }
   }
@@ -143,15 +213,16 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
     return (e: React.MouseEvent)=>{
       e.stopPropagation()
       onFocus()
+      const g = resolveAppGeometry(app)
       draggingRef.current = {
         type: 'resize',
         handle,
         startX: e.clientX,
         startY: e.clientY,
-        startLeft: app.left ?? 90,
-        startTop: app.top ?? 90,
-        startWidth: app.width ?? 560,
-        startHeight: app.height ?? 360,
+        startLeft: g.left,
+        startTop: g.top,
+        startWidth: g.width,
+        startHeight: g.height,
         active: true
       }
     }
@@ -163,7 +234,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
   if (app.minimized && !app.anim) classes.push('minimized')
 
   return (
-    <div className={classes.join(' ')} style={{left: app.left ?? 90, top: app.top ?? 90, width: app.width ?? 560, height: app.height ?? 360, zIndex}} onMouseDown={onFocus}>
+    <div className={classes.join(' ')} style={resolveAppGeometry(app)} onMouseDown={onFocus}>
       <div className="titlebar" onMouseDown={startMove}>
         <div className="traffic" onMouseDown={(e)=>e.stopPropagation()}>
           <div className="b red" onClick={onClose} title="Close" />
@@ -197,7 +268,7 @@ export default function Desktop(){
   const appsByIdRef = useRef<Record<string, App>>({})
   // Announce readiness to host so it can flush any pending open-app messages
   useEffect(()=>{
-    try { window.parent?.postMessage({ type: 'FYOS_DESKTOP_READY' }, '*') } catch {}
+    try { window.parent?.postMessage({ type: EVT_DESKTOP_READY }, '*') } catch {}
   }, [])
   // Ensure root container stretches full viewport
   useEffect(()=>{
@@ -230,12 +301,7 @@ export default function Desktop(){
 
   // Helper function to find next available icon position
   const findNextIconPosition = (currentPositions: Record<string,{left:number;top:number}>, existingApps: App[]) => {
-    const spacingX = 90
-    const spacingY = 90
-    const startX = 16
-    const startY = 52
-    const maxPerCol = 6
-    const iconSize = 64 // approximate icon size for collision detection
+    const { spacingX, spacingY, startX, startY, maxPerCol } = DESKTOP_GRID
     
     // Get all occupied positions
     const occupiedPositions = new Set<string>()
@@ -261,29 +327,18 @@ export default function Desktop(){
   }
 
   useEffect(()=>{
-    fetch('/apps/registry.json?_=' + Date.now())
-      .then(r=>r.json())
+    loadRegistry()
       .then((list: App[])=> {
         setApps(prevApps => {
           // load icon positions from localStorage if present
           try{
-            const saved = localStorage.getItem('desktop.iconPositions')
-            let currentPositions: Record<string,{left:number;top:number}> = {}
-            
-            if (saved){
-              currentPositions = JSON.parse(saved)
-            } else {
-              // initialize default positions in a simple grid for existing apps
-              const spacingX = 90
-              const spacingY = 90
-              const startX = 16
-              const startY = 52
-              const maxPerCol = 6
-              list.slice(0, 20).forEach((a, i)=>{
-                const col = Math.floor(i / maxPerCol)
-                const row = i % maxPerCol
-                currentPositions[a.id] = { left: startX + col*spacingX, top: startY + row*spacingY }
+            let currentPositions = loadIconPositions()
+            if (!currentPositions || Object.keys(currentPositions).length === 0){
+              const seed: Record<string,{left:number;top:number}> = {}
+              list.forEach(app => {
+                seed[app.id] = findNextIconPosition(seed, list)
               })
+              currentPositions = seed
             }
             
             // Check for new apps that don't have positions yet
@@ -296,10 +351,9 @@ export default function Desktop(){
             
             setIconPositions(newPositions)
             
-            const savedGeom = localStorage.getItem('desktop.windowGeometries')
-            if (savedGeom){
-              const parsed = JSON.parse(savedGeom) as Record<string,{left:number;top:number;width:number;height:number}>
-              setWindowGeometries(parsed)
+            const geoms = loadWindowGeometries()
+            if (geoms && Object.keys(geoms).length > 0){
+              setWindowGeometries(geoms)
             }
           } catch {}
           
@@ -318,8 +372,7 @@ export default function Desktop(){
   useEffect(()=>{ appsRef.current = apps }, [apps])
   useEffect(()=>{
     const iv = setInterval(()=>{
-      fetch('/apps/registry.json?_=' + Date.now())
-        .then(r=>r.json())
+      loadRegistry()
         .then((list: App[])=>{
           const curr = JSON.stringify(appsRef.current?.map(a=>({id:a.id,name:a.name,icon:a.icon,path:a.path})) ?? [])
           const next = JSON.stringify(list?.map(a=>({id:a.id,name:a.name,icon:a.icon,path:a.path})) ?? [])
@@ -371,17 +424,9 @@ export default function Desktop(){
         const exists = prev[idx]
         // If minimized, restore with animation
         if (exists.minimized){
-          const DURATION = 340
-          // ensure geometry is clamped on restore (relaxed clamp)
-          const minVisibleX = 64, minVisibleY = 48, menubarH = 28, titlebarH = 32
-          const vw = window.innerWidth, vh = window.innerHeight
-          const width = exists.width ?? 600, height = exists.height ?? 380
-          const minLeft = -(width - minVisibleX)
-          const maxLeft = vw - minVisibleX
-          const minTop = menubarH - (titlebarH - 16)
-          const maxTop = vh - minVisibleY
-          const left = Math.min(Math.max(exists.left ?? 90, minLeft), maxLeft)
-          const top = Math.min(Math.max(exists.top ?? 90, minTop), maxTop)
+          const DURATION = OPEN_RESTORE_MS
+          const g = resolveAppGeometry(exists)
+          const { left, top } = clampToViewport(g.left, g.top, g.width, g.height)
           const updated = { ...exists, left, top, minimized: false, anim: 'restore' as const }
           const next = [...prev]
           next.splice(idx, 1) // bring to front
@@ -396,35 +441,11 @@ export default function Desktop(){
       }
       
       const geom = windowGeometries[app.id]
-      let left: number
-      let top: number
-      
-      if (geom) {
-        // Use saved geometry if available
-        left = geom.left
-        top = geom.top
-      } else {
-        // Find next available position to avoid stacking
-        const nextPos = findNextWindowPosition(prev)
-        left = nextPos.left
-        top = nextPos.top
-      }
-      
-      const width = geom?.width ?? app.width ?? 600
-      const height = geom?.height ?? app.height ?? 380
-      
-      // clamp initial geometry to viewport (relaxed)
-      const minVisibleX = 64, minVisibleY = 48, menubarH = 28, titlebarH = 32
-      const vw = window.innerWidth, vh = window.innerHeight
-      const minLeft = -(width - minVisibleX)
-      const maxLeft = vw - minVisibleX
-      const minTop = menubarH - (titlebarH - 16)
-      const maxTop = vh - minVisibleY
-      left = Math.min(Math.max(left, minLeft), maxLeft)
-      top = Math.min(Math.max(top, minTop), maxTop)
-      
-      const created: App = { ...app, left, top, width, height, minimized: false, anim: 'open' }
-      const DURATION = 340
+      const basePos = geom ? { left: geom.left, top: geom.top } : findNextWindowPosition(prev)
+      const baseSize = geom ? { width: geom.width, height: geom.height } : { width: resolveAppGeometry(app).width, height: resolveAppGeometry(app).height }
+      const clamped = clampToViewport(basePos.left, basePos.top, baseSize.width, baseSize.height)
+      const created: App = { ...app, left: clamped.left, top: clamped.top, width: baseSize.width, height: baseSize.height, minimized: false, anim: 'open' }
+      const DURATION = OPEN_RESTORE_MS
       setTimeout(()=>{
         setOpen(p=> p.map(w=> w.id===app.id ? { ...w, anim: undefined } : w))
       }, DURATION)
@@ -434,7 +455,7 @@ export default function Desktop(){
 
   function close(appId: string){
     // Animate close before removing
-    const DURATION = 220
+    const DURATION = CLOSE_MS
     setOpen(prev => prev.map(w => w.id === appId ? { ...w, anim: 'close' } : w))
     setTimeout(()=>{
       setOpen(prev => prev.filter(w => w.id !== appId))
@@ -442,7 +463,7 @@ export default function Desktop(){
   }
 
   function minimize(appId: string){
-    const DURATION = 220
+    const DURATION = MINIMIZE_MS
     setOpen(prev => prev.map(w => w.id === appId ? { ...w, anim: 'minimize' } : w))
     setTimeout(()=>{
       setOpen(prev => prev.map(w => w.id === appId ? { ...w, minimized: true, anim: undefined } : w))
@@ -460,7 +481,7 @@ export default function Desktop(){
   const saveGeometries = (updater: (g: Record<string,{left:number;top:number;width:number;height:number}>)=>Record<string,{left:number;top:number;width:number;height:number}>) => {
     setWindowGeometries(prev => {
       const next = updater(prev)
-      try{ localStorage.setItem('desktop.windowGeometries', JSON.stringify(next)) } catch{}
+      saveWindowGeometries(next)
       return next
     })
   }
@@ -469,7 +490,7 @@ export default function Desktop(){
     setOpen(prev => prev.map(w => w.id === appId ? { ...w, ...partial } : w))
     if ('left' in partial || 'top' in partial || 'width' in partial || 'height' in partial){
       saveGeometries(prev => {
-        const cur = prev[appId] || { left: 90, top: 90, width: 600, height: 380 }
+        const cur = prev[appId] || { left: 90, top: 90, width: 720, height: 720 }
         return { ...prev, [appId]: { left: partial.left ?? cur.left, top: partial.top ?? cur.top, width: partial.width ?? cur.width, height: partial.height ?? cur.height } }
       })
     }
@@ -498,7 +519,7 @@ export default function Desktop(){
       if (d.id){
         // persist positions
         setTimeout(()=>{
-          try{ localStorage.setItem('desktop.iconPositions', JSON.stringify(iconPositionsRef.current)) } catch{}
+          try{ localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(iconPositionsRef.current)) } catch{}
         }, 0)
       }
       dragIconRef.current = { id: null, startX: 0, startY: 0, startLeft: 0, startTop: 0, dragging: false }
@@ -509,16 +530,9 @@ export default function Desktop(){
     document.addEventListener('mouseup', onUp)
     function onResize(){
       // Re-clamp all windows into viewport on viewport resize (relaxed)
-      const vw = window.innerWidth, vh = window.innerHeight
-      const minVisibleX = 64, minVisibleY = 48, menubarH = 28, titlebarH = 32
       setOpen(prev => prev.map(w => {
-        const width = w.width ?? 600, height = w.height ?? 380
-        const minLeft = -(width - minVisibleX)
-        const maxLeft = vw - minVisibleX
-        const minTop = menubarH - (titlebarH - 16)
-        const maxTop = vh - minVisibleY
-        const left = Math.min(Math.max(w.left ?? 90, minLeft), maxLeft)
-        const top = Math.min(Math.max(w.top ?? 90, minTop), maxTop)
+        const g = resolveAppGeometry(w)
+        const { left, top } = clampToViewport(g.left, g.top, g.width, g.height)
         return { ...w, left, top }
       }))
     }
@@ -539,7 +553,7 @@ export default function Desktop(){
   useEffect(()=>{
     function onMessage(e: MessageEvent){
       const d: any = (e as any).data
-      if (!d || d.type !== 'FYOS_OPEN_APP') return
+      if (!d || d.type !== EVT_OPEN_APP) return
       const app: App | null = (d.app && typeof d.app === 'object') ? d.app as App : null
       if (!app || !app.id) return
       // If app exists in registry, prefer that canonical entry
@@ -548,15 +562,14 @@ export default function Desktop(){
       // Ensure it has a reasonable path shape
       if (!toLaunch.path) return
       // visually bounce icon if present
-      setLaunchingIconId(toLaunch.id)
-      setTimeout(()=> setLaunchingIconId(prev => prev===toLaunch.id ? null : prev), 600)
+      bounceIcon(setLaunchingIconId, toLaunch.id)
       launch(toLaunch)
       // If icon position missing, assign one and persist
       setIconPositions(prev => {
         if (prev[toLaunch.id]) return prev
         const nextPos = findNextIconPosition(prev, appsRef.current || [])
         const next = { ...prev, [toLaunch.id]: nextPos }
-        try{ localStorage.setItem('desktop.iconPositions', JSON.stringify(next)) } catch{}
+        saveIconPositions(next)
         return next
       })
     }
@@ -589,8 +602,7 @@ export default function Desktop(){
               }}
               onClick={(e)=>{
                 if (suppressClickRef.current.has(a.id)) { e.preventDefault(); return }
-                setLaunchingIconId(a.id)
-                setTimeout(()=> setLaunchingIconId(prev => prev===a.id ? null : prev), 600)
+                bounceIcon(setLaunchingIconId, a.id)
                 launch(a)
               }}
             >
