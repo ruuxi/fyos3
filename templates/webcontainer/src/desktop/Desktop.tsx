@@ -177,8 +177,8 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         <iframe
           title={app.name}
           src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}&ui=1`}
-          style={{ width: '100%', height: '100%', border: 0, background: 'transparent' }}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads-without-user-activation"
+          style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'transparent' }}
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads"
           onError={(e) => {
             console.warn('Iframe error for app:', app.name, e);
           }}
@@ -194,6 +194,21 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
 
 export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
+  // Ensure root container stretches full viewport
+  useEffect(()=>{
+    try{
+      const root = document.getElementById('root')
+      if (root){
+        root.style.height = '100%'
+        root.style.width = '100%'
+      }
+      document.documentElement.style.height = '100%'
+      document.documentElement.style.width = '100%'
+      document.body.style.height = '100%'
+      document.body.style.width = '100%'
+      document.body.style.margin = '0'
+    } catch {}
+  }, [])
   const [open, setOpen] = useState<App[]>([])
   const [iconPositions, setIconPositions] = useState<Record<string,{left:number;top:number}>>({})
   const [windowGeometries, setWindowGeometries] = useState<Record<string,{left:number;top:number;width:number;height:number}>>({})
@@ -208,38 +223,83 @@ export default function Desktop(){
   const suppressClickRef = useRef<Set<string>>(new Set())
   const focusedName = open.length ? open[open.length-1].name : 'Finder'
 
+  // Helper function to find next available icon position
+  const findNextIconPosition = (currentPositions: Record<string,{left:number;top:number}>, existingApps: App[]) => {
+    const spacingX = 90
+    const spacingY = 90
+    const startX = 16
+    const startY = 52
+    const maxPerCol = 6
+    const iconSize = 64 // approximate icon size for collision detection
+    
+    // Get all occupied positions
+    const occupiedPositions = new Set<string>()
+    Object.values(currentPositions).forEach(pos => {
+      occupiedPositions.add(`${pos.left},${pos.top}`)
+    })
+    
+    // Find first available grid position
+    for (let i = 0; i < 50; i++) { // limit search to prevent infinite loop
+      const col = Math.floor(i / maxPerCol)
+      const row = i % maxPerCol
+      const left = startX + col * spacingX
+      const top = startY + row * spacingY
+      const posKey = `${left},${top}`
+      
+      if (!occupiedPositions.has(posKey)) {
+        return { left, top }
+      }
+    }
+    
+    // Fallback: place at end of first column
+    return { left: startX, top: startY + maxPerCol * spacingY }
+  }
+
   useEffect(()=>{
     fetch('/apps/registry.json?_=' + Date.now())
       .then(r=>r.json())
       .then((list: App[])=> {
-        setApps(list)
-        // load icon positions from localStorage if present
-        try{
-          const saved = localStorage.getItem('desktop.iconPositions')
-          if (saved){
-            const parsed = JSON.parse(saved) as Record<string,{left:number;top:number}>
-            setIconPositions(parsed)
-          } else {
-            // initialize default positions in a simple grid
-            const spacingX = 90
-            const spacingY = 90
-            const startX = 16
-            const startY = 52
-            const maxPerCol = 6
-            const pos: Record<string,{left:number;top:number}> = {}
-            list.slice(0, 20).forEach((a, i)=>{
-              const col = Math.floor(i / maxPerCol)
-              const row = i % maxPerCol
-              pos[a.id] = { left: startX + col*spacingX, top: startY + row*spacingY }
+        setApps(prevApps => {
+          // load icon positions from localStorage if present
+          try{
+            const saved = localStorage.getItem('desktop.iconPositions')
+            let currentPositions: Record<string,{left:number;top:number}> = {}
+            
+            if (saved){
+              currentPositions = JSON.parse(saved)
+            } else {
+              // initialize default positions in a simple grid for existing apps
+              const spacingX = 90
+              const spacingY = 90
+              const startX = 16
+              const startY = 52
+              const maxPerCol = 6
+              list.slice(0, 20).forEach((a, i)=>{
+                const col = Math.floor(i / maxPerCol)
+                const row = i % maxPerCol
+                currentPositions[a.id] = { left: startX + col*spacingX, top: startY + row*spacingY }
+              })
+            }
+            
+            // Check for new apps that don't have positions yet
+            const newPositions = { ...currentPositions }
+            list.forEach(app => {
+              if (!newPositions[app.id]) {
+                newPositions[app.id] = findNextIconPosition(newPositions, list)
+              }
             })
-            setIconPositions(pos)
-          }
-          const savedGeom = localStorage.getItem('desktop.windowGeometries')
-          if (savedGeom){
-            const parsed = JSON.parse(savedGeom) as Record<string,{left:number;top:number;width:number;height:number}>
-            setWindowGeometries(parsed)
-          }
-        } catch {}
+            
+            setIconPositions(newPositions)
+            
+            const savedGeom = localStorage.getItem('desktop.windowGeometries')
+            if (savedGeom){
+              const parsed = JSON.parse(savedGeom) as Record<string,{left:number;top:number;width:number;height:number}>
+              setWindowGeometries(parsed)
+            }
+          } catch {}
+          
+          return list
+        })
       })
       .catch(()=> setApps([]))
   }, [])
@@ -262,6 +322,37 @@ export default function Desktop(){
     }, 2500)
     return ()=> clearInterval(iv)
   }, [])
+
+  // Helper function to find next available window position
+  const findNextWindowPosition = (openWindows: App[]) => {
+    const baseLeft = 90
+    const baseTop = 90
+    const offsetStep = 30
+    const maxOffset = 200
+    
+    // Try positions with increasing offset
+    for (let offset = 0; offset <= maxOffset; offset += offsetStep) {
+      const left = baseLeft + offset
+      const top = baseTop + offset
+      
+      // Check if this position conflicts with existing windows
+      const hasConflict = openWindows.some(w => {
+        const wLeft = w.left ?? baseLeft
+        const wTop = w.top ?? baseTop
+        return Math.abs(wLeft - left) < 50 && Math.abs(wTop - top) < 50
+      })
+      
+      if (!hasConflict) {
+        return { left, top }
+      }
+    }
+    
+    // Fallback: use base position with random small offset
+    return {
+      left: baseLeft + Math.floor(Math.random() * 100),
+      top: baseTop + Math.floor(Math.random() * 100)
+    }
+  }
 
   function launch(app: App){
     setOpen(prev => {
@@ -293,11 +384,25 @@ export default function Desktop(){
         // otherwise just bring to front
         return [...prev.slice(0, idx), ...prev.slice(idx+1), prev[idx]]
       }
+      
       const geom = windowGeometries[app.id]
-      let left = geom?.left ?? app.left ?? 90
-      let top = geom?.top ?? app.top ?? 90
+      let left: number
+      let top: number
+      
+      if (geom) {
+        // Use saved geometry if available
+        left = geom.left
+        top = geom.top
+      } else {
+        // Find next available position to avoid stacking
+        const nextPos = findNextWindowPosition(prev)
+        left = nextPos.left
+        top = nextPos.top
+      }
+      
       const width = geom?.width ?? app.width ?? 600
       const height = geom?.height ?? app.height ?? 380
+      
       // clamp initial geometry to viewport (relaxed)
       const minVisibleX = 64, minVisibleY = 48, menubarH = 28, titlebarH = 32
       const vw = window.innerWidth, vh = window.innerHeight
@@ -307,6 +412,7 @@ export default function Desktop(){
       const maxTop = vh - minVisibleY
       left = Math.min(Math.max(left, minLeft), maxLeft)
       top = Math.min(Math.max(top, minTop), maxTop)
+      
       const created: App = { ...app, left, top, width, height, minimized: false, anim: 'open' }
       const DURATION = 340
       setTimeout(()=>{

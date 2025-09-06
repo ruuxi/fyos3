@@ -248,6 +248,13 @@ export default function WebContainer() {
 `;
 
         await instance.fs.writeFile('/fcp-notifier.js', fcpNotifierScript);
+
+        // Add a small normalization stylesheet to guarantee full-bleed preview sizing
+        const normalizeCss = `html,body,#root{height:100%;width:100%;margin:0;padding:0}
+body{background:transparent}
+#root{position:relative}
+`;
+        try { await instance.fs.writeFile('/preview-normalize.css', normalizeCss); } catch {}
         
         // Inject the FCP notifier into HTML files
         try {
@@ -270,7 +277,7 @@ export default function WebContainer() {
               if (htmlContent.includes('<head>') && !htmlContent.includes('fcp-notifier.js')) {
                 const updatedContent = htmlContent.replace(
                   '<head>',
-                  '<head>\n    <script src="/fcp-notifier.js"></script>'
+                  '<head>\n    <script src="/fcp-notifier.js"></script>\n    <link rel="stylesheet" href="/preview-normalize.css" />'
                 );
                 await instance.fs.writeFile(htmlPath, updatedContent);
                 console.log(`[WebContainer] Injected FCP notifier into ${htmlPath}`);
@@ -292,6 +299,7 @@ export default function Document() {
     <Html>
       <Head>
         <script src="/fcp-notifier.js"></script>
+        <link rel="stylesheet" href="/preview-normalize.css" />
       </Head>
       <body>
         <Main />
@@ -315,7 +323,7 @@ export default function Document() {
                   try {
                     const content = await instance.fs.readFile(`/${file.name}`, 'utf8');
                     if (content.includes('<head>') && !content.includes('fcp-notifier.js')) {
-                      const updated = content.replace('<head>', '<head>\n    <script src="/fcp-notifier.js"></script>');
+                      const updated = content.replace('<head>', '<head>\n    <script src="/fcp-notifier.js"></script>\n    <link rel="stylesheet" href="/preview-normalize.css" />');
                       await instance.fs.writeFile(`/${file.name}`, updated);
                       console.log(`[WebContainer] Injected FCP notifier into ${file.name}`);
                       break;
@@ -542,7 +550,7 @@ export default function Document() {
   }
 
   return (
-    <div className="w-full h-full relative bg-white overflow-hidden">
+    <div className="absolute inset-0 overflow-hidden">
       {isLoading && (
         <BootScreen
           message={loadingStage || 'Preparing…'}
@@ -554,7 +562,7 @@ export default function Document() {
       )}
       <iframe
         ref={iframeRef}
-        className={`w-full h-full border-0 opacity-0 will-change-[opacity,transform] transition-[opacity,transform] duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${isLoading ? 'scale-[0.995]' : 'opacity-100 scale-100'}`}
+        className={`block absolute inset-0 w-full h-full border-0 opacity-0 will-change-[opacity] transition-opacity duration-[500ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${isLoading ? '' : 'opacity-100'}`}
         title="Preview"
         sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts allow-downloads"
       />

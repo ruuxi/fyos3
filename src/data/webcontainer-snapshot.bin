@@ -1,4 +1,4 @@
-¡d‰¨app.html¡f¡cÅŸ<!doctype html>
+ï¿½ï¿½dï¿½ï¿½app.htmlï¿½ï¿½fï¿½ï¿½cï¿½ï¿½<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -10,7 +10,7 @@
     </style>
   </head>
   <body>
-    <div id="mount"></div>
+    <div id="mount" style="height:100%"></div>
     <script type="module">
       // Disable Vite error overlay in iframe
       if (import.meta.hot) {
@@ -135,19 +135,19 @@
     </script>
   </body>
   </html>
-ªindex.html¡f¡cÅd<!doctype html>
+ï¿½index.htmlï¿½ï¿½fï¿½ï¿½cï¿½ï¿½<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>macOS Desktop</title>
-    <style>html,body,#root{height:100%;margin:0}</style>
+    <style>html,body,#root{height:100%;width:100%;margin:0;padding:0}#root{position:relative}</style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
-</html>¬package.json¡f¡cÅ÷{
+</html>ï¿½package.jsonï¿½ï¿½fï¿½ï¿½cï¿½ï¿½{
   "name": "mac-desktop",
   "private": true,
   "version": "0.0.0",
@@ -170,7 +170,7 @@
     "tailwindcss": "^3.4.10",
     "vite": "^5.0.8"
   }
-}®pnpm-lock.yaml¡f¡cÅ|ilockfileVersion: '6.0'
+}ï¿½pnpm-lock.yamlï¿½ï¿½fï¿½ï¿½cï¿½|ilockfileVersion: '6.0'
 
 settings:
   autoInstallPeers: true
@@ -1118,7 +1118,7 @@ packages:
   /yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
     dev: true
-±postcss.config.js¡f¡cÄRexport default {
+ï¿½postcss.config.jsï¿½ï¿½fï¿½ï¿½cï¿½Rexport default {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},
@@ -1126,39 +1126,39 @@ packages:
 }
 
 
-¦public¡d¤apps¡d­registry.json¡f¡cÅ~[
+ï¿½publicï¿½ï¿½dï¿½ï¿½appsï¿½ï¿½dï¿½ï¿½registry.jsonï¿½ï¿½fï¿½ï¿½cï¿½D[
   {
-    "id": "00000000-0000-0000-0000-000000000001",
+    "id": "finder",
     "name": "Finder",
     "icon": "ğŸ—‚ï¸",
-    "path": "/src/apps/app-00000000-0000-0000-0000-000000000001/index.tsx"
+    "path": "/src/apps/finder/index.tsx"
   },
   {
-    "id": "00000000-0000-0000-0000-000000000002",
+    "id": "safari",
     "name": "Safari",
     "icon": "ğŸŒ",
-    "path": "/src/apps/app-00000000-0000-0000-0000-000000000002/index.tsx"
+    "path": "/src/apps/safari/index.tsx"
   },
   {
-    "id": "00000000-0000-0000-0000-000000000003",
+    "id": "notes",
     "name": "Notes",
     "icon": "ğŸ“",
-    "path": "/src/apps/app-00000000-0000-0000-0000-000000000003/index.tsx"
+    "path": "/src/apps/notes/index.tsx"
   },
   {
-    "id": "00000000-0000-0000-0000-000000000004",
+    "id": "terminal",
     "name": "Terminal",
     "icon": "ğŸ–¥ï¸",
-    "path": "/src/apps/app-00000000-0000-0000-0000-000000000004/index.tsx"
+    "path": "/src/apps/terminal/index.tsx"
   },
   {
-    "id": "00000000-0000-0000-0000-000000000005",
+    "id": "settings",
     "name": "Settings",
     "icon": "âš™ï¸",
-    "path": "/src/apps/app-00000000-0000-0000-0000-000000000005/index.tsx"
+    "path": "/src/apps/settings/index.tsx"
   }
 ]
-£src¡dˆ§App.css¡f¡cÅ]#root {
+ï¿½srcï¿½ï¿½dï¿½ï¿½App.cssï¿½ï¿½fï¿½ï¿½cï¿½]#root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
@@ -1199,7 +1199,75 @@ packages:
 
 .read-the-docs {
   color: #888;
-}¤apps¡d…Ù(app-00000000-0000-0000-0000-000000000001¡d©index.tsx¡f¡cÅimport React from 'react'
+}ï¿½aiï¿½ï¿½dï¿½ï¿½index.tsï¿½ï¿½fï¿½ï¿½cï¿½
+// AI helpers for FYOS apps (client-side, runs inside Vite iframe)
+export type AIProvider = 'fal' | 'eleven';
+
+function generateRequestId(): string {
+  return 'ai_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
+}
+
+export async function aiRequest(provider: AIProvider, model: string, input: any): Promise<any> {
+  const id = generateRequestId();
+  return new Promise((resolve, reject) => {
+    const onMessage = (e: MessageEvent) => {
+      try {
+        const d: any = (e as any).data;
+        if (!d || d.type !== 'AI_RESPONSE' || d.id !== id) return;
+        window.removeEventListener('message', onMessage as any);
+        if (d.ok) resolve(d.result);
+        else reject(new Error(d.error || 'AI request failed'));
+      } catch (err) {
+        window.removeEventListener('message', onMessage as any);
+        reject(err);
+      }
+    };
+    window.addEventListener('message', onMessage as any);
+    try {
+      const payload = { type: 'AI_REQUEST', id, provider, model, input } as const;
+      // Post directly to the top-level Next.js host to avoid needing a desktop relay
+      window.top?.postMessage(payload, '*');
+    } catch (err) {
+      window.removeEventListener('message', onMessage as any);
+      reject(err);
+      return;
+    }
+    // Timeout after 60s
+    setTimeout(() => {
+      try { window.removeEventListener('message', onMessage as any); } catch {}
+      reject(new Error('AI request timeout'));
+    }, 60000);
+  });
+}
+
+export async function callFal(model: string, input: any): Promise<any> {
+  return aiRequest('fal', model, input);
+}
+
+export async function callFluxSchnell(input: any): Promise<any> {
+  return aiRequest('fal', 'fal-ai/flux-1/schnell', input);
+}
+
+export interface ComposeMusicParams {
+  prompt?: string;
+  compositionPlan?: any;
+  musicLengthMs?: number;
+  outputFormat?: string;
+  model?: string;
+}
+
+export async function composeMusic(params: ComposeMusicParams): Promise<any> {
+  const input: any = {};
+  if (params && typeof params === 'object') {
+    if (typeof (params as any).prompt === 'string') input.prompt = (params as any).prompt;
+    if ((params as any).compositionPlan) input.composition_plan = (params as any).compositionPlan;
+    if (typeof (params as any).musicLengthMs === 'number') input.music_length_ms = (params as any).musicLengthMs;
+    if (typeof (params as any).outputFormat === 'string') input.output_format = (params as any).outputFormat;
+    if (typeof (params as any).model === 'string') input.model = (params as any).model;
+  }
+  return aiRequest('eleven', input.model || '', input);
+}
+ï¿½appsï¿½ï¿½dï¿½ï¿½finderï¿½ï¿½dï¿½ï¿½index.tsxï¿½ï¿½fï¿½ï¿½cï¿½import React from 'react'
 export default function Finder(){
   return (
     <div>
@@ -1224,7 +1292,7 @@ function AppsList(){
     </ul>
   )
 }
-Ù(app-00000000-0000-0000-0000-000000000003¡d©index.tsx¡f¡cÅšimport React from 'react'
+ï¿½notesï¿½ï¿½dï¿½ï¿½index.tsxï¿½ï¿½fï¿½ï¿½cï¿½ï¿½import React from 'react'
 export default function Notes(){
   const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])
   const [t, setT] = React.useState('')
@@ -1244,7 +1312,7 @@ export default function Notes(){
     </div>
   )
 }
-Ù(app-00000000-0000-0000-0000-000000000002¡d©index.tsx¡f¡cÅĞimport React from 'react'
+ï¿½safariï¿½ï¿½dï¿½ï¿½index.tsxï¿½ï¿½fï¿½ï¿½cï¿½ï¿½import React from 'react'
 export default function Safari(){
   return (
     <div>
@@ -1260,7 +1328,24 @@ export default function Safari(){
     </div>
   )
 }
-Ù(app-00000000-0000-0000-0000-000000000004¡d©index.tsx¡f¡cÅ¯import React from 'react'
+ï¿½settingsï¿½ï¿½dï¿½ï¿½index.tsxï¿½ï¿½fï¿½ï¿½cï¿½Bimport React from 'react'
+export default function Settings(){
+  const [dark, setDark] = React.useState(false)
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Settings</div>
+        <span className="badge">System</span>
+      </div>
+      <div style={{marginTop:10}}>
+        <label style={{display:'flex',alignItems:'center',gap:8}}>
+          <input type="checkbox" checked={dark} onChange={()=>setDark(v=>!v)} /> Dark Mode (demo)
+        </label>
+      </div>
+    </div>
+  )
+}
+ï¿½terminalï¿½ï¿½dï¿½ï¿½index.tsxï¿½ï¿½fï¿½ï¿½cï¿½ï¿½import React from 'react'
 export default function Terminal(){
   const [lines, setLines] = React.useState(['Welcome to Terminal'])
   const [cmd, setCmd] = React.useState('help')
@@ -1280,24 +1365,7 @@ export default function Terminal(){
     </div>
   )
 }
-Ù(app-00000000-0000-0000-0000-000000000005¡d©index.tsx¡f¡cÅBimport React from 'react'
-export default function Settings(){
-  const [dark, setDark] = React.useState(false)
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Settings</div>
-        <span className="badge">System</span>
-      </div>
-      <div style={{marginTop:10}}>
-        <label style={{display:'flex',alignItems:'center',gap:8}}>
-          <input type="checkbox" checked={dark} onChange={()=>setDark(v=>!v)} /> Dark Mode (demo)
-        </label>
-      </div>
-    </div>
-  )
-}
-¦assets¡d©react.svg¡f¡cÅ<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>§desktop¡d‚«Desktop.tsx¡f¡cÅEUimport React, { useEffect, useRef, useState } from 'react'
+ï¿½assetsï¿½ï¿½dï¿½ï¿½react.svgï¿½ï¿½fï¿½ï¿½cï¿½<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ï¿½desktopï¿½ï¿½dï¿½ï¿½Desktop.tsxï¿½ï¿½fï¿½ï¿½cï¿½Rimport React, { useEffect, useRef, useState } from 'react'
 
 interface App {
   id: string
@@ -1476,8 +1544,8 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         <iframe
           title={app.name}
           src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}&ui=1`}
-          style={{ width: '100%', height: '100%', border: 0, background: 'transparent' }}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads-without-user-activation"
+          style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'transparent' }}
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads"
           onError={(e) => {
             console.warn('Iframe error for app:', app.name, e);
           }}
@@ -1493,6 +1561,21 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
 
 export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
+  // Ensure root container stretches full viewport
+  useEffect(()=>{
+    try{
+      const root = document.getElementById('root')
+      if (root){
+        root.style.height = '100%'
+        root.style.width = '100%'
+      }
+      document.documentElement.style.height = '100%'
+      document.documentElement.style.width = '100%'
+      document.body.style.height = '100%'
+      document.body.style.width = '100%'
+      document.body.style.margin = '0'
+    } catch {}
+  }, [])
   const [open, setOpen] = useState<App[]>([])
   const [iconPositions, setIconPositions] = useState<Record<string,{left:number;top:number}>>({})
   const [windowGeometries, setWindowGeometries] = useState<Record<string,{left:number;top:number;width:number;height:number}>>({})
@@ -1507,38 +1590,83 @@ export default function Desktop(){
   const suppressClickRef = useRef<Set<string>>(new Set())
   const focusedName = open.length ? open[open.length-1].name : 'Finder'
 
+  // Helper function to find next available icon position
+  const findNextIconPosition = (currentPositions: Record<string,{left:number;top:number}>, existingApps: App[]) => {
+    const spacingX = 90
+    const spacingY = 90
+    const startX = 16
+    const startY = 52
+    const maxPerCol = 6
+    const iconSize = 64 // approximate icon size for collision detection
+    
+    // Get all occupied positions
+    const occupiedPositions = new Set<string>()
+    Object.values(currentPositions).forEach(pos => {
+      occupiedPositions.add(`${pos.left},${pos.top}`)
+    })
+    
+    // Find first available grid position
+    for (let i = 0; i < 50; i++) { // limit search to prevent infinite loop
+      const col = Math.floor(i / maxPerCol)
+      const row = i % maxPerCol
+      const left = startX + col * spacingX
+      const top = startY + row * spacingY
+      const posKey = `${left},${top}`
+      
+      if (!occupiedPositions.has(posKey)) {
+        return { left, top }
+      }
+    }
+    
+    // Fallback: place at end of first column
+    return { left: startX, top: startY + maxPerCol * spacingY }
+  }
+
   useEffect(()=>{
     fetch('/apps/registry.json?_=' + Date.now())
       .then(r=>r.json())
       .then((list: App[])=> {
-        setApps(list)
-        // load icon positions from localStorage if present
-        try{
-          const saved = localStorage.getItem('desktop.iconPositions')
-          if (saved){
-            const parsed = JSON.parse(saved) as Record<string,{left:number;top:number}>
-            setIconPositions(parsed)
-          } else {
-            // initialize default positions in a simple grid
-            const spacingX = 90
-            const spacingY = 90
-            const startX = 16
-            const startY = 52
-            const maxPerCol = 6
-            const pos: Record<string,{left:number;top:number}> = {}
-            list.slice(0, 20).forEach((a, i)=>{
-              const col = Math.floor(i / maxPerCol)
-              const row = i % maxPerCol
-              pos[a.id] = { left: startX + col*spacingX, top: startY + row*spacingY }
+        setApps(prevApps => {
+          // load icon positions from localStorage if present
+          try{
+            const saved = localStorage.getItem('desktop.iconPositions')
+            let currentPositions: Record<string,{left:number;top:number}> = {}
+            
+            if (saved){
+              currentPositions = JSON.parse(saved)
+            } else {
+              // initialize default positions in a simple grid for existing apps
+              const spacingX = 90
+              const spacingY = 90
+              const startX = 16
+              const startY = 52
+              const maxPerCol = 6
+              list.slice(0, 20).forEach((a, i)=>{
+                const col = Math.floor(i / maxPerCol)
+                const row = i % maxPerCol
+                currentPositions[a.id] = { left: startX + col*spacingX, top: startY + row*spacingY }
+              })
+            }
+            
+            // Check for new apps that don't have positions yet
+            const newPositions = { ...currentPositions }
+            list.forEach(app => {
+              if (!newPositions[app.id]) {
+                newPositions[app.id] = findNextIconPosition(newPositions, list)
+              }
             })
-            setIconPositions(pos)
-          }
-          const savedGeom = localStorage.getItem('desktop.windowGeometries')
-          if (savedGeom){
-            const parsed = JSON.parse(savedGeom) as Record<string,{left:number;top:number;width:number;height:number}>
-            setWindowGeometries(parsed)
-          }
-        } catch {}
+            
+            setIconPositions(newPositions)
+            
+            const savedGeom = localStorage.getItem('desktop.windowGeometries')
+            if (savedGeom){
+              const parsed = JSON.parse(savedGeom) as Record<string,{left:number;top:number;width:number;height:number}>
+              setWindowGeometries(parsed)
+            }
+          } catch {}
+          
+          return list
+        })
       })
       .catch(()=> setApps([]))
   }, [])
@@ -1561,6 +1689,37 @@ export default function Desktop(){
     }, 2500)
     return ()=> clearInterval(iv)
   }, [])
+
+  // Helper function to find next available window position
+  const findNextWindowPosition = (openWindows: App[]) => {
+    const baseLeft = 90
+    const baseTop = 90
+    const offsetStep = 30
+    const maxOffset = 200
+    
+    // Try positions with increasing offset
+    for (let offset = 0; offset <= maxOffset; offset += offsetStep) {
+      const left = baseLeft + offset
+      const top = baseTop + offset
+      
+      // Check if this position conflicts with existing windows
+      const hasConflict = openWindows.some(w => {
+        const wLeft = w.left ?? baseLeft
+        const wTop = w.top ?? baseTop
+        return Math.abs(wLeft - left) < 50 && Math.abs(wTop - top) < 50
+      })
+      
+      if (!hasConflict) {
+        return { left, top }
+      }
+    }
+    
+    // Fallback: use base position with random small offset
+    return {
+      left: baseLeft + Math.floor(Math.random() * 100),
+      top: baseTop + Math.floor(Math.random() * 100)
+    }
+  }
 
   function launch(app: App){
     setOpen(prev => {
@@ -1592,11 +1751,25 @@ export default function Desktop(){
         // otherwise just bring to front
         return [...prev.slice(0, idx), ...prev.slice(idx+1), prev[idx]]
       }
+      
       const geom = windowGeometries[app.id]
-      let left = geom?.left ?? app.left ?? 90
-      let top = geom?.top ?? app.top ?? 90
+      let left: number
+      let top: number
+      
+      if (geom) {
+        // Use saved geometry if available
+        left = geom.left
+        top = geom.top
+      } else {
+        // Find next available position to avoid stacking
+        const nextPos = findNextWindowPosition(prev)
+        left = nextPos.left
+        top = nextPos.top
+      }
+      
       const width = geom?.width ?? app.width ?? 600
       const height = geom?.height ?? app.height ?? 380
+      
       // clamp initial geometry to viewport (relaxed)
       const minVisibleX = 64, minVisibleY = 48, menubarH = 28, titlebarH = 32
       const vw = window.innerWidth, vh = window.innerHeight
@@ -1606,6 +1779,7 @@ export default function Desktop(){
       const maxTop = vh - minVisibleY
       left = Math.min(Math.max(left, minLeft), maxLeft)
       top = Math.min(Math.max(top, minTop), maxTop)
+      
       const created: App = { ...app, left, top, width, height, minimized: false, anim: 'open' }
       const DURATION = 340
       setTimeout(()=>{
@@ -1770,14 +1944,14 @@ export default function Desktop(){
     </div>
   )
 }
-ªstyles.css¡f¡cÅ/* Base variables and layout */
-:root{--bar:#0a0d12;--text:#f5f5f5;--muted:#9ca3af;--bg:#0a0d12;--glass:rgba(255,255,255,0.1);--dock:rgba(255,255,255,0.1);}
+ï¿½styles.cssï¿½ï¿½fï¿½ï¿½cï¿½ï¿½/* Base variables and layout */
+:root{--bar:#f6f6f6;--text:#111;--muted:#6b7280;--bg:#0b1020;--glass:rgba(255,255,255,0.25);--dock:rgba(255,255,255,0.3);}
 *{box-sizing:border-box}
 body{font-family:Inter,ui-sans-serif,system-ui,Arial}
-.desktop{height:100%;position:relative;color:#f5f5f5;overflow:hidden}
-.wallpaper{position:absolute;inset:0;background:radial-gradient(120% 120% at 50% 0%, #0a0d12 0%, #070a0f 55%, #05070b 100%)}
-.menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(10,13,18,.85),rgba(7,10,15,.65));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.15)}
-.menubar .title{font-weight:600;font-size:12px;color:var(--text)}
+.desktop{height:100%;width:100%;position:relative;color:#111;overflow:hidden}
+.wallpaper{position:absolute;inset:0;background:linear-gradient(135deg,#0b1020 0%,#1e2760 60%,#462e7e 100%)}
+.menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(255,255,255,.65),rgba(255,255,255,.3));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.35)}
+.menubar .title{font-weight:600;font-size:12px}
 .menubar .right{margin-left:auto;font-size:12px;color:var(--muted)}
 
 /* Dock removed */
@@ -1810,8 +1984,8 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .b.red{background:#ff5f57}
 .b.yellow{background:#febc2e}
 .b.green{background:#28c840}
-.window .title{font-weight:600;font-size:12px;color:#f5f5f5}
-.window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:12px;font-size:14px;color:#e5e7eb;overflow:auto}
+.window .title{font-weight:600;font-size:12px;color:#222}
+.window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:0;font-size:14px;color:#1f2937;overflow:hidden}
 
 @keyframes mac-window-open-spring{
   0%{opacity:0;transform:translateY(10px) scale(.92)}
@@ -1838,7 +2012,7 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .badge{font-size:11px;color:#374151;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px}
 .muted{color:#6b7280}
 .list{padding-left:16px}
-®iframe-root.js¡f¡cÅöimport React, { StrictMode } from 'react'
+ï¿½iframe-root.jsï¿½ï¿½fï¿½ï¿½cï¿½ï¿½import React, { StrictMode } from 'react'
 import { createRoot as createReactRoot } from 'react-dom/client'
 
 class ErrorBoundary extends React.Component {
@@ -1888,15 +2062,15 @@ export function createRoot(mountEl, Comp, name){
 }
 
 
-©index.css¡f¡cÅ/* Use :root (not ::root) to scope CSS variables correctly */
+ï¿½index.cssï¿½ï¿½fï¿½ï¿½cï¿½ï¿½/* Use :root (not ::root) to scope CSS variables correctly */
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: dark;
+  color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #0a0d12;
+  background-color: #242424;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -1944,7 +2118,20 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
-}¨main.tsx¡f¡cÅimport { StrictMode } from 'react'
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}ï¿½main.tsxï¿½ï¿½fï¿½ï¿½cï¿½import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import Desktop from './desktop/Desktop'
 import './desktop/styles.css'
@@ -1955,12 +2142,12 @@ createRoot(document.getElementById('root')!).render(
     <Desktop />
   </StrictMode>
 )
-¬tailwind.css¡f¡cÄ=@tailwind base;
+ï¿½tailwind.cssï¿½ï¿½fï¿½ï¿½cï¿½=@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 
-²tailwind.config.js¡f¡cÄ¸/** @type {import('tailwindcss').Config} */
+ï¿½tailwind.config.jsï¿½ï¿½fï¿½ï¿½cÄ¸/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     './index.html',
@@ -1973,7 +2160,7 @@ export default {
 }
 
 
-®vite.config.js¡f¡cÅsimport { defineConfig } from 'vite'
+ï¿½vite.config.jsï¿½ï¿½fï¿½ï¿½cï¿½simport { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
