@@ -94,38 +94,6 @@ export default function AIAgentBar() {
     return () => container.removeEventListener('scroll', handleScroll);
   }, [hasNewMessage]);
 
-  // Auto-scroll when new messages arrive
-  useEffect(() => {
-    if (messages.length === 0) return;
-    
-    const currentMessageCount = messages.length;
-    const hasNewMessages = currentMessageCount > previousMessageCount.current;
-    
-    if (hasNewMessages) {
-      // Track the latest message
-      const latestMessage = messages[messages.length - 1];
-      if (latestMessage.id !== latestMessageId) {
-        setLatestMessageId(latestMessage.id);
-        
-        // Only auto-scroll if user is near bottom or if it's the first message
-        if (autoScrollEnabled.current || previousMessageCount.current === 0) {
-          // Small delay to ensure DOM is updated
-          setTimeout(() => scrollToBottom(true), 50);
-        } else {
-          // Show new message indicator if user is scrolled up
-          setHasNewMessage(true);
-        }
-      }
-    }
-    
-    previousMessageCount.current = currentMessageCount;
-  }, [messages, latestMessageId]);
-
-  // Initial scroll position check
-  useEffect(() => {
-    checkScrollPosition();
-  }, []);
-
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id: 'agent-chat',
     transport: new DefaultChatTransport({ api: '/api/agent' }),
@@ -425,6 +393,38 @@ export default function AIAgentBar() {
       p.finally(() => pendingToolPromises.current.delete(p));
     },
   });
+
+  // Auto-scroll when new messages arrive
+  useEffect(() => {
+    if (messages.length === 0) return;
+    
+    const currentMessageCount = messages.length;
+    const hasNewMessages = currentMessageCount > previousMessageCount.current;
+    
+    if (hasNewMessages) {
+      // Track the latest message
+      const latestMessage = messages[messages.length - 1];
+      if (latestMessage.id !== latestMessageId) {
+        setLatestMessageId(latestMessage.id);
+        
+        // Only auto-scroll if user is near bottom or if it's the first message
+        if (autoScrollEnabled.current || previousMessageCount.current === 0) {
+          // Small delay to ensure DOM is updated
+          setTimeout(() => scrollToBottom(true), 50);
+        } else {
+          // Show new message indicator if user is scrolled up
+          setHasNewMessage(true);
+        }
+      }
+    }
+    
+    previousMessageCount.current = currentMessageCount;
+  }, [messages, latestMessageId]);
+
+  // Initial scroll position check
+  useEffect(() => {
+    checkScrollPosition();
+  }, []);
 
   // === Automatic diagnostics ===
   // Preview error -> show alert and auto-post to AI once per unique error
