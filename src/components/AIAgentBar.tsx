@@ -20,6 +20,7 @@ export default function AIAgentBar() {
   const [latestMessageId, setLatestMessageId] = useState<string | null>(null);
   const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
   const [welcomeLoaded, setWelcomeLoaded] = useState(false);
+  const [welcomeError, setWelcomeError] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const previousMessageCount = useRef(0);
   const autoScrollEnabled = useRef(true);
@@ -32,37 +33,59 @@ export default function AIAgentBar() {
   useEffect(() => { instanceRef.current = instance; }, [instance]);
   useEffect(() => { fnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
 
-  // One-time welcome message with enhanced error handling
+  // Generate dynamic welcome message
   useEffect(() => {
     if (welcomeLoaded) return;
     let cancelled = false;
-    const controller = new AbortController();
     
     (async () => {
       try {
-        const res = await fetch('/api/welcome', {
-          signal: controller.signal,
-          headers: { 'Content-Type': 'application/json' }
+        const response = await fetch('/api/agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{
+              role: 'user',
+              content: 'Generate a brief welcome message (1-2 sentences) with a specific app suggestion. Vary the tone and suggestion each time.'
+            }]
+          })
         });
         
-        if (!res.ok) {
-          console.warn(`Welcome API responded with status ${res.status}`);
-          throw new Error(`welcome ${res.status}`);
+        if (!response.ok) throw new Error('Failed to generate welcome');
+        
+        const reader = response.body?.getReader();
+        let welcomeText = '';
+        
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = new TextDecoder().decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+              if (line.startsWith('0:')) {
+                try {
+                  const data = JSON.parse(line.slice(2));
+                  if (data.type === 'text-delta') {
+                    welcomeText += data.textDelta;
+                  }
+                } catch {}
+              }
+            }
+          }
         }
         
-        const json = await res.json();
-        const msg = typeof json?.message === 'string' ? json.message.trim() : '';
-        
-        if (!cancelled && msg) {
-          setWelcomeMessage(msg);
-        } else if (!cancelled && !msg) {
-          // API returned empty message, use fallback
-          setWelcomeMessage('Ready to bring your ideas to life? Try asking me to create a calculator or todo app!');
+        if (!cancelled && welcomeText.trim()) {
+          setWelcomeMessage(welcomeText.trim());
+        } else if (!cancelled) {
+          setWelcomeError(true);
         }
       } catch (error) {
-        if (!cancelled && !controller.signal.aborted) {
-          console.warn('Welcome message fetch failed:', error);
-          setWelcomeMessage('Ready to bring your ideas to life? Try asking me to create a calculator or todo app!');
+        if (!cancelled) {
+          console.warn('Welcome generation failed:', error);
+          setWelcomeError(true);
         }
       } finally {
         if (!cancelled) {
@@ -71,10 +94,7 @@ export default function AIAgentBar() {
       }
     })();
     
-    return () => { 
-      cancelled = true;
-      controller.abort();
-    };
+    return () => { cancelled = true; };
   }, [welcomeLoaded]);
 
   async function waitForInstance(timeoutMs = 4000, intervalMs = 100) {
@@ -754,7 +774,7 @@ export default function AIAgentBar() {
             )}
           </div>
 
-          {/* Messages */}
+          {/* Messages - welcome + agent message message */}
           <div 
             ref={messagesContainerRef}
             className="max-h-72 overflow-auto px-4 pt-2 space-y-3 relative custom-scrollbar"
@@ -762,20 +782,29 @@ export default function AIAgentBar() {
               scrollbarWidth: 'thin',
               scrollbarColor: 'rgba(96, 165, 250, 0.3) transparent'
             }}
-          >
-            {messages.length === 0 && welcomeMessage && (
+          > 
+            {messages.length === 0 && welcomeLoaded && (
               <div className="text-sm transition-all duration-500">
                 <div className="font-semibold text-[#7dd3fc] mb-1">Agent</div>
                 <div className="space-y-2">
-                  <div className="whitespace-pre-wrap text-white/90">{welcomeMessage}</div>
+                  {welcomeError ? (
+                    <div className="text-red-400/80 italic">
+                      Welcome message generation failed. The AI agent is still ready to help with your requests.
+                    </div>
+                  ) : welcomeMessage ? (
+                    <div className="whitespace-pre-wrap text-white/90">{welcomeMessage}</div>
+                  ) : (
+                    <div className="text-white/60 italic">Generating welcome message...</div>
+                  )}
                 </div>
               </div>
             )}
+            {/* welcome message end */}
             {messages.map(m => (
               <div 
                 key={m.id} 
                 className={`text-sm transition-all duration-500 ${m.id === latestMessageId && m.role === 'assistant' ? 'bg-[rgba(96,165,250,0.1)] -mx-2 px-2 py-1 rounded-lg border-l-2 border-[#60a5fa]' : ''}`}
-              >
+              > 
                 <div className="font-semibold text-[#7dd3fc] mb-1">{m.role === 'user' ? 'You' : 'Agent'}</div>
                 <div className="space-y-2">
                   {m.parts.map((part, index) => {
