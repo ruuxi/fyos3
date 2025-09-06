@@ -41,14 +41,16 @@ export default function AIAgentBar() {
     // Respect reduced motion
     const prefersReduced =
       typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const target = el.scrollHeight - el.clientHeight;
     if (durationMs <= 0 || prefersReduced) {
-      el.scrollTop = target;
+      const snapTarget = el.scrollHeight - el.clientHeight;
+      el.scrollTop = snapTarget;
       return;
     }
-    cancelScrollAnimation();
+    // If an animation is already in progress, let it continue and dynamically follow the target
+    if (scrollAnimRef.current !== null) {
+      return;
+    }
     const startTop = el.scrollTop;
-    const distance = target - startTop;
     const startTime = performance.now();
 
     const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -57,7 +59,9 @@ export default function AIAgentBar() {
       const elapsed = now - startTime;
       const t = Math.min(1, elapsed / durationMs);
       const eased = easeOutCubic(t);
-      el.scrollTop = startTop + distance * eased;
+      // Recompute target continuously to account for container height/content changes
+      const dynamicTarget = el.scrollHeight - el.clientHeight;
+      el.scrollTop = startTop + (dynamicTarget - startTop) * eased;
       if (t < 1) {
         scrollAnimRef.current = requestAnimationFrame(step);
       } else {
@@ -303,36 +307,62 @@ export default function AIAgentBar() {
               break;
             }
             case 'create_app': {
-              const { name, icon } = tc.input as { name: string; icon?: string };
-              const id = crypto.randomUUID();
-              const base = `src/apps/${id}`;
-              console.log(`🔧 [Agent] create_app: "${name}" -> ${base} (${icon ?? '📦'})`);
+              const { id: requestedId, name, icon } = tc.input as { id: string; name: string; icon?: string };
+              
+              // Handle duplicate names by adding (1), (2), etc.
+              let finalName = name;
+              let finalId = requestedId;
+              try {
+                const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
+                const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>;
+                
+                // Check for duplicate names
+                const existingNames = new Set(registry.map(app => app.name));
+                let counter = 1;
+                while (existingNames.has(finalName)) {
+                  finalName = `${name} (${counter})`;
+                  counter++;
+                }
+                
+                // Check for duplicate IDs
+                const existingIds = new Set(registry.map(app => app.id));
+                counter = 1;
+                while (existingIds.has(finalId)) {
+                  finalId = `${requestedId}-${counter}`;
+                  counter++;
+                }
+              } catch (e) {
+                // Registry doesn't exist yet, use original name and id
+              }
+              
+              const base = `src/apps/${finalId}`;
+              console.log(`🔧 [Agent] create_app: "${finalName}" -> ${base} (${icon ?? '📦'})`);
               
               await fnsRef.current.mkdir(base, true);
               const metadata = {
-                id,
-                name,
+                id: finalId,
+                name: finalName,
                 icon: icon ?? '📦',
                 createdAt: Date.now(),
               };
               await fnsRef.current.writeFile(`${base}/metadata.json`, JSON.stringify(metadata, null, 2));
               // minimal entry file (tsx)
-              const appIndexTsx = `export default function App(){ return <div>${name}</div>; }`;
+              const appIndexTsx = `export default function App(){ return <div>${finalName}</div>; }`;
               await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
               // update registry
               try {
                 const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
                 const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>
-                registry.push({ id, name, icon: metadata.icon, path: `/${base}/index.tsx` });
+                registry.push({ id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` });
                 await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
               } catch (e) {
                 // If registry missing, create it
                 await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify([
-                  { id, name, icon: metadata.icon, path: `/${base}/index.tsx` }
+                  { id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` }
                 ], null, 2));
               }
-              console.log(`✅ [Agent] App created: ${name} (${id})`);
-              addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id, path: base, name, icon: metadata.icon } });
+              console.log(`✅ [Agent] App created: ${finalName} (${finalId})`);
+              addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id: finalId, path: base, name: finalName, icon: metadata.icon } });
               break;
             }
             case 'rename_app': {
@@ -396,22 +426,27 @@ export default function AIAgentBar() {
     },
   });
 
-  // Auto-scroll or preserve position on new messages
+  // Auto-scroll or preserve position on new messages and height changes
   useLayoutEffect(() => {
     const el = messagesContainerRef.current;
     if (!el) return;
+
+    // Refresh near-bottom state in case container height changed without user scroll
+    isNearBottomRef.current = isUserNearBottom(el, 56);
 
     const prevScrollHeight = prevScrollHeightRef.current || 0;
     const newScrollHeight = el.scrollHeight;
 
     // First run: jump to bottom
     if (prevScrollHeight === 0) {
-      el.scrollTop = newScrollHeight;
+      // Smoothly settle to bottom on initial mount as the container grows
+      smoothScrollToBottom(el, 700);
       prevScrollHeightRef.current = newScrollHeight;
       return;
     }
 
     if (isNearBottomRef.current) {
+      // Start a smooth follow if not already animating
       smoothScrollToBottom(el, 650); // extra smooth
     } else {
       // Preserve visual position by offsetting the growth
@@ -422,11 +457,7 @@ export default function AIAgentBar() {
     }
 
     prevScrollHeightRef.current = el.scrollHeight;
-  }, [
-    // Trigger on message count changes; streaming tokens won't cause excessive reflows
-    // but still capture when new tool/result chunks append
-    messages.length,
-  ]);
+  }, [messages.length, containerHeight]);
 
   // === Automatic diagnostics ===
   // Preview error -> show alert and auto-post to AI once per unique error

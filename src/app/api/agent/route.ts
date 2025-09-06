@@ -110,7 +110,7 @@ export async function POST(req: Request) {
         'You are a proactive engineering agent operating inside a WebContainer-powered workspace.',
         'You can read and modify files, create apps, and run package installs/commands. Never run dev, build, or start server commands.',
         'Project is a Vite React app: source in src/, public assets in public/.',
-        'When creating apps: place code in src/apps/<id>/index.tsx and update public/apps/registry.json with path /src/apps/<id>/index.tsx.',
+        'When creating apps: provide a kebab-case id (e.g., "notes-app", "calculator") and place code in src/apps/<id>/index.tsx. The system will automatically handle duplicate names by adding "(1)", "(2)" etc.',
         'HOW TO USE AI IN APPS:\n- Image (FAL): import { callFluxSchnell } from "/src/ai"; await callFluxSchnell({ prompt: "a cat photo" }).\n- Explicit model: import { callFal } from "/src/ai"; await callFal("fal-ai/flux-1/schnell", { prompt: "..." }).\n- Music (ElevenLabs): import { composeMusic } from "/src/ai"; await composeMusic({ prompt: "intense electronic track", musicLengthMs: 60000 }).\nThese route through the message bridge and server proxies (/api/ai/fal, /api/ai/eleven); keys stay on the server.',
         'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.',
         'When you need dependencies, use the web_exec tool to run package manager commands (e.g., pnpm add <pkg>, pnpm install). Wait for the web_exec result (which includes exitCode) before proceeding to the next step.',
@@ -166,11 +166,12 @@ export async function POST(req: Request) {
           cwd: z.string().optional(),
         }),
       },
-      // High-level: create app folder structure with auto-generated id
+      // High-level: create app folder structure with custom id
       create_app: {
         description:
-          'Create a new app in apps/<uuid> with metadata and an icon.',
+          'Create a new app in apps/<id> with metadata and an icon. Provide a suitable id based on the app name.',
         inputSchema: z.object({
+          id: z.string().describe('App id (should be kebab-case based on app name, e.g. "notes-app", "calculator")'),
           name: z.string().describe('Display name of the app'),
           icon: z.string().optional().describe('Icon character or SVG string'),
         }),

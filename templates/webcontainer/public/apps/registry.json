@@ -1,32 +1,32 @@
 [
   {
-    "id": "00000000-0000-0000-0000-000000000001",
+    "id": "finder",
     "name": "Finder",
     "icon": "🗂️",
-    "path": "/src/apps/app-00000000-0000-0000-0000-000000000001/index.tsx"
+    "path": "/src/apps/finder/index.tsx"
   },
   {
-    "id": "00000000-0000-0000-0000-000000000002",
+    "id": "safari",
     "name": "Safari",
     "icon": "🌐",
-    "path": "/src/apps/app-00000000-0000-0000-0000-000000000002/index.tsx"
+    "path": "/src/apps/safari/index.tsx"
   },
   {
-    "id": "00000000-0000-0000-0000-000000000003",
+    "id": "notes",
     "name": "Notes",
     "icon": "📝",
-    "path": "/src/apps/app-00000000-0000-0000-0000-000000000003/index.tsx"
+    "path": "/src/apps/notes/index.tsx"
   },
   {
-    "id": "00000000-0000-0000-0000-000000000004",
+    "id": "terminal",
     "name": "Terminal",
     "icon": "🖥️",
-    "path": "/src/apps/app-00000000-0000-0000-0000-000000000004/index.tsx"
+    "path": "/src/apps/terminal/index.tsx"
   },
   {
-    "id": "00000000-0000-0000-0000-000000000005",
+    "id": "settings",
     "name": "Settings",
     "icon": "⚙️",
-    "path": "/src/apps/app-00000000-0000-0000-0000-000000000005/index.tsx"
+    "path": "/src/apps/settings/index.tsx"
   }
 ]
