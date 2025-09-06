@@ -114,6 +114,7 @@ export async function POST(req: Request) {
         'You can read and modify files, create apps, and run package installs/commands. Never run dev, build, or start server commands.',
         'Project is a Vite React app: source in src/, public assets in public/.',
         'When creating apps: provide a kebab-case id (e.g., "notes-app", "calculator") and place code in src/apps/<id>/index.tsx. The system will automatically handle duplicate names by adding "(1)", "(2)" etc.',
+        'STYLING: Apps run in iframes with Tailwind CSS, base CSS, and desktop styles automatically loaded. Always use Tailwind utility classes for styling - they work out of the box. Avoid custom CSS files unless absolutely necessary.',
         'HOW TO USE AI IN APPS:\n- Image (FAL): import { callFluxSchnell } from "/src/ai"; await callFluxSchnell({ prompt: "a cat photo" }).\n- Explicit model: import { callFal } from "/src/ai"; await callFal("fal-ai/flux-1/schnell", { prompt: "..." }).\n- Music (ElevenLabs): import { composeMusic } from "/src/ai"; await composeMusic({ prompt: "intense electronic track", musicLengthMs: 60000 }).\nThese route through the message bridge and server proxies (/api/ai/fal, /api/ai/eleven); keys stay on the server.',
         'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.',
 

@@ -715,18 +715,16 @@ export default function AIAgentBar() {
                 <Textarea
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.shiftKey) {
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      if (!input.trim()) return;
-                      sendMessage({ text: input });
-                      setInput('');
-                    } else if (e.key === 'Enter' && !e.shiftKey) {
-                      // Allow default behavior (new line)
+                      if (input.trim() && status === 'ready') {
+                        onSubmit(e as any);
+                      }
                     }
                   }}
                   placeholder="Ask the AI agent… Try: 'Create a Notes app on the desktop and install zustand'"
-                  className="min-h-[40px] max-h-32 resize-none pr-12 bg-[rgba(5,7,11,0.5)] border-white/20 text-white placeholder:text-white/50 focus-visible:border-[#60a5fa]/50 focus-visible:ring-[#60a5fa]/20"
+                  className="min-h-[40px] max-h-32 resize-none pr-12"
                   rows={1}
                   disabled={status === 'submitted' || status === 'streaming'}
                 />
