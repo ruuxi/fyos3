@@ -5,15 +5,46 @@ import { z } from 'zod';
 export const maxDuration = 300;
 
 export async function POST(req: Request) {
-  const { messages }: { messages: UIMessage[] } = await req.json();
+  try {
+    const body = await req.json();
+    const { messages }: { messages: UIMessage[] } = body;
 
-  console.log('🔵 [AGENT] Incoming request with messages:', messages.map(m => ({
-    role: m.role,
-    content: 'content' in m && typeof m.content === 'string' ? (m.content.length > 100 ? m.content.substring(0, 100) + '...' : m.content) : '[non-text content]',
-    toolCalls: 'toolCalls' in m && Array.isArray(m.toolCalls) ? m.toolCalls.length : 0
-  })));
+    if (!messages || !Array.isArray(messages)) {
+      console.error('🔴 [AGENT] Invalid messages in request body:', body);
+      return new Response(JSON.stringify({ error: 'Invalid messages array' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
-  const result = streamText({
+    // Validate AI SDK 5.0 UIMessage format
+    for (const message of messages) {
+      if (!message.id || !message.role || !Array.isArray(message.parts)) {
+        console.error('🔴 [AGENT] Invalid UIMessage format:', message);
+        return new Response(JSON.stringify({ 
+          error: 'Invalid message format. Expected UIMessage with id, role, and parts array' 
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    console.log('🔵 [AGENT] Incoming request with messages:', messages.map(m => {
+      const textPart = m.parts?.find(p => p.type === 'text');
+      const preview = textPart && 'text' in textPart 
+        ? (textPart.text.length > 100 ? textPart.text.substring(0, 100) + '...' : textPart.text)
+        : '[no text]';
+      
+      return {
+        id: m.id,
+        role: m.role,
+        parts: m.parts?.length || 0,
+        preview
+      };
+    }));
+
+    const result = streamText({
     model: 'alibaba/qwen3-coder',
     providerOptions: {
       gateway: {
@@ -218,6 +249,25 @@ export async function POST(req: Request) {
     },
   });
 
-  console.log('📤 [AGENT] Returning streaming response');
-  return result.toUIMessageStreamResponse();
+    console.log('📤 [AGENT] Returning streaming response');
+    return result.toUIMessageStreamResponse({
+      onError: (error) => {
+        console.error('🔴 [AGENT] Stream error:', error);
+        // Return a user-friendly error message
+        if (error instanceof Error) {
+          return `AI processing error: ${error.message}`;
+        }
+        return 'An unexpected error occurred during AI processing';
+      }
+    });
+  } catch (error) {
+    console.error('🔴 [AGENT] Unexpected error:', error);
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 }

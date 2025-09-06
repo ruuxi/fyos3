@@ -45,8 +45,12 @@ export default function AIAgentBar() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: [{
+              id: crypto.randomUUID(),
               role: 'user',
-              content: 'Generate a brief welcome message (1-2 sentences) with a specific app suggestion. Vary the tone and suggestion each time.'
+              parts: [{
+                type: 'text',
+                text: 'Generate a brief welcome message (1-2 sentences) with a specific app suggestion. Vary the tone and suggestion each time.'
+              }]
             }]
           })
         });
@@ -62,16 +66,25 @@ export default function AIAgentBar() {
             if (done) break;
             
             const chunk = new TextDecoder().decode(value);
-            const lines = chunk.split('\n');
+            const lines = chunk.split('\n').filter(line => line.trim());
             
             for (const line of lines) {
-              if (line.startsWith('0:')) {
+              // Handle AI SDK 5.0 streaming format: "data: {json}"
+              if (line.startsWith('data: ')) {
                 try {
-                  const data = JSON.parse(line.slice(2));
-                  if (data.type === 'text-delta') {
-                    welcomeText += data.textDelta;
+                  const jsonStr = line.slice(6); // Remove "data: " prefix
+                  if (jsonStr === '[DONE]') break; // End of stream
+                  
+                  const data = JSON.parse(jsonStr);
+                  
+                  // AI SDK 5.0 uses text-delta events for streaming text
+                  if (data.type === 'text-delta' && data.delta) {
+                    welcomeText += data.delta;
                   }
-                } catch {}
+                } catch (parseError) {
+                  // Skip malformed JSON
+                  continue;
+                }
               }
             }
           }

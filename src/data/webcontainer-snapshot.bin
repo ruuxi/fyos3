@@ -1,4 +1,152 @@
-Å°dâ™index.htmlÅ°fÅ°c≈ë<!doctype html>
+Å°dâ®app.htmlÅ°fÅ°c≈6<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>App</title>
+    <style>
+      html,body,#mount{height:100%;margin:0}
+      body{background:transparent}
+    </style>
+    <!-- Preload Tailwind CSS to ensure it's available immediately -->
+    <link rel="preload" href="/src/tailwind.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/src/tailwind.css"></noscript>
+  </head>
+  <body>
+    <div id="mount" style="height:100%"></div>
+    <script type="module">
+      // Disable Vite error overlay in iframe
+      if (import.meta.hot) {
+        import.meta.hot.on('vite:error', (payload) => {
+          // Prevent Vite error overlay from showing
+          console.error('[App iframe] Vite error:', payload);
+        });
+        
+        // Force iframe reload on CSS changes for HMR
+        import.meta.hot.on('vite:beforeUpdate', () => {
+          console.log('[App iframe] CSS updated, reloading iframe');
+          location.reload();
+        });
+      }
+      
+      // Block vite-error-overlay custom element
+      const originalDefine = customElements.define;
+      customElements.define = function(name, constructor, options) {
+        if (name === 'vite-error-overlay') {
+          console.log('[App iframe] Blocked vite-error-overlay');
+          return;
+        }
+        return originalDefine.call(this, name, constructor, options);
+      };
+
+      // Watch for and remove any vite-error-overlay elements
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeName === 'VITE-ERROR-OVERLAY' || 
+                (node.tagName && node.tagName.toLowerCase() === 'vite-error-overlay')) {
+              console.log('[App iframe] Removing vite-error-overlay');
+              node.remove();
+            }
+          });
+        });
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+
+      // Immediately isolate this iframe from parent errors
+      window.addEventListener('error', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        console.error('[App iframe] window error:', e.error || e.message);
+        showOverlay(String(e?.error?.message || e?.message || 'Unknown error'));
+      }, true);
+      
+      window.addEventListener('unhandledrejection', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        console.error('[App iframe] unhandledrejection:', e.reason);
+        showOverlay(String(e?.reason?.message || e?.reason || 'Unhandled promise rejection'));
+      }, true);
+
+      // Prevent errors from bubbling to parent
+      const originalConsoleError = console.error;
+      console.error = function(...args) {
+        try {
+          originalConsoleError.apply(console, ['[App iframe]', ...args]);
+        } catch {}
+      };
+
+      
+      import { createRoot } from '/src/iframe-root.js';
+      // Expect query: ?path=/src/apps/xxx/index.tsx&name=...&id=...
+      const params = new URLSearchParams(location.search)
+      const path = params.get('path')
+      const name = params.get('name') || 'App'
+      const mountEl = document.getElementById('mount')
+      
+      // Import CSS for styling (always load; URL flags can disable if set to 0)
+      // Flags: base=0 (disable index.css), ui=0 (disable desktop/ui), tw=0 (disable tailwind)
+      try {
+        const loadBase = params.get('base') !== '0'
+        const loadUi = params.get('ui') !== '0'
+        const loadTw = params.get('tw') !== '0'
+        
+        // Always load Tailwind first to ensure utilities are available
+        if (loadTw) {
+          await import('/src/tailwind.css')
+          console.log('[App iframe] Tailwind CSS loaded')
+        }
+        if (loadBase) {
+          await import('/src/index.css')
+          console.log('[App iframe] Base CSS loaded')
+        }
+        if (loadUi) {
+          await import('/src/desktop/styles.css')
+          console.log('[App iframe] Desktop UI CSS loaded')
+        }
+      } catch (e) {
+        console.error('[App iframe] CSS import error:', e)
+      }
+      
+      // Global error isolation inside iframe
+      const overlay = document.createElement('div')
+      overlay.style.cssText = 'position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.85);color:#991b1b;text-align:center;z-index:99999;padding:16px'
+      overlay.innerHTML = '<div style="max-width:560px"><div style="font-weight:600;margin-bottom:6px">This app encountered an error</div><div id="errMsg" style="font-size:12px;color:#7f1d1d;white-space:pre-wrap"></div><button id="reloadBtn" style="margin-top:12px;padding:6px 10px;border-radius:6px;border:1px solid #fecaca;background:#fee2e2;color:#7f1d1d">Reload app</button></div>'
+      document.body.appendChild(overlay)
+      overlay.querySelector('#reloadBtn')?.addEventListener('click', ()=> location.reload())
+      
+      function showOverlay(msg){
+        const el = overlay.querySelector('#errMsg')
+        if (el) el.textContent = msg
+        overlay.style.display = 'flex'
+      }
+      if (!path){
+        mountEl.textContent = 'Missing app path'
+      } else {
+        // Wrap everything in try-catch to prevent errors from bubbling up
+        try {
+          // Load the module and mount default export as a React component
+          import(/* @vite-ignore */ path).then(mod => {
+            try {
+              const Comp = mod?.default
+              createRoot(mountEl, Comp, name)
+            } catch (renderErr) {
+              console.error('[App iframe] component render error:', renderErr)
+              showOverlay('App render error: ' + renderErr.message)
+            }
+          }).catch(err => {
+            console.error('[App iframe] module load error:', err)
+            showOverlay('Failed to load app: ' + err)
+          })
+        } catch (err) {
+          console.error('[App iframe] setup error:', err)
+          showOverlay('App setup error: ' + err)
+        }
+      }
+    </script>
+  </body>
+  </html>
+™index.htmlÅ°fÅ°c≈ë<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -33,15 +181,7 @@
     "tailwindcss": "^3.4.10",
     "vite": "^5.0.8"
   }
-}±postcss.config.jsÅ°fÅ°cƒRexport default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}
-
-
-Æpnpm-lock.yamlÅ°fÅ°c≈|ilockfileVersion: '6.0'
+}Æpnpm-lock.yamlÅ°fÅ°c≈|ilockfileVersion: '6.0'
 
 settings:
   autoInstallPeers: true
@@ -989,154 +1129,14 @@ packages:
   /yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
     dev: true
-®app.htmlÅ°fÅ°c≈6<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>App</title>
-    <style>
-      html,body,#mount{height:100%;margin:0}
-      body{background:transparent}
-    </style>
-    <!-- Preload Tailwind CSS to ensure it's available immediately -->
-    <link rel="preload" href="/src/tailwind.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/src/tailwind.css"></noscript>
-  </head>
-  <body>
-    <div id="mount" style="height:100%"></div>
-    <script type="module">
-      // Disable Vite error overlay in iframe
-      if (import.meta.hot) {
-        import.meta.hot.on('vite:error', (payload) => {
-          // Prevent Vite error overlay from showing
-          console.error('[App iframe] Vite error:', payload);
-        });
-        
-        // Force iframe reload on CSS changes for HMR
-        import.meta.hot.on('vite:beforeUpdate', () => {
-          console.log('[App iframe] CSS updated, reloading iframe');
-          location.reload();
-        });
-      }
-      
-      // Block vite-error-overlay custom element
-      const originalDefine = customElements.define;
-      customElements.define = function(name, constructor, options) {
-        if (name === 'vite-error-overlay') {
-          console.log('[App iframe] Blocked vite-error-overlay');
-          return;
-        }
-        return originalDefine.call(this, name, constructor, options);
-      };
+±postcss.config.jsÅ°fÅ°cƒRexport default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
 
-      // Watch for and remove any vite-error-overlay elements
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          mutation.addedNodes.forEach((node) => {
-            if (node.nodeName === 'VITE-ERROR-OVERLAY' || 
-                (node.tagName && node.tagName.toLowerCase() === 'vite-error-overlay')) {
-              console.log('[App iframe] Removing vite-error-overlay');
-              node.remove();
-            }
-          });
-        });
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
 
-      // Immediately isolate this iframe from parent errors
-      window.addEventListener('error', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        console.error('[App iframe] window error:', e.error || e.message);
-        showOverlay(String(e?.error?.message || e?.message || 'Unknown error'));
-      }, true);
-      
-      window.addEventListener('unhandledrejection', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        console.error('[App iframe] unhandledrejection:', e.reason);
-        showOverlay(String(e?.reason?.message || e?.reason || 'Unhandled promise rejection'));
-      }, true);
-
-      // Prevent errors from bubbling to parent
-      const originalConsoleError = console.error;
-      console.error = function(...args) {
-        try {
-          originalConsoleError.apply(console, ['[App iframe]', ...args]);
-        } catch {}
-      };
-
-      
-      import { createRoot } from '/src/iframe-root.js';
-      // Expect query: ?path=/src/apps/xxx/index.tsx&name=...&id=...
-      const params = new URLSearchParams(location.search)
-      const path = params.get('path')
-      const name = params.get('name') || 'App'
-      const mountEl = document.getElementById('mount')
-      
-      // Import CSS for styling (always load; URL flags can disable if set to 0)
-      // Flags: base=0 (disable index.css), ui=0 (disable desktop/ui), tw=0 (disable tailwind)
-      try {
-        const loadBase = params.get('base') !== '0'
-        const loadUi = params.get('ui') !== '0'
-        const loadTw = params.get('tw') !== '0'
-        
-        // Always load Tailwind first to ensure utilities are available
-        if (loadTw) {
-          await import('/src/tailwind.css')
-          console.log('[App iframe] Tailwind CSS loaded')
-        }
-        if (loadBase) {
-          await import('/src/index.css')
-          console.log('[App iframe] Base CSS loaded')
-        }
-        if (loadUi) {
-          await import('/src/desktop/styles.css')
-          console.log('[App iframe] Desktop UI CSS loaded')
-        }
-      } catch (e) {
-        console.error('[App iframe] CSS import error:', e)
-      }
-      
-      // Global error isolation inside iframe
-      const overlay = document.createElement('div')
-      overlay.style.cssText = 'position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.85);color:#991b1b;text-align:center;z-index:99999;padding:16px'
-      overlay.innerHTML = '<div style="max-width:560px"><div style="font-weight:600;margin-bottom:6px">This app encountered an error</div><div id="errMsg" style="font-size:12px;color:#7f1d1d;white-space:pre-wrap"></div><button id="reloadBtn" style="margin-top:12px;padding:6px 10px;border-radius:6px;border:1px solid #fecaca;background:#fee2e2;color:#7f1d1d">Reload app</button></div>'
-      document.body.appendChild(overlay)
-      overlay.querySelector('#reloadBtn')?.addEventListener('click', ()=> location.reload())
-      
-      function showOverlay(msg){
-        const el = overlay.querySelector('#errMsg')
-        if (el) el.textContent = msg
-        overlay.style.display = 'flex'
-      }
-      if (!path){
-        mountEl.textContent = 'Missing app path'
-      } else {
-        // Wrap everything in try-catch to prevent errors from bubbling up
-        try {
-          // Load the module and mount default export as a React component
-          import(/* @vite-ignore */ path).then(mod => {
-            try {
-              const Comp = mod?.default
-              createRoot(mountEl, Comp, name)
-            } catch (renderErr) {
-              console.error('[App iframe] component render error:', renderErr)
-              showOverlay('App render error: ' + renderErr.message)
-            }
-          }).catch(err => {
-            console.error('[App iframe] module load error:', err)
-            showOverlay('Failed to load app: ' + err)
-          })
-        } catch (err) {
-          console.error('[App iframe] setup error:', err)
-          showOverlay('App setup error: ' + err)
-        }
-      }
-    </script>
-  </body>
-  </html>
 ¶publicÅ°dÅ§appsÅ°dÅ≠registry.jsonÅ°fÅ°c≈D[
   {
     "id": "finder",
@@ -2073,22 +2073,6 @@ export function createRoot(mountEl, Comp, name){
 }
 
 
-®main.tsxÅ°fÅ°c≈import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import Desktop from './desktop/Desktop'
-import './desktop/styles.css'
-import './tailwind.css'
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <Desktop />
-  </StrictMode>
-)
-¨tailwind.cssÅ°fÅ°cƒ=@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-
 ©index.cssÅ°fÅ°c≈/* Use :root (not ::root) to scope CSS variables correctly */
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -2145,7 +2129,23 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
-}≤tailwind.config.jsÅ°fÅ°cƒ∏/** @type {import('tailwindcss').Config} */
+}®main.tsxÅ°fÅ°c≈import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import Desktop from './desktop/Desktop'
+import './desktop/styles.css'
+import './tailwind.css'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <Desktop />
+  </StrictMode>
+)
+¨tailwind.cssÅ°fÅ°cƒ=@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+≤tailwind.config.jsÅ°fÅ°cƒ∏/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     './index.html',
