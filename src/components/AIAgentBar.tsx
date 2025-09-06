@@ -384,6 +384,7 @@ export default function AIAgentBar() {
               await fnsRef.current.writeFile(`${base}/metadata.json`, JSON.stringify(metadata, null, 2));
               // minimal entry file (tsx)
               const appIndexTsx = `export default function App(){ return <div>${name}</div>; }`;
+              const appIndexTsx = `import React from 'react'\nexport default function App(){\n  return (\n    <div className=\"h-full overflow-auto\">\n      <div className=\"sticky top-0 bg-white/70 backdrop-blur border-b px-3 py-2\">\n        <div className=\"font-semibold\">${finalName}</div>\n      </div>\n      <div className=\"p-3 space-y-3\">\n        <p className=\"text-gray-600 text-sm\">This is a new app. Build your UI here. The container fills the window and scrolls as needed.</p>\n      </div>\n    </div>\n  )\n}`;
               await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
               // update registry
               try {
@@ -404,6 +405,15 @@ export default function AIAgentBar() {
               recordChange(`${base}/index.tsx`);
               recordChange('public/apps/registry.json');
               scheduleDevRefresh(800);
+              // Notify desktop to open the newly created app immediately
+              try {
+                const appIndexPath = `/${base}/index.tsx`;
+                if (typeof window !== 'undefined') {
+                  window.postMessage({ type: 'FYOS_OPEN_APP', app: { id: finalId, name: finalName, icon: metadata.icon, path: appIndexPath } }, '*');
+                }
+              } catch {}
+              console.log(`✅ [Agent] App created: ${finalName} (${finalId})`);
+              addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id: finalId, path: base, name: finalName, icon: metadata.icon } });
               break;
             }
             case 'rename_app': {
@@ -455,6 +465,13 @@ export default function AIAgentBar() {
               console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
               await runValidation(scope, files);
               addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true } });
+              break;
+            }
+            case 'validate_project': {
+              const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
+              console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
+              await runValidation(scope, files);
+              addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true, scope, files } });
               break;
             }
             default:
@@ -882,6 +899,73 @@ export default function AIAgentBar() {
                 </Button>
               </div>
             )}
+              height: containerHeight > 0 ? `${containerHeight}px` : undefined,
+              maxHeight: `${MAX_CONTAINER_HEIGHT}px`,
+              transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
+              willChange: 'height',
+            }}
+          >
+            <div ref={messagesInnerRef} className="space-y-3">
+              {messages.map(m => (
+                <div key={m.id} className="text-sm">
+                  <div className="font-semibold text-gray-700 mb-1">{m.role === 'user' ? 'You' : 'Agent'}</div>
+                  <div className="space-y-2">
+                    {m.parts.map((part, index) => {
+                      switch (part.type) {
+                        case 'text':
+                          return (
+                            <div key={index} className="whitespace-pre-wrap text-gray-800">{part.text}</div>
+                          );
+                        case 'tool-submit_plan': {
+                          const id = (part as { toolCallId: string }).toolCallId;
+                          if (part.state === 'output-available') {
+                            return (
+                              <div key={id} className="rounded-md border border-blue-200 bg-blue-50 text-blue-900 p-2">
+                                <div className="font-medium">Plan</div>
+                                <ul className="list-disc pl-5 text-sm">
+                                  {(part.output as { steps?: string[] } | undefined)?.steps?.map((s: string, i: number) => (
+                                    <li key={i}>{s}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }
+                        case 'tool-web_fs_find':
+                        case 'tool-web_fs_read':
+                        case 'tool-web_fs_write':
+                        case 'tool-web_fs_mkdir':
+                        case 'tool-web_fs_rm':
+                        case 'tool-web_exec':
+                        case 'tool-create_app':
+                        case 'tool-rename_app':
+                        case 'tool-remove_app':
+                        case 'tool-validate_project':
+                        case 'tool-web_search': {
+                          const id = (part as { toolCallId: string }).toolCallId;
+                          const label = part.type.replace('tool-', '');
+                          switch (part.state) {
+                            case 'input-streaming':
+                              return <div key={id} className="text-xs text-gray-500">{label}...</div>;
+                            case 'input-available':
+                              return (
+                                <pre key={id} className="text-xs bg-gray-50 border rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as { input?: unknown }).input, null, 2)}</pre>
+                              );
+                            case 'output-available':
+                              return (
+                                <pre key={id} className="text-xs bg-green-50 border border-green-200 rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as { output?: unknown }).output, null, 2)}</pre>
+                              );
+                            case 'output-error':
+                              return <div key={id} className="text-xs text-red-600">Error: {(part as { errorText?: string }).errorText}</div>;
+                          }
+                        }
+                      }
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Input Bar */}
