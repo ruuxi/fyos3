@@ -402,13 +402,13 @@ export default function AIAgentBar() {
               addToolResult({ tool: 'remove_app', toolCallId: tc.toolCallId, output: { ok: true, id, name: appName, removedPaths: [p1, p2] } });
               break;
             }
-            // case 'validate_project': {
-            //   const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
-            //   console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
-            //   await runValidation(scope, files);
-            //   addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true } });
-            //   break;
-            // }
+            case 'validate_project': {
+              const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
+              console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
+              await runValidation(scope, files);
+              addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true, scope, files } });
+              break;
+            }
             default:
               // Unknown tool on client
               addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output: { error: `Unhandled client tool: ${tc.toolName}` } });
@@ -764,7 +764,11 @@ export default function AIAgentBar() {
                         case 'tool-web_fs_mkdir':
                         case 'tool-web_fs_rm':
                         case 'tool-web_exec':
-                        case 'tool-create_app': {
+                        case 'tool-create_app':
+                        case 'tool-rename_app':
+                        case 'tool-remove_app':
+                        case 'tool-validate_project':
+                        case 'tool-web_search': {
                           const id = (part as { toolCallId: string }).toolCallId;
                           const label = part.type.replace('tool-', '');
                           switch (part.state) {
