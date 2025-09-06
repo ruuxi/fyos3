@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, ChevronDown, MessageCircle } from 'lucide-react';
@@ -16,11 +16,105 @@ export default function AIAgentBar() {
   const pendingToolPromises = useRef(new Set<Promise<void>>());
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
 
+  // Chat scroll management
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const messagesInnerRef = useRef<HTMLDivElement | null>(null);
+  const isNearBottomRef = useRef(true);
+  const prevScrollHeightRef = useRef(0);
+  const scrollAnimRef = useRef<number | null>(null);
+  const [containerHeight, setContainerHeight] = useState<number>(0);
+  const MIN_CONTAINER_HEIGHT = 160; // px
+  const MAX_CONTAINER_HEIGHT = 520; // px
+
+  function isUserNearBottom(el: HTMLElement, threshold = 48): boolean {
+    return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+  }
+
+  function cancelScrollAnimation() {
+    if (scrollAnimRef.current !== null) {
+      cancelAnimationFrame(scrollAnimRef.current);
+      scrollAnimRef.current = null;
+    }
+  }
+
+  function smoothScrollToBottom(el: HTMLElement, durationMs = 550) {
+    // Respect reduced motion
+    const prefersReduced =
+      typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const target = el.scrollHeight - el.clientHeight;
+    if (durationMs <= 0 || prefersReduced) {
+      el.scrollTop = target;
+      return;
+    }
+    cancelScrollAnimation();
+    const startTop = el.scrollTop;
+    const distance = target - startTop;
+    const startTime = performance.now();
+
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / durationMs);
+      const eased = easeOutCubic(t);
+      el.scrollTop = startTop + distance * eased;
+      if (t < 1) {
+        scrollAnimRef.current = requestAnimationFrame(step);
+      } else {
+        scrollAnimRef.current = null;
+      }
+    };
+    scrollAnimRef.current = requestAnimationFrame(step);
+  }
+
   // Keep latest instance and fs helpers in refs so tool callbacks don't capture stale closures
   const instanceRef = useRef(instance);
   const fnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
   useEffect(() => { instanceRef.current = instance; }, [instance]);
   useEffect(() => { fnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
+
+  // Track if user is near bottom while scrolling
+  useEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      isNearBottomRef.current = isUserNearBottom(el, 56);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    // Initialize state
+    isNearBottomRef.current = isUserNearBottom(el, 56);
+    return () => el.removeEventListener('scroll', onScroll as EventListener);
+  }, []);
+
+  // Observe content size and grow container height smoothly up to a max
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    const content = messagesInnerRef.current;
+    if (!container || !content) return;
+
+    const updateHeight = () => {
+      const contentHeight = content.scrollHeight;
+      setContainerHeight(prev => {
+        const next = Math.min(MAX_CONTAINER_HEIGHT, Math.max(prev || MIN_CONTAINER_HEIGHT, contentHeight));
+        return next;
+      });
+    };
+
+    updateHeight();
+
+    const ro = new ResizeObserver(() => {
+      updateHeight();
+    });
+    ro.observe(content);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
+
+  // Cleanup scroll animation on unmount
+  useEffect(() => () => cancelScrollAnimation(), []);
+
+  // moved below useChat to avoid referencing messages before declaration
 
   async function waitForInstance(timeoutMs = 4000, intervalMs = 100) {
     const start = Date.now();
@@ -302,6 +396,38 @@ export default function AIAgentBar() {
     },
   });
 
+  // Auto-scroll or preserve position on new messages
+  useLayoutEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+
+    const prevScrollHeight = prevScrollHeightRef.current || 0;
+    const newScrollHeight = el.scrollHeight;
+
+    // First run: jump to bottom
+    if (prevScrollHeight === 0) {
+      el.scrollTop = newScrollHeight;
+      prevScrollHeightRef.current = newScrollHeight;
+      return;
+    }
+
+    if (isNearBottomRef.current) {
+      smoothScrollToBottom(el, 650); // extra smooth
+    } else {
+      // Preserve visual position by offsetting the growth
+      const delta = newScrollHeight - prevScrollHeight;
+      if (delta > 0) {
+        el.scrollTop += delta;
+      }
+    }
+
+    prevScrollHeightRef.current = el.scrollHeight;
+  }, [
+    // Trigger on message count changes; streaming tokens won't cause excessive reflows
+    // but still capture when new tool/result chunks append
+    messages.length,
+  ]);
+
   // === Automatic diagnostics ===
   // Preview error -> show alert and auto-post to AI once per unique error
   const [previewAlert, setPreviewAlert] = useState<{
@@ -564,62 +690,73 @@ export default function AIAgentBar() {
           </div>
 
           {/* Messages */}
-          <div className="max-h-72 overflow-auto px-4 pt-2 space-y-3">
-            {messages.map(m => (
-              <div key={m.id} className="text-sm">
-                <div className="font-semibold text-gray-700 mb-1">{m.role === 'user' ? 'You' : 'Agent'}</div>
-                <div className="space-y-2">
-                  {m.parts.map((part, index) => {
-                    switch (part.type) {
-                      case 'text':
-                        return (
-                          <div key={index} className="whitespace-pre-wrap text-gray-800">{part.text}</div>
-                        );
-                      case 'tool-submit_plan': {
-                        const id = (part as { toolCallId: string }).toolCallId;
-                        if (part.state === 'output-available') {
+          <div
+            ref={messagesContainerRef}
+            className="overflow-auto px-4 pt-2"
+            style={{
+              height: containerHeight > 0 ? `${containerHeight}px` : undefined,
+              maxHeight: `${MAX_CONTAINER_HEIGHT}px`,
+              transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
+              willChange: 'height',
+            }}
+          >
+            <div ref={messagesInnerRef} className="space-y-3">
+              {messages.map(m => (
+                <div key={m.id} className="text-sm">
+                  <div className="font-semibold text-gray-700 mb-1">{m.role === 'user' ? 'You' : 'Agent'}</div>
+                  <div className="space-y-2">
+                    {m.parts.map((part, index) => {
+                      switch (part.type) {
+                        case 'text':
                           return (
-                            <div key={id} className="rounded-md border border-blue-200 bg-blue-50 text-blue-900 p-2">
-                              <div className="font-medium">Plan</div>
-                              <ul className="list-disc pl-5 text-sm">
-                                {(part.output as { steps?: string[] } | undefined)?.steps?.map((s: string, i: number) => (
-                                  <li key={i}>{s}</li>
-                                ))}
-                              </ul>
-                            </div>
+                            <div key={index} className="whitespace-pre-wrap text-gray-800">{part.text}</div>
                           );
-                        }
-                        return null;
-                      }
-                      case 'tool-web_fs_find':
-                      case 'tool-web_fs_read':
-                      case 'tool-web_fs_write':
-                      case 'tool-web_fs_mkdir':
-                      case 'tool-web_fs_rm':
-                      case 'tool-web_exec':
-                      case 'tool-create_app': {
-                        const id = (part as { toolCallId: string }).toolCallId;
-                        const label = part.type.replace('tool-', '');
-                        switch (part.state) {
-                          case 'input-streaming':
-                            return <div key={id} className="text-xs text-gray-500">{label}...</div>;
-                          case 'input-available':
+                        case 'tool-submit_plan': {
+                          const id = (part as { toolCallId: string }).toolCallId;
+                          if (part.state === 'output-available') {
                             return (
-                              <pre key={id} className="text-xs bg-gray-50 border rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as { input?: unknown }).input, null, 2)}</pre>
+                              <div key={id} className="rounded-md border border-blue-200 bg-blue-50 text-blue-900 p-2">
+                                <div className="font-medium">Plan</div>
+                                <ul className="list-disc pl-5 text-sm">
+                                  {(part.output as { steps?: string[] } | undefined)?.steps?.map((s: string, i: number) => (
+                                    <li key={i}>{s}</li>
+                                  ))}
+                                </ul>
+                              </div>
                             );
-                          case 'output-available':
-                            return (
-                              <pre key={id} className="text-xs bg-green-50 border border-green-200 rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as { output?: unknown }).output, null, 2)}</pre>
-                            );
-                          case 'output-error':
-                            return <div key={id} className="text-xs text-red-600">Error: {(part as { errorText?: string }).errorText}</div>;
+                          }
+                          return null;
+                        }
+                        case 'tool-web_fs_find':
+                        case 'tool-web_fs_read':
+                        case 'tool-web_fs_write':
+                        case 'tool-web_fs_mkdir':
+                        case 'tool-web_fs_rm':
+                        case 'tool-web_exec':
+                        case 'tool-create_app': {
+                          const id = (part as { toolCallId: string }).toolCallId;
+                          const label = part.type.replace('tool-', '');
+                          switch (part.state) {
+                            case 'input-streaming':
+                              return <div key={id} className="text-xs text-gray-500">{label}...</div>;
+                            case 'input-available':
+                              return (
+                                <pre key={id} className="text-xs bg-gray-50 border rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as { input?: unknown }).input, null, 2)}</pre>
+                              );
+                            case 'output-available':
+                              return (
+                                <pre key={id} className="text-xs bg-green-50 border border-green-200 rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as { output?: unknown }).output, null, 2)}</pre>
+                              );
+                            case 'output-error':
+                              return <div key={id} className="text-xs text-red-600">Error: {(part as { errorText?: string }).errorText}</div>;
+                          }
                         }
                       }
-                    }
-                  })}
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           {/* Input Bar */}

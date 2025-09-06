@@ -21,7 +21,7 @@ export async function POST(req: Request) {
       },
     },
     messages: convertToModelMessages(messages),
-    stopWhen: stepCountIs(8),
+    stopWhen: stepCountIs(15),
     onFinish: (event) => {
       console.log('🎯 [AI] Response finished:', {
         finishReason: event.finishReason,
@@ -159,7 +159,7 @@ export async function POST(req: Request) {
       // Process execution
       web_exec: {
         description:
-          'Run a command in the WebContainer (e.g. pnpm add <pkg>).',
+          'Install a package (e.g. pnpm add <pkg>).',
         inputSchema: z.object({
           command: z.string(),
           args: z.array(z.string()).optional().default([]),
