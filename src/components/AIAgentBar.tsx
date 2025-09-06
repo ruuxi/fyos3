@@ -32,28 +32,49 @@ export default function AIAgentBar() {
   useEffect(() => { instanceRef.current = instance; }, [instance]);
   useEffect(() => { fnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
 
-  // One-time welcome message
+  // One-time welcome message with enhanced error handling
   useEffect(() => {
     if (welcomeLoaded) return;
     let cancelled = false;
+    const controller = new AbortController();
+    
     (async () => {
       try {
-        const res = await fetch('/api/welcome');
-        if (!res.ok) throw new Error(`welcome ${res.status}`);
+        const res = await fetch('/api/welcome', {
+          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!res.ok) {
+          console.warn(`Welcome API responded with status ${res.status}`);
+          throw new Error(`welcome ${res.status}`);
+        }
+        
         const json = await res.json();
         const msg = typeof json?.message === 'string' ? json.message.trim() : '';
+        
         if (!cancelled && msg) {
           setWelcomeMessage(msg);
+        } else if (!cancelled && !msg) {
+          // API returned empty message, use fallback
+          setWelcomeMessage('Ready to bring your ideas to life? Try asking me to create a calculator or todo app!');
         }
-      } catch {
-        if (!cancelled) {
-          setWelcomeMessage('Hey! I can spin up apps or fix issues. Try: “Create a Notes app on the desktop”.');
+      } catch (error) {
+        if (!cancelled && !controller.signal.aborted) {
+          console.warn('Welcome message fetch failed:', error);
+          setWelcomeMessage('Ready to bring your ideas to life? Try asking me to create a calculator or todo app!');
         }
       } finally {
-        if (!cancelled) setWelcomeLoaded(true);
+        if (!cancelled) {
+          setWelcomeLoaded(true);
+        }
       }
     })();
-    return () => { cancelled = true; };
+    
+    return () => { 
+      cancelled = true;
+      controller.abort();
+    };
   }, [welcomeLoaded]);
 
   async function waitForInstance(timeoutMs = 4000, intervalMs = 100) {

@@ -16,26 +16,36 @@ export async function GET() {
           order: ['google', 'vertex'],
         },
       },
-      system: `You craft a single, short welcome message for a developer who just opened an AI chat bar.
+      system: `You are a friendly AI assistant greeting a user who just opened your chat interface.
 
 Goals:
-• Sound warm and friendly without fluff or technical jargon
-* assume the user has never developed an app or has never used AI before
-• Be 1–2 short sentences, max ~25 words total
-• Vary phrasing across requests (avoid stock intros)
-• Briefly suggest a concrete next step (e.g., “ask me to create an app”)
+• Create a warm, approachable welcome that feels personal and engaging
+• Assume the user might be new to AI-powered development tools
+• Be conversational and encouraging, not robotic or corporate
+• Keep it 1-2 sentences, around 20-30 words maximum
+• Vary your greeting style - sometimes curious, sometimes helpful, sometimes excited
+• Include a specific, actionable suggestion they can try right away
 
-Do not include greetings like "Hello there!" more than necessary. No emojis, no markdown, no lists. 
-Return only the final sentence(s).`,
-      prompt: 'Write a single short welcome line with a concrete next step.',
+Tone variations to rotate between:
+- Curious: "What would you like to build today?"  
+- Helpful: "I'm here to help you create anything you can imagine"
+- Encouraging: "Ready to bring your ideas to life?"
+
+Examples of concrete suggestions:
+- "Try asking me to create a calculator app"
+- "Say 'build me a todo list' and I'll get started"  
+- "Ask me to make a simple game or productivity tool"
+
+No emojis, no markdown formatting. Return only the greeting message.`,
+      prompt: 'Generate a friendly, varied welcome greeting with a specific actionable suggestion.',
     });
     const message = (text || '').trim();
     if (!message) {
-      return Response.json({ message: 'Hey! I can spin up apps or fix issues. Try: “Create a Notes app on the desktop”.' });
+      return Response.json({ message: 'Ready to bring your ideas to life? Try asking me to create a calculator or todo app!' });
     }
     return Response.json({ message });
-  } catch (e: unknown) {
-    return Response.json({ message: 'Hey! I can spin up apps or fix issues. Try: “Create a Notes app on the desktop”.' }, { status: 200 });
+  } catch {
+    return Response.json({ message: 'Ready to bring your ideas to life? Try asking me to create a calculator or todo app!' }, { status: 200 });
   }
 }
 
