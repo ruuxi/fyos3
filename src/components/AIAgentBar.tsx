@@ -50,6 +50,7 @@ export default function AIAgentBar() {
               role: 'user',
               parts: [{
                 type: 'text',
+                text: 'You are a welcome message generator that is talking to a user in a chat bar. Generate a brief welcome message (1-2 sentences) to the user with a greeting and encouraging, inspiring message about how they can build, customize, and interact with their desktop environment. For example: "Hi! What\'s in store today?.", "Hey! What\'s on your mind? Let me know how I can help bring your vision to life." You should not reveal that you are an AI agent or that you are generating suggestions to use for the user. Talk to the user directly.'
                 text: 'You are a friendly welcoming agent that greets the user the first time that they open the AI Agent bar. Your task is to generate a brief welcome message (1-2 sentences) to greet the user and seed ideas for what to do. For example: Hey! What are we building today? / Whats on your mind? / Hi! Ready to customize your desktop? Describe your vision, and I\'ll make it happen!. These are only examples, be genuine and creative. Vary the tone and suggestion each.'
               }]
             }]

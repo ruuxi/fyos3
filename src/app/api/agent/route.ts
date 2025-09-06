@@ -1,5 +1,5 @@
 import { convertToModelMessages, streamText, UIMessage, stepCountIs, tool } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { openrouter } from '@openrouter/ai-sdk-provider';
 import { z } from 'zod';
 
 // Some tool actions (like package installs) may take longer than 30s
@@ -8,7 +8,8 @@ export const maxDuration = 300;
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { messages, welcome } = body as { messages: UIMessage[]; welcome?: boolean };
+    const { messages }: { messages: UIMessage[] } = body;
+    const isWelcome = Boolean((body as any)?.welcome);
 
     if (!messages || !Array.isArray(messages)) {
       console.error('🔴 [AGENT] Invalid messages in request body:', body);
@@ -45,23 +46,13 @@ export async function POST(req: Request) {
       };
     }));
 
-    // Welcome path: route through OpenRouter using Gemini Flash
-    if (welcome) {
-      const apiKey = process.env.OPENROUTER_API_KEY;
-      if (!apiKey || apiKey.trim().length === 0) {
-        console.error('🔴 [AGENT] OPENROUTER_API_KEY is not set');
-        return new Response(JSON.stringify({ error: 'OpenRouter API key not configured' }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
-      const openrouter = createOpenRouter({ apiKey });
+    // Special-case: welcome message should use OpenRouter Gemini Flash, no tools/system
+    if (isWelcome) {
       const result = streamText({
         model: openrouter('google/gemini-2.0-flash-001'),
         messages: convertToModelMessages(messages),
         onFinish: (event) => {
-          console.log('🎯 [Welcome AI] Response finished:', {
+          console.log('🎯 [AI:welcome] Response finished:', {
             finishReason: event.finishReason,
             usage: event.usage,
             text: event.text?.length > 200 ? event.text.substring(0, 200) + '...' : event.text,
@@ -69,7 +60,7 @@ export async function POST(req: Request) {
         },
       });
 
-      console.log('📤 [AGENT] Returning streaming response (welcome via OpenRouter)');
+      console.log('📤 [AGENT] Returning streaming response (welcome)');
       return result.toUIMessageStreamResponse({
         onError: (error) => {
           console.error('🔴 [AGENT] Stream error (welcome):', error);
