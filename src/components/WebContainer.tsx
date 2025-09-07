@@ -412,18 +412,32 @@ export default function Document() {
           }
           
           if (event.data && event.data.type === 'AI_REQUEST') {
-            const { id, provider, model, input } = event.data as any;
+            const { id, provider, model, input, scope } = event.data as any;
             const srcWin = (event.source as Window | null);
             const reply = (payload: any) => { try { srcWin?.postMessage(payload, event.origin); } catch {} };
             try {
               if (provider === 'fal') {
                 const res = await fetch('/api/ai/fal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, input }) });
                 if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
-                reply({ type: 'AI_RESPONSE', id, ok: true, result: await res.json() });
+                const raw = await res.json();
+                try {
+                  const { persistAssetsFromAIResult } = await import('@/utils/ai-media');
+                  const { result: updated, persistedAssets } = await persistAssetsFromAIResult(raw, scope);
+                  reply({ type: 'AI_RESPONSE', id, ok: true, result: updated, persistedAssets });
+                } catch {
+                  reply({ type: 'AI_RESPONSE', id, ok: true, result: raw });
+                }
               } else if (provider === 'eleven') {
                 const res = await fetch('/api/ai/eleven', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input || {}) });
                 if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
-                reply({ type: 'AI_RESPONSE', id, ok: true, result: await res.json() });
+                const raw = await res.json();
+                try {
+                  const { persistAssetsFromAIResult } = await import('@/utils/ai-media');
+                  const { result: updated, persistedAssets } = await persistAssetsFromAIResult(raw, scope);
+                  reply({ type: 'AI_RESPONSE', id, ok: true, result: updated, persistedAssets });
+                } catch {
+                  reply({ type: 'AI_RESPONSE', id, ok: true, result: raw });
+                }
               }
             } catch (e: any) {
               reply({ type: 'AI_RESPONSE', id, ok: false, error: e?.message || 'Request failed' });

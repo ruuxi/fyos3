@@ -28,5 +28,11 @@
     "name": "Settings",
     "icon": "⚙️",
     "path": "/src/apps/settings/index.tsx"
+  },
+  {
+    "id": "media",
+    "name": "Media",
+    "icon": "🖼️",
+    "path": "/src/apps/media/index.tsx"
   }
 ]

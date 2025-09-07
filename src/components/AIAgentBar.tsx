@@ -192,6 +192,36 @@ export default function AIAgentBar() {
               }
               await fnsRef.current.writeFile(path, content);
               addToolResult({ tool: 'web_fs_write', toolCallId: tc.toolCallId, output: { ok: true, path, size: `${sizeKB}KB` } });
+
+              // Async media ingest hook (non-blocking)
+              try {
+                const lower = path.toLowerCase();
+                const isMedia = /\.(png|jpg|jpeg|webp|gif|mp3|wav|m4a|aac|mp4|webm|mov)$/i.test(lower);
+                if (isMedia) {
+                  (async () => {
+                    try {
+                      const base64 = btoa(unescape(encodeURIComponent(content)));
+                      const contentType = lower.endsWith('.png') ? 'image/png'
+                        : (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) ? 'image/jpeg'
+                        : lower.endsWith('.webp') ? 'image/webp'
+                        : lower.endsWith('.gif') ? 'image/gif'
+                        : lower.endsWith('.mp3') ? 'audio/mpeg'
+                        : lower.endsWith('.wav') ? 'audio/wav'
+                        : lower.endsWith('.m4a') ? 'audio/m4a'
+                        : lower.endsWith('.aac') ? 'audio/aac'
+                        : lower.endsWith('.mp4') ? 'video/mp4'
+                        : lower.endsWith('.webm') ? 'video/webm'
+                        : lower.endsWith('.mov') ? 'video/quicktime'
+                        : undefined;
+                      await fetch('/api/media/ingest', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ base64, contentType, metadata: { sourcePath: path } }),
+                      });
+                    } catch {}
+                  })();
+                }
+              } catch {}
               break;
             }
             case 'web_fs_mkdir': {

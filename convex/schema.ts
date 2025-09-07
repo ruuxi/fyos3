@@ -66,6 +66,26 @@ export default defineSchema({
     count: v.number(),
   })
     .index("by_day_name", ["day", "name"]),
+  
+  media_public: defineTable({
+    ownerId: v.string(),
+    desktopId: v.optional(v.string()),
+    appId: v.optional(v.string()),
+    sha256: v.string(),
+    size: v.number(),
+    contentType: v.string(),
+    r2Key: v.string(),
+    publicUrl: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_sha256", ["sha256"])
+    .index("by_owner_sha", ["ownerId", "sha256"])
+    .index("by_owner_app", ["ownerId", "appId"])
+    .index("by_owner_desktop", ["ownerId", "desktopId"])
+    .index("by_createdAt", ["createdAt"]),
 });
 
 

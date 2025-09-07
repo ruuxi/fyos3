@@ -22,7 +22,15 @@ export async function aiRequest(provider: AIProvider, model: string, input: any)
     };
     window.addEventListener('message', onMessage as any);
     try {
-      const payload = { type: 'AI_REQUEST', id, provider, model, input } as const;
+      // Derive app scope from iframe query params (?id=...&name=...)
+      let scope: { appId?: string; appName?: string } | undefined = undefined;
+      try {
+        const sp = new URLSearchParams(window.location.search || '');
+        const appId = sp.get('id') || undefined;
+        const appName = sp.get('name') || undefined;
+        scope = { appId, appName };
+      } catch {}
+      const payload = { type: 'AI_REQUEST', id, provider, model, input, scope } as const;
       // Post directly to the top-level Next.js host to avoid needing a desktop relay
       window.top?.postMessage(payload, '*');
     } catch (err) {

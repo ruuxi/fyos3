@@ -1,0 +1,5 @@
+[
+  { "id": "media", "name": "Media", "icon": "🖼️", "path": "/src/apps/media/index.tsx" }
+]
+
+
