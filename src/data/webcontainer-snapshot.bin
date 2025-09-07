@@ -1378,7 +1378,92 @@ export default function Terminal(){
     </div>
   )
 }
-¶assetsÅ°dÅ©react.svgÅ°fÅ°c≈<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈[áimport React, { useEffect, useRef, useState } from 'react'
+¶assetsÅ°dÅ©react.svgÅ°fÅ°c≈<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈X6import React, { useEffect, useRef, useState } from 'react'
+
+// Shared constants
+const DEFAULT_WINDOW_POS = { left: 90, top: 90 }
+const DEFAULT_WINDOW_SIZE = { width: 720, height: 720 }
+const MIN_WINDOW_SIZE = { width: 280, height: 160 }
+
+const MENUBAR_HEIGHT = 28
+const TITLEBAR_HEIGHT = 32
+const MIN_VISIBLE_X = 64
+const MIN_VISIBLE_Y = 48
+
+const OPEN_RESTORE_MS = 340
+const CLOSE_MS = 220
+const MINIMIZE_MS = 220
+
+const LS_ICON_POS_KEY = 'desktop.iconPositions'
+const LS_WINDOW_GEOM_KEY = 'desktop.windowGeometries'
+
+const EVT_OPEN_APP = 'FYOS_OPEN_APP'
+const EVT_DESKTOP_READY = 'FYOS_DESKTOP_READY'
+
+const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: 16, startY: 52, maxPerCol: 6 }
+
+type Geometry = { left: number; top: number; width: number; height: number }
+
+// Helpers
+function clampToViewport(left: number, top: number, width: number, height: number){
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const minLeft = -(width - MIN_VISIBLE_X)
+  const maxLeft = vw - MIN_VISIBLE_X
+  const minTop = MENUBAR_HEIGHT - (TITLEBAR_HEIGHT - 16)
+  const maxTop = vh - MIN_VISIBLE_Y
+  return {
+    left: Math.min(Math.max(left, minLeft), maxLeft),
+    top: Math.min(Math.max(top, minTop), maxTop)
+  }
+}
+
+function resolveAppGeometry(app: App): Geometry{
+  return {
+    left: app.left ?? DEFAULT_WINDOW_POS.left,
+    top: app.top ?? DEFAULT_WINDOW_POS.top,
+    width: app.width ?? DEFAULT_WINDOW_SIZE.width,
+    height: app.height ?? DEFAULT_WINDOW_SIZE.height,
+  }
+}
+
+function resolveInitialGeometry(app: App, stored?: { left: number; top: number; width: number; height: number }): Geometry{
+  const base: Geometry = stored ? stored as Geometry : resolveAppGeometry(app)
+  const pos = clampToViewport(base.left, base.top, base.width, base.height)
+  return { left: pos.left, top: pos.top, width: base.width, height: base.height }
+}
+
+function bounceIcon(setLaunching: React.Dispatch<React.SetStateAction<string | null>>, id: string, ms = 600){
+  setLaunching(id)
+  setTimeout(()=> setLaunching(prev => prev === id ? null : prev), ms)
+}
+
+function loadIconPositions(): Record<string, { left: number; top: number }>{
+  try{
+    const raw = localStorage.getItem(LS_ICON_POS_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch { return {} }
+}
+
+function saveIconPositions(pos: Record<string, { left: number; top: number }>): void{
+  try{ localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(pos)) } catch{}
+}
+
+function loadWindowGeometries(): Record<string, { left: number; top: number; width: number; height: number }>{
+  try{
+    const raw = localStorage.getItem(LS_WINDOW_GEOM_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch { return {} }
+}
+
+function saveWindowGeometries(geoms: Record<string, { left: number; top: number; width: number; height: number }>): void{
+  try{ localStorage.setItem(LS_WINDOW_GEOM_KEY, JSON.stringify(geoms)) } catch{}
+}
+
+async function loadRegistry(): Promise<App[]>{
+  const res = await fetch('/apps/registry.json?_=' + Date.now())
+  return res.ok ? res.json() : []
+}
 
 interface App {
   id: string
@@ -1407,16 +1492,6 @@ interface WindowProps {
   onResize: (size: { width: number; height: number }) => void
 }
 
-function getDefaultWindowSize(){
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
-  // Use 50% of the smaller dimension to make it square
-  const size = Math.max(280, Math.floor(Math.min(vw, vh) * 0.5))
-  const width = size
-  const height = size
-  return { width, height }
-}
-
 function MenuBar({ appName }: MenuBarProps){
   const [time, setTime] = useState(new Date())
   useEffect(()=>{ const t=setInterval(()=>setTime(new Date()), 30000); return ()=>clearInterval(t) },[])
@@ -1442,30 +1517,14 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
   }>({ type: null, startX: 0, startY: 0, startLeft: 0, startTop: 0, startWidth: 0, startHeight: 0, active: false })
 
   useEffect(()=>{
-    // Allow partial off-screen but keep window reachable
-    const minVisibleX = 64 // keep at least 64px visible horizontally
-    const minVisibleY = 48 // keep at least 48px visible vertically
-    const menubarH = 28
-    const titlebarH = 32
-    function clamp(left: number, top: number, width: number, height: number){
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-      const minLeft = -(width - minVisibleX)
-      const maxLeft = vw - minVisibleX
-      const minTop = menubarH - (titlebarH - 16) // keep ~16px of titlebar visible under menubar
-      const maxTop = vh - minVisibleY
-      return {
-        left: Math.min(Math.max(left, minLeft), maxLeft),
-        top: Math.min(Math.max(top, minTop), maxTop)
-      }
-    }
+    // Allow partial off-screen but keep window reachable using shared clamp
     function onMoveDoc(e: MouseEvent){
       const d = draggingRef.current
       if (!d.active || !d.type) return
       if (d.type === 'move'){
         const dx = e.clientX - d.startX
         const dy = e.clientY - d.startY
-        const pos = clamp(d.startLeft + dx, d.startTop + dy, d.startWidth, d.startHeight)
+        const pos = clampToViewport(d.startLeft + dx, d.startTop + dy, d.startWidth, d.startHeight)
         onMove(pos)
       } else if (d.type === 'resize'){
         const dx = e.clientX - d.startX
@@ -1474,8 +1533,8 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         let newH = d.startHeight
         let newL = d.startLeft
         let newT = d.startTop
-        const minW = 280
-        const minH = 160
+        const minW = MIN_WINDOW_SIZE.width
+        const minH = MIN_WINDOW_SIZE.height
         switch(d.handle){
           case 'se':
             newW = Math.max(minW, d.startWidth + dx)
@@ -1501,7 +1560,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         // Relaxed: allow oversize beyond viewport; keep window reachable via clamp on position
         if (newW < minW) newW = minW
         if (newH < minH) newH = minH
-        const pos = clamp(newL, newT, newW, newH)
+        const pos = clampToViewport(newL, newT, newW, newH)
         onMove(pos)
         onResize({ width: newW, height: newH })
       }
@@ -1517,14 +1576,15 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
 
   function startMove(e: React.MouseEvent){
     onFocus()
+    const g = resolveAppGeometry(app)
     draggingRef.current = {
       type: 'move',
       startX: e.clientX,
       startY: e.clientY,
-      startLeft: app.left ?? 90,
-      startTop: app.top ?? 90,
-      startWidth: app.width ?? getDefaultWindowSize().width,
-      startHeight: app.height ?? getDefaultWindowSize().height,
+      startLeft: g.left,
+      startTop: g.top,
+      startWidth: g.width,
+      startHeight: g.height,
       active: true
     }
   }
@@ -1533,15 +1593,16 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
     return (e: React.MouseEvent)=>{
       e.stopPropagation()
       onFocus()
+      const g = resolveAppGeometry(app)
       draggingRef.current = {
         type: 'resize',
         handle,
         startX: e.clientX,
         startY: e.clientY,
-        startLeft: app.left ?? 90,
-        startTop: app.top ?? 90,
-        startWidth: app.width ?? getDefaultWindowSize().width,
-        startHeight: app.height ?? getDefaultWindowSize().height,
+        startLeft: g.left,
+        startTop: g.top,
+        startWidth: g.width,
+        startHeight: g.height,
         active: true
       }
     }
@@ -1552,9 +1613,8 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
   if (app.anim === 'minimize') classes.push('minimizing')
   if (app.minimized && !app.anim) classes.push('minimized')
 
-  const defaultSize = getDefaultWindowSize()
   return (
-    <div className={classes.join(' ')} style={{left: app.left ?? 90, top: app.top ?? 90, width: app.width ?? defaultSize.width, height: app.height ?? defaultSize.height, zIndex}} onMouseDown={onFocus}>
+    <div className={classes.join(' ')} style={resolveAppGeometry(app)} onMouseDown={onFocus}>
       <div className="titlebar" onMouseDown={startMove}>
         <div className="traffic" onMouseDown={(e)=>e.stopPropagation()}>
           <div className="b red" onClick={onClose} title="Close" />
@@ -1588,7 +1648,7 @@ export default function Desktop(){
   const appsByIdRef = useRef<Record<string, App>>({})
   // Announce readiness to host so it can flush any pending open-app messages
   useEffect(()=>{
-    try { window.parent?.postMessage({ type: 'FYOS_DESKTOP_READY' }, '*') } catch {}
+    try { window.parent?.postMessage({ type: EVT_DESKTOP_READY }, '*') } catch {}
   }, [])
   // Ensure root container stretches full viewport
   useEffect(()=>{
@@ -1621,12 +1681,7 @@ export default function Desktop(){
 
   // Helper function to find next available icon position
   const findNextIconPosition = (currentPositions: Record<string,{left:number;top:number}>, existingApps: App[]) => {
-    const spacingX = 90
-    const spacingY = 90
-    const startX = 16
-    const startY = 52
-    const maxPerCol = 6
-    const iconSize = 64 // approximate icon size for collision detection
+    const { spacingX, spacingY, startX, startY, maxPerCol } = DESKTOP_GRID
     
     // Get all occupied positions
     const occupiedPositions = new Set<string>()
@@ -1652,29 +1707,18 @@ export default function Desktop(){
   }
 
   useEffect(()=>{
-    fetch('/apps/registry.json?_=' + Date.now())
-      .then(r=>r.json())
+    loadRegistry()
       .then((list: App[])=> {
         setApps(prevApps => {
           // load icon positions from localStorage if present
           try{
-            const saved = localStorage.getItem('desktop.iconPositions')
-            let currentPositions: Record<string,{left:number;top:number}> = {}
-            
-            if (saved){
-              currentPositions = JSON.parse(saved)
-            } else {
-              // initialize default positions in a simple grid for existing apps
-              const spacingX = 90
-              const spacingY = 90
-              const startX = 16
-              const startY = 52
-              const maxPerCol = 6
-              list.slice(0, 20).forEach((a, i)=>{
-                const col = Math.floor(i / maxPerCol)
-                const row = i % maxPerCol
-                currentPositions[a.id] = { left: startX + col*spacingX, top: startY + row*spacingY }
+            let currentPositions = loadIconPositions()
+            if (!currentPositions || Object.keys(currentPositions).length === 0){
+              const seed: Record<string,{left:number;top:number}> = {}
+              list.forEach(app => {
+                seed[app.id] = findNextIconPosition(seed, list)
               })
+              currentPositions = seed
             }
             
             // Check for new apps that don't have positions yet
@@ -1687,10 +1731,9 @@ export default function Desktop(){
             
             setIconPositions(newPositions)
             
-            const savedGeom = localStorage.getItem('desktop.windowGeometries')
-            if (savedGeom){
-              const parsed = JSON.parse(savedGeom) as Record<string,{left:number;top:number;width:number;height:number}>
-              setWindowGeometries(parsed)
+            const geoms = loadWindowGeometries()
+            if (geoms && Object.keys(geoms).length > 0){
+              setWindowGeometries(geoms)
             }
           } catch {}
           
@@ -1709,8 +1752,7 @@ export default function Desktop(){
   useEffect(()=>{ appsRef.current = apps }, [apps])
   useEffect(()=>{
     const iv = setInterval(()=>{
-      fetch('/apps/registry.json?_=' + Date.now())
-        .then(r=>r.json())
+      loadRegistry()
         .then((list: App[])=>{
           const curr = JSON.stringify(appsRef.current?.map(a=>({id:a.id,name:a.name,icon:a.icon,path:a.path})) ?? [])
           const next = JSON.stringify(list?.map(a=>({id:a.id,name:a.name,icon:a.icon,path:a.path})) ?? [])
@@ -1762,17 +1804,9 @@ export default function Desktop(){
         const exists = prev[idx]
         // If minimized, restore with animation
         if (exists.minimized){
-          const DURATION = 340
-          // ensure geometry is clamped on restore (relaxed clamp)
-          const minVisibleX = 64, minVisibleY = 48, menubarH = 28, titlebarH = 32
-          const vw = window.innerWidth, vh = window.innerHeight
-          const width = exists.width ?? 600, height = exists.height ?? 380
-          const minLeft = -(width - minVisibleX)
-          const maxLeft = vw - minVisibleX
-          const minTop = menubarH - (titlebarH - 16)
-          const maxTop = vh - minVisibleY
-          const left = Math.min(Math.max(exists.left ?? 90, minLeft), maxLeft)
-          const top = Math.min(Math.max(exists.top ?? 90, minTop), maxTop)
+          const DURATION = OPEN_RESTORE_MS
+          const g = resolveAppGeometry(exists)
+          const { left, top } = clampToViewport(g.left, g.top, g.width, g.height)
           const updated = { ...exists, left, top, minimized: false, anim: 'restore' as const }
           const next = [...prev]
           next.splice(idx, 1) // bring to front
@@ -1787,36 +1821,11 @@ export default function Desktop(){
       }
       
       const geom = windowGeometries[app.id]
-      let left: number
-      let top: number
-      
-      if (geom) {
-        // Use saved geometry if available
-        left = geom.left
-        top = geom.top
-      } else {
-        // Find next available position to avoid stacking
-        const nextPos = findNextWindowPosition(prev)
-        left = nextPos.left
-        top = nextPos.top
-      }
-      
-      const defaultSize = getDefaultWindowSize()
-      const width = geom?.width ?? app.width ?? defaultSize.width
-      const height = geom?.height ?? app.height ?? defaultSize.height
-      
-      // clamp initial geometry to viewport (relaxed)
-      const minVisibleX = 64, minVisibleY = 48, menubarH = 28, titlebarH = 32
-      const vw = window.innerWidth, vh = window.innerHeight
-      const minLeft = -(width - minVisibleX)
-      const maxLeft = vw - minVisibleX
-      const minTop = menubarH - (titlebarH - 16)
-      const maxTop = vh - minVisibleY
-      left = Math.min(Math.max(left, minLeft), maxLeft)
-      top = Math.min(Math.max(top, minTop), maxTop)
-      
-      const created: App = { ...app, left, top, width, height, minimized: false, anim: 'open' }
-      const DURATION = 340
+      const basePos = geom ? { left: geom.left, top: geom.top } : findNextWindowPosition(prev)
+      const baseSize = geom ? { width: geom.width, height: geom.height } : { width: resolveAppGeometry(app).width, height: resolveAppGeometry(app).height }
+      const clamped = clampToViewport(basePos.left, basePos.top, baseSize.width, baseSize.height)
+      const created: App = { ...app, left: clamped.left, top: clamped.top, width: baseSize.width, height: baseSize.height, minimized: false, anim: 'open' }
+      const DURATION = OPEN_RESTORE_MS
       setTimeout(()=>{
         setOpen(p=> p.map(w=> w.id===app.id ? { ...w, anim: undefined } : w))
       }, DURATION)
@@ -1826,7 +1835,7 @@ export default function Desktop(){
 
   function close(appId: string){
     // Animate close before removing
-    const DURATION = 220
+    const DURATION = CLOSE_MS
     setOpen(prev => prev.map(w => w.id === appId ? { ...w, anim: 'close' } : w))
     setTimeout(()=>{
       setOpen(prev => prev.filter(w => w.id !== appId))
@@ -1834,7 +1843,7 @@ export default function Desktop(){
   }
 
   function minimize(appId: string){
-    const DURATION = 220
+    const DURATION = MINIMIZE_MS
     setOpen(prev => prev.map(w => w.id === appId ? { ...w, anim: 'minimize' } : w))
     setTimeout(()=>{
       setOpen(prev => prev.map(w => w.id === appId ? { ...w, minimized: true, anim: undefined } : w))
@@ -1852,7 +1861,7 @@ export default function Desktop(){
   const saveGeometries = (updater: (g: Record<string,{left:number;top:number;width:number;height:number}>)=>Record<string,{left:number;top:number;width:number;height:number}>) => {
     setWindowGeometries(prev => {
       const next = updater(prev)
-      try{ localStorage.setItem('desktop.windowGeometries', JSON.stringify(next)) } catch{}
+      saveWindowGeometries(next)
       return next
     })
   }
@@ -1861,7 +1870,7 @@ export default function Desktop(){
     setOpen(prev => prev.map(w => w.id === appId ? { ...w, ...partial } : w))
     if ('left' in partial || 'top' in partial || 'width' in partial || 'height' in partial){
       saveGeometries(prev => {
-        const cur = prev[appId] || { left: 90, top: 90, width: 600, height: 380 }
+        const cur = prev[appId] || { left: 90, top: 90, width: 720, height: 720 }
         return { ...prev, [appId]: { left: partial.left ?? cur.left, top: partial.top ?? cur.top, width: partial.width ?? cur.width, height: partial.height ?? cur.height } }
       })
     }
@@ -1890,7 +1899,7 @@ export default function Desktop(){
       if (d.id){
         // persist positions
         setTimeout(()=>{
-          try{ localStorage.setItem('desktop.iconPositions', JSON.stringify(iconPositionsRef.current)) } catch{}
+          try{ localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(iconPositionsRef.current)) } catch{}
         }, 0)
       }
       dragIconRef.current = { id: null, startX: 0, startY: 0, startLeft: 0, startTop: 0, dragging: false }
@@ -1901,17 +1910,9 @@ export default function Desktop(){
     document.addEventListener('mouseup', onUp)
     function onResize(){
       // Re-clamp all windows into viewport on viewport resize (relaxed)
-      const vw = window.innerWidth, vh = window.innerHeight
-      const minVisibleX = 64, minVisibleY = 48, menubarH = 28, titlebarH = 32
       setOpen(prev => prev.map(w => {
-        const d = getDefaultWindowSize()
-        const width = w.width ?? d.width, height = w.height ?? d.height
-        const minLeft = -(width - minVisibleX)
-        const maxLeft = vw - minVisibleX
-        const minTop = menubarH - (titlebarH - 16)
-        const maxTop = vh - minVisibleY
-        const left = Math.min(Math.max(w.left ?? 90, minLeft), maxLeft)
-        const top = Math.min(Math.max(w.top ?? 90, minTop), maxTop)
+        const g = resolveAppGeometry(w)
+        const { left, top } = clampToViewport(g.left, g.top, g.width, g.height)
         return { ...w, left, top }
       }))
     }
@@ -1932,7 +1933,7 @@ export default function Desktop(){
   useEffect(()=>{
     function onMessage(e: MessageEvent){
       const d: any = (e as any).data
-      if (!d || d.type !== 'FYOS_OPEN_APP') return
+      if (!d || d.type !== EVT_OPEN_APP) return
       const app: App | null = (d.app && typeof d.app === 'object') ? d.app as App : null
       if (!app || !app.id) return
       // If app exists in registry, prefer that canonical entry
@@ -1941,15 +1942,14 @@ export default function Desktop(){
       // Ensure it has a reasonable path shape
       if (!toLaunch.path) return
       // visually bounce icon if present
-      setLaunchingIconId(toLaunch.id)
-      setTimeout(()=> setLaunchingIconId(prev => prev===toLaunch.id ? null : prev), 600)
+      bounceIcon(setLaunchingIconId, toLaunch.id)
       launch(toLaunch)
       // If icon position missing, assign one and persist
       setIconPositions(prev => {
         if (prev[toLaunch.id]) return prev
         const nextPos = findNextIconPosition(prev, appsRef.current || [])
         const next = { ...prev, [toLaunch.id]: nextPos }
-        try{ localStorage.setItem('desktop.iconPositions', JSON.stringify(next)) } catch{}
+        saveIconPositions(next)
         return next
       })
     }
@@ -1982,8 +1982,7 @@ export default function Desktop(){
               }}
               onClick={(e)=>{
                 if (suppressClickRef.current.has(a.id)) { e.preventDefault(); return }
-                setLaunchingIconId(a.id)
-                setTimeout(()=> setLaunchingIconId(prev => prev===a.id ? null : prev), 600)
+                bounceIcon(setLaunchingIconId, a.id)
                 launch(a)
               }}
             >
@@ -2207,12 +2206,10 @@ createRoot(document.getElementById('root')!).render(
     <Desktop />
   </StrictMode>
 )
-¨tailwind.cssÅ°fÅ°cƒ=@tailwind base;
+¨tailwind.cssÅ°fÅ°cƒ;
+@tailwind base;
 @tailwind components;
-@tailwind utilities;
-
-
-≤tailwind.config.jsÅ°fÅ°cƒ∏/** @type {import('tailwindcss').Config} */
+@tailwind utilities;≤tailwind.config.jsÅ°fÅ°cƒ∏/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     './index.html',
