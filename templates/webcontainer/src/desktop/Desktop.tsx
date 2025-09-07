@@ -25,7 +25,7 @@ const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: 16, startY: 52, maxPe
 type Geometry = { left: number; top: number; width: number; height: number }
 
 // Helpers
-function clampToViewport(left: number, top: number, width: number, height: number){
+function clampToViewport(left: number, top: number, width: number, _height: number){
   const vw = window.innerWidth
   const vh = window.innerHeight
   const minLeft = -(width - MIN_VISIBLE_X)
@@ -47,11 +47,7 @@ function resolveAppGeometry(app: App): Geometry{
   }
 }
 
-function resolveInitialGeometry(app: App, stored?: { left: number; top: number; width: number; height: number }): Geometry{
-  const base: Geometry = stored ? stored as Geometry : resolveAppGeometry(app)
-  const pos = clampToViewport(base.left, base.top, base.width, base.height)
-  return { left: pos.left, top: pos.top, width: base.width, height: base.height }
-}
+// (removed unused resolveInitialGeometry)
 
 function bounceIcon(setLaunching: React.Dispatch<React.SetStateAction<string | null>>, id: string, ms = 600){
   setLaunching(id)
@@ -234,7 +230,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
   if (app.minimized && !app.anim) classes.push('minimized')
 
   return (
-    <div className={classes.join(' ')} style={resolveAppGeometry(app)} onMouseDown={onFocus}>
+    <div className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex }} onMouseDown={onFocus}>
       <div className="titlebar" onMouseDown={startMove}>
         <div className="traffic" onMouseDown={(e)=>e.stopPropagation()}>
           <div className="b red" onClick={onClose} title="Close" />
@@ -300,7 +296,7 @@ export default function Desktop(){
   const focusedName = open.length ? open[open.length-1].name : 'Finder'
 
   // Helper function to find next available icon position
-  const findNextIconPosition = (currentPositions: Record<string,{left:number;top:number}>, existingApps: App[]) => {
+  const findNextIconPosition = (currentPositions: Record<string,{left:number;top:number}>, _existingApps: App[]) => {
     const { spacingX, spacingY, startX, startY, maxPerCol } = DESKTOP_GRID
     
     // Get all occupied positions
@@ -329,7 +325,7 @@ export default function Desktop(){
   useEffect(()=>{
     loadRegistry()
       .then((list: App[])=> {
-        setApps(prevApps => {
+        setApps(() => {
           // load icon positions from localStorage if present
           try{
             let currentPositions = loadIconPositions()
