@@ -28,5 +28,11 @@
     "name": "Settings",
     "icon": "⚙️",
     "path": "/src/apps/settings/index.tsx"
+  },
+  {
+    "id": "doggy-bird",
+    "name": "Doggy Bird",
+    "icon": "🐕",
+    "path": "/src/apps/doggy-bird/index.tsx"
   }
 ]

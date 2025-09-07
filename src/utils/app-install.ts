@@ -1,4 +1,5 @@
 import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
+import { gunzipSync, unzipSync, strFromU8 } from 'fflate';
 
 type FS = WebContainerAPI['fs'];
 
@@ -27,14 +28,13 @@ async function readJSON<T>(fs: FS, path: string): Promise<T | null> {
 export async function installAppFromBundle(instance: WebContainerAPI, bundleBytes: Uint8Array) {
   const fs = instance.fs as FS;
   // Our bundle format is gzip(zip(files...)) per packaging util
-  const fflate = await import('fflate');
-  const unGz = fflate.gunzipSync(bundleBytes);
-  const files = fflate.unzipSync(unGz);
+  const unGz = gunzipSync(bundleBytes);
+  const files = unzipSync(unGz);
 
   // Find manifest first
   const manifestEntry = files['app.manifest.json'];
   if (!manifestEntry) throw new Error('Invalid bundle: missing app.manifest.json');
-  const manifestText = fflate.strFromU8(manifestEntry);
+  const manifestText = strFromU8(manifestEntry);
   const manifest = JSON.parse(manifestText) as {
     id: string; name: string; icon?: string; entry: string;
     dependencies?: Record<string,string>; peerDependencies?: Record<string,string>; devDependencies?: Record<string,string>;

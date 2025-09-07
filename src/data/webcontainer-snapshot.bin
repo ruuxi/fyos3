@@ -2499,7 +2499,7 @@ snapshots:
 }
 
 
-¦public¡d¤apps¡d­registry.json¡f¡cÅD[
+¦public¡d¤apps¡d­registry.json¡f¡cÅÀ[
   {
     "id": "finder",
     "name": "Finder",
@@ -2529,6 +2529,12 @@ snapshots:
     "name": "Settings",
     "icon": "âš™ï¸",
     "path": "/src/apps/settings/index.tsx"
+  },
+  {
+    "id": "doggy-bird",
+    "name": "Doggy Bird",
+    "icon": "ğŸ•",
+    "path": "/src/apps/doggy-bird/index.tsx"
   }
 ]
 £src¡d‹§App.css¡f¡cÅ]#root {
@@ -2640,7 +2646,7 @@ export async function composeMusic(params: ComposeMusicParams): Promise<any> {
   }
   return aiRequest('eleven', input.model || '', input);
 }
-¤apps¡d‡©app-store¡d©index.tsx¡f¡cÅ“import { useEffect, useMemo, useState } from 'react'
+¤apps¡dˆ©app-store¡d©index.tsx¡f¡cÅ“import { useEffect, useMemo, useState } from 'react'
 
 type AppRecord = {
   _id: string;
@@ -2728,6 +2734,31 @@ export default function AppStore() {
 }
 
 
+ªdoggy-bird¡d‚©index.tsx¡f¡cÅğimport React from 'react'
+
+export default function App(){
+  return (
+    <div className="h-full overflow-auto">
+      <div className="sticky top-0 bg-white/70 backdrop-blur border-b px-3 py-2">
+        <div className="font-semibold">ğŸ• Doggy Bird</div>
+      </div>
+      <div className="p-3 space-y-3">
+        <p className="text-gray-600 text-sm">This is the Doggy Bird app. Build your UI here. The container fills the window and scrolls as needed.</p>
+        <div className="text-center py-8">
+          <div className="text-6xl mb-4">ğŸ•ğŸ¦</div>
+          <div className="text-lg font-medium text-gray-800">Doggy Bird</div>
+          <div className="text-sm text-gray-500">A placeholder app</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+­metadata.json¡f¡cÄa{
+  "id": "doggy-bird",
+  "name": "Doggy Bird",
+  "icon": "ğŸ•",
+  "createdAt": 1703123456789
+}
 ¦finder¡d©index.tsx¡f¡cÅimport React from 'react'
 export default function Finder(){
   return (
