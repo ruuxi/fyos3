@@ -13,6 +13,14 @@ import ChatAlert from './ChatAlert';
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showAppStore, setShowAppStore] = useState(false);
+  const [showVisit, setShowVisit] = useState(false);
+  const [appsListing, setAppsListing] = useState<Array<{ _id: string; name: string; description?: string; icon?: string }>>([]);
+  const [desktopsListing, setDesktopsListing] = useState<Array<{ _id: string; title: string; description?: string; icon?: string }>>([]);
+  const [appsLoading, setAppsLoading] = useState(false);
+  const [desktopsLoading, setDesktopsLoading] = useState(false);
+  const [appsError, setAppsError] = useState<string | null>(null);
+  const [desktopsError, setDesktopsError] = useState<string | null>(null);
   const pendingToolPromises = useRef(new Set<Promise<void>>());
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
 
@@ -433,6 +441,41 @@ export default function AIAgentBar() {
     },
   });
 
+  // Host-side fetchers for listings
+  useEffect(() => {
+    if (!showAppStore) return;
+    setAppsLoading(true); setAppsError(null);
+    fetch('/api/store/apps')
+      .then(r => r.json())
+      .then(j => setAppsListing((j?.apps || []).map((a: any) => ({ _id: String(a._id), name: a.name, description: a.description, icon: a.icon }))))
+      .catch(e => setAppsError(e?.message || 'Failed'))
+      .finally(() => setAppsLoading(false));
+  }, [showAppStore]);
+
+  useEffect(() => {
+    if (!showVisit) return;
+    setDesktopsLoading(true); setDesktopsError(null);
+    fetch('/api/visit/desktops')
+      .then(r => r.json())
+      .then(j => setDesktopsListing((j?.desktops || []).map((d: any) => ({ _id: String(d._id), title: d.title, description: d.description, icon: d.icon }))))
+      .catch(e => setDesktopsError(e?.message || 'Failed'))
+      .finally(() => setDesktopsLoading(false));
+  }, [showVisit]);
+
+  async function hostInstallApp(appId: string) {
+    try {
+      const res = await fetch(`/api/store/apps/${appId}/bundle`);
+      if (!res.ok) throw new Error(`Bundle fetch failed`);
+      const buf = new Uint8Array(await res.arrayBuffer());
+      const { installAppFromBundle } = await import('@/utils/app-install');
+      if (!instanceRef.current) await waitForInstance(6000, 120);
+      if (!instanceRef.current) throw new Error('WebContainer not ready');
+      await installAppFromBundle(instanceRef.current, buf);
+    } catch (e) {
+      console.error('Install failed', e);
+    }
+  }
+
   // Auto-scroll or preserve position on new messages and height changes
   useLayoutEffect(() => {
     const el = messagesContainerRef.current;
@@ -703,6 +746,76 @@ export default function AIAgentBar() {
             </div>
             <div className="flex items-center space-x-1">
               <Button
+                variant="ghost"
+                size="sm"
+                className="p-1 h-auto"
+                onClick={() => { setShowAppStore((s) => !s); if (!showAppStore) setShowVisit(false); }}
+              >App Store</Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-1 h-auto"
+                onClick={() => { setShowVisit((s) => !s); if (!showVisit) setShowAppStore(false); }}
+              >Visit</Button>
+              {/* Minimal Publish App control */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-1 h-auto text-white bg-gray-800 hover:bg-black"
+                onClick={async () => {
+                  try {
+                    if (!instanceRef.current) return;
+                    const fs = instanceRef.current.fs as any;
+                    // Prompt for app id to publish
+                    const id = prompt('App id to publish (folder under src/apps)');
+                    if (!id) return;
+                    const metaRaw = await fs.readFile(`/src/apps/${id}/metadata.json`, 'utf8');
+                    const meta = JSON.parse(typeof metaRaw === 'string' ? metaRaw : new TextDecoder().decode(metaRaw));
+                    const name = meta?.name || id;
+                    const icon = meta?.icon || '📦';
+                    const entry = `/src/apps/${id}/index.tsx`;
+                    // Build manifest minimal
+                    const manifest = {
+                      schemaVersion: 1 as const,
+                      id,
+                      name,
+                      icon,
+                      entry,
+                      dependencies: {},
+                      peerDependencies: {},
+                      devDependencies: {},
+                      tags: [],
+                      description: meta?.description || ''
+                    };
+                    const { buildAppTarGz } = await import('@/utils/app-packaging');
+                    const pkg = await buildAppTarGz(instanceRef.current, id, manifest as any);
+                    // Upload
+                    const version = new Date().toISOString().replace(/[:.]/g, '-');
+                    const res = await fetch('/api/publish/app', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        appId: id,
+                        name,
+                        version,
+                        description: manifest.description,
+                        icon,
+                        tags: manifest.tags,
+                        size: pkg.size,
+                        manifestHash: pkg.manifestHash,
+                        depsHash: pkg.depsHash,
+                        blobBase64: btoa(String.fromCharCode(...Array.from(pkg.tarGz)))
+                      })
+                    });
+                    const json = await res.json();
+                    if (!res.ok) throw new Error(json?.error || 'Publish failed');
+                    alert('App published!');
+                  } catch (e: any) {
+                    alert(`Publish failed: ${e?.message || e}`);
+                  }
+                }}
+              >Publish App</Button>
+              <Button
                 onClick={() => setIsCollapsed(true)}
                 variant="ghost"
                 size="sm"
@@ -712,6 +825,61 @@ export default function AIAgentBar() {
               </Button>
             </div>
           </div>
+
+          {/* Host-side panels */}
+          {showAppStore && (
+            <div className="px-4 pb-2">
+              <div className="rounded border p-3 bg-white">
+                <div className="font-medium mb-2">App Store</div>
+                {appsLoading && <div className="text-sm text-gray-500">Loading…</div>}
+                {appsError && <div className="text-sm text-red-600">{appsError}</div>}
+                {!appsLoading && !appsError && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {appsListing.map((a) => (
+                      <div key={a._id} className="border rounded p-2">
+                        <div className="flex items-center gap-2">
+                          <div>{a.icon || '📦'}</div>
+                          <div className="font-medium truncate" title={a.name}>{a.name}</div>
+                        </div>
+                        {a.description && <div className="text-xs text-gray-600 line-clamp-2 mt-1">{a.description}</div>}
+                        <div className="mt-2 flex items-center gap-2">
+                          <Button size="sm" onClick={() => hostInstallApp(a._id)}>Install</Button>
+                          <a href={`/api/store/apps/${a._id}/bundle`} target="_blank" className="text-xs px-2 py-1 rounded border">Download</a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {showVisit && (
+            <div className="px-4 pb-2">
+              <div className="rounded border p-3 bg-white">
+                <div className="font-medium mb-2">Visit Desktops</div>
+                {desktopsLoading && <div className="text-sm text-gray-500">Loading…</div>}
+                {desktopsError && <div className="text-sm text-red-600">{desktopsError}</div>}
+                {!desktopsLoading && !desktopsError && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {desktopsListing.map((d) => (
+                      <div key={d._id} className="border rounded p-2">
+                        <div className="flex items-center gap-2">
+                          <div>{d.icon || '🖥️'}</div>
+                          <div className="font-medium truncate" title={d.title}>{d.title}</div>
+                        </div>
+                        {d.description && <div className="text-xs text-gray-600 line-clamp-2 mt-1">{d.description}</div>}
+                        <div className="mt-2 flex items-center gap-2">
+                          <a href={`/d/${d._id}`} className="text-xs px-2 py-1 rounded bg-black text-white">Open</a>
+                          <a href={`/api/visit/desktops/${d._id}/snapshot`} target="_blank" className="text-xs px-2 py-1 rounded border">Download</a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Alerts */}
           <div className="px-4 pt-2 space-y-2">

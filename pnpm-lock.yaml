@@ -65,6 +65,9 @@ importers:
       exa-js:
         specifier: ^1.9.3
         version: 1.9.3
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.2
       lucide-react:
         specifier: ^0.542.0
         version: 0.542.0(react@19.1.0)

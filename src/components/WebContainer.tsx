@@ -431,6 +431,26 @@ export default function Document() {
             return;
           }
 
+          // Install App from App Store (bundle download + install inside WebContainer)
+          if (event.data && event.data.type === 'FYOS_INSTALL_APP') {
+            try {
+              const appId = event.data.appId as string;
+              if (!appId) return;
+              const bundleUrl = `/api/store/apps/${appId}/bundle`;
+              const res = await fetch(bundleUrl);
+              if (!res.ok) {
+                console.error('[WebContainer] Failed to fetch bundle', res.status);
+                return;
+              }
+              const buf = new Uint8Array(await res.arrayBuffer());
+              const { installAppFromBundle } = await import('@/utils/app-install');
+              await installAppFromBundle(instance, buf);
+            } catch (e) {
+              console.error('[WebContainer] Install failed', e);
+            }
+            return;
+          }
+
           // Desktop iframe announced readiness; flush any queued opens
           if (event.data && event.data.type === 'FYOS_DESKTOP_READY') {
             const target = iframeRef.current?.contentWindow;
