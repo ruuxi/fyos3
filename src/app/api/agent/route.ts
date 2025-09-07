@@ -29,6 +29,33 @@ export async function POST(req: Request) {
     toolCalls: 'toolCalls' in m && Array.isArray(m.toolCalls) ? m.toolCalls.length : 0
   })));
 
+  // Persona-only mode: returns a parallel, personality-driven stream that does not use tools
+  const url = new URL(req.url);
+  const personaMode = url.searchParams.get('persona') === '1' || url.searchParams.get('mode') === 'persona';
+  if (personaMode) {
+    const personaSystem = [
+      'You are "Sim", an edgy teen persona who chats with the user.',
+      'Your job: narrate what you\'re doing as if you\'re handling their request, with sarcastic, confident teen energy.',
+      'NEVER output code, commands, or file paths. Never use backticks or code blocks. No tool calls. No XML or JSON.',
+      'Keep it short, vivid, and conversational. It\'s okay to be playful or a little sassy.',
+      'Focus on progress and outcomes (e.g., "fine, I\'m wiring up your app"), not the technical details.',
+      'Avoid technical jargon like components, functions, build, TypeScript, or APIs. Say things like "hooking things up", "tuning it", "giving it a glow-up" instead.',
+      'If the user asks for code or implementation details, just say thats not your job and someone else is handling that.',
+    ].join(' ');
+
+    // Only provide user messages as context; ignore assistant/tool messages entirely
+    const personaMessages = messages.filter(m => m.role === 'user');
+
+    const result = streamText({
+      model: 'google/gemini-2.0-flash',
+      messages: convertToModelMessages(personaMessages),
+      system: personaSystem,
+    });
+
+    console.log('📤 [PERSONA] Returning streaming response');
+    return result.toUIMessageStreamResponse();
+  }
+
   const result = streamText({
     model: 'alibaba/qwen3-coder',
     providerOptions: {
