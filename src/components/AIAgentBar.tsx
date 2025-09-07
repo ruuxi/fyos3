@@ -3,9 +3,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Send, Search, Store, Monitor, Image as ImageIcon, X } from 'lucide-react';
+import { Send, Search, Store, Monitor, Image as ImageIcon } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
@@ -14,7 +13,7 @@ import ChatAlert from './ChatAlert';
 
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
-  const [mode, setMode] = useState<'compact' | 'chat' | 'appstore' | 'visit' | 'media'>('compact');
+  const [mode, setMode] = useState<'compact' | 'chat' | 'appstore' | 'visit' | 'media'>('chat');
   const [appsListing, setAppsListing] = useState<Array<{ _id: string; name: string; description?: string; icon?: string }>>([]);
   const [desktopsListing, setDesktopsListing] = useState<Array<{ _id: string; title: string; description?: string; icon?: string }>>([]);
   const [appsLoading, setAppsLoading] = useState(false);
@@ -31,8 +30,9 @@ export default function AIAgentBar() {
   const prevScrollHeightRef = useRef(0);
   const scrollAnimRef = useRef<number | null>(null);
   const [containerHeight, setContainerHeight] = useState<number>(0);
-  const MIN_CONTAINER_HEIGHT = 160; // px
+  const MIN_CONTAINER_HEIGHT = 72; // px
   const MAX_CONTAINER_HEIGHT = 520; // px
+  const barAreaRef = useRef<HTMLDivElement | null>(null);
 
   function isUserNearBottom(el: HTMLElement, threshold = 48): boolean {
     return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
@@ -106,10 +106,8 @@ export default function AIAgentBar() {
 
     const updateHeight = () => {
       const contentHeight = content.scrollHeight;
-      setContainerHeight(prev => {
-        const next = Math.min(MAX_CONTAINER_HEIGHT, Math.max(prev || MIN_CONTAINER_HEIGHT, contentHeight));
-        return next;
-      });
+      const next = Math.min(MAX_CONTAINER_HEIGHT, Math.max(MIN_CONTAINER_HEIGHT, contentHeight));
+      setContainerHeight(next);
     };
 
     updateHeight();
@@ -556,6 +554,8 @@ export default function AIAgentBar() {
     return () => window.removeEventListener('keydown', onKey);
   }, [mode]);
 
+  // Overlay click handled via a fixed backdrop element in the JSX
+
   // === Automatic diagnostics ===
   // Preview error -> show alert and auto-post to AI once per unique error
   const [previewAlert, setPreviewAlert] = useState<{
@@ -763,11 +763,20 @@ export default function AIAgentBar() {
 
   return (
     <>
+      {mode !== 'compact' && (
+        <div
+          className="fixed inset-0 z-40 bg-black/0"
+          onClick={() => setMode('compact')}
+          aria-hidden="true"
+        />
+      )}
       <div className="flex justify-center">
-        <div className="w-full max-w-4xl mx-4">
-          <div className="flex flex-col-reverse">
-            {/* Bottom bar with single input */}
-            <div className="rounded-none border border-sky-400/70 px-4 py-3 supports-[backdrop-filter]:backdrop-blur-xl backdrop-saturate-150 bg-neutral-950/70 text-white shadow-[0_0_0_1px_rgba(56,189,248,0.45),0_8px_24px_rgba(56,189,248,0.22)]">
+        <div className="w-full max-w-4xl mx-4 relative z-50" ref={barAreaRef}>
+          {/* Unified rim wrapper around panel + bar */}
+          <div className="rounded-none border border-sky-400/70 supports-[backdrop-filter]:backdrop-blur-xl backdrop-saturate-150 bg-neutral-950/70 text-white shadow-[0_0_0_1px_rgba(56,189,248,0.45),0_8px_24px_rgba(56,189,248,0.22)] overflow-hidden">
+            <div className="flex flex-col-reverse">
+              {/* Bottom bar with single input (no inner border; inherits rim) */}
+              <div className="rounded-none px-4 py-3 bg-transparent">
               <form onSubmit={onSubmit}>
                 <div className="flex items-center gap-2">
                   {/* Left cluster */}
@@ -820,18 +829,12 @@ export default function AIAgentBar() {
                       rows={1}
                       disabled={status === 'submitted' || status === 'streaming'}
                     />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-300">
-                      {status === 'submitted' || status === 'streaming' ? 'Working…' : input.length > 0 ? `${input.length} chars` : ''}
-                    </div>
                   </div>
 
                   {/* Right cluster */}
                   <div className="flex items-center gap-2">
                     {(status === 'submitted' || status === 'streaming') && (
-                      <>
-                        <div className="text-xs text-white/80">Working…</div>
-                        <Button type="button" onClick={() => stop()} variant="ghost" size="sm" className="h-10 rounded-none">Stop</Button>
-                      </>
+                      <Button type="button" onClick={() => stop()} variant="ghost" size="sm" className="h-10 rounded-none">Stop</Button>
                     )}
                     <Button type="submit" disabled={!input.trim() || status !== 'ready'} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
                       <Send className="w-4 h-4" />
@@ -846,19 +849,7 @@ export default function AIAgentBar() {
               className="overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
               style={{ maxHeight: mode !== 'compact' ? '70vh' : 0, opacity: mode !== 'compact' ? 1 : 0, transform: mode !== 'compact' ? 'translateY(0)' : 'translateY(4px)' }}
             >
-              <div className="supports-[backdrop-filter]:backdrop-blur-xl backdrop-saturate-150 bg-neutral-950/65 text-white border border-sky-400/70 rounded-none shadow-[0_0_0_1px_rgba(56,189,248,0.45),0_12px_32px_rgba(56,189,248,0.22)]">
-                <div className="px-4 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <Button className="rounded-none" variant={mode === 'chat' ? 'secondary' : 'ghost'} size="sm" onClick={() => setMode('chat')}>Chat</Button>
-                    <Button className="rounded-none" variant={mode === 'appstore' ? 'secondary' : 'ghost'} size="sm" onClick={() => setMode('appstore')}>App Store</Button>
-                    <Button className="rounded-none" variant={mode === 'visit' ? 'secondary' : 'ghost'} size="sm" onClick={() => setMode('visit')}>Visit</Button>
-                    <Button className="rounded-none" variant={mode === 'media' ? 'secondary' : 'ghost'} size="sm" onClick={() => setMode('media')}>Media</Button>
-                  </div>
-                  <Button className="rounded-none" variant="ghost" size="icon" onClick={() => setMode('compact')} aria-label="Close">
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Separator />
+              <div className="bg-transparent text-white">
 
                 {mode === 'chat' && (
                   <div className="px-4 pt-3">
@@ -877,7 +868,7 @@ export default function AIAgentBar() {
 
                     <div
                       ref={messagesContainerRef}
-                      className="overflow-auto pt-2"
+                      className="overflow-auto pt-2 pb-1 modern-scrollbar"
                       style={{
                         height: containerHeight > 0 ? `${containerHeight}px` : undefined,
                         maxHeight: '60vh',
@@ -886,6 +877,20 @@ export default function AIAgentBar() {
                       }}
                     >
                       <div ref={messagesInnerRef} className="space-y-3 px-1">
+                        {messages.length === 0 && (
+                          <div className="text-sm" aria-label="Welcome message">
+                            <div className="font-semibold text-white mb-1">Agent</div>
+                            <div className="space-y-2">
+                              <div className="whitespace-pre-wrap text-white">
+                                {"Hi I'm Sim! What would you like to create?".split('').map((ch, i) => (
+                                  <span key={i} className="reveal-char" style={{ animationDelay: `${i * 18}ms` }}>
+                                    {ch === ' ' ? '\u00A0' : ch}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         {messages.map(m => (
                           <div key={m.id} className="text-sm">
                             <div className="font-semibold text-white mb-1">{m.role === 'user' ? 'You' : 'Agent'}</div>
@@ -947,6 +952,20 @@ export default function AIAgentBar() {
                         ))}
                       </div>
                     </div>
+                    <style jsx>{`
+                      .reveal-char { opacity: 0; display: inline-block; animation: charFade 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+                      @keyframes charFade { from { opacity: 0; filter: blur(1px); } to { opacity: 1; filter: blur(0); } }
+                      @media (prefers-reduced-motion: reduce) {
+                        .reveal-char { animation-duration: 1ms; }
+                      }
+                    `}</style>
+                    <style jsx global>{`
+                      .modern-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(56,189,248,0.45) transparent; }
+                      .modern-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+                      .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                      .modern-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(56,189,248,0.45); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
+                      .modern-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(56,189,248,0.65); }
+                    `}</style>
                   </div>
                 )}
 
@@ -1007,6 +1026,7 @@ export default function AIAgentBar() {
                   </div>
                 )}
               </div>
+            </div>
             </div>
           </div>
         </div>

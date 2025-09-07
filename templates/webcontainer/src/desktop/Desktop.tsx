@@ -5,7 +5,7 @@ const DEFAULT_WINDOW_POS = { left: 90, top: 90 }
 const DEFAULT_WINDOW_SIZE = { width: 720, height: 720 }
 const MIN_WINDOW_SIZE = { width: 280, height: 160 }
 
-const MENUBAR_HEIGHT = 28
+const MENUBAR_HEIGHT = 0
 const TITLEBAR_HEIGHT = 32
 const MIN_VISIBLE_X = 64
 const MIN_VISIBLE_Y = 48
@@ -94,10 +94,6 @@ interface App {
   anim?: 'open' | 'close' | 'minimize' | 'restore'
 }
 
-interface MenuBarProps {
-  appName?: string
-}
-
 interface WindowProps {
   app: App
   zIndex: number
@@ -108,16 +104,7 @@ interface WindowProps {
   onResize: (size: { width: number; height: number }) => void
 }
 
-function MenuBar({ appName }: MenuBarProps){
-  const [time, setTime] = useState(new Date())
-  useEffect(()=>{ const t=setInterval(()=>setTime(new Date()), 30000); return ()=>clearInterval(t) },[])
-  return (
-    <div className="menubar">
-      <div className="title"> {appName || 'Finder'}</div>
-      <div className="right">{time.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
-    </div>
-  )
-}
+// Top menubar removed
 
 function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }: WindowProps){
   const draggingRef = useRef<{
@@ -293,7 +280,7 @@ export default function Desktop(){
     dragging: boolean
   }>({ id: null, startX: 0, startY: 0, startLeft: 0, startTop: 0, dragging: false })
   const suppressClickRef = useRef<Set<string>>(new Set())
-  const focusedName = open.length ? open[open.length-1].name : 'Finder'
+  // focusedName removed with menubar
 
   // Helper function to find next available icon position
   const findNextIconPosition = (currentPositions: Record<string,{left:number;top:number}>, _existingApps: App[]) => {
@@ -576,7 +563,7 @@ export default function Desktop(){
   return (
     <div className="desktop">
       <div className="wallpaper" />
-      <MenuBar appName={focusedName} />
+      {/* MenuBar removed */}
 
       <div className="desktop-icons">
         {apps.slice(0,20).map(a => {
