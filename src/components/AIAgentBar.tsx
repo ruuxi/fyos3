@@ -21,8 +21,7 @@ export default function AIAgentBar() {
   const [appsError, setAppsError] = useState<string | null>(null);
   const [desktopsError, setDesktopsError] = useState<string | null>(null);
   const [personaActive, setPersonaActive] = useState(false);
-  const welcomeHasAnimatedRef = useRef(false);
-  const [welcomeAnimate, setWelcomeAnimate] = useState(false);
+  const [didAnimateWelcome, setDidAnimateWelcome] = useState(false);
   const pendingToolPromises = useRef(new Set<Promise<void>>());
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
 
@@ -36,6 +35,7 @@ export default function AIAgentBar() {
   const MIN_CONTAINER_HEIGHT = 72; // px
   const MAX_CONTAINER_HEIGHT = 520; // px
   const barAreaRef = useRef<HTMLDivElement | null>(null);
+  const isOpen = mode !== 'compact';
 
   function isUserNearBottom(el: HTMLElement, threshold = 48): boolean {
     return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
@@ -88,18 +88,6 @@ export default function AIAgentBar() {
   useEffect(() => { instanceRef.current = instance; }, [instance]);
   useEffect(() => { fnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
 
-  // Animate welcome bubble like iOS only on first time opening chat
-  useEffect(() => {
-    if (mode === 'chat' && !welcomeHasAnimatedRef.current) {
-      setWelcomeAnimate(true);
-      const t = setTimeout(() => {
-        setWelcomeAnimate(false);
-        welcomeHasAnimatedRef.current = true;
-      }, 240);
-      return () => clearTimeout(t);
-    }
-  }, [mode]);
-
   // Track if user is near bottom while scrolling
   useEffect(() => {
     const el = messagesContainerRef.current;
@@ -139,6 +127,12 @@ export default function AIAgentBar() {
 
   // Cleanup scroll animation on unmount
   useEffect(() => () => cancelScrollAnimation(), []);
+
+  // One-time welcome animation flag: allow initial pop-in to play, then disable
+  useEffect(() => {
+    const t = setTimeout(() => setDidAnimateWelcome(true), 500);
+    return () => clearTimeout(t);
+  }, []);
 
   // moved below useChat to avoid referencing messages before declaration
 
@@ -889,10 +883,11 @@ export default function AIAgentBar() {
 
             {/* Inline expansion content above the bar */}
             <div
-              className="overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-              style={{ maxHeight: mode !== 'compact' ? (personaActive ? '80vh' : '70vh') : 0, opacity: mode !== 'compact' ? 1 : 0, transform: mode !== 'compact' ? 'translateY(0)' : 'translateY(4px)' }}
+              className={`grid transition-[grid-template-rows,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isOpen ? 'grid-rows-[1fr] opacity-100 translate-y-0' : 'grid-rows-[0fr] opacity-0 translate-y-1'} motion-reduce:transition-none`}
+              aria-hidden={!isOpen}
             >
-              <div className="bg-transparent text-white">
+              <div className="overflow-hidden" style={{ maxHeight: personaActive ? '80vh' : '70vh' }}>
+                <div className="bg-transparent text-white">
 
                 {mode === 'chat' && (
                   <div className="px-4 pt-3">
@@ -921,10 +916,10 @@ export default function AIAgentBar() {
                       }}
                     >
                       <div ref={messagesInnerRef} className="space-y-3 px-1">
-                        <div className={`text-sm flex justify-start ${welcomeAnimate ? 'bubble-appear' : ''}`} aria-label="Welcome message">
+                        <div className="text-sm flex justify-start" aria-label="Welcome message">
                           <div className="max-w-full flex-1">
                             <div className="text-xs mb-1 text-white/60 pl-1">Sim</div>
-                            <div className="inline-block max-w-[80%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words bg-white/10 border border-white/15 text-white">
+                            <div className={`inline-block max-w-[80%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words bg-white/10 border border-white/15 text-white ${!didAnimateWelcome ? 'ios-pop' : ''}`}>
                               {"Hey. I'm Sim. Tell me what you want, I'll make it happen."}
                             </div>
                           </div>
@@ -951,9 +946,15 @@ export default function AIAgentBar() {
                       </div>
                     </div>
                     <style jsx>{`
-                      @keyframes bubbleIn { from { opacity: 0; transform: translateY(6px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
-                      .bubble-appear { animation: bubbleIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-                      @media (prefers-reduced-motion: reduce) { .bubble-appear { animation-duration: 1ms; } }
+                      .ios-pop { animation: iosPop 420ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: bottom left; }
+                      @keyframes iosPop {
+                        0% { transform: scale(0.92); opacity: 0; }
+                        60% { transform: scale(1.02); opacity: 1; }
+                        100% { transform: scale(1); opacity: 1; }
+                      }
+                      @media (prefers-reduced-motion: reduce) {
+                        .ios-pop { animation-duration: 1ms; }
+                      }
                     `}</style>
                     <style jsx global>{`
                       .modern-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(56,189,248,0.45) transparent; }
@@ -1021,6 +1022,7 @@ export default function AIAgentBar() {
                     <div className="text-sm text-gray-600 dark:text-gray-300">Coming soon. Browse, upload, and use media in prompts.</div>
                   </div>
                 )}
+                </div>
               </div>
             </div>
             </div>
