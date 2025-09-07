@@ -3,7 +3,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, ChevronDown, MessageCircle } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Send, Search, Store, Monitor, Image as ImageIcon, X } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
@@ -12,9 +14,7 @@ import ChatAlert from './ChatAlert';
 
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [showAppStore, setShowAppStore] = useState(false);
-  const [showVisit, setShowVisit] = useState(false);
+  const [mode, setMode] = useState<'compact' | 'chat' | 'appstore' | 'visit' | 'media'>('compact');
   const [appsListing, setAppsListing] = useState<Array<{ _id: string; name: string; description?: string; icon?: string }>>([]);
   const [desktopsListing, setDesktopsListing] = useState<Array<{ _id: string; title: string; description?: string; icon?: string }>>([]);
   const [appsLoading, setAppsLoading] = useState(false);
@@ -471,26 +471,26 @@ export default function AIAgentBar() {
     },
   });
 
-  // Host-side fetchers for listings
+  // Host-side fetchers for listings (driven by mode)
   useEffect(() => {
-    if (!showAppStore) return;
+    if (mode !== 'appstore') return;
     setAppsLoading(true); setAppsError(null);
     fetch('/api/store/apps')
       .then(r => r.json())
       .then(j => setAppsListing((j?.apps || []).map((a: any) => ({ _id: String(a._id), name: a.name, description: a.description, icon: a.icon }))))
       .catch(e => setAppsError(e?.message || 'Failed'))
       .finally(() => setAppsLoading(false));
-  }, [showAppStore]);
+  }, [mode]);
 
   useEffect(() => {
-    if (!showVisit) return;
+    if (mode !== 'visit') return;
     setDesktopsLoading(true); setDesktopsError(null);
     fetch('/api/visit/desktops')
       .then(r => r.json())
       .then(j => setDesktopsListing((j?.desktops || []).map((d: any) => ({ _id: String(d._id), title: d.title, description: d.description, icon: d.icon }))))
       .catch(e => setDesktopsError(e?.message || 'Failed'))
       .finally(() => setDesktopsLoading(false));
-  }, [showVisit]);
+  }, [mode]);
 
   async function hostInstallApp(appId: string) {
     try {
@@ -506,7 +506,7 @@ export default function AIAgentBar() {
     }
   }
 
-  // Auto-scroll or preserve position on new messages and height changes
+  // Auto-scroll or preserve position on new messages and height changes (chat mode)
   useLayoutEffect(() => {
     const el = messagesContainerRef.current;
     if (!el) return;
@@ -538,6 +538,23 @@ export default function AIAgentBar() {
 
     prevScrollHeightRef.current = el.scrollHeight;
   }, [messages.length, containerHeight]);
+
+  // Keyboard shortcuts: Cmd/Ctrl+K to open chat, Esc to close overlay
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const isK = e.key.toLowerCase() === 'k';
+      if ((e.metaKey || e.ctrlKey) && isK) {
+        e.preventDefault();
+        setMode('chat');
+      }
+      if (e.key === 'Escape' && mode !== 'compact') {
+        e.preventDefault();
+        setMode('compact');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode]);
 
   // === Automatic diagnostics ===
   // Preview error -> show alert and auto-post to AI once per unique error
@@ -744,296 +761,256 @@ export default function AIAgentBar() {
     setInput('');
   };
 
-  if (isCollapsed) {
-    return (
-      <div className="flex justify-center">
-        <div className="bg-gray-600 hover:bg-gray-700 text-white rounded-full p-3 shadow-lg cursor-pointer transition-all duration-200 hover:scale-105">
-          <Button
-            onClick={() => setIsCollapsed(false)}
-            variant="ghost"
-            size="sm"
-            className="p-0 h-auto text-white hover:text-white hover:bg-transparent relative"
-          >
-            <MessageCircle className="w-6 h-6" />
-            {messages.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                {messages.length}
-              </span>
-            )}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex justify-center">
-      <div className="w-full max-w-4xl mx-4">
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-          <div className="flex items-center justify-between p-3 text-black">
-            <div className="flex items-center space-x-2">
-              <span className="font-medium text-sm">AI Agent</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="p-1 h-auto"
-                onClick={() => { setShowAppStore((s) => !s); if (!showAppStore) setShowVisit(false); }}
-              >App Store</Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="p-1 h-auto"
-                onClick={() => { setShowVisit((s) => !s); if (!showVisit) setShowAppStore(false); }}
-              >Visit</Button>
-              {/* Minimal Publish App control */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="p-1 h-auto text-white bg-gray-800 hover:bg-black"
-                onClick={async () => {
-                  try {
-                    if (!instanceRef.current) return;
-                    const fs = instanceRef.current.fs as any;
-                    // Prompt for app id to publish
-                    const id = prompt('App id to publish (folder under src/apps)');
-                    if (!id) return;
-                    const metaRaw = await fs.readFile(`/src/apps/${id}/metadata.json`, 'utf8');
-                    const meta = JSON.parse(typeof metaRaw === 'string' ? metaRaw : new TextDecoder().decode(metaRaw));
-                    const name = meta?.name || id;
-                    const icon = meta?.icon || '📦';
-                    const entry = `/src/apps/${id}/index.tsx`;
-                    // Build manifest minimal
-                    const manifest = {
-                      schemaVersion: 1 as const,
-                      id,
-                      name,
-                      icon,
-                      entry,
-                      dependencies: {},
-                      peerDependencies: {},
-                      devDependencies: {},
-                      tags: [],
-                      description: meta?.description || ''
-                    };
-                    const { buildAppTarGz } = await import('@/utils/app-packaging');
-                    const pkg = await buildAppTarGz(instanceRef.current, id, manifest as any);
-                    // Upload
-                    const version = new Date().toISOString().replace(/[:.]/g, '-');
-                    const res = await fetch('/api/publish/app', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        appId: id,
-                        name,
-                        version,
-                        description: manifest.description,
-                        icon,
-                        tags: manifest.tags,
-                        size: pkg.size,
-                        manifestHash: pkg.manifestHash,
-                        depsHash: pkg.depsHash,
-                        blobBase64: btoa(String.fromCharCode(...Array.from(pkg.tarGz)))
-                      })
-                    });
-                    const json = await res.json();
-                    if (!res.ok) throw new Error(json?.error || 'Publish failed');
-                    alert('App published!');
-                  } catch (e: any) {
-                    alert(`Publish failed: ${e?.message || e}`);
-                  }
-                }}
-              >Publish App</Button>
-              <Button
-                onClick={() => setIsCollapsed(true)}
-                variant="ghost"
-                size="sm"
-                className="p-1 h-auto text-white hover:text-white bg-gray-400 hover:bg-gray-800"
-              >
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+    <>
+      <div className="flex justify-center">
+        <div className="w-full max-w-4xl mx-4">
+          <div className="flex flex-col-reverse">
+            {/* Bottom bar with single input */}
+            <div className="rounded-none border border-sky-400/70 px-4 py-3 supports-[backdrop-filter]:backdrop-blur-xl backdrop-saturate-150 bg-neutral-950/70 text-white shadow-[0_0_0_1px_rgba(56,189,248,0.45),0_8px_24px_rgba(56,189,248,0.22)]">
+              <form onSubmit={onSubmit}>
+                <div className="flex items-center gap-2">
+                  {/* Left cluster */}
+                  <TooltipProvider>
+                    <div className="flex items-center gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none text-white hover:bg-white/10" onClick={() => setMode('appstore')}>
+                            <Store className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="rounded-none">App Store</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none text-white hover:bg-white/10" onClick={() => setMode('visit')}>
+                            <Monitor className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="rounded-none">Visit Desktops</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none text-white hover:bg-white/10" onClick={() => setMode('media')}>
+                            <ImageIcon className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="rounded-none">Media</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TooltipProvider>
 
-          {/* Host-side panels */}
-          {showAppStore && (
-            <div className="px-4 pb-2">
-              <div className="rounded border p-3 bg-white">
-                <div className="font-medium mb-2">App Store</div>
-                {appsLoading && <div className="text-sm text-gray-500">Loading…</div>}
-                {appsError && <div className="text-sm text-red-600">{appsError}</div>}
-                {!appsLoading && !appsError && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {appsListing.map((a) => (
-                      <div key={a._id} className="border rounded p-2">
-                        <div className="flex items-center gap-2">
-                          <div>{a.icon || '📦'}</div>
-                          <div className="font-medium truncate" title={a.name}>{a.name}</div>
-                        </div>
-                        {a.description && <div className="text-xs text-gray-600 line-clamp-2 mt-1">{a.description}</div>}
-                        <div className="mt-2 flex items-center gap-2">
-                          <Button size="sm" onClick={() => hostInstallApp(a._id)}>Install</Button>
-                          <a href={`/api/store/apps/${a._id}/bundle`} target="_blank" className="text-xs px-2 py-1 rounded border">Download</a>
-                        </div>
+                  {/* Center chat input */}
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-16 top-1/2 -translate-y-1/2 h-4 w-4 text-white" />
+                    <Textarea
+                      value={input}
+                      onFocus={() => setMode('chat')}
+                      onChange={e => setInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          if (input.trim() && status === 'ready') {
+                            onSubmit(e as any);
+                          }
+                        }
+                      }}
+                      placeholder="Ask the AI agent… Try: 'Create a Notes app, Change my background!'"
+                      className="pl-24 pr-12 h-10 min-h-0 py-2 resize-none rounded-none bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none text-white placeholder:text-white/60 caret-sky-300 text-base leading-6"
+                      rows={1}
+                      disabled={status === 'submitted' || status === 'streaming'}
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-300">
+                      {status === 'submitted' || status === 'streaming' ? 'Working…' : input.length > 0 ? `${input.length} chars` : ''}
+                    </div>
+                  </div>
+
+                  {/* Right cluster */}
+                  <div className="flex items-center gap-2">
+                    {(status === 'submitted' || status === 'streaming') && (
+                      <>
+                        <div className="text-xs text-white/80">Working…</div>
+                        <Button type="button" onClick={() => stop()} variant="ghost" size="sm" className="h-10 rounded-none">Stop</Button>
+                      </>
+                    )}
+                    <Button type="submit" disabled={!input.trim() || status !== 'ready'} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            {/* Inline expansion content above the bar */}
+            <div
+              className="overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+              style={{ maxHeight: mode !== 'compact' ? '70vh' : 0, opacity: mode !== 'compact' ? 1 : 0, transform: mode !== 'compact' ? 'translateY(0)' : 'translateY(4px)' }}
+            >
+              <div className="supports-[backdrop-filter]:backdrop-blur-xl backdrop-saturate-150 bg-neutral-950/65 text-white border border-sky-400/70 rounded-none shadow-[0_0_0_1px_rgba(56,189,248,0.45),0_12px_32px_rgba(56,189,248,0.22)]">
+                <div className="px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <Button className="rounded-none" variant={mode === 'chat' ? 'secondary' : 'ghost'} size="sm" onClick={() => setMode('chat')}>Chat</Button>
+                    <Button className="rounded-none" variant={mode === 'appstore' ? 'secondary' : 'ghost'} size="sm" onClick={() => setMode('appstore')}>App Store</Button>
+                    <Button className="rounded-none" variant={mode === 'visit' ? 'secondary' : 'ghost'} size="sm" onClick={() => setMode('visit')}>Visit</Button>
+                    <Button className="rounded-none" variant={mode === 'media' ? 'secondary' : 'ghost'} size="sm" onClick={() => setMode('media')}>Media</Button>
+                  </div>
+                  <Button className="rounded-none" variant="ghost" size="icon" onClick={() => setMode('compact')} aria-label="Close">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Separator />
+
+                {mode === 'chat' && (
+                  <div className="px-4 pt-3">
+                    <div className="space-y-2">
+                      {previewAlert && (
+                        <ChatAlert
+                          alert={previewAlert}
+                          onAsk={(msg) => {
+                            void sendMessage({ text: msg });
+                            setPreviewAlert(null);
+                          }}
+                          onDismiss={() => setPreviewAlert(null)}
+                        />
+                      )}
+                    </div>
+
+                    <div
+                      ref={messagesContainerRef}
+                      className="overflow-auto pt-2"
+                      style={{
+                        height: containerHeight > 0 ? `${containerHeight}px` : undefined,
+                        maxHeight: '60vh',
+                        transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
+                        willChange: 'height',
+                      }}
+                    >
+                      <div ref={messagesInnerRef} className="space-y-3 px-1">
+                        {messages.map(m => (
+                          <div key={m.id} className="text-sm">
+                            <div className="font-semibold text-white mb-1">{m.role === 'user' ? 'You' : 'Agent'}</div>
+                            <div className="space-y-2">
+                              {m.parts.map((part, index) => {
+                                switch (part.type) {
+                                  case 'text':
+                                    return (
+                                      <div key={index} className="whitespace-pre-wrap text-white">{part.text}</div>
+                                    );
+                                  case 'tool-submit_plan': {
+                                    const id = (part as { toolCallId: string }).toolCallId;
+                                    if (part.state === 'output-available') {
+                                      return (
+                                        <div key={id} className="border border-blue-200 bg-blue-50 text-blue-900 p-2">
+                                          <div className="font-medium">Plan</div>
+                                          <ul className="list-disc pl-5 text-sm">
+                                            {(part.output as { steps?: string[] } | undefined)?.steps?.map((s: string, i: number) => (
+                                              <li key={i}>{s}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }
+                                  case 'tool-web_fs_find':
+                                  case 'tool-web_fs_read':
+                                  case 'tool-web_fs_write':
+                                  case 'tool-web_fs_mkdir':
+                                  case 'tool-web_fs_rm':
+                                  case 'tool-web_exec':
+                                  case 'tool-create_app':
+                                  case 'tool-rename_app':
+                                  case 'tool-remove_app':
+                                  case 'tool-validate_project':
+                                  case 'tool-web_search': {
+                                    const id = (part as { toolCallId: string }).toolCallId;
+                                    const label = part.type.replace('tool-', '');
+                                    switch (part.state) {
+                                      case 'input-streaming':
+                                        return <div key={id} className="text-xs text-gray-500">{label}...</div>;
+                                      case 'input-available':
+                                        return (
+                                          <pre key={id} className="text-xs bg-gray-50 border p-2 overflow-auto max-h-40">{JSON.stringify((part as { input?: unknown }).input, null, 2)}</pre>
+                                        );
+                                      case 'output-available':
+                                        return (
+                                          <pre key={id} className="text-xs bg-green-50 border border-green-200 p-2 overflow-auto max-h-40">{JSON.stringify((part as { output?: unknown }).output, null, 2)}</pre>
+                                        );
+                                      case 'output-error':
+                                        return <div key={id} className="text-xs text-red-600">Error: {(part as { errorText?: string }).errorText}</div>;
+                                    }
+                                  }
+                                }
+                              })}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+                  </div>
+                )}
+
+                {mode === 'appstore' && (
+                  <div className="px-4 py-3">
+                    <div className="font-medium mb-2">App Store</div>
+                    {appsLoading && <div className="text-sm text-gray-500">Loading…</div>}
+                    {appsError && <div className="text-sm text-red-600">{appsError}</div>}
+                    {!appsLoading && !appsError && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {appsListing.map((a) => (
+                          <div key={a._id} className="border border-white/10 dark:border-white/10 p-2 bg-white text-black hover:bg-white/90 transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div>{a.icon || '📦'}</div>
+                              <div className="font-medium truncate" title={a.name}>{a.name}</div>
+                            </div>
+                            {a.description && <div className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 mt-1">{a.description}</div>}
+                            <div className="mt-2 flex items-center gap-2">
+                              <Button size="sm" className="rounded-none" onClick={() => hostInstallApp(a._id)}>Install</Button>
+                              <a href={`/api/store/apps/${a._id}/bundle`} target="_blank" className="text-xs px-2 py-1 border">Download</a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {mode === 'visit' && (
+                  <div className="px-4 py-3">
+                    <div className="font-medium mb-2">Visit Desktops</div>
+                    {desktopsLoading && <div className="text-sm text-gray-500">Loading…</div>}
+                    {desktopsError && <div className="text-sm text-red-600">{desktopsError}</div>}
+                    {!desktopsLoading && !desktopsError && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {desktopsListing.map((d) => (
+                          <div key={d._id} className="border border-white/10 dark:border-white/10 p-2 bg-white text-black hover:bg-white/90 transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div>{d.icon || '🖥️'}</div>
+                              <div className="font-medium truncate" title={d.title}>{d.title}</div>
+                            </div>
+                            {d.description && <div className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 mt-1">{d.description}</div>}
+                            <div className="mt-2 flex items-center gap-2">
+                              <a href={`/d/${d._id}`} className="text-xs px-2 py-1 bg-black text-white">Open</a>
+                              <a href={`/api/visit/desktops/${d._id}/snapshot`} target="_blank" className="text-xs px-2 py-1 border">Download</a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {mode === 'media' && (
+                  <div className="px-4 py-6">
+                    <div className="font-medium mb-2">Media Library</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-300">Coming soon. Browse, upload, and use media in prompts.</div>
                   </div>
                 )}
               </div>
             </div>
-          )}
-
-          {showVisit && (
-            <div className="px-4 pb-2">
-              <div className="rounded border p-3 bg-white">
-                <div className="font-medium mb-2">Visit Desktops</div>
-                {desktopsLoading && <div className="text-sm text-gray-500">Loading…</div>}
-                {desktopsError && <div className="text-sm text-red-600">{desktopsError}</div>}
-                {!desktopsLoading && !desktopsError && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {desktopsListing.map((d) => (
-                      <div key={d._id} className="border rounded p-2">
-                        <div className="flex items-center gap-2">
-                          <div>{d.icon || '🖥️'}</div>
-                          <div className="font-medium truncate" title={d.title}>{d.title}</div>
-                        </div>
-                        {d.description && <div className="text-xs text-gray-600 line-clamp-2 mt-1">{d.description}</div>}
-                        <div className="mt-2 flex items-center gap-2">
-                          <a href={`/d/${d._id}`} className="text-xs px-2 py-1 rounded bg-black text-white">Open</a>
-                          <a href={`/api/visit/desktops/${d._id}/snapshot`} target="_blank" className="text-xs px-2 py-1 rounded border">Download</a>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Alerts */}
-          <div className="px-4 pt-2 space-y-2">
-            {previewAlert && (
-              <ChatAlert
-                alert={previewAlert}
-                onAsk={(msg) => {
-                  void sendMessage({ text: msg });
-                  setPreviewAlert(null);
-                }}
-                onDismiss={() => setPreviewAlert(null)}
-              />
-            )}
           </div>
-
-          {/* Messages */}
-          <div
-            ref={messagesContainerRef}
-            className="overflow-auto px-4 pt-2"
-            style={{
-              height: containerHeight > 0 ? `${containerHeight}px` : undefined,
-              maxHeight: `${MAX_CONTAINER_HEIGHT}px`,
-              transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
-              willChange: 'height',
-            }}
-          >
-            <div ref={messagesInnerRef} className="space-y-3">
-              {messages.map(m => (
-                <div key={m.id} className="text-sm">
-                  <div className="font-semibold text-gray-700 mb-1">{m.role === 'user' ? 'You' : 'Agent'}</div>
-                  <div className="space-y-2">
-                    {m.parts.map((part, index) => {
-                      switch (part.type) {
-                        case 'text':
-                          return (
-                            <div key={index} className="whitespace-pre-wrap text-gray-800">{part.text}</div>
-                          );
-                        case 'tool-submit_plan': {
-                          const id = (part as { toolCallId: string }).toolCallId;
-                          if (part.state === 'output-available') {
-                            return (
-                              <div key={id} className="rounded-md border border-blue-200 bg-blue-50 text-blue-900 p-2">
-                                <div className="font-medium">Plan</div>
-                                <ul className="list-disc pl-5 text-sm">
-                                  {(part.output as { steps?: string[] } | undefined)?.steps?.map((s: string, i: number) => (
-                                    <li key={i}>{s}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }
-                        case 'tool-web_fs_find':
-                        case 'tool-web_fs_read':
-                        case 'tool-web_fs_write':
-                        case 'tool-web_fs_mkdir':
-                        case 'tool-web_fs_rm':
-                        case 'tool-web_exec':
-                        case 'tool-create_app':
-                        case 'tool-rename_app':
-                        case 'tool-remove_app':
-                        case 'tool-validate_project':
-                        case 'tool-web_search': {
-                          const id = (part as { toolCallId: string }).toolCallId;
-                          const label = part.type.replace('tool-', '');
-                          switch (part.state) {
-                            case 'input-streaming':
-                              return <div key={id} className="text-xs text-gray-500">{label}...</div>;
-                            case 'input-available':
-                              return (
-                                <pre key={id} className="text-xs bg-gray-50 border rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as { input?: unknown }).input, null, 2)}</pre>
-                              );
-                            case 'output-available':
-                              return (
-                                <pre key={id} className="text-xs bg-green-50 border border-green-200 rounded p-2 overflow-auto max-h-40">{JSON.stringify((part as { output?: unknown }).output, null, 2)}</pre>
-                              );
-                            case 'output-error':
-                              return <div key={id} className="text-xs text-red-600">Error: {(part as { errorText?: string }).errorText}</div>;
-                          }
-                        }
-                      }
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Input Bar */}
-          <form onSubmit={onSubmit} className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="flex-1 relative">
-                <Textarea
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      if (input.trim() && status === 'ready') {
-                        onSubmit(e as any);
-                      }
-                    }
-                  }}
-                  placeholder="Ask the AI agent… Try: 'Create a Notes app on the desktop and install zustand'"
-                  className="min-h-[40px] max-h-32 resize-none pr-12"
-                  rows={1}
-                  disabled={status === 'submitted' || status === 'streaming'}
-                />
-                <div className="absolute right-2 bottom-2 text-xs text-gray-400">
-                  {status === 'submitted' || status === 'streaming' ? 'Working…' : input.length > 0 ? `${input.length} chars` : ''}
-                </div>
-              </div>
-
-              <Button type="submit" disabled={!input.trim() || status !== 'ready'} size="sm" className="h-10">
-                <Send className="w-4 h-4" />
-              </Button>
-              {(status === 'submitted' || status === 'streaming') && (
-                <Button type="button" onClick={() => stop()} variant="ghost" size="sm" className="h-10">Stop</Button>
-              )}
-            </div>
-          </form>
         </div>
       </div>
-    </div>
+    </>
   );
 }

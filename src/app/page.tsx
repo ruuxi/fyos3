@@ -22,7 +22,7 @@ export default function Home() {
             <SignInButton />
           </Unauthenticated>
         </div>
-        <div className="absolute bottom-4 left-0 right-0 z-10">
+        <div className="absolute bottom-2 left-0 right-0 z-10">
           <AIAgentBar />
         </div>
       </main>

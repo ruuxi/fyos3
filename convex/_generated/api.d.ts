@@ -10,6 +10,7 @@
 
 import type * as apps from "../apps.js";
 import type * as desktops from "../desktops.js";
+import type * as media from "../media.js";
 import type * as messages from "../messages.js";
 import type * as metrics from "../metrics.js";
 import type * as r2 from "../r2.js";
@@ -31,6 +32,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   apps: typeof apps;
   desktops: typeof desktops;
+  media: typeof media;
   messages: typeof messages;
   metrics: typeof metrics;
   r2: typeof r2;

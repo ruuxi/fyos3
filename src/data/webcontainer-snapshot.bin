@@ -2491,15 +2491,14 @@ snapshots:
   yallist@3.1.1: {}
 
   yallist@5.0.0: {}
-±postcss.config.js¡f¡cÄ]export default {
+±postcss.config.js¡f¡cÄ=export default {
   plugins: {
-    '@tailwindcss/postcss': {},
     autoprefixer: {},
   },
 }
 
 
-¦public¡d¤apps¡d­registry.json¡f¡cÅD[
+¦public¡d¤apps¡d­registry.json¡f¡cÅ´[
   {
     "id": "finder",
     "name": "Finder",
@@ -2529,6 +2528,12 @@ snapshots:
     "name": "Settings",
     "icon": "âš™ï¸",
     "path": "/src/apps/settings/index.tsx"
+  },
+  {
+    "id": "media",
+    "name": "Media",
+    "icon": "ğŸ–¼ï¸",
+    "path": "/src/apps/media/index.tsx"
   }
 ]
 £src¡d‹§App.css¡f¡cÅ]#root {
@@ -2572,8 +2577,7 @@ snapshots:
 
 .read-the-docs {
   color: #888;
-}¢ai¡d¨index.ts¡f¡cÅ
-// AI helpers for FYOS apps (client-side, runs inside Vite iframe)
+}¢ai¡d¨index.ts¡f¡cÅ // AI helpers for FYOS apps (client-side, runs inside Vite iframe)
 export type AIProvider = 'fal' | 'eleven';
 
 function generateRequestId(): string {
@@ -2597,7 +2601,15 @@ export async function aiRequest(provider: AIProvider, model: string, input: any)
     };
     window.addEventListener('message', onMessage as any);
     try {
-      const payload = { type: 'AI_REQUEST', id, provider, model, input } as const;
+      // Derive app scope from iframe query params (?id=...&name=...)
+      let scope: { appId?: string; appName?: string } | undefined = undefined;
+      try {
+        const sp = new URLSearchParams(window.location.search || '');
+        const appId = sp.get('id') || undefined;
+        const appName = sp.get('name') || undefined;
+        scope = { appId, appName };
+      } catch {}
+      const payload = { type: 'AI_REQUEST', id, provider, model, input, scope } as const;
       // Post directly to the top-level Next.js host to avoid needing a desktop relay
       window.top?.postMessage(payload, '*');
     } catch (err) {
@@ -3527,7 +3539,7 @@ const Textarea = React.forwardRef<
 Textarea.displayName = "Textarea"
 
 export { Textarea }
-§desktop¡d‚«Desktop.tsx¡f¡cÅX6import React, { useEffect, useRef, useState } from 'react'
+§desktop¡d‚«Desktop.tsx¡f¡cÅWimport React, { useEffect, useRef, useState } from 'react'
 
 // Shared constants
 const DEFAULT_WINDOW_POS = { left: 90, top: 90 }
@@ -3554,7 +3566,7 @@ const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: 16, startY: 52, maxPe
 type Geometry = { left: number; top: number; width: number; height: number }
 
 // Helpers
-function clampToViewport(left: number, top: number, width: number, height: number){
+function clampToViewport(left: number, top: number, width: number, _height: number){
   const vw = window.innerWidth
   const vh = window.innerHeight
   const minLeft = -(width - MIN_VISIBLE_X)
@@ -3576,11 +3588,7 @@ function resolveAppGeometry(app: App): Geometry{
   }
 }
 
-function resolveInitialGeometry(app: App, stored?: { left: number; top: number; width: number; height: number }): Geometry{
-  const base: Geometry = stored ? stored as Geometry : resolveAppGeometry(app)
-  const pos = clampToViewport(base.left, base.top, base.width, base.height)
-  return { left: pos.left, top: pos.top, width: base.width, height: base.height }
-}
+// (removed unused resolveInitialGeometry)
 
 function bounceIcon(setLaunching: React.Dispatch<React.SetStateAction<string | null>>, id: string, ms = 600){
   setLaunching(id)
@@ -3763,7 +3771,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
   if (app.minimized && !app.anim) classes.push('minimized')
 
   return (
-    <div className={classes.join(' ')} style={resolveAppGeometry(app)} onMouseDown={onFocus}>
+    <div className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex }} onMouseDown={onFocus}>
       <div className="titlebar" onMouseDown={startMove}>
         <div className="traffic" onMouseDown={(e)=>e.stopPropagation()}>
           <div className="b red" onClick={onClose} title="Close" />
@@ -3829,7 +3837,7 @@ export default function Desktop(){
   const focusedName = open.length ? open[open.length-1].name : 'Finder'
 
   // Helper function to find next available icon position
-  const findNextIconPosition = (currentPositions: Record<string,{left:number;top:number}>, existingApps: App[]) => {
+  const findNextIconPosition = (currentPositions: Record<string,{left:number;top:number}>, _existingApps: App[]) => {
     const { spacingX, spacingY, startX, startY, maxPerCol } = DESKTOP_GRID
     
     // Get all occupied positions
@@ -3858,7 +3866,7 @@ export default function Desktop(){
   useEffect(()=>{
     loadRegistry()
       .then((list: App[])=> {
-        setApps(prevApps => {
+        setApps(() => {
           // load icon positions from localStorage if present
           try{
             let currentPositions = loadIconPositions()
