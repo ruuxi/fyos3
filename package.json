@@ -15,6 +15,8 @@
   "dependencies": {
     "@ai-sdk/openai": "^2.0.23",
     "@ai-sdk/react": "^2.0.29",
+    "@clerk/nextjs": "^6.31.9",
+    "@convex-dev/r2": "^0.7.3",
     "@openrouter/ai-sdk-provider": "^1.2.0",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-separator": "^1.1.7",
@@ -28,6 +30,7 @@
     "ai": "^5.0.29",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "convex": "^1.26.2",
     "exa-js": "^1.9.3",
     "lucide-react": "^0.542.0",
     "ms": "^2.1.3",
