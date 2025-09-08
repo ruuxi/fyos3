@@ -1,7 +1,7 @@
 import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
 
 type PersistedVfs = {
-  version: number;
+  version: 1;
   savedAt: number;
   files: Array<{ path: string; base64: string }>;
 };
@@ -81,7 +81,7 @@ async function idbDel(key: IDBValidKey): Promise<void> {
 export async function hasPersistedVfs(): Promise<boolean> {
   try {
     const data = await idbGet<PersistedVfs>(STORE_KEY);
-    return !!(data && data.version === CURRENT_VFS_VERSION && data.files && data.files.length > 0);
+    return !!(data && data.files && data.files.length > 0);
   } catch {
     return false;
   }
@@ -90,7 +90,7 @@ export async function hasPersistedVfs(): Promise<boolean> {
 export async function loadPersistedVfsMeta(): Promise<{ fileCount: number; savedAt: number } | null> {
   try {
     const data = await idbGet<PersistedVfs>(STORE_KEY);
-    if (!data || data.version !== CURRENT_VFS_VERSION) return null;
+    if (!data) return null;
     return { fileCount: data.files.length, savedAt: data.savedAt };
   } catch {
     return null;
@@ -165,7 +165,7 @@ export async function exportVfs(instance: WebContainerAPI, opts?: { maxDepth?: n
       // ignore
     }
   }
-  return { version: CURRENT_VFS_VERSION, savedAt: Date.now(), files };
+  return { version: 1, savedAt: Date.now(), files };
 }
 
 export async function persistNow(instance: WebContainerAPI): Promise<void> {
@@ -195,7 +195,7 @@ export function enqueuePersist(instance: WebContainerAPI) {
 export async function restoreFromPersistence(instance: WebContainerAPI): Promise<boolean> {
   try {
     const data = await idbGet<PersistedVfs>(STORE_KEY);
-    if (!data || data.version !== CURRENT_VFS_VERSION || !data.files || data.files.length === 0) return false;
+    if (!data || !data.files || data.files.length === 0) return false;
     // Recreate directories and files
     const dirs = new Set<string>();
     for (const file of data.files) {
@@ -230,8 +230,5 @@ export async function restoreFromPersistence(instance: WebContainerAPI): Promise
     return false;
   }
 }
-
-// Increment to invalidate stale persisted VFS snapshots when templates change in a breaking way.
-export const CURRENT_VFS_VERSION = 2;
 
 

@@ -233,21 +233,6 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
           src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}&base=0&ui=1&tw=1`}
           style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'transparent' }}
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads"
-          onLoad={(e)=>{
-            try{
-              const doc = e.currentTarget.contentDocument
-              if (!doc) return
-              // Ensure Tailwind CSS is available inside the iframe even if the HTML import failed
-              const mod = doc.createElement('script')
-              mod.type = 'module'
-              mod.text = `import "/src/tailwind.css"`
-              doc.head.appendChild(mod)
-              // Minimal normalize to make h-full layouts reliable
-              const style = doc.createElement('style')
-              style.textContent = 'html,body,#root,#mount{height:100%;width:100%;margin:0}'
-              doc.head.appendChild(style)
-            } catch {}
-          }}
           onError={(e) => {
             console.warn('Iframe error for app:', app.name, e);
           }}
