@@ -479,6 +479,10 @@ export default function Desktop(){
   const snapAppIdRef = useRef<string | null>(null)
   const currentZoneRef = useRef<SnapZoneId | null>(null)
   const lastZoneSwitchTsRef = useRef<number>(0)
+  // Require a dwell period in a snap zone before arming snap
+  const SNAP_DWELL_MS = 1000
+  const zoneEnterTsRef = useRef<number>(0)
+  const zoneArmedRef = useRef<boolean>(false)
   const [iconPositions, setIconPositions] = useState<Record<string,{left:number;top:number}>>({})
   const [windowGeometries, setWindowGeometries] = useState<Record<string,{left:number;top:number;width:number;height:number}>>({})
   const dragIconRef = useRef<{
@@ -837,10 +841,13 @@ export default function Desktop(){
         snapAppIdRef.current = d.id || null
         currentZoneRef.current = null
         lastZoneSwitchTsRef.current = now
+        zoneArmedRef.current = false
+        zoneEnterTsRef.current = now
         showOverlay()
         const z = snapAltBypassRef.current ? null : detectSnap(d.pointer?.x, d.pointer?.y)
         currentZoneRef.current = z
-        applyPreviewRect(z ? rectForZone(z) : null, !!z)
+        // Show preview but keep inactive until dwell time has elapsed
+        applyPreviewRect(z ? rectForZone(z) : null, false)
       } else if (d.phase === 'move'){
         if (!snapAppIdRef.current) return
         const candidate = snapAltBypassRef.current ? null : detectSnap(d.pointer?.x, d.pointer?.y)
@@ -850,13 +857,23 @@ export default function Desktop(){
           if (now - lastZoneSwitchTsRef.current >= 60){
             currentZoneRef.current = candidate
             lastZoneSwitchTsRef.current = now
-            applyPreviewRect(candidate ? rectForZone(candidate) : null, !!candidate)
+            // reset dwell when entering a new zone
+            zoneEnterTsRef.current = now
+            zoneArmedRef.current = false
+            applyPreviewRect(candidate ? rectForZone(candidate) : null, false)
           }
+        }
+        // arm snap only after dwelling in the same zone for SNAP_DWELL_MS
+        const z = currentZoneRef.current
+        if (z && !zoneArmedRef.current && (now - zoneEnterTsRef.current) >= SNAP_DWELL_MS){
+          zoneArmedRef.current = true
+          applyPreviewRect(rectForZone(z), true)
         }
       } else if (d.phase === 'end'){
         const id = snapAppIdRef.current
         const z = snapAltBypassRef.current ? null : (currentZoneRef.current || detectSnap(d.pointer?.x, d.pointer?.y))
-        if (z && id){
+        // Only snap if the zone was armed (held long enough)
+        if (z && id && zoneArmedRef.current){
           const r = rectForZone(z)
           updateWindow(id, { left: r.left, top: r.top, width: r.width, height: r.height })
         }
@@ -865,6 +882,7 @@ export default function Desktop(){
         snapAppIdRef.current = null
         currentZoneRef.current = null
         snapAltBypassRef.current = false
+        zoneArmedRef.current = false
       }
     }
     window.addEventListener('FYOS_TILING' as any, onTiling)

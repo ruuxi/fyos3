@@ -730,20 +730,7 @@ export default function AIAgentBar() {
     return () => window.removeEventListener('keydown', onKey);
   }, [mode]);
 
-  // Close when clicking outside the bar area without blocking desktop interactions
-  useEffect(() => {
-    if (mode === 'compact') return;
-    const onDown = (e: MouseEvent) => {
-      const area = barAreaRef.current;
-      if (!area) return;
-      if (area.contains(e.target as Node)) return;
-      setMode('compact');
-    };
-    document.addEventListener('mousedown', onDown, true);
-    return () => document.removeEventListener('mousedown', onDown, true);
-  }, [mode]);
-
-  // Overlay element kept for stacking context only (non-interactive)
+  // Overlay click handled via a fixed backdrop element in the JSX
 
   // === Automatic diagnostics ===
   // Preview error -> show alert and auto-post to AI once per unique error
@@ -970,7 +957,8 @@ export default function AIAgentBar() {
   return (
     <>
       <div
-        className="fixed inset-0 z-40 pointer-events-none"
+        className={`fixed inset-0 z-40 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+        onClick={() => setMode('compact')}
         aria-hidden="true"
       />
       <div className="flex justify-center">
