@@ -80,6 +80,9 @@
 
       
       import { createRoot } from '/src/iframe-root.js';
+      // Hint Vite/Tailwind to include all app entry modules in the module graph
+      // so Tailwind v4 can detect their classes even when loaded dynamically.
+      const loaders = import.meta.glob('/src/apps/**/index.{tsx,ts,jsx,js}');
       // Expect query: ?path=/src/apps/xxx/index.tsx&name=...&id=...
       const params = new URLSearchParams(location.search)
       const path = params.get('path')
@@ -128,7 +131,8 @@
         // Wrap everything in try-catch to prevent errors from bubbling up
         try {
           // Load the module and mount default export as a React component
-          import(/* @vite-ignore */ path).then(mod => {
+          const load = loaders[path] ? loaders[path] : (p)=> import(/* @vite-ignore */ p);
+          Promise.resolve(load(path)).then(mod => {
             try {
               const Comp = mod?.default
               createRoot(mountEl, Comp, name)

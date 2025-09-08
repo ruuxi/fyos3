@@ -6,6 +6,8 @@ export default {
     content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
+	'./src/apps/**/*.{ts,tsx,js,jsx}',    // ← include AI-made apps
+	'./app.html'
   ],
   theme: {
   	extend: {
