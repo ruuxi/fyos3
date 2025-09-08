@@ -1,4 +1,4 @@
-Å°dç®app.htmlÅ°fÅ°c≈Ú<!doctype html>
+Å°dç®app.htmlÅ°fÅ°c≈Ì<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -8,10 +8,10 @@
       html,body,#mount{height:100%;margin:0}
       /* Ensure scrolling happens inside the app mount, not the iframe viewport */
       #mount{overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-      body{background:transparent;overflow:hidden}
+      body{background:transparent;overflow:hidden;font-family:Inter,ui-sans-serif,system-ui,Arial}
     </style>
-    <!-- Preload Tailwind CSS to ensure it's available immediately -->
-    <link rel="preload" href="/src/tailwind.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <!-- Ensure Tailwind CSS is linked as a stylesheet for robustness -->
+    <link rel="stylesheet" href="/src/tailwind.css">
     <noscript><link rel="stylesheet" href="/src/tailwind.css"></noscript>
   </head>
   <body>
@@ -2292,7 +2292,7 @@ packages:
     "path": "/src/apps/settings/index.tsx"
   }
 ]
-£srcÅ°dãßApp.cssÅ°fÅ°c≈]#root {
+£srcÅ°dåßApp.cssÅ°fÅ°c≈]#root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
@@ -2521,6 +2521,42 @@ function AppsList(){
     </ul>
   )
 }
+•notesÅ°dÅ©index.tsxÅ°fÅ°c≈öimport React from 'react'
+export default function Notes(){
+  const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])
+  const [t, setT] = React.useState('')
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Notes</div>
+        <span className="badge">Local</span>
+      </div>
+      <div style={{display:'flex',gap:10,marginTop:10}}>
+        <textarea value={t} onChange={e=>setT(e.target.value)} placeholder="Write a note‚Ä¶" style={{flex:1,height:90,border:'1px solid #e5e7eb',borderRadius:8,padding:8}} />
+        <button onClick={()=>{ if(t.trim()){ setNotes(n=>[{id:Date.now(),text:t.trim()},...n]); setT('') } }} style={{padding:'8px 12px'}}>Add</button>
+      </div>
+      <ul className="list" style={{marginTop:8}}>
+        {notes.map(n=> <li key={n.id}>{n.text}</li>)}
+      </ul>
+    </div>
+  )
+}
+¶safariÅ°dÅ©index.tsxÅ°fÅ°c≈–import React from 'react'
+export default function Safari(){
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Safari</div>
+        <span className="badge">Preview</span>
+      </div>
+      <p className="muted">Minimal browser placeholder. Open external sites is disabled in this preview.</p>
+      <div style={{background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:8,padding:10}}>
+        <div style={{fontSize:13,color:'#6b7280'}}>Address Bar</div>
+        <input style={{width:'100%',padding:8,borderRadius:6,border:'1px solid #d1d5db'}} placeholder="https://example.com" disabled />
+      </div>
+    </div>
+  )
+}
 ®settingsÅ°dÅ©index.tsxÅ°fÅ°c≈Bimport React from 'react'
 export default function Settings(){
   const [dark, setDark] = React.useState(false)
@@ -2554,22 +2590,6 @@ export default function Terminal(){
       <div style={{display:'flex',gap:8,marginTop:8}}>
         <input value={cmd} onChange={e=>setCmd(e.target.value)} style={{flex:1,border:'1px solid #e5e7eb',borderRadius:6,padding:8}} />
         <button onClick={()=>{ setLines(l=>[...l, 'executed: '+cmd]); setCmd('') }}>Run</button>
-      </div>
-    </div>
-  )
-}
-¶safariÅ°dÅ©index.tsxÅ°fÅ°c≈–import React from 'react'
-export default function Safari(){
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Safari</div>
-        <span className="badge">Preview</span>
-      </div>
-      <p className="muted">Minimal browser placeholder. Open external sites is disabled in this preview.</p>
-      <div style={{background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:8,padding:10}}>
-        <div style={{fontSize:13,color:'#6b7280'}}>Address Bar</div>
-        <input style={{width:'100%',padding:8,borderRadius:6,border:'1px solid #d1d5db'}} placeholder="https://example.com" disabled />
       </div>
     </div>
   )
@@ -2653,27 +2673,7 @@ export default function Visit() {
 }
 
 
-•notesÅ°dÅ©index.tsxÅ°fÅ°c≈öimport React from 'react'
-export default function Notes(){
-  const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])
-  const [t, setT] = React.useState('')
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Notes</div>
-        <span className="badge">Local</span>
-      </div>
-      <div style={{display:'flex',gap:10,marginTop:10}}>
-        <textarea value={t} onChange={e=>setT(e.target.value)} placeholder="Write a note‚Ä¶" style={{flex:1,height:90,border:'1px solid #e5e7eb',borderRadius:8,padding:8}} />
-        <button onClick={()=>{ if(t.trim()){ setNotes(n=>[{id:Date.now(),text:t.trim()},...n]); setT('') } }} style={{padding:'8px 12px'}}>Add</button>
-      </div>
-      <ul className="list" style={{marginTop:8}}>
-        {notes.map(n=> <li key={n.id}>{n.text}</li>)}
-      </ul>
-    </div>
-  )
-}
-¶assetsÅ°dÅ©react.svgÅ°fÅ°c≈<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>™componentsÅ°dÅ¢uiÅ°dà©badge.tsxÅ°fÅ°c≈timport * as React from "react"
+™componentsÅ°dÅ¢uiÅ°dà©badge.tsxÅ°fÅ°c≈timport * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
@@ -3295,7 +3295,7 @@ const Textarea = React.forwardRef<
 Textarea.displayName = "Textarea"
 
 export { Textarea }
-ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈Uimport React, { useEffect, useRef, useState } from 'react'
+¶assetsÅ°dÅ©react.svgÅ°fÅ°c≈<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈csimport React, { useEffect, useRef, useState } from 'react'
 
 // Shared constants
 const DEFAULT_WINDOW_POS = { left: 90, top: 90 }
@@ -3404,6 +3404,8 @@ interface WindowProps {
 // Top menubar removed
 
 function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }: WindowProps){
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const rafIdRef = useRef<number | null>(null)
   const draggingRef = useRef<{
     type: 'move' | 'resize' | null
     startX: number
@@ -3414,18 +3416,53 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
     startHeight: number
     handle?: 'nw'|'ne'|'sw'|'se'
     active: boolean
+    curLeft?: number
+    curTop?: number
+    curWidth?: number
+    curHeight?: number
   }>({ type: null, startX: 0, startY: 0, startLeft: 0, startTop: 0, startWidth: 0, startHeight: 0, active: false })
+
+  function clearSelectionEverywhere(){
+    try{ window.getSelection()?.removeAllRanges() } catch {}
+    try{
+      const iframe = rootRef.current?.querySelector('iframe') as HTMLIFrameElement | null
+      const sel = iframe?.contentWindow?.getSelection()
+      if (sel && sel.rangeCount > 0) sel.removeAllRanges()
+    } catch {}
+  }
+
+  function scheduleApply(){
+    if (rafIdRef.current != null) return
+    rafIdRef.current = requestAnimationFrame(()=>{
+      rafIdRef.current = null
+      const d = draggingRef.current
+      const el = rootRef.current
+      if (!el || !d.active) return
+      if (typeof d.curLeft === 'number') el.style.left = `${d.curLeft}px`
+      if (typeof d.curTop === 'number') el.style.top = `${d.curTop}px`
+      if (d.type === 'resize'){
+        if (typeof d.curWidth === 'number') el.style.width = `${d.curWidth}px`
+        if (typeof d.curHeight === 'number') el.style.height = `${d.curHeight}px`
+      }
+    })
+  }
 
   useEffect(()=>{
     // Allow partial off-screen but keep window reachable using shared clamp
     function onMoveDoc(e: MouseEvent){
       const d = draggingRef.current
       if (!d.active || !d.type) return
+      e.preventDefault()
+      clearSelectionEverywhere()
+      const el = rootRef.current
+      if (!el) return
       if (d.type === 'move'){
         const dx = e.clientX - d.startX
         const dy = e.clientY - d.startY
         const pos = clampToViewport(d.startLeft + dx, d.startTop + dy, d.startWidth, d.startHeight)
-        onMove(pos)
+        d.curLeft = pos.left
+        d.curTop = pos.top
+        scheduleApply()
       } else if (d.type === 'resize'){
         const dx = e.clientX - d.startX
         const dy = e.clientY - d.startY
@@ -3457,15 +3494,37 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
             newT = d.startTop + dy
             break
         }
-        // Relaxed: allow oversize beyond viewport; keep window reachable via clamp on position
         if (newW < minW) newW = minW
         if (newH < minH) newH = minH
         const pos = clampToViewport(newL, newT, newW, newH)
-        onMove(pos)
-        onResize({ width: newW, height: newH })
+        d.curLeft = pos.left
+        d.curTop = pos.top
+        d.curWidth = newW
+        d.curHeight = newH
+        scheduleApply()
       }
     }
-    function onUp(){ draggingRef.current.active = false; draggingRef.current.type = null }
+    function onUp(){
+      const d = draggingRef.current
+      if (d.active && d.type){
+        // Commit final geometry once to React state
+        const left = d.curLeft ?? d.startLeft
+        const top = d.curTop ?? d.startTop
+        onMove({ left, top })
+        if (d.type === 'resize'){
+          const width = d.curWidth ?? d.startWidth
+          const height = d.curHeight ?? d.startHeight
+          onResize({ width, height })
+        }
+        clearSelectionEverywhere()
+        try{ rootRef.current?.classList.remove('resizing') } catch {}
+        try{ document.body.classList.remove('desktop-resizing') } catch {}
+        try{ document.body.style.userSelect = '' } catch {}
+        try{ (document.body.style as any).webkitUserSelect = '' } catch {}
+        try{ document.body.style.cursor = '' } catch {}
+      }
+      draggingRef.current.active = false; draggingRef.current.type = null
+    }
     document.addEventListener('mousemove', onMoveDoc)
     document.addEventListener('mouseup', onUp)
     return ()=>{
@@ -3475,6 +3534,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
   }, [onMove, onResize])
 
   function startMove(e: React.MouseEvent){
+    e.preventDefault()
     onFocus()
     const g = resolveAppGeometry(app)
     draggingRef.current = {
@@ -3487,11 +3547,17 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
       startHeight: g.height,
       active: true
     }
+    try{ rootRef.current?.classList.add('resizing') } catch {}
+    try{ document.body.classList.add('desktop-resizing') } catch {}
+    try{ document.body.style.userSelect = 'none' } catch {}
+    try{ (document.body.style as any).webkitUserSelect = 'none' } catch {}
+    try{ document.body.style.cursor = 'grabbing' } catch {}
   }
 
   function startResize(handle: 'nw'|'ne'|'sw'|'se'){
     return (e: React.MouseEvent)=>{
       e.stopPropagation()
+      e.preventDefault()
       onFocus()
       const g = resolveAppGeometry(app)
       draggingRef.current = {
@@ -3505,6 +3571,14 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         startHeight: g.height,
         active: true
       }
+      try{ rootRef.current?.classList.add('resizing') } catch {}
+      try{ document.body.classList.add('desktop-resizing') } catch {}
+      try{ document.body.style.userSelect = 'none' } catch {}
+      try{ (document.body.style as any).webkitUserSelect = 'none' } catch {}
+      try{
+        const map: Record<string,string> = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' }
+        document.body.style.cursor = map[handle] || 'nwse-resize'
+      } catch {}
     }
   }
   const classes = ['window']
@@ -3514,7 +3588,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
   if (app.minimized && !app.anim) classes.push('minimized')
 
   return (
-    <div className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex }} onMouseDown={onFocus}>
+    <div ref={rootRef} className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex }} onMouseDown={onFocus}>
       <div className="titlebar" onMouseDown={startMove}>
         <div className="traffic" onMouseDown={(e)=>e.stopPropagation()}>
           <div className="b red" onClick={onClose} title="Close" />
@@ -3530,6 +3604,21 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
           src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}&base=0&ui=1&tw=1`}
           style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'transparent' }}
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads"
+          onLoad={(e)=>{
+            try{
+              const doc = e.currentTarget.contentDocument
+              if (!doc) return
+              // Ensure Tailwind CSS is available inside the iframe even if the HTML import failed
+              const mod = doc.createElement('script')
+              mod.type = 'module'
+              mod.text = `import "/src/tailwind.css"`
+              doc.head.appendChild(mod)
+              // Minimal normalize to make h-full layouts reliable
+              const style = doc.createElement('style')
+              style.textContent = 'html,body,#root,#mount{height:100%;width:100%;margin:0}'
+              doc.head.appendChild(style)
+            } catch {}
+          }}
           onError={(e) => {
             console.warn('Iframe error for app:', app.name, e);
           }}
@@ -3908,11 +3997,11 @@ export default function Desktop(){
     </div>
   )
 }
-™styles.cssÅ°fÅ°c≈g/* Base variables and layout */
+™styles.cssÅ°fÅ°c≈â/* Base variables and layout */
 :root{--bar:#f6f6f6;--text:#111;--muted:#6b7280;--bg:#0b1020;--glass:rgba(255,255,255,0.25);--dock:rgba(255,255,255,0.3);}
 *{box-sizing:border-box}
 body{font-family:Inter,ui-sans-serif,system-ui,Arial}
-.desktop{height:100%;width:100%;position:relative;color:#111;overflow:hidden}
+.desktop{height:100%;width:100%;position:relative;color:#111;overflow:hidden;overscroll-behavior:none}
 .wallpaper{position:absolute;inset:0;background:linear-gradient(135deg,#0b1020 0%,#1e2760 60%,#462e7e 100%)}
 .menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(255,255,255,.65),rgba(255,255,255,.3));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.35)}
 .menubar .title{font-weight:600;font-size:12px}
@@ -3937,19 +4026,19 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .desktop-icon .glyph{font-size:36px;line-height:36px}
 
 /* Window */
-.window{position:absolute;top:90px;left:90px;min-width:280px;min-height:160px;background:white;border-radius:0;box-shadow:0 18px 44px rgba(0,0,0,.25);overflow:hidden;border:0;outline:4px solid rgba(56,189,248,.95);outline-offset:0;will-change:transform,opacity}
+.window{position:absolute;top:90px;left:90px;min-width:280px;min-height:160px;background:white;border-radius:0;box-shadow:0 18px 44px rgba(0,0,0,.25);overflow:hidden;border:0;outline:4px solid rgba(56,189,248,.95);outline-offset:0;will-change:transform,width,height,opacity;backface-visibility:hidden;transform:translateZ(0);contain:layout paint}
 .window.opening{animation:mac-window-open-spring .34s cubic-bezier(.2,.8,.2,1)}
 .window.closing{animation:mac-window-close .22s cubic-bezier(.2,.8,.2,1) forwards}
 .window.minimizing{animation:mac-window-minimize .22s cubic-bezier(.2,.8,.2,1) forwards}
 .window.minimized{opacity:0;transform:translateY(8px) scale(.92);pointer-events:none;visibility:hidden}
-.window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(255,255,255,.9),rgba(255,255,255,.7));border-bottom:1px solid rgba(0,0,0,.08);cursor:move}
+.window .titlebar{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(to bottom,rgba(255,255,255,.9),rgba(255,255,255,.7));border-bottom:1px solid rgba(0,0,0,.08);cursor:move;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-app-region:no-drag}
 .traffic{display:flex;gap:6px;margin-right:6px}
 .traffic .b{width:12px;height:12px;border-radius:0;border:1px solid rgba(56,189,248,.9)}
 .b.red{background:#ef4444;border-color:#fca5a5}
 .b.yellow{background:#f59e0b;border-color:#fcd34d}
 .b.green{background:#22c55e;border-color:#86efac}
 .window .title{font-weight:600;font-size:12px;color:#0b1020}
-.window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:0;font-size:14px;color:#111827;overflow:hidden}
+.window .content{position:absolute;top:32px;left:0;right:0;bottom:0;padding:0;font-size:14px;color:#111827;overflow:hidden;user-select:text;-webkit-user-select:text}
 
 @keyframes mac-window-open-spring{
   0%{opacity:0;transform:translateY(10px) scale(.92)}
@@ -3966,28 +4055,41 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 }
 
 /* Resize handles (corners) */
-.resize-handle{position:absolute;width:12px;height:12px;background:transparent}
+.resize-handle{position:absolute;width:12px;height:12px;background:transparent;user-select:none;-webkit-user-select:none;touch-action:none}
 .resize-handle.nw{left:-1px;top:-1px;cursor:nwse-resize}
 .resize-handle.ne{right:-1px;top:-1px;cursor:nesw-resize}
 .resize-handle.sw{left:-1px;bottom:-1px;cursor:nesw-resize}
 .resize-handle.se{right:-1px;bottom:-1px;cursor:nwse-resize}
 
+/* While any window is resizing/moving, disable selection globally and hint compositing */
+.desktop-resizing, .desktop-resizing *{user-select:none;-webkit-user-select:none}
+.window.resizing{will-change:width,height,transform;pointer-events:none}
+
 /* Misc */
 .badge{font-size:11px;color:#374151;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px}
 .muted{color:#6b7280}
 .list{padding-left:16px}
-Æiframe-root.jsÅ°fÅ°c≈ˆimport React, { StrictMode } from 'react'
+Øiframe-root.tsxÅ°fÅ°c≈import React, { StrictMode, Component, ReactNode } from 'react'
 import { createRoot as createReactRoot } from 'react-dom/client'
 
-class ErrorBoundary extends React.Component {
-  constructor(props){
+interface ErrorBoundaryProps {
+  name?: string;
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps){
     super(props)
     this.state = { error: null }
   }
-  static getDerivedStateFromError(error){
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState{
     return { error }
   }
-  componentDidCatch(error, info){
+  componentDidCatch(error: Error, info: any){
     try{ console.error('[App iframe] render error:', error, info) } catch{}
   }
   render(){
@@ -4009,7 +4111,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-export function createRoot(mountEl, Comp, name){
+export function createRoot(mountEl: HTMLElement, Comp: any, name?: string){
   const root = createReactRoot(mountEl)
   function Wrapper(){
     if (!Comp) return React.createElement('div', null, `Missing component: ${name || 'App'}`)
@@ -4094,7 +4196,57 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
-}£libÅ°dÅ®utils.tsÅ°fÅ°cƒ¶import { clsx, type ClassValue } from "clsx"
+}Æiframe-root.jsÅ°fÅ°c≈ˆimport React, { StrictMode } from 'react'
+import { createRoot as createReactRoot } from 'react-dom/client'
+
+class ErrorBoundary extends React.Component {
+  constructor(props){
+    super(props)
+    this.state = { error: null }
+  }
+  static getDerivedStateFromError(error){
+    return { error }
+  }
+  componentDidCatch(error, info){
+    try{ console.error('[App iframe] render error:', error, info) } catch{}
+  }
+  render(){
+    const { error } = this.state
+    if (error){
+      const message = (error && (error.message || String(error))) || 'Unknown error'
+      return React.createElement('div', {
+        style: {
+          height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(255,255,255,0.75)', color: '#991b1b', padding: 16, textAlign: 'center'
+        }, role: 'alert'
+      },
+      React.createElement('div', { style: { fontWeight: 600, marginBottom: 6 } }, 'This app crashed'),
+      React.createElement('div', { style: { fontSize: 12, color: '#7f1d1d', whiteSpace: 'pre-wrap' } }, message),
+      React.createElement('button', { onClick: ()=> location.reload(), style: { marginTop: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid #fecaca', background: '#fee2e2', color: '#7f1d1d' } }, 'Reload app')
+      )
+    }
+    return this.props.children
+  }
+}
+
+export function createRoot(mountEl, Comp, name){
+  const root = createReactRoot(mountEl)
+  function Wrapper(){
+    if (!Comp) return React.createElement('div', null, `Missing component: ${name || 'App'}`)
+    return React.createElement(Comp)
+  }
+  root.render(
+    React.createElement(StrictMode, null,
+      React.createElement(ErrorBoundary, { name },
+        React.createElement(Wrapper)
+      )
+    )
+  )
+  return root
+}
+
+
+£libÅ°dÅ®utils.tsÅ°fÅ°cƒ¶import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {

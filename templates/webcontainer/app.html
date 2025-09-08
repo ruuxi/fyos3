@@ -8,10 +8,10 @@
       html,body,#mount{height:100%;margin:0}
       /* Ensure scrolling happens inside the app mount, not the iframe viewport */
       #mount{overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-      body{background:transparent;overflow:hidden}
+      body{background:transparent;overflow:hidden;font-family:Inter,ui-sans-serif,system-ui,Arial}
     </style>
-    <!-- Preload Tailwind CSS to ensure it's available immediately -->
-    <link rel="preload" href="/src/tailwind.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <!-- Ensure Tailwind CSS is linked as a stylesheet for robustness -->
+    <link rel="stylesheet" href="/src/tailwind.css">
     <noscript><link rel="stylesheet" href="/src/tailwind.css"></noscript>
   </head>
   <body>

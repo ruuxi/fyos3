@@ -343,14 +343,12 @@ export default function Document() {
         // Use pnpm for faster dependency installation
         const installProcess = await instance.spawn('pnpm', ['install']);
         
-        // Stream installation output for better UX
-        installProcess.output.pipeTo(new WritableStream({
-          write(data) {
-            console.log('[WebContainer Install]:', data);
-            // Heuristically increase progress during install
-            setTargetProgress((prev) => (prev < 72 ? prev + 0.25 : prev));
-          }
-        }));
+        // Consume installation output without noisy logging to avoid jank
+        try {
+          installProcess.output.pipeTo(new WritableStream({
+            write() {}
+          }));
+        } catch {}
 
         const installExitCode = await installProcess.exit;
 
@@ -378,22 +376,21 @@ export default function Document() {
         beforeUnloadHandler = handleBeforeUnload;
 
         setLoadingStage('Almost there…');
+        // Jump progress modestly; avoid per-chunk increments to reduce renders
         setTargetProgress((p) => Math.max(p, 78));
         // Start dev server
         const devProcess = await instance.spawn('pnpm', ['run', 'dev']);
         devProcRef.current = devProcess;
         
-        // Stream dev server output (optional logging + progress)
-        devProcess.output.pipeTo(new WritableStream({
-          write(data) {
-            console.log('[WebContainer Dev]:', data);
-            setTargetProgress((prev) => (prev < 88 ? prev + 0.15 : prev));
-          }
-        }));
+        // Consume dev server output silently
+        try {
+          devProcess.output.pipeTo(new WritableStream({
+            write() {}
+          }));
+        } catch {}
 
         // Wait for server-ready event
         instance.on('server-ready', (port: number, url: string) => {
-          console.log(`Server ready on port ${port}: ${url}`);
           devUrlRef.current = url;
           setServerReady(true);
           setLoadingStage('Waiting for content to render…');

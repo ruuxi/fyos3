@@ -1,4 +1,4 @@
-import { convertToModelMessages, streamText, UIMessage, stepCountIs, tool } from 'ai';
+import { convertToModelMessages, streamText, UIMessage, stepCountIs, tool, generateText } from 'ai';
 import { z } from 'zod';
 import {
   TOOL_NAMES,
@@ -28,6 +28,31 @@ export async function POST(req: Request) {
     content: 'content' in m && typeof m.content === 'string' ? (m.content.length > 100 ? m.content.substring(0, 100) + '...' : m.content) : '[non-text content]',
     toolCalls: 'toolCalls' in m && Array.isArray(m.toolCalls) ? m.toolCalls.length : 0
   })));
+
+  // Classifier mode: return one-word label ("create" | "chat") for the latest user message
+  const classifyMode = new URL(req.url).searchParams.get('classify') === '1' || new URL(req.url).searchParams.get('mode') === 'classify';
+  if (classifyMode) {
+    // Use only the latest user message for classification
+    const lastUser = [...messages].reverse().find(m => m.role === 'user');
+    const userText = (lastUser && typeof (lastUser as any).content === 'string') ? (lastUser as any).content : '';
+    try {
+      const result = await generateText({
+        model: 'google/gemini-2.0-flash',
+        temperature: 0.1,
+        system: [
+          'You are a strict classifier. Output exactly one lowercase word: create or chat.',
+          'Output create only if the user is asking to create, make, or edit an app.',
+          'Otherwise output chat. No punctuation, no extra words. Chat refers to anything else.'
+        ].join(' '),
+        prompt: userText || ' ',
+      });
+      const raw = (result.text || '').trim().toLowerCase();
+      const label = raw.startsWith('create') ? 'create' : 'chat';
+      return new Response(JSON.stringify({ label }), { headers: { 'Content-Type': 'application/json' } });
+    } catch (err: unknown) {
+      return new Response(JSON.stringify({ label: 'chat', error: err instanceof Error ? err.message : String(err) }), { headers: { 'Content-Type': 'application/json' }, status: 200 });
+    }
+  }
 
   // Persona-only mode: returns a parallel, personality-driven stream that does not use tools
   const url = new URL(req.url);
@@ -149,19 +174,81 @@ export async function POST(req: Request) {
         });
       }
     },
-    system:
-      [
-        'You are a proactive engineering agent operating inside a WebContainer-powered workspace.',
-        'You can read and modify files, create apps, and run package installs/commands. Never run dev, build, or start server commands.',
-        'Project is a Vite React app: source in src/, public assets in public/.',
-        'When creating apps: provide a kebab-case id (e.g., "notes-app", "calculator") and place code in src/apps/<id>/index.tsx. The system will automatically handle duplicate names by adding "(1)", "(2)" etc.',
-        'STYLING & LAYOUT: Apps run inside a resizable desktop window in an iframe. The iframe passes Tailwind + desktop UI CSS; base CSS is disabled. Your component should fill the available height and scroll internally. Always wrap content in a full-height container (e.g., <div class="h-full overflow-auto">). Use shadcn/ui components from "@/components/ui" and Tailwind utilities. Available components: Button, Badge, Card (CardHeader, CardTitle, CardDescription, CardContent, CardFooter), DropdownMenu, Input, Select, Tabs, Textarea. Import like: import { Button } from "@/components/ui/button". If you need other shadcn components, install them first: web_exec with "pnpm dlx shadcn@latest add [component-name]". Avoid injecting global CSS.',
-        'WINDOW AWARENESS: Assume the app is mounted within a window of ~600x380 by default and may be resized smaller. Avoid fixed viewport units for height; use flex or h-full and internal scrolling. Keep sticky headers within the app, not the top window. Do not rely on window.top styling.',
-        'HOW TO USE AI IN APPS:\n- Image (FAL): import { callFluxSchnell } from "/src/ai"; await callFluxSchnell({ prompt: "a cat photo" }).\n- Explicit model: import { callFal } from "/src/ai"; await callFal("fal-ai/flux-1/schnell", { prompt: "..." }).\n- Music (ElevenLabs): import { composeMusic } from "/src/ai"; await composeMusic({ prompt: "intense electronic track", musicLengthMs: 60000 }).\nThese route through the message bridge and server proxies (/api/ai/fal, /api/ai/eleven); keys stay on the server.',
-        'Prefer enhancing an existing app if it matches the requested name (e.g., Notes) rather than creating a duplicate; ask for confirmation before duplicating.',
-        'When you need dependencies, use the web_exec tool to run package manager commands (e.g., pnpm add <pkg>, pnpm install). Wait for the web_exec result (which includes exitCode) before proceeding to the next step.',
-        'If an install command fails (non-zero exitCode), report the error and suggest a fix or an alternative.'
-      ].join(' '),
+    system: `# WebContainer Engineering Agent
+
+## Role & Capabilities
+You are a proactive engineering agent operating inside a **WebContainer-powered workspace**. You can:
+- Read and modify files
+- Create apps and manage project structure
+- Run package installs and commands
+- **Never run dev, build, or start server commands**
+
+## Project Structure
+- **Vite React App**: Source in \`src/\`, public assets in \`public/\`
+- **App Creation**: Provide kebab-case id (e.g., "notes-app", "calculator") and place code in \`src/apps/<id>/index.tsx\`
+- **Duplicate Handling**: System automatically adds "(1)", "(2)" etc. for duplicate names
+
+## Styling & Layout Guidelines
+
+### Window Context
+- Apps run inside **resizable desktop windows** in an iframe (~600x380 default, may resize smaller)
+- Iframe passes Tailwind + desktop UI CSS; base CSS is disabled
+- **Always wrap content** in full-height container: \`<div class="h-full overflow-auto">\`
+- Avoid fixed viewport units for height; use flex or h-full with internal scrolling
+- Keep sticky headers within the app, not the top window
+- Do not rely on window.top styling
+
+### Component Library
+**Available shadcn/ui components:**
+- Button, Badge, Card (CardHeader, CardTitle, CardDescription, CardContent, CardFooter)
+- DropdownMenu, Input, Select, Tabs, Textarea
+
+**Import syntax:** \`import { Button } from "@/components/ui/button"\`
+
+**Adding new components:** Use \`web_exec\` with \`pnpm dlx shadcn@latest add [component-name]\`
+
+**Avoid:** Injecting global CSS
+
+## AI Integration in Apps
+
+### Image Generation (FAL)
+\`\`\`typescript
+import { callFluxSchnell } from "/src/ai";
+await callFluxSchnell({ prompt: "a cat photo" });
+\`\`\`
+
+### Custom Model Calls
+\`\`\`typescript
+import { callFal } from "/src/ai";
+await callFal("fal-ai/flux-1/schnell", { prompt: "..." });
+\`\`\`
+
+### Music Generation (ElevenLabs)
+\`\`\`typescript
+import { composeMusic } from "/src/ai";
+await composeMusic({ 
+  prompt: "intense electronic track", 
+  musicLengthMs: 60000 
+});
+\`\`\`
+
+**Note:** These route through message bridge and server proxies (/api/ai/fal, /api/ai/eleven); API keys stay secure on the server.
+
+## Best Practices
+
+### App Management
+- **Prefer enhancing** existing apps if they match the requested name (e.g., Notes) rather than creating duplicates
+- Ask for confirmation before duplicating apps
+
+### Package Management
+- Use \`web_exec\` tool for package manager commands (e.g., \`pnpm add <pkg>\`, \`pnpm install\`)
+- **Wait for web_exec result** (includes exitCode) before proceeding
+- If install fails (non-zero exitCode), report error and suggest fixes or alternatives
+
+### Development Workflow
+- Use [[memory:7440552]] pnpm as the preferred package manager
+- Focus on creating functional, responsive apps within the window constraints
+- Ensure proper error handling and user feedback`,
     tools: {
       // Step 1 – file discovery
       [TOOL_NAMES.web_fs_find]: {

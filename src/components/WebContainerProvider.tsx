@@ -35,7 +35,10 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
     try {
       await instance.fs.writeFile(path, content);
       const duration = Date.now() - startTime;
-      console.log(`📝 [FileOp] WRITE: ${path} (${sizeKB}KB, ${duration}ms)`);
+      if (process.env.NODE_ENV === 'development') {
+        // Keep minimal dev log; avoid noisy output in production
+        console.debug?.(`📝 [FileOp] WRITE: ${path} (${sizeKB}KB, ${duration}ms)`);
+      }
     } catch (error) {
       const duration = Date.now() - startTime;
       console.error(`❌ [FileOp] WRITE FAILED: ${path} (${duration}ms)`, error);
@@ -51,7 +54,9 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
       const data = await instance.fs.readFile(path);
       const sizeKB = (data.length / 1024).toFixed(1);
       const duration = Date.now() - startTime;
-      console.log(`👁️ [FileOp] READ: ${path} (${sizeKB}KB, ${duration}ms)`);
+      if (process.env.NODE_ENV === 'development') {
+        console.debug?.(`👁️ [FileOp] READ: ${path} (${sizeKB}KB, ${duration}ms)`);
+      }
       
       if (encoding === 'base64') return btoa(String.fromCharCode(...Array.from(data)));
       return new TextDecoder().decode(data);
@@ -73,7 +78,9 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
         await instance.fs.mkdir(path);
       }
       const duration = Date.now() - startTime;
-      console.log(`📁 [FileOp] MKDIR: ${path} ${recursive ? '(recursive)' : ''} (${duration}ms)`);
+      if (process.env.NODE_ENV === 'development') {
+        console.debug?.(`📁 [FileOp] MKDIR: ${path} ${recursive ? '(recursive)' : ''} (${duration}ms)`);
+      }
     } catch (error) {
       const duration = Date.now() - startTime;
       console.error(`❌ [FileOp] MKDIR FAILED: ${path} (${duration}ms)`, error);
@@ -104,7 +111,9 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
     try {
       await instance.fs.rm(path, { recursive: isRecursive });
       const duration = Date.now() - startTime;
-      console.log(`🗑️ [FileOp] REMOVE: ${path} ${isRecursive ? '(recursive)' : ''} (${duration}ms)`);
+      if (process.env.NODE_ENV === 'development') {
+        console.debug?.(`🗑️ [FileOp] REMOVE: ${path} ${isRecursive ? '(recursive)' : ''} (${duration}ms)`);
+      }
     } catch (error) {
       const duration = Date.now() - startTime;
       console.error(`❌ [FileOp] REMOVE FAILED: ${path} (${duration}ms)`, error);
@@ -154,7 +163,9 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
     const cwd = opts?.cwd || '.';
     
     try {
-      console.log(`⚡ [FileOp] SPAWN: ${fullCommand} (cwd: ${cwd})`);
+      if (process.env.NODE_ENV === 'development') {
+        console.debug?.(`⚡ [FileOp] SPAWN: ${fullCommand} (cwd: ${cwd})`);
+      }
       const proc = await instance.spawn(command, args, { cwd: opts?.cwd });
       let output = '';
       const reader = proc.output.getReader();
@@ -183,10 +194,12 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
       try { await readLoop; } catch {}
       const duration = Date.now() - startTime;
       
-      if (exitCode === 0) {
-        console.log(`✅ [FileOp] SPAWN SUCCESS: ${fullCommand} (${duration}ms, exit: ${exitCode})`);
-      } else {
-        console.warn(`⚠️ [FileOp] SPAWN WARNING: ${fullCommand} (${duration}ms, exit: ${exitCode})`);
+      if (process.env.NODE_ENV === 'development') {
+        if (exitCode === 0) {
+          console.debug?.(`✅ [FileOp] SPAWN SUCCESS: ${fullCommand} (${duration}ms, exit: ${exitCode})`);
+        } else {
+          console.warn(`⚠️ [FileOp] SPAWN WARNING: ${fullCommand} (${duration}ms, exit: ${exitCode})`);
+        }
       }
       
       return { exitCode, output } as SpawnResult;

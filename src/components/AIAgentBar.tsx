@@ -27,6 +27,91 @@ export default function AIAgentBar() {
   const pendingToolPromises = useRef(new Set<Promise<void>>());
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
 
+  // Media panel state
+  type MediaItem = { _id: string; contentType: string; publicUrl?: string; r2Key: string; createdAt: number; size?: number };
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [mediaType, setMediaType] = useState<string>('');
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [ingestUrl, setIngestUrl] = useState('');
+
+  function formatBytes(n?: number): string {
+    if (!n || n <= 0) return '';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let i = 0; let v = n;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return `${v.toFixed(1)} ${units[i]}`;
+  }
+
+  async function loadMedia() {
+    if (mode !== 'media') return;
+    setMediaLoading(true); setMediaError(null);
+    try {
+      const params = new URLSearchParams();
+      if (mediaType) params.set('type', mediaType);
+      params.set('limit', '100');
+      const res = await fetch(`/api/media/list?${params.toString()}`);
+      if (!res.ok) throw new Error(`Failed (${res.status})`);
+      const json = await res.json();
+      setMediaItems(Array.isArray(json?.items) ? json.items : []);
+    } catch (e: any) {
+      setMediaError(e?.message || 'Failed to load');
+    } finally {
+      setMediaLoading(false);
+    }
+  }
+
+  useEffect(() => { if (mode === 'media') { void loadMedia(); } }, [mode, mediaType]);
+
+  async function handleUploadFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploadBusy(true); setUploadError(null);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error('Read failed'));
+          reader.readAsDataURL(file);
+        });
+        const body: any = { base64, contentType: file.type || undefined, metadata: { filename: file.name } };
+        const res = await fetch('/api/media/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(text || `Upload failed (${res.status})`);
+        }
+        // Optional: const json = await res.json();
+      }
+      await loadMedia();
+    } catch (e: any) {
+      setUploadError(e?.message || 'Upload failed');
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
+  async function handleIngestFromUrl() {
+    const url = ingestUrl.trim();
+    if (!url) return;
+    setUploadBusy(true); setUploadError(null);
+    try {
+      const res = await fetch('/api/media/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceUrl: url }) });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `Ingest failed (${res.status})`);
+      }
+      setIngestUrl('');
+      await loadMedia();
+    } catch (e: any) {
+      setUploadError(e?.message || 'Ingest failed');
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
   // Chat scroll management
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesInnerRef = useRef<HTMLDivElement | null>(null);
@@ -413,8 +498,11 @@ export default function AIAgentBar() {
               };
               await fnsRef.current.writeFile(`${base}/metadata.json`, JSON.stringify(metadata, null, 2));
               // minimal entry file (tsx)
-              const appIndexTsx = `import React from 'react'\nexport default function App(){\n  return (\n    <div className=\"h-full overflow-auto\">\n      <div className=\"sticky top-0 bg-white/70 backdrop-blur border-b px-3 py-2\">\n        <div className=\"font-semibold\">${finalName}</div>\n      </div>\n      <div className=\"p-3 space-y-3\">\n        <p className=\"text-gray-600 text-sm\">This is a new app. Build your UI here. The container fills the window and scrolls as needed.</p>\n      </div>\n    </div>\n  )\n}`;
+              const appIndexTsx = `import React from 'react'\nimport '/src/tailwind.css'\nimport './styles.css'\nexport default function App(){\n  return (\n    <div className=\"h-full overflow-auto bg-gradient-to-b from-white to-slate-50\">\n      <div className=\"sticky top-0 bg-white/80 backdrop-blur border-b px-3 py-2\">\n        <div className=\"font-semibold tracking-tight\">${finalName}</div>\n      </div>\n      <div className=\"p-3 space-y-3\">\n        <div className=\"rounded-lg border bg-white shadow-sm p-3\">\n          <p className=\"text-slate-600 text-sm\">This is a new app. Build your UI here. The container fills the window and scrolls as needed.</p>\n        </div>\n      </div>\n    </div>\n  )\n}`;
               await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
+              // Write a minimal per-app stylesheet to make the template look styled even without Tailwind upgrades
+              const appStylesCss = `:root{--app-accent:#22c55e;}\nbody{font-family:Inter,ui-sans-serif,system-ui,Arial}\na{color:var(--app-accent)}`;
+              await fnsRef.current.writeFile(`${base}/styles.css`, appStylesCss);
               // update registry
               try {
                 const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
@@ -842,14 +930,27 @@ export default function AIAgentBar() {
     return null;
   }
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
     forceFollowRef.current = true;
-    // Send to hidden agent (tools-enabled)
-    sendMessage({ text: input });
-    // Send to persona stream (UI-only)
-    sendPersonaMessage({ text: input });
+    const userText = input;
+    // 1) Always send to persona immediately (non-blocking)
+    void sendPersonaMessage({ text: userText });
+    // 2) Classify in background, and only send to tools agent if label == create
+    try {
+      const res = await fetch('/api/agent?classify=1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ id: String(Date.now()), role: 'user', content: userText }] }),
+      });
+      const j = await res.json();
+      if ((j?.label || 'chat') === 'create') {
+        void sendMessage({ text: userText });
+      }
+    } catch {
+      // On any error, default to chat (do not trigger tools)
+    }
     setInput('');
   };
 
@@ -1075,7 +1176,70 @@ export default function AIAgentBar() {
                 {mode === 'media' && (
                   <div className="px-4 py-6">
                     <div className="font-medium mb-2">Media Library</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Coming soon. Browse, upload, and use media in prompts.</div>
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <select
+                        value={mediaType}
+                        onChange={(e)=> setMediaType(e.target.value)}
+                        className="text-black rounded-none px-2 py-1 text-sm"
+                      >
+                        <option value="">All</option>
+                        <option value="image">Images</option>
+                        <option value="audio">Audio</option>
+                        <option value="video">Video</option>
+                      </select>
+                      <Button size="sm" className="rounded-none" onClick={()=>void loadMedia()} disabled={mediaLoading}>Refresh</Button>
+                      <div className="ml-auto flex items-center gap-2">
+                        <input
+                          type="file"
+                          multiple
+                          onChange={(e)=> void handleUploadFiles(e.target.files)}
+                          disabled={uploadBusy}
+                          className="text-xs"
+                        />
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={ingestUrl}
+                            onChange={(e)=> setIngestUrl(e.target.value)}
+                            placeholder="Ingest from URL"
+                            className="rounded-none text-black px-2 py-1 text-xs w-[220px]"
+                            disabled={uploadBusy}
+                          />
+                          <Button size="sm" className="rounded-none" onClick={()=> void handleIngestFromUrl()} disabled={uploadBusy || !ingestUrl.trim()}>Add</Button>
+                        </div>
+                      </div>
+                    </div>
+                    {mediaLoading && <div className="text-sm text-gray-500">Loading…</div>}
+                    {mediaError && <div className="text-sm text-red-600">{mediaError}</div>}
+                    {uploadError && <div className="text-sm text-red-600">{uploadError}</div>}
+                    {!mediaLoading && !mediaError && mediaItems.length === 0 && (
+                      <div className="text-sm text-gray-300">No media found.</div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {mediaItems.map((m) => (
+                        <div key={m._id} className="border border-white/10 bg-white/5 p-2">
+                          <div className="text-xs text-white/70">
+                            {new Date(m.createdAt).toLocaleString()} • {formatBytes(m.size)}
+                          </div>
+                          <div className="mt-2">
+                            {m.contentType.startsWith('image/') && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={m.publicUrl || `/api/media/${m._id}`} alt={m.r2Key} className="w-full h-auto" />
+                            )}
+                            {m.contentType.startsWith('audio/') && (
+                              <audio controls src={m.publicUrl || `/api/media/${m._id}`} className="w-full" />
+                            )}
+                            {m.contentType.startsWith('video/') && (
+                              <video controls src={m.publicUrl || `/api/media/${m._id}`} className="w-full" />
+                            )}
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <a href={m.publicUrl || `/api/media/${m._id}`} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 border rounded-none">Open</a>
+                            <div className="text-xs text-white/70 truncate" title={m.r2Key}>{m.r2Key}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
                 </div>
