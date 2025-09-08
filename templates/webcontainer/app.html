@@ -24,11 +24,6 @@
           console.error('[App iframe] Vite error:', payload);
         });
         
-        // Force iframe reload on CSS changes for HMR
-        import.meta.hot.on('vite:beforeUpdate', () => {
-          console.log('[App iframe] CSS updated, reloading iframe');
-          location.reload();
-        });
       }
       
       // Block vite-error-overlay custom element
