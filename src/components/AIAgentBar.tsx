@@ -22,6 +22,8 @@ export default function AIAgentBar() {
   const [desktopsError, setDesktopsError] = useState<string | null>(null);
   const [personaActive, setPersonaActive] = useState(false);
   const [didAnimateWelcome, setDidAnimateWelcome] = useState(false);
+  const [bubbleAnimatingIds, setBubbleAnimatingIds] = useState<Set<string>>(new Set());
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
   const pendingToolPromises = useRef(new Set<Promise<void>>());
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
 
@@ -36,6 +38,21 @@ export default function AIAgentBar() {
   const MAX_CONTAINER_HEIGHT = 520; // px
   const barAreaRef = useRef<HTMLDivElement | null>(null);
   const isOpen = mode !== 'compact';
+  const prevOpenRef = useRef(isOpen);
+  const isOpening = isOpen && !prevOpenRef.current;
+  const isClosing = !isOpen && prevOpenRef.current;
+  useEffect(() => { prevOpenRef.current = isOpen; }, [isOpen]);
+  const forceFollowRef = useRef(false);
+  const [suppressBubbleAnimation, setSuppressBubbleAnimation] = useState(false);
+
+  // Suppress bubble animations while panel is opening/closing to avoid re-pop animations
+  useEffect(() => {
+    if (!(isOpening || isClosing)) return;
+    setSuppressBubbleAnimation(true);
+    const duration = isOpening ? 340 : isClosing ? 220 : 300;
+    const t = setTimeout(() => setSuppressBubbleAnimation(false), duration + 60);
+    return () => clearTimeout(t);
+  }, [isOpening, isClosing]);
 
   function isUserNearBottom(el: HTMLElement, threshold = 48): boolean {
     return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
@@ -101,7 +118,7 @@ export default function AIAgentBar() {
     return () => el.removeEventListener('scroll', onScroll as EventListener);
   }, []);
 
-  // Observe content size and grow container height smoothly up to a max
+  // Observe content size and grow container height smoothly up to a max (viewport-based)
   useEffect(() => {
     const container = messagesContainerRef.current;
     const content = messagesInnerRef.current;
@@ -109,8 +126,8 @@ export default function AIAgentBar() {
 
     const updateHeight = () => {
       const contentHeight = content.scrollHeight;
-      const maxCap = personaActive ? 720 : MAX_CONTAINER_HEIGHT;
-      const next = Math.min(maxCap, Math.max(MIN_CONTAINER_HEIGHT, contentHeight));
+      const viewportCap = typeof window !== 'undefined' ? Math.round(window.innerHeight * (personaActive ? 0.72 : 0.6)) : (personaActive ? 720 : MAX_CONTAINER_HEIGHT);
+      const next = Math.min(viewportCap, Math.max(MIN_CONTAINER_HEIGHT, contentHeight));
       setContainerHeight(next);
     };
 
@@ -120,8 +137,11 @@ export default function AIAgentBar() {
       updateHeight();
     });
     ro.observe(content);
+    const onResize = () => updateHeight();
+    window.addEventListener('resize', onResize);
     return () => {
       ro.disconnect();
+      window.removeEventListener('resize', onResize);
     };
   }, [personaActive]);
 
@@ -497,11 +517,41 @@ export default function AIAgentBar() {
     const content = messagesInnerRef.current;
     if (!content) return;
     const contentHeight = content.scrollHeight;
-    const maxCap = hasConversation ? 720 : MAX_CONTAINER_HEIGHT;
-    const next = Math.min(maxCap, Math.max(MIN_CONTAINER_HEIGHT, contentHeight));
+    const viewportCap = typeof window !== 'undefined' ? Math.round(window.innerHeight * (hasConversation ? 0.72 : 0.6)) : (hasConversation ? 720 : MAX_CONTAINER_HEIGHT);
+    const next = Math.min(viewportCap, Math.max(MIN_CONTAINER_HEIGHT, contentHeight));
     setContainerHeight(next);
   }, [hasConversation, mode]);
   useEffect(() => { setPersonaActive(personaMessages.length > 0); }, [personaMessages.length]);
+
+  // Add pop animation to newly added bubbles (both user and assistant)
+  useEffect(() => {
+    const currentIds = new Set(personaMessages.map(m => m.id));
+    const unseen: string[] = [];
+    for (const id of currentIds) {
+      if (!seenMessageIdsRef.current.has(id)) unseen.push(id);
+    }
+    if (unseen.length === 0) return;
+
+    // mark as seen to avoid re-animating on re-renders
+    unseen.forEach(id => seenMessageIdsRef.current.add(id));
+
+    // start animation for these ids
+    setBubbleAnimatingIds(prev => {
+      const next = new Set(prev);
+      unseen.forEach(id => next.add(id));
+      return next;
+    });
+
+    const timeout = setTimeout(() => {
+      setBubbleAnimatingIds(prev => {
+        const next = new Set(prev);
+        unseen.forEach(id => next.delete(id));
+        return next;
+      });
+    }, 450);
+
+    return () => clearTimeout(timeout);
+  }, [personaMessages]);
 
   // Host-side fetchers for listings (driven by mode)
   useEffect(() => {
@@ -554,12 +604,14 @@ export default function AIAgentBar() {
       // Smoothly settle to bottom on initial mount as the container grows
       smoothScrollToBottom(el, 700);
       prevScrollHeightRef.current = newScrollHeight;
+      forceFollowRef.current = false;
       return;
     }
 
-    if (isNearBottomRef.current) {
-      // Start a smooth follow if not already animating
-      smoothScrollToBottom(el, 650); // extra smooth
+    const shouldFollow = forceFollowRef.current || isNearBottomRef.current;
+    if (shouldFollow) {
+      // Defer one frame so layout/height settle before scrolling
+      requestAnimationFrame(() => smoothScrollToBottom(el, 600));
     } else {
       // Preserve visual position by offsetting the growth
       const delta = newScrollHeight - prevScrollHeight;
@@ -569,6 +621,8 @@ export default function AIAgentBar() {
     }
 
     prevScrollHeightRef.current = el.scrollHeight;
+    // Reset forced follow after handling
+    forceFollowRef.current = false;
   }, [personaMessages.length, containerHeight]);
 
   // Keyboard shortcuts: Cmd/Ctrl+K to open chat, Esc to close overlay
@@ -791,6 +845,7 @@ export default function AIAgentBar() {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
+    forceFollowRef.current = true;
     // Send to hidden agent (tools-enabled)
     sendMessage({ text: input });
     // Send to persona stream (UI-only)
@@ -800,17 +855,15 @@ export default function AIAgentBar() {
 
   return (
     <>
-      {mode !== 'compact' && (
-        <div
-          className="fixed inset-0 z-40 bg-black/0"
-          onClick={() => setMode('compact')}
-          aria-hidden="true"
-        />
-      )}
+      <div
+        className={`fixed inset-0 z-40 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+        onClick={() => setMode('compact')}
+        aria-hidden="true"
+      />
       <div className="flex justify-center">
         <div className="w-full max-w-4xl mx-4 relative z-50" ref={barAreaRef}>
           {/* Unified rim wrapper around panel + bar */}
-          <div className="rounded-none border border-sky-400/70 supports-[backdrop-filter]:backdrop-blur-xl backdrop-saturate-150 bg-neutral-950/70 text-white shadow-[0_0_0_1px_rgba(56,189,248,0.45),0_8px_24px_rgba(56,189,248,0.22)] overflow-hidden">
+          <div className={`rounded-none border border-sky-400/70 supports-[backdrop-filter]:backdrop-blur-xl backdrop-saturate-150 bg-neutral-950/70 text-white ${isOpen ? 'shadow-[0_0_0_1px_rgba(56,189,248,0.50),0_12px_28px_rgba(0,0,0,0.28),0_24px_56px_rgba(0,0,0,0.38)]' : 'shadow-[0_0_0_1px_rgba(56,189,248,0.45),0_8px_24px_rgba(56,189,248,0.22)]'} transition-shadow overflow-hidden`}>
             <div className="flex flex-col-reverse">
               {/* Bottom bar with single input (no inner border; inherits rim) */}
               <div className="rounded-none px-4 py-3 bg-transparent">
@@ -883,7 +936,7 @@ export default function AIAgentBar() {
 
             {/* Inline expansion content above the bar */}
             <div
-              className={`grid transition-[grid-template-rows,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isOpen ? 'grid-rows-[1fr] opacity-100 translate-y-0' : 'grid-rows-[0fr] opacity-0 translate-y-1'} motion-reduce:transition-none`}
+              className={`grid origin-bottom will-change-[transform] transition-[grid-template-rows,transform] ${isOpening ? 'duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)]' : isClosing ? 'duration-[220ms] ease-[cubic-bezier(0.4,0,1,1)]' : 'duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'} ${isOpen ? 'grid-rows-[1fr] translate-y-0 scale-100' : 'grid-rows-[0fr] translate-y-1 scale-[0.995]'} motion-reduce:transition-none`}
               aria-hidden={!isOpen}
             >
               <div className="overflow-hidden" style={{ maxHeight: personaActive ? '80vh' : '70vh' }}>
@@ -907,12 +960,15 @@ export default function AIAgentBar() {
 
                     <div
                       ref={messagesContainerRef}
-                      className="overflow-auto pt-2 pb-1 modern-scrollbar"
+                      className="overflow-auto pt-2 pb-1 modern-scrollbar pr-3"
                       style={{
                         height: containerHeight > 0 ? `${containerHeight}px` : undefined,
                         maxHeight: personaActive ? '72vh' : '60vh',
                         transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
                         willChange: 'height',
+                        scrollBehavior: 'auto',
+                        paddingLeft: '12px',
+                        paddingRight: '22px',
                       }}
                     >
                       <div ref={messagesInnerRef} className="space-y-3 px-1">
@@ -930,7 +986,7 @@ export default function AIAgentBar() {
                               <div className={`text-xs mb-1 ${m.role === 'user' ? 'text-white/60 pr-1' : 'text-white/60 pl-1'}`}>
                                 {m.role === 'user' ? 'You' : 'Sim'}
                               </div>
-                              <div className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${m.role === 'user' ? 'bg-sky-500 text-white max-w-full' : 'inline-block max-w-[80%] bg-white/10 border border-white/15 text-white'}`}>
+                              <div className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${m.role === 'user' ? 'bg-sky-500 text-white max-w-full' : 'inline-block max-w-[80%] bg-white/10 border border-white/15 text-white'} ${!suppressBubbleAnimation && bubbleAnimatingIds.has(m.id) ? 'ios-pop' : ''}`}>
                                 {m.parts.map((part, index) => {
                                   switch (part.type) {
                                     case 'text':
@@ -958,7 +1014,7 @@ export default function AIAgentBar() {
                     `}</style>
                     <style jsx global>{`
                       .modern-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(56,189,248,0.45) transparent; }
-                      .modern-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+                      .modern-scrollbar::-webkit-scrollbar { width: 9px; height: 9px; }
                       .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
                       .modern-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(56,189,248,0.45); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
                       .modern-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(56,189,248,0.65); }
