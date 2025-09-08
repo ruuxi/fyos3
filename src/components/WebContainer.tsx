@@ -23,6 +23,7 @@ export default function WebContainer() {
   const devProcRef = useRef<any>(null);
   const devUrlRef = useRef<string | null>(null);
   const pendingOpenAppsRef = useRef<any[]>([]);
+  const desktopReadyRef = useRef<boolean>(false);
 
   useEffect(() => {
     let mounted = true;
@@ -320,8 +321,9 @@ export default function Document() {
             return;
           }
 
-          // Desktop iframe announced readiness; flush any queued opens
+          // Desktop iframe announced readiness; mark ready and flush any queued opens
           if (event.data && event.data.type === 'FYOS_DESKTOP_READY') {
+            desktopReadyRef.current = true;
             const target = iframeRef.current?.contentWindow;
             if (target && pendingOpenAppsRef.current.length > 0) {
               try {
@@ -334,16 +336,20 @@ export default function Document() {
             return;
           }
 
-          // Forward auto-open app signals to the desktop iframe; always queue and try to send
+          // Handle auto-open app signals. If desktop not ready yet, queue for later.
+          // If desktop is ready, send immediately without queueing.
           if (event.data && event.data.type === 'FYOS_OPEN_APP') {
             const payload = event.data;
-            try {
-              const idx = pendingOpenAppsRef.current.findIndex(p => p?.app?.id === payload?.app?.id);
-              if (idx === -1) pendingOpenAppsRef.current.push(payload);
-            } catch { pendingOpenAppsRef.current.push(payload); }
-            const target = iframeRef.current?.contentWindow;
-            if (target) {
-              try { target.postMessage(payload, '*'); } catch {}
+            if (!desktopReadyRef.current) {
+              try {
+                const idx = pendingOpenAppsRef.current.findIndex(p => p?.app?.id === payload?.app?.id);
+                if (idx === -1) pendingOpenAppsRef.current.push(payload);
+              } catch { pendingOpenAppsRef.current.push(payload); }
+            } else {
+              const target = iframeRef.current?.contentWindow;
+              if (target) {
+                try { target.postMessage(payload, '*'); } catch {}
+              }
             }
             return;
           }
@@ -435,16 +441,8 @@ export default function Document() {
         return;
       }
 
-      // Best-effort: attempt to forward queued auto-open messages,
-      // but do NOT clear the queue here. We'll clear only after desktop signals readiness.
-      try {
-        const target = iframe.contentWindow;
-        if (target && pendingOpenAppsRef.current.length > 0) {
-          pendingOpenAppsRef.current.forEach(payload => {
-            try { target.postMessage(payload, '*'); } catch {}
-          });
-        }
-      } catch {}
+      // Do not forward queued auto-open messages here to avoid duplicates.
+      // These will be flushed when the desktop iframe announces readiness.
 
       // Start iframe fade-in
       iframe.classList.add('iframe-ready');
