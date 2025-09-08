@@ -25,7 +25,7 @@ type SnapZoneId =
   | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
 // Visual gap to keep from edges and between tiles
-const GAP = 12
+const GAP = 16
 
 // Helpers
 function clampToViewport(left: number, top: number, width: number, height: number){
@@ -594,21 +594,47 @@ export default function Desktop(){
     }
   }
 
-  function detectSnap(x: number, y: number, T = 80): SnapZoneId | null{
+  function detectSnap(x: number, y: number, T = 120): SnapZoneId | null{
     const vw = window.innerWidth
     const vh = window.innerHeight
     const nearLeft = x <= T
     const nearRight = x >= vw - T
     const nearTop = y <= T
     const nearBottom = y >= vh - T
-    if (nearLeft && nearTop) return 'top-left'
-    if (nearRight && nearTop) return 'top-right'
-    if (nearLeft && nearBottom) return 'bottom-left'
-    if (nearRight && nearBottom) return 'bottom-right'
-    if (nearLeft) return 'left-half'
-    if (nearRight) return 'right-half'
-    if (nearTop) return 'top-half'
-    if (nearBottom) return 'bottom-half'
+    if (!(nearLeft || nearRight || nearTop || nearBottom)) return null
+
+    const cornerRatio = 0.3 // widen corner segments for easier corner snaps
+    const cornerW = vw * cornerRatio
+    const cornerH = vh * cornerRatio
+
+    // Top edge
+    if (nearTop) {
+      if (x <= cornerW) return 'top-left'
+      if (x >= vw - cornerW) return 'top-right'
+      return 'top-half'
+    }
+
+    // Bottom edge
+    if (nearBottom) {
+      if (x <= cornerW) return 'bottom-left'
+      if (x >= vw - cornerW) return 'bottom-right'
+      return 'bottom-half'
+    }
+
+    // Left edge
+    if (nearLeft) {
+      if (y <= cornerH) return 'top-left'
+      if (y >= vh - cornerH) return 'bottom-left'
+      return 'left-half'
+    }
+
+    // Right edge
+    if (nearRight) {
+      if (y <= cornerH) return 'top-right'
+      if (y >= vh - cornerH) return 'bottom-right'
+      return 'right-half'
+    }
+
     return null
   }
 
