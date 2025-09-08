@@ -46,6 +46,32 @@ export async function POST(req: Request) {
         ].join(' '),
         prompt: userText || ' ',
       });
+      
+      // Log usage after generateText completes
+      console.log('🏷️ [CLASSIFY] Classification finished:', {
+        finishReason: result.finishReason,
+        textLength: result.text?.length || 0,
+        inputLength: userText?.length || 0,
+      });
+      
+      if (result.usage) {
+        console.log('📊 [USAGE-CLASSIFY] Token consumption:', {
+          inputTokens: result.usage.inputTokens || 0,
+          outputTokens: result.usage.outputTokens || 0,
+          totalTokens: result.usage.totalTokens || 0,
+          reasoningTokens: result.usage.reasoningTokens || 0,
+          cachedInputTokens: result.usage.cachedInputTokens || 0,
+        });
+        
+        // Calculate cost for gemini-2.0-flash: $0.10 per million input, $0.40 per million output
+        const inputCostPerMillion = 0.10;
+        const outputCostPerMillion = 0.40;
+        const estimatedCost = 
+          ((result.usage.inputTokens || 0) / 1000000) * inputCostPerMillion +
+          ((result.usage.outputTokens || 0) / 1000000) * outputCostPerMillion;
+        
+        console.log('💰 [USAGE-COST] gemini-2.0-flash estimated cost: $' + estimatedCost.toFixed(6));
+      }
       const raw = (result.text || '').trim().toLowerCase();
       const label = raw.startsWith('create') ? 'create' : 'chat';
       return new Response(JSON.stringify({ label }), { headers: { 'Content-Type': 'application/json' } });
@@ -76,6 +102,32 @@ export async function POST(req: Request) {
       model: 'google/gemini-2.0-flash',
       messages: convertToModelMessages(personaMessages),
       system: personaSystem,
+      onFinish: ({ usage, finishReason, text }: any) => {
+        console.log('🎭 [PERSONA] Response finished:', {
+          finishReason,
+          textLength: text?.length || 0,
+          messagesCount: personaMessages.length,
+        });
+        
+        if (usage) {
+          console.log('📊 [USAGE-PERSONA] Token consumption:', {
+            inputTokens: usage.inputTokens || 0,
+            outputTokens: usage.outputTokens || 0,
+            totalTokens: usage.totalTokens || 0,
+            reasoningTokens: usage.reasoningTokens || 0,
+            cachedInputTokens: usage.cachedInputTokens || 0,
+          });
+          
+          // Calculate cost for gemini-2.0-flash: $0.10 per million input, $0.40 per million output
+          const inputCostPerMillion = 0.10;
+          const outputCostPerMillion = 0.40;
+          const estimatedCost = 
+            ((usage.inputTokens || 0) / 1000000) * inputCostPerMillion +
+            ((usage.outputTokens || 0) / 1000000) * outputCostPerMillion;
+          
+          console.log('💰 [USAGE-COST] gemini-2.0-flash estimated cost: $' + estimatedCost.toFixed(6));
+        }
+      },
     });
 
     console.log('📤 [PERSONA] Returning streaming response');
@@ -91,14 +143,67 @@ export async function POST(req: Request) {
     },
     messages: convertToModelMessages(messages),
     stopWhen: stepCountIs(15),
+    onStepFinish: ({ text, toolCalls, toolResults, finishReason, usage }: any) => {
+      console.log('📊 [USAGE-STEP] Step finished:', {
+        finishReason,
+        textLength: text?.length || 0,
+        toolCallsCount: toolCalls?.length || 0,
+        toolResultsCount: toolResults?.length || 0,
+        usage: usage ? {
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          totalTokens: usage.totalTokens,
+          reasoningTokens: usage.reasoningTokens,
+          cachedInputTokens: usage.cachedInputTokens,
+        } : null,
+      });
+      
+      // Log individual tool calls in this step
+      if (toolCalls?.length) {
+        console.log('🔧 [USAGE-STEP] Tool calls:', toolCalls.map((tc: any) => ({
+          name: tc.toolName,
+          id: tc.toolCallId?.substring(0, 8),
+        })));
+      }
+    },
     onFinish: (event) => {
+      // Enhanced usage logging
       console.log('🎯 [AI] Response finished:', {
         finishReason: event.finishReason,
-        usage: event.usage,
-        text: event.text?.length > 200 ? event.text.substring(0, 200) + '...' : event.text,
+        textLength: event.text?.length || 0,
         toolCalls: event.toolCalls?.length || 0,
-        toolResults: event.toolResults?.length || 0
+        toolResults: event.toolResults?.length || 0,
+        stepCount: event.steps?.length || 0,
       });
+
+      // Detailed token usage logging
+      if (event.usage) {
+        console.log('📊 [USAGE-TOTAL] Token consumption:', {
+          inputTokens: event.usage.inputTokens || 0,
+          outputTokens: event.usage.outputTokens || 0,
+          totalTokens: event.usage.totalTokens || 0,
+          reasoningTokens: event.usage.reasoningTokens || 0,
+          cachedInputTokens: event.usage.cachedInputTokens || 0,
+        });
+
+        // Calculate cost estimates based on model pricing
+        // qwen3-coder: $2.00 per million tokens (input and output)
+        const inputCostPerMillion = 2.00; // $2.00 per 1M input tokens
+        const outputCostPerMillion = 2.00; // $2.00 per 1M output tokens
+        const estimatedCost = 
+          ((event.usage.inputTokens || 0) / 1000000) * inputCostPerMillion +
+          ((event.usage.outputTokens || 0) / 1000000) * outputCostPerMillion;
+        
+        console.log('💰 [USAGE-COST] qwen3-coder estimated cost: $' + estimatedCost.toFixed(6));
+      }
+
+      // Log step-by-step breakdown if multiple steps
+      if (event.steps && event.steps.length > 1) {
+        console.log('📈 [USAGE-STEPS] Step breakdown:');
+        event.steps.forEach((step: any, index: number) => {
+          console.log(`  Step ${index}: ${step.text?.length || 0} chars, ${step.toolCalls?.length || 0} tools`);
+        });
+      }
 
       if (event.toolCalls?.length) {
         console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc: any) => ({

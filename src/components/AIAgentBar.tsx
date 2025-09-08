@@ -4,21 +4,20 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Send, Search, Store, Monitor, Image as ImageIcon } from 'lucide-react';
+import { Send, Search, Store, Monitor, Image as ImageIcon, Home } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
+import { useScreens } from './ScreensProvider';
 import ChatAlert from './ChatAlert';
 // Persistence is handled by WebContainer visibility/unload hooks
 
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
-  const [mode, setMode] = useState<'compact' | 'chat' | 'appstore' | 'visit' | 'media'>('chat');
-  const [appsListing, setAppsListing] = useState<Array<{ _id: string; name: string; description?: string; icon?: string }>>([]);
+  const [mode, setMode] = useState<'compact' | 'chat' | 'visit' | 'media'>('chat');
+  const { goTo, activeIndex } = useScreens();
   const [desktopsListing, setDesktopsListing] = useState<Array<{ _id: string; title: string; description?: string; icon?: string }>>([]);
-  const [appsLoading, setAppsLoading] = useState(false);
   const [desktopsLoading, setDesktopsLoading] = useState(false);
-  const [appsError, setAppsError] = useState<string | null>(null);
   const [desktopsError, setDesktopsError] = useState<string | null>(null);
   const [personaActive, setPersonaActive] = useState(false);
   const [didAnimateWelcome, setDidAnimateWelcome] = useState(false);
@@ -642,15 +641,6 @@ export default function AIAgentBar() {
   }, [personaMessages]);
 
   // Host-side fetchers for listings (driven by mode)
-  useEffect(() => {
-    if (mode !== 'appstore') return;
-    setAppsLoading(true); setAppsError(null);
-    fetch('/api/store/apps')
-      .then(r => r.json())
-      .then(j => setAppsListing((j?.apps || []).map((a: any) => ({ _id: String(a._id), name: a.name, description: a.description, icon: a.icon }))))
-      .catch(e => setAppsError(e?.message || 'Failed'))
-      .finally(() => setAppsLoading(false));
-  }, [mode]);
 
   useEffect(() => {
     if (mode !== 'visit') return;
@@ -662,19 +652,6 @@ export default function AIAgentBar() {
       .finally(() => setDesktopsLoading(false));
   }, [mode]);
 
-  async function hostInstallApp(appId: string) {
-    try {
-      const res = await fetch(`/api/store/apps/${appId}/bundle`);
-      if (!res.ok) throw new Error(`Bundle fetch failed`);
-      const buf = new Uint8Array(await res.arrayBuffer());
-      const { installAppFromBundle } = await import('@/utils/app-install');
-      if (!instanceRef.current) await waitForInstance(6000, 120);
-      if (!instanceRef.current) throw new Error('WebContainer not ready');
-      await installAppFromBundle(instanceRef.current, buf);
-    } catch (e) {
-      console.error('Install failed', e);
-    }
-  }
 
   // Auto-scroll or preserve position on new messages and height changes (chat mode)
   useLayoutEffect(() => {
@@ -716,12 +693,13 @@ export default function AIAgentBar() {
   // Keyboard shortcuts: Cmd/Ctrl+K to open chat, Esc to close overlay
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const isK = e.key.toLowerCase() === 'k';
+      const key = (e.key ?? '').toLowerCase();
+      const isK = key === 'k';
       if ((e.metaKey || e.ctrlKey) && isK) {
         e.preventDefault();
         setMode('chat');
       }
-      if (e.key === 'Escape' && mode !== 'compact') {
+      if (key === 'escape' && mode !== 'compact') {
         e.preventDefault();
         setMode('compact');
       }
@@ -975,11 +953,22 @@ export default function AIAgentBar() {
                     <div className="flex items-center gap-1">
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none text-white hover:bg-white/10" onClick={() => setMode('appstore')}>
-                            <Store className="h-4 w-4" />
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-10 w-10 rounded-none text-white hover:bg-white/10" 
+                            onClick={() => goTo(activeIndex === 0 ? 1 : 0)}
+                          >
+                            {activeIndex === 0 ? (
+                              <Home className="h-4 w-4" />
+                            ) : (
+                              <Store className="h-4 w-4" />
+                            )}
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent className="rounded-none">App Store</TooltipContent>
+                        <TooltipContent className="rounded-none">
+                          {activeIndex === 0 ? 'Back to Desktop' : 'App Store'}
+                        </TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1123,30 +1112,6 @@ export default function AIAgentBar() {
                   </div>
                 )}
 
-                {mode === 'appstore' && (
-                  <div className="px-4 py-3">
-                    <div className="font-medium mb-2">App Store</div>
-                    {appsLoading && <div className="text-sm text-gray-500">Loading…</div>}
-                    {appsError && <div className="text-sm text-red-600">{appsError}</div>}
-                    {!appsLoading && !appsError && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {appsListing.map((a) => (
-                          <div key={a._id} className="border border-white/10 dark:border-white/10 p-2 bg-white text-black hover:bg-white/90 transition-colors">
-                            <div className="flex items-center gap-2">
-                              <div>{a.icon || '📦'}</div>
-                              <div className="font-medium truncate" title={a.name}>{a.name}</div>
-                            </div>
-                            {a.description && <div className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 mt-1">{a.description}</div>}
-                            <div className="mt-2 flex items-center gap-2">
-                              <Button size="sm" className="rounded-none" onClick={() => hostInstallApp(a._id)}>Install</Button>
-                              <a href={`/api/store/apps/${a._id}/bundle`} target="_blank" className="text-xs px-2 py-1 border">Download</a>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {mode === 'visit' && (
                   <div className="px-4 py-3">
