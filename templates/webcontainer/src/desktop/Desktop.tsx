@@ -5,10 +5,7 @@ const DEFAULT_WINDOW_POS = { left: 90, top: 90 }
 const DEFAULT_WINDOW_SIZE = { width: 720, height: 720 }
 const MIN_WINDOW_SIZE = { width: 280, height: 160 }
 
-const MENUBAR_HEIGHT = 0
-const TITLEBAR_HEIGHT = 32
-const MIN_VISIBLE_X = 64
-const MIN_VISIBLE_Y = 48
+// kept for reference; removed unused constants to satisfy linter
 
 const OPEN_RESTORE_MS = 340
 const CLOSE_MS = 220
@@ -23,15 +20,22 @@ const EVT_DESKTOP_READY = 'FYOS_DESKTOP_READY'
 const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: 16, startY: 52, maxPerCol: 6 }
 
 type Geometry = { left: number; top: number; width: number; height: number }
+type SnapZoneId =
+  | 'left-half' | 'right-half' | 'top-half' | 'bottom-half'
+  | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+
+// Visual gap to keep from edges and between tiles
+const GAP = 12
 
 // Helpers
-function clampToViewport(left: number, top: number, width: number, _height: number){
+function clampToViewport(left: number, top: number, width: number, height: number){
   const vw = window.innerWidth
   const vh = window.innerHeight
-  const minLeft = -(width - MIN_VISIBLE_X)
-  const maxLeft = vw - MIN_VISIBLE_X
-  const minTop = MENUBAR_HEIGHT - (TITLEBAR_HEIGHT - 16)
-  const maxTop = vh - MIN_VISIBLE_Y
+  // Enforce a consistent visual gap from all edges (instead of partial visibility)
+  const minLeft = GAP
+  const maxLeft = Math.max(GAP, vw - width - GAP)
+  const minTop = GAP
+  const maxTop = Math.max(GAP, vh - height - GAP)
   return {
     left: Math.min(Math.max(left, minLeft), maxLeft),
     top: Math.min(Math.max(top, minTop), maxTop)
@@ -107,6 +111,8 @@ interface WindowProps {
 // Top menubar removed
 
 function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }: WindowProps){
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const rafIdRef = useRef<number | null>(null)
   const draggingRef = useRef<{
     type: 'move' | 'resize' | null
     startX: number
@@ -117,18 +123,65 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
     startHeight: number
     handle?: 'nw'|'ne'|'sw'|'se'
     active: boolean
+    curDx?: number
+    curDy?: number
+    curLeft?: number
+    curTop?: number
+    curWidth?: number
+    curHeight?: number
   }>({ type: null, startX: 0, startY: 0, startLeft: 0, startTop: 0, startWidth: 0, startHeight: 0, active: false })
 
+  function clearSelectionEverywhere(){
+    try{ window.getSelection()?.removeAllRanges() } catch {}
+    try{
+      const iframe = rootRef.current?.querySelector('iframe') as HTMLIFrameElement | null
+      const sel = iframe?.contentWindow?.getSelection()
+      if (sel && sel.rangeCount > 0) sel.removeAllRanges()
+    } catch {}
+  }
+
+  function scheduleApply(){
+    if (rafIdRef.current != null) return
+    rafIdRef.current = requestAnimationFrame(()=>{
+      rafIdRef.current = null
+      const d = draggingRef.current
+      const el = rootRef.current
+      if (!el || !d.active) return
+      if (d.type === 'move'){
+        const dx = d.curDx ?? 0
+        const dy = d.curDy ?? 0
+        el.style.transform = `translate(${dx}px, ${dy}px)`
+      } else if (d.type === 'resize'){
+        if (typeof d.curLeft === 'number') el.style.left = `${d.curLeft}px`
+        if (typeof d.curTop === 'number') el.style.top = `${d.curTop}px`
+        if (typeof d.curWidth === 'number') el.style.width = `${d.curWidth}px`
+        if (typeof d.curHeight === 'number') el.style.height = `${d.curHeight}px`
+      }
+    })
+  }
+
   useEffect(()=>{
-    // Allow partial off-screen but keep window reachable using shared clamp
+    // Drag loop: use rAF and transform to avoid React state churn
     function onMoveDoc(e: MouseEvent){
       const d = draggingRef.current
       if (!d.active || !d.type) return
+      e.preventDefault()
+      clearSelectionEverywhere()
+      const el = rootRef.current
+      if (!el) return
       if (d.type === 'move'){
         const dx = e.clientX - d.startX
         const dy = e.clientY - d.startY
-        const pos = clampToViewport(d.startLeft + dx, d.startTop + dy, d.startWidth, d.startHeight)
-        onMove(pos)
+        // Store deltas; apply via rAF transform
+        d.curDx = dx
+        d.curDy = dy
+        scheduleApply()
+        // Broadcast for snap overlay
+        try {
+          const geom = resolveAppGeometry(app)
+          const pos = clampToViewport(geom.left + dx, geom.top + dy, geom.width, geom.height)
+          window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'move', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: { left: pos.left, top: pos.top, width: geom.width, height: geom.height }, altKey: e.altKey } }))
+        } catch {}
       } else if (d.type === 'resize'){
         const dx = e.clientX - d.startX
         const dy = e.clientY - d.startY
@@ -139,45 +192,65 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         const minW = MIN_WINDOW_SIZE.width
         const minH = MIN_WINDOW_SIZE.height
         switch(d.handle){
-          case 'se':
-            newW = Math.max(minW, d.startWidth + dx)
-            newH = Math.max(minH, d.startHeight + dy)
-            break
-          case 'ne':
-            newW = Math.max(minW, d.startWidth + dx)
-            newH = Math.max(minH, d.startHeight - dy)
-            newT = d.startTop + dy
-            break
-          case 'sw':
-            newW = Math.max(minW, d.startWidth - dx)
-            newH = Math.max(minH, d.startHeight + dy)
-            newL = d.startLeft + dx
-            break
-          case 'nw':
-            newW = Math.max(minW, d.startWidth - dx)
-            newH = Math.max(minH, d.startHeight - dy)
-            newL = d.startLeft + dx
-            newT = d.startTop + dy
-            break
+          case 'se': newW = Math.max(minW, d.startWidth + dx); newH = Math.max(minH, d.startHeight + dy); break
+          case 'ne': newW = Math.max(minW, d.startWidth + dx); newH = Math.max(minH, d.startHeight - dy); newT = d.startTop + dy; break
+          case 'sw': newW = Math.max(minW, d.startWidth - dx); newH = Math.max(minH, d.startHeight + dy); newL = d.startLeft + dx; break
+          case 'nw': newW = Math.max(minW, d.startWidth - dx); newH = Math.max(minH, d.startHeight - dy); newL = d.startLeft + dx; newT = d.startTop + dy; break
         }
-        // Relaxed: allow oversize beyond viewport; keep window reachable via clamp on position
         if (newW < minW) newW = minW
         if (newH < minH) newH = minH
         const pos = clampToViewport(newL, newT, newW, newH)
-        onMove(pos)
-        onResize({ width: newW, height: newH })
+        d.curLeft = pos.left
+        d.curTop = pos.top
+        d.curWidth = newW
+        d.curHeight = newH
+        scheduleApply()
+        try {
+          window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'move', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: { left: pos.left, top: pos.top, width: newW, height: newH }, altKey: e.altKey } }))
+        } catch {}
       }
     }
-    function onUp(){ draggingRef.current.active = false; draggingRef.current.type = null }
+    function onUp(e: MouseEvent){
+      const d = draggingRef.current
+      if (d.active && d.type){
+        const isMove = d.type === 'move'
+        if (isMove){
+          const dx = (d.curDx ?? 0)
+          const dy = (d.curDy ?? 0)
+          const geom = resolveAppGeometry(app)
+          const pos = clampToViewport(geom.left + dx, geom.top + dy, geom.width, geom.height)
+          // Commit to React once
+          onMove({ left: pos.left, top: pos.top })
+          try { const el = rootRef.current; if (el){ el.style.transform = ''; } } catch {}
+          try { window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'end', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: { left: pos.left, top: pos.top, width: geom.width, height: geom.height } } })) } catch {}
+        } else {
+          const width = d.curWidth ?? d.startWidth
+          const height = d.curHeight ?? d.startHeight
+          const left = d.curLeft ?? d.startLeft
+          const top = d.curTop ?? d.startTop
+          onMove({ left, top })
+          onResize({ width, height })
+          try { window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'end', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: { left, top, width, height } } })) } catch {}
+        }
+        clearSelectionEverywhere()
+        try{ rootRef.current?.classList.remove('resizing') } catch {}
+        try{ document.body.classList.remove('desktop-resizing') } catch {}
+        try{ document.body.style.userSelect = '' } catch {}
+        try{ (document.body.style as any).webkitUserSelect = '' } catch {}
+        try{ document.body.style.cursor = '' } catch {}
+      }
+      draggingRef.current.active = false; draggingRef.current.type = null
+    }
     document.addEventListener('mousemove', onMoveDoc)
     document.addEventListener('mouseup', onUp)
     return ()=>{
       document.removeEventListener('mousemove', onMoveDoc)
       document.removeEventListener('mouseup', onUp)
     }
-  }, [onMove, onResize])
+  }, [app, onMove, onResize])
 
   function startMove(e: React.MouseEvent){
+    e.preventDefault()
     onFocus()
     const g = resolveAppGeometry(app)
     draggingRef.current = {
@@ -190,11 +263,18 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
       startHeight: g.height,
       active: true
     }
+    try{ rootRef.current?.classList.add('resizing') } catch {}
+    try{ document.body.classList.add('desktop-resizing') } catch {}
+    try{ document.body.style.userSelect = 'none' } catch {}
+    try{ (document.body.style as any).webkitUserSelect = 'none' } catch {}
+    try{ document.body.style.cursor = 'grabbing' } catch {}
+    try { window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'start', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: g } })) } catch {}
   }
 
   function startResize(handle: 'nw'|'ne'|'sw'|'se'){
     return (e: React.MouseEvent)=>{
       e.stopPropagation()
+      e.preventDefault()
       onFocus()
       const g = resolveAppGeometry(app)
       draggingRef.current = {
@@ -208,6 +288,15 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         startHeight: g.height,
         active: true
       }
+      try{ rootRef.current?.classList.add('resizing') } catch {}
+      try{ document.body.classList.add('desktop-resizing') } catch {}
+      try{ document.body.style.userSelect = 'none' } catch {}
+      try{ (document.body.style as any).webkitUserSelect = 'none' } catch {}
+      try{
+        const map: Record<string,string> = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' }
+        document.body.style.cursor = map[handle] || 'nwse-resize'
+      } catch {}
+      try { window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'start', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: g } })) } catch {}
     }
   }
   const classes = ['window']
@@ -217,7 +306,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
   if (app.minimized && !app.anim) classes.push('minimized')
 
   return (
-    <div className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex }} onMouseDown={onFocus}>
+    <div ref={rootRef} className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex }} onMouseDown={onFocus}>
       <div className="titlebar" onMouseDown={startMove}>
         <div className="traffic" onMouseDown={(e)=>e.stopPropagation()}>
           <div className="b red" onClick={onClose} title="Close" />
@@ -269,6 +358,12 @@ export default function Desktop(){
     } catch {}
   }, [])
   const [open, setOpen] = useState<App[]>([])
+  const snapAltBypassRef = useRef(false)
+  const overlayRef = useRef<HTMLDivElement | null>(null)
+  const previewRef = useRef<HTMLDivElement | null>(null)
+  const snapAppIdRef = useRef<string | null>(null)
+  const currentZoneRef = useRef<SnapZoneId | null>(null)
+  const lastZoneSwitchTsRef = useRef<number>(0)
   const [iconPositions, setIconPositions] = useState<Record<string,{left:number;top:number}>>({})
   const [windowGeometries, setWindowGeometries] = useState<Record<string,{left:number;top:number;width:number;height:number}>>({})
   const dragIconRef = useRef<{
@@ -479,6 +574,44 @@ export default function Desktop(){
     }
   }
 
+  // SNAP GEOMETRY AND DETECTION
+  const GAP = 12
+  function rectForZone(zone: SnapZoneId, gap = GAP): Geometry{
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const g2 = gap * 2
+    const halfW = Math.floor(vw / 2)
+    const halfH = Math.floor(vh / 2)
+    switch(zone){
+      case 'left-half': return { left: gap, top: gap, width: Math.max(0, halfW - gap - gap/2), height: vh - g2 }
+      case 'right-half': return { left: halfW + gap/2, top: gap, width: Math.max(0, halfW - gap - gap/2), height: vh - g2 }
+      case 'top-half': return { left: gap, top: gap, width: vw - g2, height: Math.max(0, halfH - gap - gap/2) }
+      case 'bottom-half': return { left: gap, top: halfH + gap/2, width: vw - g2, height: Math.max(0, halfH - gap - gap/2) }
+      case 'top-left': return { left: gap, top: gap, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
+      case 'top-right': return { left: halfW + gap/2, top: gap, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
+      case 'bottom-left': return { left: gap, top: halfH + gap/2, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
+      case 'bottom-right': return { left: halfW + gap/2, top: halfH + gap/2, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
+    }
+  }
+
+  function detectSnap(x: number, y: number, T = 80): SnapZoneId | null{
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const nearLeft = x <= T
+    const nearRight = x >= vw - T
+    const nearTop = y <= T
+    const nearBottom = y >= vh - T
+    if (nearLeft && nearTop) return 'top-left'
+    if (nearRight && nearTop) return 'top-right'
+    if (nearLeft && nearBottom) return 'bottom-left'
+    if (nearRight && nearBottom) return 'bottom-right'
+    if (nearLeft) return 'left-half'
+    if (nearRight) return 'right-half'
+    if (nearTop) return 'top-half'
+    if (nearBottom) return 'bottom-half'
+    return null
+  }
+
   useEffect(()=>{
     function onMoveDoc(e: MouseEvent){
       const d = dragIconRef.current
@@ -534,6 +667,64 @@ export default function Desktop(){
 
   // Listen for requests to auto-open an app
   useEffect(()=>{
+    // Tiling event bus for snap overlay (imperative updates for performance)
+    function applyPreviewRect(rect: Geometry | null, active: boolean){
+      const overlay = overlayRef.current
+      const preview = previewRef.current
+      if (!overlay || !preview) return
+      if (!rect){
+        preview.classList.remove('active')
+        return
+      }
+      preview.style.left = `${rect.left}px`
+      preview.style.top = `${rect.top}px`
+      preview.style.width = `${rect.width}px`
+      preview.style.height = `${rect.height}px`
+      if (active) preview.classList.add('active'); else preview.classList.remove('active')
+    }
+    function showOverlay(){ const o = overlayRef.current; if (o) o.style.display = 'block' }
+    function hideOverlay(){ const o = overlayRef.current; if (o) o.style.display = 'none' }
+
+    function onTiling(e: any){
+      const d = e?.detail || {}
+      if (!d || !d.phase) return
+      if (d.altKey) { snapAltBypassRef.current = true } else { snapAltBypassRef.current = false }
+      const now = Date.now()
+      if (d.phase === 'start'){
+        snapAppIdRef.current = d.id || null
+        currentZoneRef.current = null
+        lastZoneSwitchTsRef.current = now
+        showOverlay()
+        const z = snapAltBypassRef.current ? null : detectSnap(d.pointer?.x, d.pointer?.y)
+        currentZoneRef.current = z
+        applyPreviewRect(z ? rectForZone(z) : null, !!z)
+      } else if (d.phase === 'move'){
+        if (!snapAppIdRef.current) return
+        const candidate = snapAltBypassRef.current ? null : detectSnap(d.pointer?.x, d.pointer?.y)
+        const prev = currentZoneRef.current
+        if (candidate !== prev){
+          // hysteresis: require 60ms stability before switching
+          if (now - lastZoneSwitchTsRef.current >= 60){
+            currentZoneRef.current = candidate
+            lastZoneSwitchTsRef.current = now
+            applyPreviewRect(candidate ? rectForZone(candidate) : null, !!candidate)
+          }
+        }
+      } else if (d.phase === 'end'){
+        const id = snapAppIdRef.current
+        const z = snapAltBypassRef.current ? null : (currentZoneRef.current || detectSnap(d.pointer?.x, d.pointer?.y))
+        if (z && id){
+          const r = rectForZone(z)
+          updateWindow(id, { left: r.left, top: r.top, width: r.width, height: r.height })
+        }
+        hideOverlay()
+        applyPreviewRect(null, false)
+        snapAppIdRef.current = null
+        currentZoneRef.current = null
+        snapAltBypassRef.current = false
+      }
+    }
+    window.addEventListener('FYOS_TILING' as any, onTiling)
     function onMessage(e: MessageEvent){
       const d: any = (e as any).data
       if (!d || d.type !== EVT_OPEN_APP) return
@@ -557,13 +748,17 @@ export default function Desktop(){
       })
     }
     window.addEventListener('message', onMessage)
-    return ()=> window.removeEventListener('message', onMessage)
+    return ()=> { window.removeEventListener('message', onMessage); window.removeEventListener('FYOS_TILING' as any, onTiling) }
   }, [])
 
   return (
     <div className="desktop">
       <div className="wallpaper" />
       {/* MenuBar removed */}
+
+      <div ref={overlayRef} className="snap-overlay" aria-hidden style={{display:'none'}}>
+        <div ref={previewRef} className="snap-preview" />
+      </div>
 
       <div className="desktop-icons">
         {apps.slice(0,20).map(a => {
