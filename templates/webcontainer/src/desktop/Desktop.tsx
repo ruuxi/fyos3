@@ -13,6 +13,7 @@ const MINIMIZE_MS = 220
 
 const LS_ICON_POS_KEY = 'desktop.iconPositions'
 const LS_WINDOW_GEOM_KEY = 'desktop.windowGeometries'
+const LS_WINDOW_TABS_KEY = 'desktop.windowTabs'
 
 const EVT_OPEN_APP = 'FYOS_OPEN_APP'
 const EVT_DESKTOP_READY = 'FYOS_DESKTOP_READY'
@@ -80,10 +81,31 @@ function saveWindowGeometries(geoms: Record<string, { left: number; top: number;
   try{ localStorage.setItem(LS_WINDOW_GEOM_KEY, JSON.stringify(geoms)) } catch{}
 }
 
+function loadWindowTabs(): Record<string, WindowTabsState> {
+  try { return JSON.parse(localStorage.getItem(LS_WINDOW_TABS_KEY) || '{}') || {}; } catch { return {}; }
+}
+
+function saveWindowTabs(map: Record<string, WindowTabsState>) {
+  try { localStorage.setItem(LS_WINDOW_TABS_KEY, JSON.stringify(map)); } catch {}
+}
+
 async function loadRegistry(): Promise<App[]>{
   const res = await fetch('/apps/registry.json?_=' + Date.now())
   return res.ok ? res.json() : []
 }
+
+type WindowTab = {
+  id: string;         // unique per tab within a window
+  appId: string | null;
+  title: string;
+  icon?: string;
+  path?: string;
+};
+
+type WindowTabsState = {
+  activeTabId: string;
+  tabs: WindowTab[];
+};
 
 interface App {
   id: string
@@ -106,11 +128,31 @@ interface WindowProps {
   onFocus: () => void
   onMove: (pos: { left: number; top: number }) => void
   onResize: (size: { width: number; height: number }) => void
+  tabs: WindowTab[]
+  activeTabId: string
+  onTabActivate: (tabId: string) => void
+  onTabClose: (tabId: string) => void
+  onNewTab: () => void
+  onOpenAppInTab: (tabId: string, app: App) => void
+  availableApps: App[]
 }
 
 // Top menubar removed
 
-function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }: WindowProps){
+function LauncherGrid({ apps, onPick }: { apps: App[]; onPick: (a: App) => void }) {
+  return (
+    <div className="launcher-grid">
+      {apps.map(a => (
+        <button key={a.id} className="launcher-item" onClick={() => onPick(a)}>
+          <div className="glyph">{a.icon || '📦'}</div>
+          <div className="label">{a.name}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, tabs, activeTabId, onTabActivate, onTabClose, onNewTab, onOpenAppInTab, availableApps }: WindowProps){
   const rootRef = useRef<HTMLDivElement | null>(null)
   const rafIdRef = useRef<number | null>(null)
   const draggingRef = useRef<{
@@ -150,7 +192,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
       if (d.type === 'move'){
         const dx = d.curDx ?? 0
         const dy = d.curDy ?? 0
-        el.style.transform = `translate(${dx}px, ${dy}px)`
+        el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
       } else if (d.type === 'resize'){
         if (typeof d.curLeft === 'number') el.style.left = `${d.curLeft}px`
         if (typeof d.curTop === 'number') el.style.top = `${d.curTop}px`
@@ -166,7 +208,6 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
       const d = draggingRef.current
       if (!d.active || !d.type) return
       e.preventDefault()
-      clearSelectionEverywhere()
       const el = rootRef.current
       if (!el) return
       if (d.type === 'move'){
@@ -268,6 +309,8 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
     try{ document.body.style.userSelect = 'none' } catch {}
     try{ (document.body.style as any).webkitUserSelect = 'none' } catch {}
     try{ document.body.style.cursor = 'grabbing' } catch {}
+    // Avoid costly selection updates during drag; clear once at start
+    clearSelectionEverywhere()
     try { window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'start', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: g } })) } catch {}
   }
 
@@ -296,6 +339,8 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
         const map: Record<string,string> = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' }
         document.body.style.cursor = map[handle] || 'nwse-resize'
       } catch {}
+      // Avoid costly selection updates during drag; clear once at start
+      clearSelectionEverywhere()
       try { window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'start', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: g } })) } catch {}
     }
   }
@@ -305,6 +350,10 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
   if (app.anim === 'minimize') classes.push('minimizing')
   if (app.minimized && !app.anim) classes.push('minimized')
 
+  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
+  const isBlank = !activeTab || !activeTab.appId;
+  const iframeSrc = !isBlank ? `/app.html?path=${encodeURIComponent(activeTab.path||'')}&id=${encodeURIComponent(activeTab.appId||'')}&name=${encodeURIComponent(activeTab.title)}&base=0&ui=1&tw=1` : '';
+
   return (
     <div ref={rootRef} className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex }} onMouseDown={onFocus}>
       <div className="titlebar" onMouseDown={startMove}>
@@ -313,19 +362,38 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize }:
           <div className="b yellow" onClick={onMinimize} title="Minimize" />
           <div className="b green" title="Zoom" />
         </div>
-        <div className="title">{app.name}</div>
+        <div className="title">{activeTab?.title || app.name}</div>
         <div style={{marginLeft:'auto'}} className="badge">{app.id.slice(0,8)}</div>
       </div>
-      <div className="content">
-        <iframe
-          title={app.name}
-          src={`/app.html?path=${encodeURIComponent(app.path)}&id=${encodeURIComponent(app.id)}&name=${encodeURIComponent(app.name)}&base=0&ui=1&tw=1`}
-          style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'transparent' }}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads"
-          onError={(e) => {
-            console.warn('Iframe error for app:', app.name, e);
-          }}
-        />
+      <nav className="tabstrip" role="tablist" aria-label="Tabs" onMouseDown={e=>e.stopPropagation()}>
+        {tabs.map((t) => (
+          <button key={t.id} role="tab" aria-selected={t.id===activeTabId}
+            className={`tab${t.id===activeTabId?' active':''}`}
+            onClick={()=>onTabActivate(t.id)}>
+            <span className="tab-ico">{t.icon||'📦'}</span>
+            <span className="tab-title">{t.title}</span>
+            <span className="tab-close" onClick={(e)=>{ e.stopPropagation(); onTabClose(t.id); }}>×</span>
+          </button>
+        ))}
+        <button className="tab-add" aria-label="New tab" onClick={onNewTab}>+</button>
+        <div className="tab-gradient-left" />
+        <div className="tab-gradient-right" />
+        <div className="tab-insert-marker" aria-hidden />
+      </nav>
+      <div className="content" style={{ top: '64px' }}>
+        {isBlank ? (
+          <LauncherGrid apps={availableApps} onPick={(a) => onOpenAppInTab(activeTab?.id || tabs[0]?.id || '', a)} />
+        ) : (
+          <iframe
+            title={activeTab.title}
+            src={iframeSrc}
+            style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'transparent' }}
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads"
+            onError={(e) => {
+              console.warn('Iframe error for app:', activeTab.title, e);
+            }}
+          />
+        )}
       </div>
       <div className="resize-handle nw" onMouseDown={startResize('nw')} />
       <div className="resize-handle ne" onMouseDown={startResize('ne')} />
@@ -358,6 +426,53 @@ export default function Desktop(){
     } catch {}
   }, [])
   const [open, setOpen] = useState<App[]>([])
+  const [windowTabs, setWindowTabs] = useState<Record<string, WindowTabsState>>({})
+
+  useEffect(() => { setWindowTabs(loadWindowTabs()); }, []);
+
+  const persistWindowTabs = (updater: (prev: Record<string, WindowTabsState>) => Record<string, WindowTabsState>) => {
+    setWindowTabs(prev => { const next = updater(prev); saveWindowTabs(next); return next; });
+  };
+
+  function ensureWindowTabsFor(app: App) {
+    persistWindowTabs(prev => {
+      if (prev[app.id]) return prev;
+      const first: WindowTab = { id: crypto.randomUUID(), appId: app.id, title: app.name, icon: app.icon, path: app.path };
+      return { ...prev, [app.id]: { activeTabId: first.id, tabs: [first] } };
+    });
+  }
+
+  function addTab(windowId: string) {
+    persistWindowTabs(prev => {
+      const curr = prev[windowId] || { activeTabId: '', tabs: [] };
+      const tab: WindowTab = { id: crypto.randomUUID(), appId: null, title: 'New Tab' };
+      return { ...prev, [windowId]: { activeTabId: tab.id, tabs: [...curr.tabs, tab] } };
+    });
+  }
+
+  function closeTab(windowId: string, tabId: string) {
+    persistWindowTabs(prev => {
+      const curr = prev[windowId]; if (!curr) return prev;
+      const idx = curr.tabs.findIndex(t => t.id === tabId); if (idx < 0) return prev;
+      const nextTabs = curr.tabs.filter(t => t.id !== tabId);
+      const nextActive = curr.activeTabId === tabId ? (nextTabs[idx - 1]?.id || nextTabs[0]?.id || '') : curr.activeTabId;
+      return { ...prev, [windowId]: { tabs: nextTabs, activeTabId: nextActive } };
+    });
+  }
+
+  function activateTab(windowId: string, tabId: string) {
+    persistWindowTabs(prev => ({ ...prev, [windowId]: { ...prev[windowId], activeTabId: tabId } }));
+  }
+
+
+  function openAppIntoTab(windowId: string, tabId: string, appLike: App) {
+    persistWindowTabs(prev => {
+      const curr = prev[windowId]; if (!curr) return prev;
+      const list = curr.tabs.map(t => t.id === tabId ? ({ ...t, appId: appLike.id, title: appLike.name, icon: appLike.icon, path: appLike.path }) : t);
+      return { ...prev, [windowId]: { ...curr, tabs: list, activeTabId: tabId } };
+    });
+  }
+
   const snapAltBypassRef = useRef(false)
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const previewRef = useRef<HTMLDivElement | null>(null)
@@ -527,6 +642,8 @@ export default function Desktop(){
       setTimeout(()=>{
         setOpen(p=> p.map(w=> w.id===app.id ? { ...w, anim: undefined } : w))
       }, DURATION)
+      // Seed tabs for new window
+      ensureWindowTabsFor(created)
       return [...prev, created]
     })
   }
@@ -817,18 +934,28 @@ export default function Desktop(){
         })}
       </div>
 
-      {open.map((app, idx) => (
-        <Window
-          key={app.id}
-          app={app}
-          zIndex={100 + idx}
-          onClose={()=>close(app.id)}
-          onMinimize={()=>minimize(app.id)}
-          onFocus={()=>focus(app.id)}
-          onMove={(pos)=>updateWindow(app.id, pos)}
-          onResize={(size)=>updateWindow(app.id, size)}
-        />
-      ))}
+      {open.map((app, idx) => {
+        const tabsState = windowTabs[app.id] || { activeTabId: '', tabs: [] };
+        return (
+          <Window
+            key={app.id}
+            app={app}
+            zIndex={100 + idx}
+            onClose={()=>close(app.id)}
+            onMinimize={()=>minimize(app.id)}
+            onFocus={()=>focus(app.id)}
+            onMove={(pos)=>updateWindow(app.id, pos)}
+            onResize={(size)=>updateWindow(app.id, size)}
+            tabs={tabsState.tabs}
+            activeTabId={tabsState.activeTabId}
+            onTabActivate={(id)=>activateTab(app.id, id)}
+            onTabClose={(id)=>closeTab(app.id, id)}
+            onNewTab={()=>addTab(app.id)}
+            onOpenAppInTab={(tabId, a)=>openAppIntoTab(app.id, tabId, a)}
+            availableApps={apps}
+          />
+        );
+      })}
     </div>
   )
 }
