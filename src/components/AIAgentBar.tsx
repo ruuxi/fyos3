@@ -19,7 +19,6 @@ export default function AIAgentBar() {
   const [desktopsListing, setDesktopsListing] = useState<Array<{ _id: string; title: string; description?: string; icon?: string }>>([]);
   const [desktopsLoading, setDesktopsLoading] = useState(false);
   const [desktopsError, setDesktopsError] = useState<string | null>(null);
-  const [personaActive, setPersonaActive] = useState(false);
   const [didAnimateWelcome, setDidAnimateWelcome] = useState(false);
   const [bubbleAnimatingIds, setBubbleAnimatingIds] = useState<Set<string>>(new Set());
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
@@ -127,16 +126,7 @@ export default function AIAgentBar() {
   const isClosing = !isOpen && prevOpenRef.current;
   useEffect(() => { prevOpenRef.current = isOpen; }, [isOpen]);
   const forceFollowRef = useRef(false);
-  const [suppressBubbleAnimation, setSuppressBubbleAnimation] = useState(false);
 
-  // Suppress bubble animations while panel is opening/closing to avoid re-pop animations
-  useEffect(() => {
-    if (!(isOpening || isClosing)) return;
-    setSuppressBubbleAnimation(true);
-    const duration = isOpening ? 340 : isClosing ? 220 : 300;
-    const t = setTimeout(() => setSuppressBubbleAnimation(false), duration + 60);
-    return () => clearTimeout(t);
-  }, [isOpening, isClosing]);
 
   function isUserNearBottom(el: HTMLElement, threshold = 48): boolean {
     return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
@@ -210,7 +200,7 @@ export default function AIAgentBar() {
 
     const updateHeight = () => {
       const contentHeight = content.scrollHeight;
-      const viewportCap = typeof window !== 'undefined' ? Math.round(window.innerHeight * (personaActive ? 0.72 : 0.6)) : (personaActive ? 720 : MAX_CONTAINER_HEIGHT);
+      const viewportCap = typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.6) : MAX_CONTAINER_HEIGHT;
       const next = Math.min(viewportCap, Math.max(MIN_CONTAINER_HEIGHT, contentHeight));
       setContainerHeight(next);
     };
@@ -227,7 +217,7 @@ export default function AIAgentBar() {
       ro.disconnect();
       window.removeEventListener('resize', onResize);
     };
-  }, [personaActive]);
+  });
 
   // Cleanup scroll animation on unmount
   useEffect(() => () => cancelScrollAnimation(), []);
@@ -514,11 +504,11 @@ export default function AIAgentBar() {
                   { id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` }
                 ], null, 2));
               }
-              // Notify desktop to open the newly created app immediately
+              // Notify desktop to open the newly created app after a short delay
               try {
                 const appIndexPath = `/${base}/index.tsx`;
                 if (typeof window !== 'undefined') {
-                  window.postMessage({ type: 'FYOS_OPEN_APP', app: { id: finalId, name: finalName, icon: metadata.icon, path: appIndexPath } }, '*');
+                  window.postMessage({ type: 'FYOS_OPEN_APP', delayMs: 2000, app: { id: finalId, name: finalName, icon: metadata.icon, path: appIndexPath } }, '*');
                 }
               } catch {}
               console.log(`✅ [Agent] App created: ${finalName} (${finalId})`);
@@ -586,17 +576,6 @@ export default function AIAgentBar() {
     },
   });
 
-  // Persona stream: separate chat hooked to persona endpoint, only user messages considered on server
-  const {
-    messages: personaMessages,
-    sendMessage: sendPersonaMessage,
-    status: personaStatus,
-    stop: stopPersona,
-  } = useChat({
-    id: 'persona-chat',
-    transport: new DefaultChatTransport({ api: '/api/agent?persona=1' }),
-  });
-  const hasConversation = personaMessages.length > 0;
 
   // Recompute container height when returning to chat or when conversation state changes
   useEffect(() => {
@@ -604,15 +583,14 @@ export default function AIAgentBar() {
     const content = messagesInnerRef.current;
     if (!content) return;
     const contentHeight = content.scrollHeight;
-    const viewportCap = typeof window !== 'undefined' ? Math.round(window.innerHeight * (hasConversation ? 0.72 : 0.6)) : (hasConversation ? 720 : MAX_CONTAINER_HEIGHT);
+    const viewportCap = typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.6) : MAX_CONTAINER_HEIGHT;
     const next = Math.min(viewportCap, Math.max(MIN_CONTAINER_HEIGHT, contentHeight));
     setContainerHeight(next);
-  }, [hasConversation, mode]);
-  useEffect(() => { setPersonaActive(personaMessages.length > 0); }, [personaMessages.length]);
+  }, [messages.length, mode]);
 
   // Add pop animation to newly added bubbles (both user and assistant)
   useEffect(() => {
-    const currentIds = new Set(personaMessages.map(m => m.id));
+    const currentIds = new Set(messages.map(m => m.id));
     const unseen: string[] = [];
     for (const id of currentIds) {
       if (!seenMessageIdsRef.current.has(id)) unseen.push(id);
@@ -638,7 +616,7 @@ export default function AIAgentBar() {
     }, 450);
 
     return () => clearTimeout(timeout);
-  }, [personaMessages]);
+  }, [messages]);
 
   // Host-side fetchers for listings (driven by mode)
 
@@ -688,7 +666,7 @@ export default function AIAgentBar() {
     prevScrollHeightRef.current = el.scrollHeight;
     // Reset forced follow after handling
     forceFollowRef.current = false;
-  }, [personaMessages.length, containerHeight]);
+  }, [messages.length, containerHeight]);
 
   // Keyboard shortcuts: Cmd/Ctrl+K to open chat, Esc to close overlay
   useEffect(() => {
@@ -913,22 +891,7 @@ export default function AIAgentBar() {
     if (!input.trim()) return;
     forceFollowRef.current = true;
     const userText = input;
-    // 1) Always send to persona immediately (non-blocking)
-    void sendPersonaMessage({ text: userText });
-    // 2) Classify in background, and only send to tools agent if label == create
-    try {
-      const res = await fetch('/api/agent?classify=1', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [{ id: String(Date.now()), role: 'user', content: userText }] }),
-      });
-      const j = await res.json();
-      if ((j?.label || 'chat') === 'create') {
-        void sendMessage({ text: userText });
-      }
-    } catch {
-      // On any error, default to chat (do not trigger tools)
-    }
+    void sendMessage({ text: userText });
     setInput('');
   };
 
@@ -1007,16 +970,16 @@ export default function AIAgentBar() {
                       placeholder="Ask the AI agent… Try: 'Create a Notes app, Change my background!'"
                       className="pl-24 pr-12 h-10 min-h-0 py-2 resize-none rounded-none bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none text-white placeholder:text-white/60 caret-sky-300 text-base leading-6"
                       rows={1}
-                      disabled={status === 'submitted' || status === 'streaming' || personaStatus === 'submitted' || personaStatus === 'streaming'}
+                      disabled={status === 'submitted' || status === 'streaming'}
                     />
                   </div>
 
                   {/* Right cluster */}
                   <div className="flex items-center gap-2">
-                    {(status === 'submitted' || status === 'streaming' || personaStatus === 'submitted' || personaStatus === 'streaming') && (
-                      <Button type="button" onClick={() => { stop(); stopPersona(); }} variant="ghost" size="sm" className="h-10 rounded-none">Stop</Button>
+                    {(status === 'submitted' || status === 'streaming') && (
+                      <Button type="button" onClick={() => { stop(); }} variant="ghost" size="sm" className="h-10 rounded-none">Stop</Button>
                     )}
-                    <Button type="submit" disabled={!input.trim() || !(status === 'ready' && personaStatus === 'ready')} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
+                    <Button type="submit" disabled={!input.trim() || status !== 'ready'} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
                       <Send className="w-4 h-4" />
                     </Button>
                   </div>
@@ -1029,7 +992,7 @@ export default function AIAgentBar() {
               className={`grid origin-bottom will-change-[transform] transition-[grid-template-rows,transform] ${isOpening ? 'duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)]' : isClosing ? 'duration-[220ms] ease-[cubic-bezier(0.4,0,1,1)]' : 'duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'} ${isOpen ? 'grid-rows-[1fr] translate-y-0 scale-100' : 'grid-rows-[0fr] translate-y-1 scale-[0.995]'} motion-reduce:transition-none`}
               aria-hidden={!isOpen}
             >
-              <div className="overflow-hidden" style={{ maxHeight: personaActive ? '80vh' : '70vh' }}>
+              <div className="overflow-hidden" style={{ maxHeight: '70vh' }}>
                 <div className="bg-transparent text-white">
 
                 {mode === 'chat' && (
@@ -1040,7 +1003,6 @@ export default function AIAgentBar() {
                           alert={previewAlert}
                           onAsk={(msg) => {
                             void sendMessage({ text: msg });
-                            void sendPersonaMessage({ text: msg });
                             setPreviewAlert(null);
                           }}
                           onDismiss={() => setPreviewAlert(null)}
@@ -1053,7 +1015,7 @@ export default function AIAgentBar() {
                       className="overflow-auto pt-2 pb-1 modern-scrollbar pr-3"
                       style={{
                         height: containerHeight > 0 ? `${containerHeight}px` : undefined,
-                        maxHeight: personaActive ? '72vh' : '60vh',
+                        maxHeight: '60vh',
                         transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
                         willChange: 'height',
                         scrollBehavior: 'auto',
@@ -1064,19 +1026,19 @@ export default function AIAgentBar() {
                       <div ref={messagesInnerRef} className="space-y-3 px-1">
                         <div className="text-sm flex justify-start" aria-label="Welcome message">
                           <div className="max-w-full flex-1">
-                            <div className="text-xs mb-1 text-white/60 pl-1">Sim</div>
+                            <div className="text-xs mb-1 text-white/60 pl-1">AI Agent</div>
                             <div className={`inline-block max-w-[80%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words bg-white/10 border border-white/15 text-white ${!didAnimateWelcome ? 'ios-pop' : ''}`}>
-                              {"Hey. I'm Sim. Tell me what you want, I'll make it happen."}
+                              {"Hello! I'm your AI assistant. I can help you create apps, modify files, and manage your WebContainer workspace."}
                             </div>
                           </div>
                         </div>
-                        {personaMessages.map(m => (
+                        {messages.map(m => (
                           <div key={m.id} className={`text-sm flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                             <div className={`${m.role === 'user' ? 'flex flex-col items-end max-w-[80%]' : 'max-w-full flex-1'}`}>
                               <div className={`text-xs mb-1 ${m.role === 'user' ? 'text-white/60 pr-1' : 'text-white/60 pl-1'}`}>
-                                {m.role === 'user' ? 'You' : 'Sim'}
+                                {m.role === 'user' ? 'You' : 'AI Agent'}
                               </div>
-                              <div className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${m.role === 'user' ? 'bg-sky-500 text-white max-w-full' : 'inline-block max-w-[80%] bg-white/10 border border-white/15 text-white'} ${!suppressBubbleAnimation && bubbleAnimatingIds.has(m.id) ? 'ios-pop' : ''}`}>
+                              <div className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${m.role === 'user' ? 'bg-sky-500 text-white max-w-full' : 'inline-block max-w-[80%] bg-white/10 border border-white/15 text-white'} ${bubbleAnimatingIds.has(m.id) ? 'ios-pop' : ''}`}>
                                 {m.parts.map((part, index) => {
                                   switch (part.type) {
                                     case 'text':
@@ -1189,17 +1151,17 @@ export default function AIAgentBar() {
                           <div className="mt-2">
                             {m.contentType.startsWith('image/') && (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={m.publicUrl || `/api/media/${m._id}`} alt={m.r2Key} className="w-full h-auto" />
+                              <img src={`/api/media/${m._id}`} alt={m.r2Key} className="w-full h-auto" />
                             )}
                             {m.contentType.startsWith('audio/') && (
-                              <audio controls src={m.publicUrl || `/api/media/${m._id}`} className="w-full" />
+                              <audio controls src={`/api/media/${m._id}`} className="w-full" />
                             )}
                             {m.contentType.startsWith('video/') && (
-                              <video controls src={m.publicUrl || `/api/media/${m._id}`} className="w-full" />
+                              <video controls src={`/api/media/${m._id}`} className="w-full" />
                             )}
                           </div>
                           <div className="mt-2 flex items-center gap-2">
-                            <a href={m.publicUrl || `/api/media/${m._id}`} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 border rounded-none">Open</a>
+                            <a href={`/api/media/${m._id}`} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 border rounded-none">Open</a>
                             <div className="text-xs text-white/70 truncate" title={m.r2Key}>{m.r2Key}</div>
                           </div>
                         </div>

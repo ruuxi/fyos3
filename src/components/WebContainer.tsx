@@ -6,6 +6,7 @@ import { WebContainer as WebContainerAPI } from '@webcontainer/api';
 import { useWebContainer } from './WebContainerProvider';
 import BootScreen from './BootScreen';
 import { hasPersistedVfs, restoreFromPersistence, persistNow } from '@/utils/vfs-persistence';
+import { persistAssetsFromAIResult } from '@/utils/ai-media';
 
 export default function WebContainer() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -277,7 +278,6 @@ export default function Document() {
                 if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
                 const raw = await res.json();
                 try {
-                  const { persistAssetsFromAIResult } = await import('@/utils/ai-media');
                   const { result: updated, persistedAssets } = await persistAssetsFromAIResult(raw, scope);
                   reply({ type: 'AI_RESPONSE', id, ok: true, result: updated, persistedAssets });
                 } catch {
@@ -288,7 +288,6 @@ export default function Document() {
                 if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
                 const raw = await res.json();
                 try {
-                  const { persistAssetsFromAIResult } = await import('@/utils/ai-media');
                   const { result: updated, persistedAssets } = await persistAssetsFromAIResult(raw, scope);
                   reply({ type: 'AI_RESPONSE', id, ok: true, result: updated, persistedAssets });
                 } catch {
@@ -297,6 +296,31 @@ export default function Document() {
               }
             } catch (e: any) {
               reply({ type: 'AI_RESPONSE', id, ok: false, error: e?.message || 'Request failed' });
+            }
+            return;
+          }
+
+          // Media ingest bridge: apps can request host to ingest base64 or sourceUrl to R2
+          if (event.data && event.data.type === 'MEDIA_INGEST') {
+            const { id, payload, scope } = event.data as any;
+            const srcWin = (event.source as Window | null);
+            const reply = (resp: any) => { try { srcWin?.postMessage(resp, event.origin); } catch {} };
+            try {
+              const body = { ...(payload || {}), scope };
+              const res = await fetch('/api/media/ingest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+              });
+              if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: false, error: text || `HTTP ${res.status}` });
+                return;
+              }
+              const json = await res.json();
+              reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: true, result: json });
+            } catch (e: any) {
+              reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: false, error: e?.message || 'Ingest failed' });
             }
             return;
           }
@@ -328,7 +352,12 @@ export default function Document() {
             if (target && pendingOpenAppsRef.current.length > 0) {
               try {
                 pendingOpenAppsRef.current.forEach(payload => {
-                  try { target.postMessage(payload, '*'); } catch {}
+                  try {
+                    const delay = Number((payload as any)?.delayMs) || 2000;
+                    window.setTimeout(() => {
+                      try { target.postMessage(payload, '*'); } catch {}
+                    }, delay);
+                  } catch {}
                 });
                 pendingOpenAppsRef.current = [];
               } catch {}
@@ -342,13 +371,20 @@ export default function Document() {
             const payload = event.data;
             if (!desktopReadyRef.current) {
               try {
+                const delay = Number((payload as any)?.delayMs) || 2000;
+                (payload as any).delayMs = delay;
                 const idx = pendingOpenAppsRef.current.findIndex(p => p?.app?.id === payload?.app?.id);
                 if (idx === -1) pendingOpenAppsRef.current.push(payload);
               } catch { pendingOpenAppsRef.current.push(payload); }
             } else {
               const target = iframeRef.current?.contentWindow;
               if (target) {
-                try { target.postMessage(payload, '*'); } catch {}
+                const delay = Number((payload as any)?.delayMs) || 2000;
+                try {
+                  window.setTimeout(() => {
+                    try { target.postMessage(payload, '*'); } catch {}
+                  }, delay);
+                } catch {}
               }
             }
             return;

@@ -287,6 +287,7 @@ You are a proactive engineering agent operating inside a **WebContainer-powered 
 - Create apps and manage project structure
 - Run package installs and commands
 - **Never run dev, build, or start server commands**
+- Keep commentary to a minimum, it's not necessary.
 
 ## Project Structure
 - **Vite React App**: Source in \`src/\`, public assets in \`public/\`
@@ -358,6 +359,51 @@ await composeMusic({
   prompt: "intense electronic track", 
   musicLengthMs: 60000 
 });
+\`\`\`
+
+### Uploading Inputs (R2) for FAL Models Requiring URLs
+Most FAL endpoints require a publicly accessible URL. Before calling them, upload local files to R2 and use the returned URL.
+
+\`\`\`typescript
+import { uploadFileToPublicUrl, ensurePublicUrl, callFal } from "/src/ai";
+
+// 1) Turn a File into a public URL in our R2 bucket
+const imageUrl = await uploadFileToPublicUrl(file);
+// 2) Use that URL with the target model
+await callFal("fal-ai/bytedance/seedance/v1/lite/image-to-video", { image_url: imageUrl });
+
+// Helper that accepts either a File or string URL
+const videoUrl = await ensurePublicUrl(maybeFileOrUrl);
+await callFal("fal-ai/wan/v2.2-a14b/video-to-video", { video_url: videoUrl, prompt: "anime style" });
+\`\`\`
+
+R2 public base: \`https://pub-d7b49ac5f9d84e3aba3879015a55f5b3.r2.dev\` (configured via \`NEXT_PUBLIC_R2_PUBLIC_BASE\`). Outputs from FAL are auto‑ingested and rewritten to durable FYOS URLs.
+
+### Common FAL Flows (Wrappers Available)
+Use convenience wrappers from \`/src/ai\` or call \`callFal(model, input)\` directly.
+
+\`\`\`typescript
+import {
+  imageToVideo, referenceToVideo, imageToImage, imageEdit,
+  textToVideo, videoToVideo, audioToVideoAvatar, textToSpeechMultilingual,
+  speechToSpeech, soundEffects, videoToAudio, videoFoley,
+  imageTo3D, multiviewTo3D,
+} from "/src/ai";
+
+await textToVideo("a neon city timelapse");
+await imageToVideo(fileOrUrl);
+await referenceToVideo(fileOrUrl, { prompt: "walking on a beach" });
+await imageTo3D(fileOrUrl);
+await multiviewTo3D([file1, file2]);
+await imageToImage(fileOrUrl, "watercolor style");
+await imageEdit(fileOrUrl, "remove background");
+await videoToVideo(fileOrUrl, { prompt: "anime style" });
+await audioToVideoAvatar("Noemie car (UGC)", audioFileOrUrl);
+await textToSpeechMultilingual("Hello", { language: "en" });
+await speechToSpeech(audioFileOrUrl);
+await soundEffects("sci-fi door open");
+await videoToAudio(videoFileOrUrl);
+await videoFoley(videoFileOrUrl);
 \`\`\`
 
 **Note:** These route through message bridge and server proxies (/api/ai/fal, /api/ai/eleven); API keys stay secure on the server.

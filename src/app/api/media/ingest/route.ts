@@ -17,10 +17,13 @@ type IngestBody = {
 const ALLOWED_PREFIXES = [
   'https://fal.run/',
   'https://fal.media/',
+  'https://v3.fal.media/',
   'https://cdn.fal.ai/',
   'https://api.elevenlabs.io/',
   'https://storage.googleapis.com/',
   'https://pub-cdn-1.elevenlabs.io/',
+  // FYOS R2 public bucket base
+  'https://pub-d7b49ac5f9d84e3aba3879015a55f5b3.r2.dev/',
 ];
 
 function isAllowedUrl(url: string): boolean {
@@ -53,10 +56,18 @@ function sniffContentType(bytes: Uint8Array, fallback?: string): string {
 }
 
 function getPublicUrlFromEnv(r2Key: string): string | undefined {
-  const base = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE || process.env.R2_PUBLIC_HOST;
-  if (!base) return undefined;
-  const trimmed = base.endsWith('/') ? base.slice(0, -1) : base;
-  return `${trimmed}/${r2Key}`;
+  // Prefer the public r2.dev host. Fallbacks avoid cloudflarestorage.com which usually requires signed requests.
+  const preferred = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE || 'https://pub-d7b49ac5f9d84e3aba3879015a55f5b3.r2.dev';
+  if (preferred) {
+    const trimmed = preferred.endsWith('/') ? preferred.slice(0, -1) : preferred;
+    return `${trimmed}/${r2Key}`;
+  }
+  const alt = process.env.R2_PUBLIC_HOST;
+  if (alt && /r2\.dev/.test(alt)) {
+    const trimmed = alt.endsWith('/') ? alt.slice(0, -1) : alt;
+    return `${trimmed}/${r2Key}`;
+  }
+  return undefined;
 }
 
 async function getConvexClient() {
