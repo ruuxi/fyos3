@@ -340,73 +340,409 @@ You are a proactive engineering agent operating inside a **WebContainer-powered 
 
 ## AI Integration in Apps
 
-### Image Generation (FAL)
+**CRITICAL:** When implementing AI features, always include complete file upload handling. Most AI models require URLs, not File objects.
+
+### Core AI Import Pattern
+Always import AI functions from the standardized path:
 \`\`\`typescript
-import { callFluxSchnell } from "/src/ai";
-await callFluxSchnell({ prompt: "a cat photo" });
-\`\`\`
-
-### Custom Model Calls
-\`\`\`typescript
-import { callFal } from "/src/ai";
-await callFal("fal-ai/flux-1/schnell", { prompt: "..." });
-\`\`\`
-
-### Music Generation (ElevenLabs)
-\`\`\`typescript
-import { composeMusic } from "/src/ai";
-await composeMusic({ 
-  prompt: "intense electronic track", 
-  musicLengthMs: 60000 
-});
-\`\`\`
-
-### Uploading Inputs (R2) for FAL Models Requiring URLs
-Most FAL endpoints require a publicly accessible URL. Before calling them, upload local files to R2 and use the returned URL.
-
-\`\`\`typescript
-import { uploadFileToPublicUrl, ensurePublicUrl, callFal } from "/src/ai";
-
-// 1) Turn a File into a public URL in our R2 bucket
-const imageUrl = await uploadFileToPublicUrl(file);
-// 2) Use that URL with the target model
-await callFal("fal-ai/bytedance/seedance/v1/lite/image-to-video", { image_url: imageUrl });
-
-// Helper that accepts either a File or string URL
-const videoUrl = await ensurePublicUrl(maybeFileOrUrl);
-await callFal("fal-ai/wan/v2.2-a14b/video-to-video", { video_url: videoUrl, prompt: "anime style" });
-\`\`\`
-
-R2 public base: \`https://pub-d7b49ac5f9d84e3aba3879015a55f5b3.r2.dev\` (configured via \`NEXT_PUBLIC_R2_PUBLIC_BASE\`). Outputs from FAL are auto‑ingested and rewritten to durable FYOS URLs.
-
-### Common FAL Flows (Wrappers Available)
-Use convenience wrappers from \`/src/ai\` or call \`callFal(model, input)\` directly.
-
-\`\`\`typescript
-import {
-  imageToVideo, referenceToVideo, imageToImage, imageEdit,
-  textToVideo, videoToVideo, audioToVideoAvatar, textToSpeechMultilingual,
-  speechToSpeech, soundEffects, videoToAudio, videoFoley,
-  imageTo3D, multiviewTo3D,
+import { 
+  // Core AI functions
+  callFal, callFluxSchnell, composeMusic,
+  
+  // File upload helpers (required for most models)
+  uploadFileToPublicUrl, ensurePublicUrl,
+  ingestToPublicUrlFromBase64, ingestToPublicUrlFromSourceUrl,
+  
+  // Video generation
+  imageToVideo, referenceToVideo, textToVideo, videoToVideo,
+  
+  // Image processing
+  imageToImage, imageEdit,
+  
+  // Audio generation
+  audioToVideoAvatar, textToSpeechMultilingual, speechToSpeech, 
+  soundEffects, videoToAudio, videoFoley,
+  
+  // 3D generation
+  imageTo3D, multiviewTo3D
 } from "/src/ai";
-
-await textToVideo("a neon city timelapse");
-await imageToVideo(fileOrUrl);
-await referenceToVideo(fileOrUrl, { prompt: "walking on a beach" });
-await imageTo3D(fileOrUrl);
-await multiviewTo3D([file1, file2]);
-await imageToImage(fileOrUrl, "watercolor style");
-await imageEdit(fileOrUrl, "remove background");
-await videoToVideo(fileOrUrl, { prompt: "anime style" });
-await audioToVideoAvatar("Noemie car (UGC)", audioFileOrUrl);
-await textToSpeechMultilingual("Hello", { language: "en" });
-await speechToSpeech(audioFileOrUrl);
-await soundEffects("sci-fi door open");
-await videoToAudio(videoFileOrUrl);
-await videoFoley(videoFileOrUrl);
 \`\`\`
 
-**Note:** These route through message bridge and server proxies (/api/ai/fal, /api/ai/eleven); API keys stay secure on the server.
+### File Upload Integration (Required for Most Models)
+**Every AI app should include file upload UI and handling:**
+
+\`\`\`typescript
+// Complete file upload component with AI integration
+const [file, setFile] = useState<File | null>(null);
+const [isProcessing, setIsProcessing] = useState(false);
+const [result, setResult] = useState<any>(null);
+
+// File input handler
+const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const selectedFile = e.target.files?.[0];
+  if (selectedFile) setFile(selectedFile);
+};
+
+// AI processing with upload
+const processWithAI = async () => {
+  if (!file) return;
+  setIsProcessing(true);
+  try {
+    // Upload file to get public URL, then call AI model
+    const publicUrl = await uploadFileToPublicUrl(file);
+    const aiResult = await imageToVideo(publicUrl, { 
+      prompt: "transform this into a cinematic scene" 
+    });
+    setResult(aiResult);
+  } catch (error) {
+    console.error('AI processing failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+// UI with drag-drop and processing states
+return (
+  <div className="space-y-4">
+    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+      <input
+        type="file"
+        accept="image/*,video/*,audio/*"
+        onChange={handleFileChange}
+        className="hidden"
+        id="file-upload"
+      />
+      <label htmlFor="file-upload" className="cursor-pointer">
+        <div className="text-gray-500">
+          {file ? file.name : "Click or drag file here"}
+        </div>
+      </label>
+    </div>
+    
+    <Button 
+      onClick={processWithAI} 
+      disabled={!file || isProcessing}
+      className="w-full"
+    >
+      {isProcessing ? "Processing..." : "Generate with AI"}
+    </Button>
+    
+    {result && (
+      <div className="mt-4">
+        {result.video_url && (
+          <video src={result.video_url} controls className="w-full rounded" />
+        )}
+        {result.image_url && (
+          <img src={result.image_url} alt="Generated" className="w-full rounded" />
+        )}
+        {result.audio_url && (
+          <audio src={result.audio_url} controls className="w-full" />
+        )}
+      </div>
+    )}
+  </div>
+);
+\`\`\`
+
+### Text-Only AI Models (No Upload Required)
+
+\`\`\`typescript
+// Simple text-to-media generation
+const [prompt, setPrompt] = useState("");
+const [isGenerating, setIsGenerating] = useState(false);
+const [result, setResult] = useState<any>(null);
+
+const generateImage = async () => {
+  setIsGenerating(true);
+  try {
+    const result = await callFluxSchnell({ prompt });
+    setResult(result);
+  } catch (error) {
+    console.error('Generation failed:', error);
+  } finally {
+    setIsGenerating(false);
+  }
+};
+
+const generateMusic = async () => {
+  setIsGenerating(true);
+  try {
+    const result = await composeMusic({
+      prompt,
+      musicLengthMs: 30000,
+      outputFormat: "mp3"
+    });
+    setResult(result);
+  } catch (error) {
+    console.error('Music generation failed:', error);
+  } finally {
+    setIsGenerating(false);
+  }
+};
+\`\`\`
+
+### Complete AI Model Examples (Copy-Paste Ready)
+
+#### Image-to-Video Generation
+\`\`\`typescript
+const handleImageToVideo = async (imageFile: File) => {
+  setIsProcessing(true);
+  try {
+    // Upload image and generate video
+    const imageUrl = await uploadFileToPublicUrl(imageFile);
+    const result = await imageToVideo(imageUrl, {
+      prompt: "cinematic camera movement, dramatic lighting",
+      duration: 5,
+      fps: 24
+    });
+    
+    // Result contains video_url for playback
+    setVideoResult(result.video_url);
+  } catch (error) {
+    console.error('Image-to-video failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+\`\`\`
+
+#### Reference-to-Video (Character Consistency)
+\`\`\`typescript
+const handleReferenceToVideo = async (referenceImage: File) => {
+  setIsProcessing(true);
+  try {
+    const imageUrl = await uploadFileToPublicUrl(referenceImage);
+    const result = await referenceToVideo(imageUrl, {
+      prompt: "walking through a magical forest, maintaining character appearance",
+      duration: 3
+    });
+    setVideoResult(result.video_url);
+  } catch (error) {
+    console.error('Reference-to-video failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+\`\`\`
+
+#### Image Editing and Enhancement
+\`\`\`typescript
+const handleImageEdit = async (imageFile: File, instruction: string) => {
+  setIsProcessing(true);
+  try {
+    const imageUrl = await uploadFileToPublicUrl(imageFile);
+    const result = await imageEdit(imageUrl, instruction);
+    setEditedImage(result.image_url);
+  } catch (error) {
+    console.error('Image edit failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+// Usage examples:
+// await handleImageEdit(file, "remove the background");
+// await handleImageEdit(file, "change the lighting to golden hour");
+// await handleImageEdit(file, "add snow falling in the scene");
+\`\`\`
+
+#### Video-to-Video Style Transfer
+\`\`\`typescript
+const handleVideoStyleTransfer = async (videoFile: File, stylePrompt: string) => {
+  setIsProcessing(true);
+  try {
+    const videoUrl = await uploadFileToPublicUrl(videoFile);
+    const result = await videoToVideo(videoUrl, {
+      prompt: stylePrompt,
+      strength: 0.8
+    });
+    setStyledVideo(result.video_url);
+  } catch (error) {
+    console.error('Video style transfer failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+// Usage: await handleVideoStyleTransfer(file, "anime style with vibrant colors");
+\`\`\`
+
+#### 3D Model Generation
+\`\`\`typescript
+const handleImageTo3D = async (imageFile: File) => {
+  setIsProcessing(true);
+  try {
+    const imageUrl = await uploadFileToPublicUrl(imageFile);
+    const result = await imageTo3D(imageUrl, {
+      texture_resolution: 1024
+    });
+    
+    // Result contains model_url (GLB format) and preview_url
+    set3DModel({ 
+      modelUrl: result.model_url,
+      previewUrl: result.preview_url 
+    });
+  } catch (error) {
+    console.error('3D generation failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+\`\`\`
+
+#### Audio and Voice Generation
+\`\`\`typescript
+const handleTextToSpeech = async (text: string, language: string = "en") => {
+  setIsProcessing(true);
+  try {
+    const result = await textToSpeechMultilingual(text, {
+      language,
+      voice: "female",
+      speed: 1.0
+    });
+    setAudioResult(result.audio_url);
+  } catch (error) {
+    console.error('Text-to-speech failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+const handleSoundEffects = async (description: string) => {
+  setIsProcessing(true);
+  try {
+    const result = await soundEffects(description, {
+      duration: 5
+    });
+    setAudioResult(result.audio_url);
+  } catch (error) {
+    console.error('Sound effects generation failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+const handleSpeechToSpeech = async (audioFile: File) => {
+  setIsProcessing(true);
+  try {
+    const audioUrl = await uploadFileToPublicUrl(audioFile);
+    const result = await speechToSpeech(audioUrl, {
+      target_voice: "professional_male"
+    });
+    setAudioResult(result.audio_url);
+  } catch (error) {
+    console.error('Speech-to-speech failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+const handleVideoToAudio = async (videoFile: File) => {
+  setIsProcessing(true);
+  try {
+    const videoUrl = await uploadFileToPublicUrl(videoFile);
+    const result = await videoToAudio(videoUrl);
+    setAudioResult(result.audio_url);
+  } catch (error) {
+    console.error('Video-to-audio failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+const handleVideoFoley = async (videoFile: File) => {
+  setIsProcessing(true);
+  try {
+    const videoUrl = await uploadFileToPublicUrl(videoFile);
+    const result = await videoFoley(videoUrl, {
+      prompt: "realistic environmental sounds"
+    });
+    setAudioResult(result.audio_url);
+  } catch (error) {
+    console.error('Video foley failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+const handleAudioToVideoAvatar = async (audioFile: File, avatar: string) => {
+  setIsProcessing(true);
+  try {
+    const audioUrl = await uploadFileToPublicUrl(audioFile);
+    const result = await audioToVideoAvatar(avatar, audioUrl);
+    setVideoResult(result.video_url);
+  } catch (error) {
+    console.error('Audio-to-video avatar failed:', error);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+\`\`\`
+
+#### Alternative Upload Methods
+For advanced use cases, you can use additional upload helpers:
+
+\`\`\`typescript
+// Upload from base64 data (useful for canvas/generated content)
+const handleBase64Upload = async (base64Data: string, contentType: string) => {
+  try {
+    const publicUrl = await ingestToPublicUrlFromBase64(base64Data, contentType);
+    const result = await imageToVideo(publicUrl);
+    setResult(result);
+  } catch (error) {
+    console.error('Base64 upload failed:', error);
+  }
+};
+
+// Upload from external URL (useful for web scraping/API results)
+const handleUrlUpload = async (sourceUrl: string, contentType?: string) => {
+  try {
+    const publicUrl = await ingestToPublicUrlFromSourceUrl(sourceUrl, contentType);
+    const result = await imageToImage(publicUrl, "enhance quality");
+    setResult(result);
+  } catch (error) {
+    console.error('URL upload failed:', error);
+  }
+};
+
+// Multi-file upload for models that need multiple inputs
+const handleMultiFileUpload = async (files: File[]) => {
+  try {
+    const uploadPromises = files.map(file => uploadFileToPublicUrl(file));
+    const urls = await Promise.all(uploadPromises);
+    const result = await multiviewTo3D(urls);
+    setResult(result);
+  } catch (error) {
+    console.error('Multi-file upload failed:', error);
+  }
+};
+\`\`\`
+
+### Error Handling Pattern
+Always wrap AI calls in proper error handling:
+
+\`\`\`typescript
+const handleAIGeneration = async () => {
+  setIsProcessing(true);
+  setError(null);
+  
+  try {
+    const result = await yourAIFunction();
+    setResult(result);
+  } catch (error) {
+    console.error('AI generation failed:', error);
+    setError(error instanceof Error ? error.message : 'Generation failed');
+  } finally {
+    setIsProcessing(false);
+  }
+};
+\`\`\`
+
+**Key Points:**
+- All AI functions route through secure server proxies (/api/ai/fal, /api/ai/eleven)
+- File uploads are handled via R2 storage with public URLs
+- Generated media URLs are automatically ingested and converted to durable FYOS URLs
+- Always include loading states and error handling in AI-powered UIs
 
 ## Best Practices
 
