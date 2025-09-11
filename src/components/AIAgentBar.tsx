@@ -4,16 +4,19 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Send, Search, Store, Monitor, Image as ImageIcon, Home } from 'lucide-react';
+import { Send, Search, Store, Monitor, Image as ImageIcon, Home, Paperclip, X } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
 import { useScreens } from './ScreensProvider';
+import { persistAssetsFromAIResult } from '@/utils/ai-media';
+import { autoIngestInputs } from '@/utils/auto-ingest';
 // Persistence is handled by WebContainer visibility/unload hooks
 
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'compact' | 'chat' | 'visit' | 'media'>('chat');
+  const [attachments, setAttachments] = useState<Array<{ name: string; publicUrl: string; contentType: string }>>([]);
   const { goTo, activeIndex } = useScreens();
   const [desktopsListing, setDesktopsListing] = useState<Array<{ _id: string; title: string; description?: string; icon?: string }>>([]);
   const [desktopsLoading, setDesktopsLoading] = useState(false);
@@ -555,6 +558,135 @@ export default function AIAgentBar() {
               addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true, scope, files } });
               break;
             }
+            case 'ai_fal': {
+              const { model, input, scope } = tc.input as { model: string; input: Record<string, any>; scope?: { desktopId?: string; appId?: string; appName?: string } };
+              console.log(`🔧 [Agent] ai_fal: model=${model}`);
+              try {
+                // Auto-ingest any external URLs or base64 data in the input
+                const { processedInput, ingestedCount } = await autoIngestInputs(input, scope);
+                if (ingestedCount > 0) {
+                  console.log(`🔄 [Agent] ai_fal: auto-ingested ${ingestedCount} media items`);
+                }
+                
+                const res = await fetch('/api/ai/fal', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ model, input: processedInput }),
+                });
+                if (!res.ok) {
+                  throw new Error(`FAL API error: ${res.status} ${res.statusText}`);
+                }
+                const json = await res.json();
+                const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, scope);
+                addToolResult({
+                  tool: 'ai_fal',
+                  toolCallId: tc.toolCallId,
+                  output: { ok: true, result: updated, persistedAssets, autoIngestedCount: ingestedCount },
+                });
+              } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : String(err);
+                addToolResult({ tool: 'ai_fal', toolCallId: tc.toolCallId, output: { error: message } });
+              }
+              break;
+            }
+            case 'ai_eleven_music': {
+              const input = tc.input as { prompt: string; musicLengthMs?: number; outputFormat?: string; scope?: { desktopId?: string; appId?: string; appName?: string } };
+              const { scope, ...params } = input;
+              console.log(`🔧 [Agent] ai_eleven_music: ${params.prompt.slice(0, 50)}...`);
+              try {
+                // Auto-ingest any external URLs or base64 data in the params
+                const { processedInput: processedParams, ingestedCount } = await autoIngestInputs(params, scope);
+                if (ingestedCount > 0) {
+                  console.log(`🔄 [Agent] ai_eleven_music: auto-ingested ${ingestedCount} media items`);
+                }
+                
+                const res = await fetch('/api/ai/eleven', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(processedParams),
+                });
+                if (!res.ok) {
+                  throw new Error(`ElevenLabs API error: ${res.status} ${res.statusText}`);
+                }
+                const json = await res.json();
+                const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, scope);
+                addToolResult({
+                  tool: 'ai_eleven_music',
+                  toolCallId: tc.toolCallId,
+                  output: { ok: true, result: updated, persistedAssets, autoIngestedCount: ingestedCount },
+                });
+              } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : String(err);
+                addToolResult({ tool: 'ai_eleven_music', toolCallId: tc.toolCallId, output: { error: message } });
+              }
+              break;
+            }
+            case 'media_list': {
+              const input = tc.input as { type?: string; appId?: string; desktopId?: string; from?: string; to?: string; limit?: number };
+              console.log(`🔧 [Agent] media_list: type=${input.type || 'all'} limit=${input.limit || 20}`);
+              try {
+                const params = new URLSearchParams();
+                if (input.type) params.set('type', input.type);
+                if (input.appId) params.set('appId', input.appId);
+                if (input.desktopId) params.set('desktopId', input.desktopId);
+                if (input.from) params.set('from', input.from);
+                if (input.to) params.set('to', input.to);
+                if (input.limit) params.set('limit', input.limit.toString());
+                
+                const res = await fetch(`/api/media/list?${params.toString()}`);
+                if (!res.ok) {
+                  throw new Error(`Media list error: ${res.status} ${res.statusText}`);
+                }
+                const result = await res.json();
+                addToolResult({ tool: 'media_list', toolCallId: tc.toolCallId, output: { items: result.items || [] } });
+              } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : String(err);
+                addToolResult({ tool: 'media_list', toolCallId: tc.toolCallId, output: { error: message } });
+              }
+              break;
+            }
+            case 'code_edit_ast': {
+              const input = tc.input as { path: string; action: 'upsertImport' | 'updateFunctionBody' | 'replaceJsxElement' | 'replaceJsxAttributes' | 'insertAfterLastImport' | 'insertAtTop'; selector?: any; payload?: any; dryRun?: boolean };
+              console.log(`🔧 [Agent] code_edit_ast: ${input.action} on ${input.path} (dryRun: ${input.dryRun || false})`);
+              try {
+                // Read the file content
+                const content = await fnsRef.current.readFile(input.path, 'utf-8');
+                
+                // Lazy-load the AST editor to minimize initial bundle size
+                const { applyAstEdit } = await import('@/lib/code-edit/recastEdit');
+                
+                // Apply the AST transformation
+                const result = await applyAstEdit({ ...input, content, dryRun: input.dryRun || false });
+                
+                // Write back to file if not a dry run and changes were applied
+                if (!input.dryRun && result.applied) {
+                  await fnsRef.current.writeFile(input.path, result.code);
+                }
+                
+                // Return result with metadata
+                addToolResult({
+                  tool: 'code_edit_ast',
+                  toolCallId: tc.toolCallId,
+                  output: {
+                    ok: true,
+                    applied: result.applied,
+                    edits: result.edits,
+                    previewDiff: result.previewDiff,
+                    path: input.path,
+                    elapsedMs: result.elapsedMs,
+                    bytesChanged: result.applied ? Math.abs(result.code.length - content.length) : 0,
+                  },
+                });
+              } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : String(err);
+                addToolResult({
+                  tool: 'code_edit_ast',
+                  toolCallId: tc.toolCallId,
+                  output: { ok: false, error: message, path: input.path },
+                });
+              }
+              break;
+            }
             default:
               // Unknown tool on client
               addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output: { error: `Unhandled client tool: ${tc.toolName}` } });
@@ -874,13 +1006,67 @@ export default function AIAgentBar() {
     return null;
   }
 
+  const handleFileUpload = async (files: FileList) => {
+    for (const file of Array.from(files)) {
+      try {
+        // Read file as base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            // Remove data URL prefix to get just base64
+            const base64Data = result.split(',')[1];
+            resolve(base64Data);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        // Upload to media ingest API
+        const res = await fetch('/api/media/ingest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base64,
+            contentType: file.type,
+            metadata: { filename: file.name },
+          }),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          setAttachments(prev => [...prev, {
+            name: file.name,
+            publicUrl: result.publicUrl,
+            contentType: file.type,
+          }]);
+        } else {
+          console.error('Failed to upload file:', file.name);
+        }
+      } catch (error) {
+        console.error('Error uploading file:', file.name, error);
+      }
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
     forceFollowRef.current = true;
-    const userText = input;
+    let userText = input;
+    
+    // Append attachments if any
+    if (attachments.length > 0) {
+      userText += '\n\nAttachments:\n' + attachments.map(a => `- ${a.name}: ${a.publicUrl}`).join('\n');
+    }
+    
     void sendMessage({ text: userText });
     setInput('');
+    setAttachments([]);
   };
 
   return (
@@ -942,6 +1128,22 @@ export default function AIAgentBar() {
 
                   {/* Center chat input */}
                   <div className="flex-1 relative">
+                    {/* Attachment chips */}
+                    {attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2 px-16">
+                        {attachments.map((attachment, index) => (
+                          <div key={index} className="flex items-center gap-1 bg-white/20 rounded px-2 py-1 text-xs text-white">
+                            <span className="truncate max-w-32">{attachment.name}</span>
+                            <button
+                              onClick={() => removeAttachment(index)}
+                              className="hover:bg-white/20 rounded p-0.5"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <Search className="absolute left-16 top-1/2 -translate-y-1/2 h-4 w-4 text-white" />
                     <Textarea
                       value={input}
@@ -967,6 +1169,33 @@ export default function AIAgentBar() {
                     {(status === 'submitted' || status === 'streaming') && (
                       <Button type="button" onClick={() => { stop(); }} variant="ghost" size="sm" className="h-10 rounded-none">Stop</Button>
                     )}
+                    {/* File upload button */}
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept="image/*,video/*,audio/*"
+                        multiple
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            handleFileUpload(e.target.files);
+                            e.target.value = ''; // Reset for re-uploads
+                          }
+                        }}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        id="file-upload"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-10 rounded-none text-white hover:bg-white/10"
+                        asChild
+                      >
+                        <label htmlFor="file-upload" className="cursor-pointer">
+                          <Paperclip className="w-4 h-4" />
+                        </label>
+                      </Button>
+                    </div>
                     <Button type="submit" disabled={!input.trim() || status !== 'ready'} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
                       <Send className="w-4 h-4" />
                     </Button>
@@ -1021,6 +1250,104 @@ export default function AIAgentBar() {
                                       return (
                                         <span key={index}>{part.text}</span>
                                       );
+                                    case 'tool-result': {
+                                      const payload = (part as any).result ?? (part as any).output ?? null;
+                                      
+                                      // Render persisted assets as media players
+                                      if (payload?.persistedAssets?.length) {
+                                        return (
+                                          <div key={index} className="mt-2 space-y-2">
+                                            {payload.persistedAssets.map((asset: any, assetIndex: number) => {
+                                              const { publicUrl, contentType, size } = asset;
+                                              if (!publicUrl) return null;
+                                              
+                                              const isImage = contentType?.startsWith('image/');
+                                              const isAudio = contentType?.startsWith('audio/');
+                                              const isVideo = contentType?.startsWith('video/');
+                                              
+                                              return (
+                                                <div key={assetIndex} className="w-full">
+                                                  {isImage && (
+                                                    <img 
+                                                      src={publicUrl} 
+                                                      alt="Generated content"
+                                                      className="w-full rounded max-w-sm"
+                                                    />
+                                                  )}
+                                                  {isAudio && (
+                                                    <audio 
+                                                      controls 
+                                                      src={publicUrl}
+                                                      className="w-full"
+                                                    />
+                                                  )}
+                                                  {isVideo && (
+                                                    <video 
+                                                      controls 
+                                                      src={publicUrl}
+                                                      className="w-full rounded max-w-sm"
+                                                    />
+                                                  )}
+                                                  {contentType && size && (
+                                                    <div className="text-xs text-white/60 mt-1">
+                                                      {contentType} • {formatBytes(size)}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // Render single media item (from media_ingest)
+                                      if (payload?.publicUrl && payload?.contentType) {
+                                        const { publicUrl, contentType, size } = payload;
+                                        const isImage = contentType.startsWith('image/');
+                                        const isAudio = contentType.startsWith('audio/');
+                                        const isVideo = contentType.startsWith('video/');
+                                        
+                                        return (
+                                          <div key={index} className="mt-2">
+                                            {isImage && (
+                                              <img 
+                                                src={publicUrl} 
+                                                alt="Uploaded content"
+                                                className="w-full rounded max-w-sm"
+                                              />
+                                            )}
+                                            {isAudio && (
+                                              <audio 
+                                                controls 
+                                                src={publicUrl}
+                                                className="w-full"
+                                              />
+                                            )}
+                                            {isVideo && (
+                                              <video 
+                                                controls 
+                                                src={publicUrl}
+                                                className="w-full rounded max-w-sm"
+                                              />
+                                            )}
+                                            {size && (
+                                              <div className="text-xs text-white/60 mt-1">
+                                                {contentType} • {formatBytes(size)}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // Fallback: render JSON payload
+                                      return (
+                                        <pre key={index} className="text-xs bg-black/20 rounded p-2 mt-2 overflow-auto">
+                                          {JSON.stringify(payload, null, 2)}
+                                        </pre>
+                                      );
+                                    }
+                                    default:
+                                      return null;
                                   }
                                 })}
                               </div>
