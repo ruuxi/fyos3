@@ -1085,7 +1085,10 @@ export default function AIAgentBar() {
       const classifyResponse = await fetch('/api/classify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText }),
+        body: JSON.stringify({ 
+          message: userText, 
+          messages: messages // Include conversation history for context
+        }),
       });
       
       if (classifyResponse.ok) {

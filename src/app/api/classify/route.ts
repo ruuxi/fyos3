@@ -1,10 +1,10 @@
-import { generateText } from 'ai';
+import { generateText, convertToModelMessages } from 'ai';
 import { NextRequest, NextResponse } from 'next/server';
 import { CLASSIFIER_PROMPT } from '@/lib/agentPrompts';
 
 export async function POST(req: NextRequest) {
   try {
-    const { message } = await req.json();
+    const { message, messages } = await req.json();
     
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -14,8 +14,21 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('🏷️ [CLASSIFY] Input message:', message);
+    console.log('🏷️ [CLASSIFY] Messages history length:', messages?.length || 0);
 
-    // Use AI to classify the user's intent
+    // Prepare conversation context (last 10 messages)
+    let conversationContext = '';
+    if (messages && Array.isArray(messages) && messages.length > 0) {
+      const last10Messages = messages.slice(-10);
+      conversationContext = '\n\nConversation history (last 10 messages):\n' + 
+        last10Messages.map((msg, i) => {
+          const role = msg.role === 'user' ? 'User' : 'Assistant';
+          const content = msg.parts?.map((p: any) => p.type === 'text' ? p.text : '').join('') || msg.content || '';
+          return `${role}: ${content}`;
+        }).join('\n');
+    }
+
+    // Use AI to classify the user's intent with conversation context
     const { text } = await generateText({
       model: 'meta/llama-4-scout',
       providerOptions: {
@@ -24,7 +37,7 @@ export async function POST(req: NextRequest) {
         },
       },
       system: CLASSIFIER_PROMPT,
-      prompt: message,
+      prompt: message + conversationContext,
       temperature: 0.2, // Lower temperature for more consistent classification
     });
 
