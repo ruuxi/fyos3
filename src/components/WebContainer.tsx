@@ -536,6 +536,7 @@ export default function Document() {
         className={`block absolute inset-0 w-full h-full border-0 opacity-0 will-change-[opacity] transition-opacity duration-[500ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${isLoading ? '' : 'opacity-100'}`}
         title="Preview"
         sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts allow-downloads"
+        style={{ backgroundColor: 'rgb(11, 16, 32)' }}
       />
       <style jsx>{`
         .iframe-ready { opacity: 1; }

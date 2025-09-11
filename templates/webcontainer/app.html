@@ -8,7 +8,7 @@
       html,body,#mount{height:100%;margin:0}
       /* Ensure scrolling happens inside the app mount, not the iframe viewport */
       #mount{overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-      body{background:transparent;overflow:hidden}
+      body{background:#0b1020;overflow:hidden}
     </style>
     <!-- Preload Tailwind CSS to ensure it's available immediately -->
     <link rel="preload" href="/src/tailwind.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
@@ -16,6 +16,7 @@
   </head>
   <body>
     <div id="mount" style="height:100%"></div>
+    <div id="vite-hmr-mask" style="position:fixed;inset:0;background:#0b1020;opacity:0;pointer-events:none;transition:opacity .12s ease;z-index:2147483646"></div>
     <script type="module">
       // Disable Vite error overlay in iframe
       if (import.meta.hot) {
@@ -144,6 +145,18 @@
           showOverlay('App setup error: ' + err)
         }
       }
+
+      // HMR anti-flash inside app iframe
+      try {
+        const mask = document.getElementById('vite-hmr-mask')
+        const show = () => { if (mask) { mask.style.opacity = '.9' } }
+        const hideSoon = () => { setTimeout(() => { if (mask) mask.style.opacity = '0' }, 120) }
+        if (import.meta && import.meta.hot) {
+          import.meta.hot.on('vite:beforeUpdate', show)
+          import.meta.hot.on('vite:afterUpdate', hideSoon)
+          import.meta.hot.on('full-reload', show)
+        }
+      } catch {}
     </script>
   </body>
   </html>

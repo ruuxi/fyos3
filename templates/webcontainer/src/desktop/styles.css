@@ -95,3 +95,7 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .badge{font-size:11px;color:#374151;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px}
 .muted{color:#6b7280}
 .list{padding-left:16px}
+
+/* HMR mask to suppress white flashes during full reloads/HMR swaps */
+.hmr-mask{position:fixed;inset:0;background:#0b1020;opacity:0;pointer-events:none;transition:opacity .12s ease;z-index:2147483646}
+.hmr-mask.active{opacity:.9}
