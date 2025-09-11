@@ -12,16 +12,48 @@ import {
   RenameAppInput,
   RemoveAppInput,
   ValidateProjectInput,
-  SubmitPlanInput,
   WebSearchInput,
 } from '@/lib/agentTools';
+import { agentLogger } from '@/lib/agentLogger';
 import Exa from 'exa-js';
+
+// Helper function to sanitize tool inputs for logging (removes large content)
+function sanitizeToolInput(toolName: string, input: any): any {
+  try {
+    if (toolName === 'fs_write' && input?.content) {
+      const contentBytes = typeof input.content === 'string' ? new TextEncoder().encode(input.content).length : 0;
+      return {
+        path: input.path,
+        createDirs: input.createDirs,
+        contentSize: contentBytes,
+        contentSizeKB: Number((contentBytes / 1024).toFixed(1)),
+        contentPreview: typeof input.content === 'string' ? input.content.slice(0, 100) + (input.content.length > 100 ? '...' : '') : undefined
+      };
+    }
+    if (toolName === 'fs_read') {
+      return { path: input?.path, encoding: input?.encoding };
+    }
+    return input;
+  } catch {
+    return { sanitizationError: true, originalKeys: Object.keys(input || {}) };
+  }
+}
 
 // Some tool actions (like package installs) may take longer than 30s
 export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
+  
+  // Generate session ID for this conversation
+  const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  
+  // Log the incoming user message
+  const lastMessage = messages[messages.length - 1];
+  if (lastMessage && lastMessage.role === 'user') {
+    const content = lastMessage.parts?.map(p => p.type === 'text' ? p.text : '').join('') || '';
+    await agentLogger.logMessage(sessionId, lastMessage.id, 'user', content);
+  }
 
   console.log('🔵 [AGENT] Incoming request with messages:', messages.map(m => ({
     role: m.role,
@@ -134,6 +166,9 @@ export async function POST(req: Request) {
     return result.toUIMessageStreamResponse();
   }
 
+  // Track tool call timings to avoid duplicate logging
+  const toolCallTimings = new Map<string, number>();
+
   const result = streamText({
     model: 'alibaba/qwen3-coder',
     providerOptions: {
@@ -143,7 +178,7 @@ export async function POST(req: Request) {
     },
     messages: convertToModelMessages(messages),
     stopWhen: stepCountIs(15),
-    onStepFinish: ({ text, toolCalls, toolResults, finishReason, usage }: any) => {
+    onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }: any) => {
       console.log('📊 [USAGE-STEP] Step finished:', {
         finishReason,
         textLength: text?.length || 0,
@@ -158,15 +193,48 @@ export async function POST(req: Request) {
         } : null,
       });
       
-      // Log individual tool calls in this step
+      // Track start times for tool calls (for timing)
       if (toolCalls?.length) {
         console.log('🔧 [USAGE-STEP] Tool calls:', toolCalls.map((tc: any) => ({
           name: tc.toolName,
           id: tc.toolCallId?.substring(0, 8),
         })));
+
+        // Record start times for duration tracking
+        for (const tc of toolCalls) {
+          toolCallTimings.set(tc.toolCallId, Date.now());
+        }
+      }
+
+      // Log completed tool calls with results and timing
+      if (toolResults?.length) {
+        for (const result of toolResults) {
+          const startTime = toolCallTimings.get(result.toolCallId) || Date.now();
+          const duration = Date.now() - startTime;
+          
+          // Sanitize large content from tool inputs before logging
+          const sanitizedInput = sanitizeToolInput(result.toolName || 'unknown', (result as any).args || (result as any).input || {});
+          
+          await agentLogger.logToolCall(
+            sessionId,
+            result.toolName || 'unknown',
+            result.toolCallId,
+            sanitizedInput,
+            {
+              result: (result as any).result,
+              state: (result as any).state,
+              isError: (result as any).isError || false,
+              errorMessage: (result as any).errorMessage
+            },
+            duration
+          );
+          
+          // Clean up timing tracking
+          toolCallTimings.delete(result.toolCallId);
+        }
       }
     },
-    onFinish: (event) => {
+    onFinish: async (event) => {
       // Enhanced usage logging
       console.log('🎯 [AI] Response finished:', {
         finishReason: event.finishReason,
@@ -175,6 +243,14 @@ export async function POST(req: Request) {
         toolResults: event.toolResults?.length || 0,
         stepCount: event.steps?.length || 0,
       });
+
+      // Log the complete assistant response including tool calls
+      if (event.text) {
+        await agentLogger.logMessage(sessionId, `assistant_${Date.now()}`, 'assistant', event.text);
+      }
+
+      // Tool calls are now logged in onStepFinish with proper timing and results
+      // No need to duplicate logging here
 
       // Detailed token usage logging
       if (event.usage) {
@@ -195,6 +271,16 @@ export async function POST(req: Request) {
           ((event.usage.outputTokens || 0) / 1000000) * outputCostPerMillion;
         
         console.log('💰 [USAGE-COST] qwen3-coder estimated cost: $' + estimatedCost.toFixed(6));
+        
+        // Log token usage and cost to file
+        await agentLogger.logTokenUsage(
+          sessionId,
+          event.usage.inputTokens || 0,
+          event.usage.outputTokens || 0,
+          event.usage.totalTokens || 0,
+          'qwen3-coder',
+          estimatedCost
+        );
       }
 
       // Log step-by-step breakdown if multiple steps
@@ -205,42 +291,13 @@ export async function POST(req: Request) {
         });
       }
 
+      // Console logging for development (tool calls already logged in onStepFinish)
       if (event.toolCalls?.length) {
         console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc: any) => ({
           name: tc.toolName,
           input: tc.input ?? tc.args,
           id: tc.toolCallId?.substring(0, 8)
         })));
-        
-        // Log file operation details
-        event.toolCalls.forEach((tc: any) => {
-          if (tc.toolName.startsWith('web_fs_') || ['create_app', 'remove_app', 'rename_app'].includes(tc.toolName)) {
-            const args = tc.input || tc.args || {};
-            switch (tc.toolName) {
-              case 'web_fs_write':
-                console.log(`📝 [AI-Tool] WRITE: ${args.path} (${args.content?.length || 0} chars)`);
-                break;
-              case 'web_fs_read':
-                console.log(`👁️ [AI-Tool] READ: ${args.path}`);
-                break;
-              case 'web_fs_mkdir':
-                console.log(`📁 [AI-Tool] MKDIR: ${args.path}`);
-                break;
-              case 'web_fs_rm':
-                console.log(`🗑️ [AI-Tool] REMOVE: ${args.path}`);
-                break;
-              case 'create_app':
-                console.log(`🆕 [AI-Tool] CREATE_APP: "${args.name}" (${args.icon || '📦'})`);
-                break;
-              case 'remove_app':
-                console.log(`❌ [AI-Tool] REMOVE_APP: ${args.id}`);
-                break;
-              case 'rename_app':
-                console.log(`✏️ [AI-Tool] RENAME_APP: ${args.id} -> "${args.name}"`);
-                break;
-            }
-          }
-        });
       }
 
       if (event.toolResults?.length) {
@@ -249,34 +306,6 @@ export async function POST(req: Request) {
           success: !tr.result?.error,
           id: tr.toolCallId?.substring(0, 8)
         })));
-        
-        // Log file operation results
-        event.toolResults.forEach((tr: any) => {
-          if (tr.toolName.startsWith('web_fs_') || ['create_app', 'remove_app', 'rename_app'].includes(tr.toolName)) {
-            const result = tr.result || {};
-            if (result.error) {
-              console.error(`❌ [AI-Result] ${tr.toolName.toUpperCase()} FAILED:`, result.error);
-            } else {
-              switch (tr.toolName) {
-                case 'web_fs_write':
-                  console.log(`✅ [AI-Result] WRITE SUCCESS: ${result.path} (${result.size || 'unknown size'})`);
-                  break;
-                case 'web_fs_read':
-                  console.log(`✅ [AI-Result] READ SUCCESS: ${result.path} (${result.size || 'unknown size'})`);
-                  break;
-                case 'create_app':
-                  console.log(`✅ [AI-Result] APP CREATED: "${result.name}" at ${result.path}`);
-                  break;
-                case 'remove_app':
-                  console.log(`✅ [AI-Result] APP REMOVED: "${result.name}" (${result.id})`);
-                  break;
-                case 'rename_app':
-                  console.log(`✅ [AI-Result] APP RENAMED: "${result.oldName}" -> "${result.newName}"`);
-                  break;
-              }
-            }
-          }
-        });
       }
     },
     system: `# WebContainer Engineering Agent
@@ -328,7 +357,7 @@ You are a proactive engineering agent operating inside a **WebContainer-powered 
 
 **Import syntax:** \`import { Button } from "@/components/ui/button"\`
 
-**If not listed above, add new components:** Use \`web_exec\` with \`pnpm dlx shadcn@latest add [component-name]\`
+**If not listed above, add new components:** Use \`exec\` with \`pnpm dlx shadcn@latest add [component-name]\`
 
 **Tailwind Styling Examples:**
 - **Headers**: \`bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-t-lg\`
@@ -751,8 +780,8 @@ const handleAIGeneration = async () => {
 - Ask for confirmation before duplicating apps
 
 ### Package Management
-- Use \`web_exec\` tool for package manager commands (e.g., \`pnpm add <pkg>\`, \`pnpm install\`)
-- **Wait for web_exec result** (includes exitCode) before proceeding
+- Use \`exec\` tool for package manager commands (e.g., \`pnpm add <pkg>\`, \`pnpm install\`)
+- **Wait for exec result** (includes exitCode) before proceeding
 - If install fails (non-zero exitCode), report error and suggest fixes or alternatives
 
 
@@ -774,30 +803,30 @@ const handleAIGeneration = async () => {
 - User asks for "dashboard" → Data app → Structured grid, charts, neutral colors with accent highlights`,
     tools: {
       // Step 1 – file discovery
-      [TOOL_NAMES.web_fs_find]: {
+      [TOOL_NAMES.fs_find]: {
         description: 'List files and folders recursively starting at a directory.',
         inputSchema: FSFindInput,
       },
       // File reads
-      [TOOL_NAMES.web_fs_read]: {
+      [TOOL_NAMES.fs_read]: {
         description: 'Read a file from the filesystem.',
         inputSchema: FSReadInput,
       },
       // Writes and mkdirs
-      [TOOL_NAMES.web_fs_write]: {
+      [TOOL_NAMES.fs_write]: {
         description: 'Write file contents. Creates parent directories when needed.',
         inputSchema: FSWriteInput,
       },
-      [TOOL_NAMES.web_fs_mkdir]: {
+      [TOOL_NAMES.fs_mkdir]: {
         description: 'Create a directory (optionally recursive).',
         inputSchema: FSMkdirInput,
       },
-      [TOOL_NAMES.web_fs_rm]: {
+      [TOOL_NAMES.fs_rm]: {
         description: 'Remove a file or directory (recursive by default).',
         inputSchema: FSRmInput,
       },
       // Process execution
-      [TOOL_NAMES.web_exec]: {
+      [TOOL_NAMES.exec]: {
         description: 'Run shell commands. Prefer pnpm for installs. Never run dev/build/start.',
         inputSchema: ExecInput,
       },
@@ -822,41 +851,43 @@ const handleAIGeneration = async () => {
           'Run validation checks (TypeScript noEmit; optionally ESLint on files; full also runs build).',
         inputSchema: ValidateProjectInput,
       },
-      // Planning helper – capture a plan before execution
-      [TOOL_NAMES.submit_plan]: tool({
-        description: 'Submit a structured execution plan before making changes.',
-        inputSchema: SubmitPlanInput,
-        async execute({ steps }) {
-          console.log('🛠️ [TOOL] submit_plan executed with steps:', steps);
-          const result = { accepted: true, steps };
-          console.log('✅ [TOOL] submit_plan result:', result);
-          return result;
-        },
-      }),
 
       // Web search with Exa (server-side tool)
-      [TOOL_NAMES.web_search]: tool({
+      [TOOL_NAMES.search]: tool({
         description: 'Search the web for up-to-date information.',
         inputSchema: WebSearchInput,
         async execute({ query }) {
-          const apiKey = process.env.EXA_API_KEY;
-          if (!apiKey) {
-            return { error: 'Missing EXA_API_KEY in environment.' };
-          }
+          const startTime = Date.now();
+          const toolCallId = `search_${Date.now()}`;
+          
           try {
+            const apiKey = process.env.EXA_API_KEY;
+            if (!apiKey) {
+              const error = { error: 'Missing EXA_API_KEY in environment.' };
+              await agentLogger.logToolCall(sessionId, TOOL_NAMES.search, toolCallId, { query }, error, Date.now() - startTime);
+              return error;
+            }
+            
             const exa = new Exa(apiKey);
             const { results } = await exa.searchAndContents(query, {
               livecrawl: 'always',
               numResults: 3,
             } as any);
-            return (results || []).map((r: any) => ({
+            
+            const output = (results || []).map((r: any) => ({
               title: r.title,
               url: r.url,
               content: typeof r.text === 'string' ? r.text.slice(0, 1000) : undefined,
               publishedDate: r.publishedDate,
             }));
+            
+            await agentLogger.logToolCall(sessionId, TOOL_NAMES.search, toolCallId, { query }, { results: output.length, data: output }, Date.now() - startTime);
+            return output;
           } catch (err: unknown) {
-            return { error: err instanceof Error ? err.message : String(err) };
+            const error = { error: err instanceof Error ? err.message : String(err) };
+            await agentLogger.logError(sessionId, err as Error, { toolName: TOOL_NAMES.search, query });
+            await agentLogger.logToolCall(sessionId, TOOL_NAMES.search, toolCallId, { query }, error, Date.now() - startTime);
+            return error;
           }
         },
       }),
@@ -866,3 +897,4 @@ const handleAIGeneration = async () => {
   console.log('📤 [AGENT] Returning streaming response');
   return result.toUIMessageStreamResponse();
 }
+

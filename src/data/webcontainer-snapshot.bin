@@ -1,4 +1,4 @@
-Å°dç®app.htmlÅ°fÅ°c≈[<!doctype html>
+Å°dç®app.htmlÅ°fÅ°c≈<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -8,7 +8,7 @@
       html,body,#mount{height:100%;margin:0}
       /* Ensure scrolling happens inside the app mount, not the iframe viewport */
       #mount{overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-      body{background:transparent;overflow:hidden}
+      body{background:#0b1020;overflow:hidden}
     </style>
     <!-- Preload Tailwind CSS to ensure it's available immediately -->
     <link rel="preload" href="/src/tailwind.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
@@ -16,6 +16,7 @@
   </head>
   <body>
     <div id="mount" style="height:100%"></div>
+    <div id="vite-hmr-mask" style="position:fixed;inset:0;background:#0b1020;opacity:0;pointer-events:none;transition:opacity .12s ease;z-index:2147483646"></div>
     <script type="module">
       // Disable Vite error overlay in iframe
       if (import.meta.hot) {
@@ -144,6 +145,18 @@
           showOverlay('App setup error: ' + err)
         }
       }
+
+      // HMR anti-flash inside app iframe
+      try {
+        const mask = document.getElementById('vite-hmr-mask')
+        const show = () => { if (mask) { mask.style.opacity = '.9' } }
+        const hideSoon = () => { setTimeout(() => { if (mask) mask.style.opacity = '0' }, 120) }
+        if (import.meta && import.meta.hot) {
+          import.meta.hot.on('vite:beforeUpdate', show)
+          import.meta.hot.on('vite:afterUpdate', hideSoon)
+          import.meta.hot.on('full-reload', show)
+        }
+      } catch {}
     </script>
   </body>
   </html>
@@ -169,13 +182,19 @@
   },
   "registries": {}
 }
-™index.htmlÅ°fÅ°c≈ë<!doctype html>
+™index.htmlÅ°fÅ°c≈ß<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
     <title>macOS Desktop</title>
-    <style>html,body,#root{height:100%;width:100%;margin:0;padding:0}#root{position:relative}</style>
+    <style>html,body,#root{height:100%;width:100%;margin:0;padding:0}html,body{background:#0b1020}#root{position:relative}</style>
+    <!-- Preload critical CSS to reduce FOUC during HMR/full reloads -->
+    <link rel="preload" href="/src/tailwind.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/src/tailwind.css"></noscript>
+    <link rel="preload" href="/src/desktop/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/src/desktop/styles.css"></noscript>
   </head>
   <body>
     <div id="root"></div>
@@ -2571,7 +2590,32 @@ export async function multiviewTo3D(images: Array<File | string>, options: any =
   for (const img of images) image_urls.push(await ensurePublicUrl(img));
   return callFal('tripo3d/tripo/v2.5/multiview-to-3d', { image_urls, ...options });
 }
-§appsÅ°dá©app-storeÅ°dÅ©index.tsxÅ°fÅ°c≈ìimport { useEffect, useMemo, useState } from 'react'
+§appsÅ°dá¶finderÅ°dÅ©index.tsxÅ°fÅ°c≈import React from 'react'
+export default function Finder(){
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Finder</div>
+        <span className="badge">Home</span>
+      </div>
+      <p className="muted">This is a simple Finder. It lists installed apps:</p>
+      <AppsList />
+    </div>
+  )
+}
+
+type App = { id: string; name: string; icon: string }
+
+function AppsList(){
+  const [apps, setApps] = React.useState<App[]>([])
+  React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
+  return (
+    <ul className="list">
+      {apps.map(a=> <li key={a.id}>{a.icon} {a.name} <code style={{color:'#6b7280'}}>{a.id.slice(0,8)}</code></li>)}
+    </ul>
+  )
+}
+©app-storeÅ°dÅ©index.tsxÅ°fÅ°c≈ìimport { useEffect, useMemo, useState } from 'react'
 
 type AppRecord = {
   _id: string;
@@ -2659,31 +2703,6 @@ export default function AppStore() {
 }
 
 
-¶finderÅ°dÅ©index.tsxÅ°fÅ°c≈import React from 'react'
-export default function Finder(){
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Finder</div>
-        <span className="badge">Home</span>
-      </div>
-      <p className="muted">This is a simple Finder. It lists installed apps:</p>
-      <AppsList />
-    </div>
-  )
-}
-
-type App = { id: string; name: string; icon: string }
-
-function AppsList(){
-  const [apps, setApps] = React.useState<App[]>([])
-  React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
-  return (
-    <ul className="list">
-      {apps.map(a=> <li key={a.id}>{a.icon} {a.name} <code style={{color:'#6b7280'}}>{a.id.slice(0,8)}</code></li>)}
-    </ul>
-  )
-}
 •notesÅ°dÅ©index.tsxÅ°fÅ°c≈öimport React from 'react'
 export default function Notes(){
   const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])
@@ -3226,59 +3245,6 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
 Input.displayName = "Input"
 
 export { Input }
-®tabs.tsxÅ°fÅ°c≈Uimport * as React from "react"
-import * as TabsPrimitive from "@radix-ui/react-tabs"
-
-import { cn } from "@/lib/utils"
-
-const Tabs = TabsPrimitive.Root
-
-const TabsList = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    ref={ref}
-    className={cn(
-      "inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground",
-      className
-    )}
-    {...props}
-  />
-))
-TabsList.displayName = TabsPrimitive.List.displayName
-
-const TabsTrigger = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
-      className
-    )}
-    {...props}
-  />
-))
-TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
-
-const TabsContent = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Content
-    ref={ref}
-    className={cn(
-      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-      className
-    )}
-    {...props}
-  />
-))
-TabsContent.displayName = TabsPrimitive.Content.displayName
-
-export { Tabs, TabsList, TabsTrigger, TabsContent }
 ™select.tsxÅ°fÅ°c≈cimport * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp } from "lucide-react"
@@ -3436,6 +3402,59 @@ export {
   SelectScrollUpButton,
   SelectScrollDownButton,
 }
+®tabs.tsxÅ°fÅ°c≈Uimport * as React from "react"
+import * as TabsPrimitive from "@radix-ui/react-tabs"
+
+import { cn } from "@/lib/utils"
+
+const Tabs = TabsPrimitive.Root
+
+const TabsList = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.List
+    ref={ref}
+    className={cn(
+      "inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground",
+      className
+    )}
+    {...props}
+  />
+))
+TabsList.displayName = TabsPrimitive.List.displayName
+
+const TabsTrigger = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
+      className
+    )}
+    {...props}
+  />
+))
+TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
+
+const TabsContent = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Content
+    ref={ref}
+    className={cn(
+      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      className
+    )}
+    {...props}
+  />
+))
+TabsContent.displayName = TabsPrimitive.Content.displayName
+
+export { Tabs, TabsList, TabsTrigger, TabsContent }
 ¨textarea.tsxÅ°fÅ°c≈âimport * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -4437,7 +4456,7 @@ export default function Desktop(){
     </div>
   )
 }
-™styles.cssÅ°fÅ°c≈ß/* Base variables and layout */
+™styles.cssÅ°fÅ°c≈è/* Base variables and layout */
 :root{--bar:#f6f6f6;--text:#111;--muted:#6b7280;--bg:#0b1020;--glass:rgba(255,255,255,0.25);--dock:rgba(255,255,255,0.3);}
 *{box-sizing:border-box}
 body{font-family:Inter,ui-sans-serif,system-ui,Arial}
@@ -4534,6 +4553,10 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .badge{font-size:11px;color:#374151;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px}
 .muted{color:#6b7280}
 .list{padding-left:16px}
+
+/* HMR mask to suppress white flashes during full reloads/HMR swaps */
+.hmr-mask{position:fixed;inset:0;background:#0b1020;opacity:0;pointer-events:none;transition:opacity .12s ease;z-index:2147483646}
+.hmr-mask.active{opacity:.9}
 Æiframe-root.jsÅ°fÅ°c≈ˆimport React, { StrictMode } from 'react'
 import { createRoot as createReactRoot } from 'react-dom/client'
 
@@ -4717,7 +4740,7 @@ import { twMerge } from "tailwind-merge"
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
-®main.tsxÅ°fÅ°c≈import { StrictMode } from 'react'
+®main.tsxÅ°fÅ°c≈’import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import Desktop from './desktop/Desktop'
 import './desktop/styles.css'
@@ -4728,6 +4751,37 @@ createRoot(document.getElementById('root')!).render(
     <Desktop />
   </StrictMode>
 )
+
+// Lightweight HMR anti-flash mask
+if (import.meta && (import.meta as any).hot) {
+  try {
+    const maskId = 'vite-hmr-mask'
+    let mask = document.getElementById(maskId)
+    const ensureMask = () => {
+      if (!mask) {
+        mask = document.createElement('div')
+        mask.id = maskId
+        mask.className = 'hmr-mask'
+        document.body.appendChild(mask)
+      }
+      return mask as HTMLDivElement
+    }
+    const show = () => { ensureMask().classList.add('active') }
+    const hideSoon = () => { setTimeout(() => ensureMask().classList.remove('active'), 120) }
+
+    ;(import.meta as any).hot.on('vite:beforeUpdate', () => {
+      // HMR update incoming; briefly mask
+      show()
+    })
+    ;(import.meta as any).hot.on('vite:afterUpdate', () => {
+      hideSoon()
+    })
+    ;(import.meta as any).hot.on('full-reload', () => {
+      // Mask until the new page paints; keep active, browser reload will clear
+      show()
+    })
+  } catch {}
+}
 ¨tailwind.cssÅ°fÅ°c≈Ñ@import "tailwindcss";
 
 @layer base {

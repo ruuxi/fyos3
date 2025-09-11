@@ -12,6 +12,27 @@ export const FSFindInput = z.object({
     .max(20)
     .default(10)
     .describe('Maximum folder depth to traverse (0 lists only the root).'),
+  glob: z
+    .string()
+    .optional()
+    .describe('Optional glob filter (e.g., "**/*.tsx"). Applied to full paths.'),
+  prefix: z
+    .string()
+    .optional()
+    .describe('Optional path prefix filter. Only include entries starting with this prefix.'),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(5000)
+    .default(200)
+    .describe('Maximum number of entries to return (default 200).'),
+  offset: z
+    .number()
+    .int()
+    .min(0)
+    .default(0)
+    .describe('Pagination offset. Use nextOffset from the previous result for the next page.'),
 });
 
 export const FSReadInput = z.object({
@@ -74,12 +95,6 @@ export const ValidateProjectInput = z.object({
     .describe('Optional list of files to lint (paths relative to project root).'),
 });
 
-export const SubmitPlanInput = z.object({
-  steps: z
-    .array(z.string().describe('One concise, actionable step.'))
-    .min(1)
-    .describe('High-level plan steps to execute in order.'),
-});
 
 export type TFSFindInput = z.infer<typeof FSFindInput>;
 export type TFSReadInput = z.infer<typeof FSReadInput>;
@@ -91,22 +106,20 @@ export type TCreateAppInput = z.infer<typeof CreateAppInput>;
 export type TRenameAppInput = z.infer<typeof RenameAppInput>;
 export type TRemoveAppInput = z.infer<typeof RemoveAppInput>;
 export type TValidateProjectInput = z.infer<typeof ValidateProjectInput>;
-export type TSubmitPlanInput = z.infer<typeof SubmitPlanInput>;
 
 // Shared list of tool names for consistency across server and client (optional)
 export const TOOL_NAMES = {
-  web_fs_find: 'web_fs_find',
-  web_fs_read: 'web_fs_read',
-  web_fs_write: 'web_fs_write',
-  web_fs_mkdir: 'web_fs_mkdir',
-  web_fs_rm: 'web_fs_rm',
-  web_exec: 'web_exec',
+  fs_find: 'fs_find',
+  fs_read: 'fs_read',
+  fs_write: 'fs_write',
+  fs_mkdir: 'fs_mkdir',
+  fs_rm: 'fs_rm',
+  exec: 'exec',
   create_app: 'create_app',
   rename_app: 'rename_app',
   remove_app: 'remove_app',
   validate_project: 'validate_project',
-  submit_plan: 'submit_plan',
-  web_search: 'web_search',
+  search: 'search',
 } as const;
 
 export type ToolName = typeof TOOL_NAMES[keyof typeof TOOL_NAMES];

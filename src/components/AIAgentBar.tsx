@@ -9,7 +9,6 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
 import { useScreens } from './ScreensProvider';
-import ChatAlert from './ChatAlert';
 // Persistence is handled by WebContainer visibility/unload hooks
 
 export default function AIAgentBar() {
@@ -267,33 +266,56 @@ export default function AIAgentBar() {
       const task = async () => {
         try {
           switch (tc.toolName) {
-            case 'web_fs_find': {
-              const { root = '.', maxDepth = 10 } = (tc.input as { root?: string; maxDepth?: number }) ?? {};
-              console.log(`🔧 [Agent] web_fs_find: ${root} (depth: ${maxDepth})`);
+            case 'fs_find': {
+              const { root = '.', maxDepth = 10, glob, prefix, limit = 200, offset = 0 } = (tc.input as { root?: string; maxDepth?: number; glob?: string; prefix?: string; limit?: number; offset?: number }) ?? {};
+              console.log(`🔧 [Agent] fs_find: ${root} (depth: ${maxDepth}) glob=${glob ?? '-'} prefix=${prefix ?? '-'} limit=${limit} offset=${offset}`);
               const results = await fnsRef.current.readdirRecursive(root, maxDepth);
-              console.log(`📊 [Agent] Found ${results.length} items in ${root}`);
-              addToolResult({ tool: 'web_fs_find', toolCallId: tc.toolCallId, output: { files: results, count: results.length, root } });
+              const filterByPrefix = (p: string) => (prefix ? p.startsWith(prefix) : true);
+              const globToRegExp = (pattern: string) => {
+                let re = '^';
+                for (let i = 0; i < pattern.length; i++) {
+                  const ch = pattern[i];
+                  if (ch === '*') {
+                    if (pattern[i + 1] === '*') { re += '.*'; i++; } else { re += '[^/]*'; }
+                  } else if (ch === '?') {
+                    re += '.';
+                  } else {
+                    re += /[\\.^$+()|{}\[\]\-]/.test(ch) ? `\\${ch}` : ch;
+                  }
+                }
+                re += '$';
+                return new RegExp(re);
+              };
+              const regex = glob ? globToRegExp(glob) : null;
+              const filterByGlob = (p: string) => (regex ? regex.test(p) : true);
+              const filtered = results.filter((p: any) => typeof p === 'string' ? filterByPrefix(p) && filterByGlob(p) : true);
+              const start = Math.max(0, offset || 0);
+              const end = Math.min(filtered.length, start + Math.max(1, Math.min(limit || 200, 5000)));
+              const page = filtered.slice(start, end);
+              const nextOffset = end < filtered.length ? end : null;
+              console.log(`📊 [Agent] fs_find matched ${filtered.length} items; returning ${page.length} (offset ${start})`);
+              addToolResult({ tool: 'fs_find', toolCallId: tc.toolCallId, output: { files: page, count: page.length, total: filtered.length, root, offset: start, nextOffset, hasMore: end < filtered.length, applied: { glob: !!glob, prefix: !!prefix } } });
               break;
             }
-            case 'web_fs_read': {
+            case 'fs_read': {
               const { path, encoding = 'utf-8' } = tc.input as { path: string; encoding?: 'utf-8' | 'base64' };
-              console.log(`🔧 [Agent] web_fs_read: ${path} (${encoding})`);
+              console.log(`🔧 [Agent] fs_read: ${path} (${encoding})`);
               const content = await fnsRef.current.readFile(path, encoding);
               const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
-              addToolResult({ tool: 'web_fs_read', toolCallId: tc.toolCallId, output: { content, path, size: `${sizeKB}KB` } });
+              addToolResult({ tool: 'fs_read', toolCallId: tc.toolCallId, output: { content, path, size: `${sizeKB}KB` } });
               break;
             }
-            case 'web_fs_write': {
+            case 'fs_write': {
               const { path, content, createDirs = true } = tc.input as { path: string; content: string; createDirs?: boolean };
               const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
-              console.log(`🔧 [Agent] web_fs_write: ${path} (${sizeKB}KB)`);
+              console.log(`🔧 [Agent] fs_write: ${path} (${sizeKB}KB)`);
               
               if (createDirs) {
                 const dir = path.split('/').slice(0, -1).join('/') || '.';
                 await fnsRef.current.mkdir(dir, true);
               }
               await fnsRef.current.writeFile(path, content);
-              addToolResult({ tool: 'web_fs_write', toolCallId: tc.toolCallId, output: { ok: true, path, size: `${sizeKB}KB` } });
+              addToolResult({ tool: 'fs_write', toolCallId: tc.toolCallId, output: { ok: true, path, size: `${sizeKB}KB` } });
 
               // Async media ingest hook (non-blocking)
               try {
@@ -326,21 +348,21 @@ export default function AIAgentBar() {
               } catch {}
               break;
             }
-            case 'web_fs_mkdir': {
+            case 'fs_mkdir': {
               const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
-              console.log(`🔧 [Agent] web_fs_mkdir: ${path} ${recursive ? '(recursive)' : ''}`);
+              console.log(`🔧 [Agent] fs_mkdir: ${path} ${recursive ? '(recursive)' : ''}`);
               await fnsRef.current.mkdir(path, recursive);
-              addToolResult({ tool: 'web_fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
+              addToolResult({ tool: 'fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
               break;
             }
-            case 'web_fs_rm': {
+            case 'fs_rm': {
               const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
-              console.log(`🔧 [Agent] web_fs_rm: ${path} ${recursive ? '(recursive)' : ''}`);
+              console.log(`🔧 [Agent] fs_rm: ${path} ${recursive ? '(recursive)' : ''}`);
               await fnsRef.current.remove(path, { recursive });
-              addToolResult({ tool: 'web_fs_rm', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
+              addToolResult({ tool: 'fs_rm', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
               break;
             }
-            case 'web_exec': {
+            case 'exec': {
               let { command, args = [], cwd } = tc.input as { command: string; args?: string[]; cwd?: string };
 
               // If the model sent the entire command as a single string, split into cmd + argv
@@ -404,7 +426,7 @@ export default function AIAgentBar() {
                 }
               }
               const fullCommand = `${command} ${args.join(' ')}`.trim();
-              console.log(`🔧 [Agent] web_exec: ${fullCommand} ${cwd ? `(cwd: ${cwd})` : ''}`);
+              console.log(`🔧 [Agent] exec: ${fullCommand} ${cwd ? `(cwd: ${cwd})` : ''}`);
               let result = await fnsRef.current.spawn(command, args, { cwd });
 
               // No package manager fallback to keep behavior strict
@@ -423,7 +445,7 @@ export default function AIAgentBar() {
 
               if (isPkgMgrCmd) {
                 addToolResult({
-                  tool: 'web_exec',
+                  tool: 'exec',
                   toolCallId: tc.toolCallId,
                   output: {
                     command: fullCommand,
@@ -434,7 +456,7 @@ export default function AIAgentBar() {
                 });
               } else {
                 addToolResult({
-                  tool: 'web_exec',
+                  tool: 'exec',
                   toolCallId: tc.toolCallId,
                   output: {
                     command: fullCommand,
@@ -448,62 +470,36 @@ export default function AIAgentBar() {
             }
             case 'create_app': {
               const { id: requestedId, name, icon } = tc.input as { id: string; name: string; icon?: string };
-              
-              // Handle duplicate names by adding (1), (2), etc.
+              let registry: Array<{ id: string; name: string; icon?: string; path: string }>; 
+              try {
+                const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
+                registry = JSON.parse(regRaw);
+              } catch {
+                registry = [];
+              }
+              // Deduplicate name/id using one registry read
               let finalName = name;
               let finalId = requestedId;
-              try {
-                const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
-                const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>;
-                
-                // Check for duplicate names
-                const existingNames = new Set(registry.map(app => app.name));
-                let counter = 1;
-                while (existingNames.has(finalName)) {
-                  finalName = `${name} (${counter})`;
-                  counter++;
-                }
-                
-                // Check for duplicate IDs
-                const existingIds = new Set(registry.map(app => app.id));
-                counter = 1;
-                while (existingIds.has(finalId)) {
-                  finalId = `${requestedId}-${counter}`;
-                  counter++;
-                }
-              } catch (e) {
-                // Registry doesn't exist yet, use original name and id
-              }
-              
+              const existingNames = new Set(registry.map(app => app.name));
+              const existingIds = new Set(registry.map(app => app.id));
+              let counter = 1;
+              while (existingNames.has(finalName)) { finalName = `${name} (${counter})`; counter++; }
+              counter = 1;
+              while (existingIds.has(finalId)) { finalId = `${requestedId}-${counter}`; counter++; }
+
               const base = `src/apps/${finalId}`;
               console.log(`🔧 [Agent] create_app: "${finalName}" -> ${base} (${icon ?? '📦'})`);
-              
+
               await fnsRef.current.mkdir(base, true);
-              const metadata = {
-                id: finalId,
-                name: finalName,
-                icon: icon ?? '📦',
-                createdAt: Date.now(),
-              };
+              const metadata = { id: finalId, name: finalName, icon: icon ?? '📦', createdAt: Date.now() };
               await fnsRef.current.writeFile(`${base}/metadata.json`, JSON.stringify(metadata, null, 2));
-              // minimal entry file (tsx)
               const appIndexTsx = `import React from 'react'\nimport '/src/tailwind.css'\nimport './styles.css'\nexport default function App(){\n  return (\n    <div className=\"h-full overflow-auto bg-gradient-to-b from-white to-slate-50\">\n      <div className=\"sticky top-0 bg-white/80 backdrop-blur border-b px-3 py-2\">\n        <div className=\"font-semibold tracking-tight\">${finalName}</div>\n      </div>\n      <div className=\"p-3 space-y-3\">\n        <div className=\"rounded-lg border bg-white shadow-sm p-3\">\n          <p className=\"text-slate-600 text-sm\">This is a new app. Build your UI here. The container fills the window and scrolls as needed.</p>\n        </div>\n      </div>\n    </div>\n  )\n}`;
               await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
-              // Write a minimal per-app stylesheet to make the template look styled even without Tailwind upgrades
               const appStylesCss = `:root{--app-accent:#22c55e;}\nbody{font-family:Inter,ui-sans-serif,system-ui,Arial}\na{color:var(--app-accent)}`;
               await fnsRef.current.writeFile(`${base}/styles.css`, appStylesCss);
-              // update registry
-              try {
-                const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
-                const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>
-                registry.push({ id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` });
-                await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
-              } catch (e) {
-                // If registry missing, create it
-                await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify([
-                  { id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` }
-                ], null, 2));
-              }
+              // Update registry once
+              registry.push({ id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` });
+              await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
               // Notify desktop to open the newly created app after a short delay
               try {
                 const appIndexPath = `/${base}/index.tsx`;
@@ -689,13 +685,6 @@ export default function AIAgentBar() {
   // Overlay click handled via a fixed backdrop element in the JSX
 
   // === Automatic diagnostics ===
-  // Preview error -> show alert and auto-post to AI once per unique error
-  const [previewAlert, setPreviewAlert] = useState<{
-    source: 'preview';
-    title: string;
-    description?: string;
-    content: string;
-  } | null>(null);
 
   // Removed automatic validation loop; validation runs only via validate_project tool
   const validateRunningRef = useRef(false);
@@ -728,20 +717,19 @@ export default function AIAgentBar() {
     }
   }
 
-  // Listen for preview runtime errors
+  // Listen for preview runtime errors and automatically send to AI
   useEffect(() => {
     const handler = (e: Event) => {
       const ce = e as CustomEvent;
       if (ce?.detail?.source === 'preview') {
         const detail = ce.detail as any;
-        setPreviewAlert(detail);
         const payload = detail?.content || detail?.description || '';
         if (payload) {
           const hash = stableHash(String(payload));
           if (hash !== lastErrorHashRef.current) {
             lastErrorHashRef.current = hash;
             void autoPostDiagnostic(
-              `Preview runtime error detected automatically. Please diagnose and fix.\n\n\`\`\`txt\n${payload}\n\`\`\`\n`,
+              `Preview runtime error detected automatically. Please diagnose and fix this error:\n\n\`\`\`txt\n${payload}\n\`\`\`\n`,
             );
           }
         }
@@ -808,15 +796,15 @@ export default function AIAgentBar() {
       }
 
       const final = logs.filter(Boolean).join('\n\n');
-      if (final.trim().length > 0) {
-        const hash = stableHash(final);
-        if (hash !== lastErrorHashRef.current) {
-          lastErrorHashRef.current = hash;
-          await autoPostDiagnostic(
-            `Automatic checks found issues after recent changes (${changed.join(', ')}). Please fix.\n\n\`\`\`txt\n${final}\n\`\`\`\n`,
-          );
-        }
-      }
+         if (final.trim().length > 0) {
+           const hash = stableHash(final);
+           if (hash !== lastErrorHashRef.current) {
+             lastErrorHashRef.current = hash;
+             await autoPostDiagnostic(
+               `Automatic validation detected issues after recent changes (${changed.join(', ')}). Please fix these errors:\n\n\`\`\`txt\n${final}\n\`\`\`\n`,
+             );
+           }
+         }
     } finally {
       validateRunningRef.current = false;
     }
@@ -995,20 +983,8 @@ export default function AIAgentBar() {
               <div className="overflow-hidden" style={{ maxHeight: '70vh' }}>
                 <div className="bg-transparent text-white">
 
-                {mode === 'chat' && (
-                  <div className="px-4 pt-3">
-                    <div className="space-y-2">
-                      {previewAlert && (
-                        <ChatAlert
-                          alert={previewAlert}
-                          onAsk={(msg) => {
-                            void sendMessage({ text: msg });
-                            setPreviewAlert(null);
-                          }}
-                          onDismiss={() => setPreviewAlert(null)}
-                        />
-                      )}
-                    </div>
+                 {mode === 'chat' && (
+                   <div className="px-4 pt-3">
 
                     <div
                       ref={messagesContainerRef}
@@ -1179,3 +1155,4 @@ export default function AIAgentBar() {
     </>
   );
 }
+
