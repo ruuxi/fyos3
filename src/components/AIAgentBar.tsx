@@ -242,9 +242,24 @@ export default function AIAgentBar() {
 
   // Lean reloads: rely on dev server HMR; no manual refresh orchestration
 
+  // Store classification in a ref so it persists across renders
+  const classificationRef = useRef<any>(null);
+
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id: 'agent-chat',
-    transport: new DefaultChatTransport({ api: '/api/agent' }),
+    transport: new DefaultChatTransport({ 
+      api: '/api/agent',
+      prepareSendMessagesRequest({ messages, id }) {
+        // Include classification if available
+        const body: any = { messages, id };
+        if (classificationRef.current) {
+          body.classification = classificationRef.current;
+          // Clear classification after use
+          classificationRef.current = null;
+        }
+        return { body };
+      }
+    }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     async onToolCall({ toolCall }) {
       if (toolCall.dynamic) return; // not expected here, but keep safe
@@ -1064,7 +1079,32 @@ export default function AIAgentBar() {
       userText += '\n\nAttachments:\n' + attachments.map(a => `- ${a.name}: ${a.publicUrl}`).join('\n');
     }
     
+    try {
+      // First, classify the user's message
+      console.log('🏷️ [AIAgentBar] Classifying message...');
+      const classifyResponse = await fetch('/api/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userText }),
+      });
+      
+      if (classifyResponse.ok) {
+        const classification = await classifyResponse.json();
+        console.log('🏷️ [AIAgentBar] Classification result:', classification.taskType);
+        // Store classification in ref for the transport to use
+        classificationRef.current = classification;
+      } else {
+        console.error('Classification failed, using default settings');
+        classificationRef.current = null;
+      }
+    } catch (error) {
+      console.error('Error classifying message:', error);
+      classificationRef.current = null;
+    }
+    
+    // Send message - the transport will include classification if available
     void sendMessage({ text: userText });
+    
     setInput('');
     setAttachments([]);
   };

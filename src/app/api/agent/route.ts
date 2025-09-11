@@ -19,7 +19,18 @@ import {
   CodeEditAstInput,
 } from '@/lib/agentTools';
 import { agentLogger } from '@/lib/agentLogger';
-import { CLASSIFIER_PROMPT, PERSONA_PROMPT, MAIN_SYSTEM_PROMPT } from '@/lib/agentPrompts';
+import { 
+  BASE_SYSTEM_PROMPT,
+  CREATE_APP_PROMPT,
+  EDIT_APP_PROMPT,
+  GENERATION_PROMPT,
+  CHAT_PROMPT,
+  STYLING_GUIDELINES,
+  AI_INTEGRATION_PATTERNS,
+  BEST_PRACTICES,
+  PERSONA_PROMPT,
+  MAIN_SYSTEM_PROMPT 
+} from '@/lib/agentPrompts';
 import Exa from 'exa-js';
 
 // Helper function to sanitize tool inputs for logging (removes large content)
@@ -48,7 +59,8 @@ function sanitizeToolInput(toolName: string, input: any): any {
 export const maxDuration = 300;
 
 export async function POST(req: Request) {
-  const { messages }: { messages: UIMessage[] } = await req.json();
+  const body = await req.json();
+  const { messages, classification }: { messages: UIMessage[], classification?: any } = body;
   
   // Generate session ID for this conversation
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -66,51 +78,13 @@ export async function POST(req: Request) {
     toolCalls: 'toolCalls' in m && Array.isArray(m.toolCalls) ? m.toolCalls.length : 0
   })));
 
-  // Classifier mode: return one-word label ("create" | "chat") for the latest user message
-  const classifyMode = new URL(req.url).searchParams.get('classify') === '1' || new URL(req.url).searchParams.get('mode') === 'classify';
-  if (classifyMode) {
-    // Use only the latest user message for classification
-    const lastUser = [...messages].reverse().find(m => m.role === 'user');
-    const userText = (lastUser && typeof (lastUser as any).content === 'string') ? (lastUser as any).content : '';
-    try {
-      const result = await generateText({
-        model: 'google/gemini-2.0-flash',
-        temperature: 0.1,
-        system: CLASSIFIER_PROMPT,
-        prompt: userText || ' ',
-      });
-      
-      // Log usage after generateText completes
-      console.log('🏷️ [CLASSIFY] Classification finished:', {
-        finishReason: result.finishReason,
-        textLength: result.text?.length || 0,
-        inputLength: userText?.length || 0,
-      });
-      
-      if (result.usage) {
-        console.log('📊 [USAGE-CLASSIFY] Token consumption:', {
-          inputTokens: result.usage.inputTokens || 0,
-          outputTokens: result.usage.outputTokens || 0,
-          totalTokens: result.usage.totalTokens || 0,
-          reasoningTokens: result.usage.reasoningTokens || 0,
-          cachedInputTokens: result.usage.cachedInputTokens || 0,
-        });
-        
-        // Calculate cost for gemini-2.0-flash: $0.10 per million input, $0.40 per million output
-        const inputCostPerMillion = 0.10;
-        const outputCostPerMillion = 0.40;
-        const estimatedCost = 
-          ((result.usage.inputTokens || 0) / 1000000) * inputCostPerMillion +
-          ((result.usage.outputTokens || 0) / 1000000) * outputCostPerMillion;
-        
-        console.log('💰 [USAGE-COST] gemini-2.0-flash estimated cost: $' + estimatedCost.toFixed(6));
-      }
-      const raw = (result.text || '').trim().toLowerCase();
-      const label = raw.startsWith('create') ? 'create' : 'chat';
-      return new Response(JSON.stringify({ label }), { headers: { 'Content-Type': 'application/json' } });
-    } catch (err: unknown) {
-      return new Response(JSON.stringify({ label: 'chat', error: err instanceof Error ? err.message : String(err) }), { headers: { 'Content-Type': 'application/json' }, status: 200 });
-    }
+  // Log classification if provided
+  if (classification) {
+    console.log('🏷️ [AGENT] Using classification:', {
+      taskType: classification.taskType,
+      toolsCount: classification.availableTools?.length || 0,
+      promptSections: classification.promptSections
+    });
   }
 
   // Persona-only mode: returns a parallel, personality-driven stream that does not use tools
@@ -156,6 +130,146 @@ export async function POST(req: Request) {
 
     console.log('📤 [PERSONA] Returning streaming response');
     return result.toUIMessageStreamResponse();
+  }
+
+  // Build system prompt based on classification
+  let systemPrompt = MAIN_SYSTEM_PROMPT; // Default to full prompt if no classification
+  
+  if (classification && classification.promptSections) {
+    const promptMap: Record<string, string> = {
+      'BASE_SYSTEM_PROMPT': BASE_SYSTEM_PROMPT,
+      'CREATE_APP_PROMPT': CREATE_APP_PROMPT,
+      'EDIT_APP_PROMPT': EDIT_APP_PROMPT,
+      'GENERATION_PROMPT': GENERATION_PROMPT,
+      'CHAT_PROMPT': CHAT_PROMPT,
+      'STYLING_GUIDELINES': STYLING_GUIDELINES,
+      'AI_INTEGRATION_PATTERNS': AI_INTEGRATION_PATTERNS,
+      'BEST_PRACTICES': BEST_PRACTICES,
+    };
+
+    const sections = classification.promptSections
+      .map((section: string) => promptMap[section])
+      .filter(Boolean);
+    
+    if (sections.length > 0) {
+      systemPrompt = sections.join('\n\n');
+    }
+  }
+
+  // Define all available tools
+  const allTools = {
+    // File operations
+    [TOOL_NAMES.fs_find]: {
+      description: 'List files and folders recursively starting at a directory.',
+      inputSchema: FSFindInput,
+    },
+    [TOOL_NAMES.fs_read]: {
+      description: 'Read a file from the filesystem.',
+      inputSchema: FSReadInput,
+    },
+    [TOOL_NAMES.fs_write]: {
+      description: 'Write file contents. Creates parent directories when needed.',
+      inputSchema: FSWriteInput,
+    },
+    [TOOL_NAMES.fs_mkdir]: {
+      description: 'Create a directory (optionally recursive).',
+      inputSchema: FSMkdirInput,
+    },
+    [TOOL_NAMES.fs_rm]: {
+      description: 'Remove a file or directory (recursive by default).',
+      inputSchema: FSRmInput,
+    },
+    // Process execution
+    [TOOL_NAMES.exec]: {
+      description: 'Run shell commands. Prefer pnpm for installs. Never run dev/build/start.',
+      inputSchema: ExecInput,
+    },
+    // App management
+    [TOOL_NAMES.create_app]: {
+      description: 'Create a new app under src/apps/<id> + update public/apps/registry.json.',
+      inputSchema: CreateAppInput,
+    },
+    [TOOL_NAMES.rename_app]: {
+      description: 'Rename an app in public/apps/registry.json by id.',
+      inputSchema: RenameAppInput,
+    },
+    [TOOL_NAMES.remove_app]: {
+      description: 'Remove an app folder and its registry entry by id.',
+      inputSchema: RemoveAppInput,
+    },
+    // Validation
+    [TOOL_NAMES.validate_project]: {
+      description: 'Run validation checks (TypeScript noEmit; optionally ESLint on files; full also runs build).',
+      inputSchema: ValidateProjectInput,
+    },
+    // Web search
+    [TOOL_NAMES.web_search]: tool({
+      description: 'Search the web for up-to-date information.',
+      inputSchema: WebSearchInput,
+      async execute({ query }) {
+        const startTime = Date.now();
+        const toolCallId = `search_${Date.now()}`;
+        
+        try {
+          const apiKey = process.env.EXA_API_KEY;
+          if (!apiKey) {
+            const error = { error: 'Missing EXA_API_KEY in environment.' };
+            await agentLogger.logToolCall(sessionId, TOOL_NAMES.web_search, toolCallId, { query }, error, Date.now() - startTime);
+            return error;
+          }
+          
+          const exa = new Exa(apiKey);
+          const { results } = await exa.searchAndContents(query, {
+            livecrawl: 'always',
+            numResults: 3,
+          } as any);
+          
+          const output = (results || []).map((r: any) => ({
+            title: r.title,
+            url: r.url,
+            content: typeof r.text === 'string' ? r.text.slice(0, 1000) : undefined,
+            publishedDate: r.publishedDate,
+          }));
+          
+          await agentLogger.logToolCall(sessionId, TOOL_NAMES.web_search, toolCallId, { query }, { results: output.length, data: output }, Date.now() - startTime);
+          return output;
+        } catch (err: unknown) {
+          const error = { error: err instanceof Error ? err.message : String(err) };
+          await agentLogger.logError(sessionId, err as Error, { toolName: TOOL_NAMES.web_search, query });
+          await agentLogger.logToolCall(sessionId, TOOL_NAMES.web_search, toolCallId, { query }, error, Date.now() - startTime);
+          return error;
+        }
+      },
+    }),
+    // AI Media Tools
+    [TOOL_NAMES.ai_fal]: {
+      description: 'Generate media using FAL models. Supports image, video, and audio generation.',
+      inputSchema: AiFalInput,
+    },
+    [TOOL_NAMES.ai_eleven_music]: {
+      description: 'Generate music using ElevenLabs Music API.',
+      inputSchema: ElevenMusicInput,
+    },
+    [TOOL_NAMES.media_list]: {
+      description: 'List previously generated or ingested media assets.',
+      inputSchema: MediaListInput,
+    },
+    // Code editing
+    [TOOL_NAMES.code_edit_ast]: {
+      description: 'Edit TypeScript/JavaScript files using AST-based transformations. Supports import management, function body updates, JSX element manipulation, and code insertion.',
+      inputSchema: CodeEditAstInput,
+    },
+  };
+
+  // Filter tools based on classification
+  let tools: any = allTools;
+  if (classification && classification.availableTools && classification.availableTools.length > 0) {
+    const allowedTools = new Set(classification.availableTools);
+    tools = Object.fromEntries(
+      Object.entries(allTools).filter(([toolName]) => allowedTools.has(toolName))
+    );
+    
+    console.log('🔧 [AGENT] Filtered tools:', Object.keys(tools));
   }
 
   // Track tool call timings to avoid duplicate logging
@@ -300,119 +414,10 @@ export async function POST(req: Request) {
         })));
       }
     },
-    system: MAIN_SYSTEM_PROMPT,
-    tools: {
-      // Step 1 – file discovery
-      [TOOL_NAMES.fs_find]: {
-        description: 'List files and folders recursively starting at a directory.',
-        inputSchema: FSFindInput,
-      },
-      // File reads
-      [TOOL_NAMES.fs_read]: {
-        description: 'Read a file from the filesystem.',
-        inputSchema: FSReadInput,
-      },
-      // Writes and mkdirs
-      [TOOL_NAMES.fs_write]: {
-        description: 'Write file contents. Creates parent directories when needed.',
-        inputSchema: FSWriteInput,
-      },
-      [TOOL_NAMES.fs_mkdir]: {
-        description: 'Create a directory (optionally recursive).',
-        inputSchema: FSMkdirInput,
-      },
-      [TOOL_NAMES.fs_rm]: {
-        description: 'Remove a file or directory (recursive by default).',
-        inputSchema: FSRmInput,
-      },
-      // Process execution
-      [TOOL_NAMES.exec]: {
-        description: 'Run shell commands. Prefer pnpm for installs. Never run dev/build/start.',
-        inputSchema: ExecInput,
-      },
-      // High-level: create app folder structure with custom id
-      [TOOL_NAMES.create_app]: {
-        description: 'Create a new app under src/apps/<id> + update public/apps/registry.json.',
-        inputSchema: CreateAppInput,
-      },
-      // Update registry: rename an app by id
-      [TOOL_NAMES.rename_app]: {
-        description: 'Rename an app in public/apps/registry.json by id.',
-        inputSchema: RenameAppInput,
-      },
-      // Remove an app from disk and registry
-      [TOOL_NAMES.remove_app]: {
-        description: 'Remove an app folder and its registry entry by id.',
-        inputSchema: RemoveAppInput,
-      },
-      // Validate project health (typecheck/lint/build quick checks)
-      [TOOL_NAMES.validate_project]: {
-        description:
-          'Run validation checks (TypeScript noEmit; optionally ESLint on files; full also runs build).',
-        inputSchema: ValidateProjectInput,
-      },
-
-      // Web search with Exa (server-side tool)
-      [TOOL_NAMES.web_search]: tool({
-        description: 'Search the web for up-to-date information.',
-        inputSchema: WebSearchInput,
-        async execute({ query }) {
-          const startTime = Date.now();
-          const toolCallId = `search_${Date.now()}`;
-          
-          try {
-            const apiKey = process.env.EXA_API_KEY;
-            if (!apiKey) {
-              const error = { error: 'Missing EXA_API_KEY in environment.' };
-              await agentLogger.logToolCall(sessionId, TOOL_NAMES.web_search, toolCallId, { query }, error, Date.now() - startTime);
-              return error;
-            }
-            
-            const exa = new Exa(apiKey);
-            const { results } = await exa.searchAndContents(query, {
-              livecrawl: 'always',
-              numResults: 3,
-            } as any);
-            
-            const output = (results || []).map((r: any) => ({
-              title: r.title,
-              url: r.url,
-              content: typeof r.text === 'string' ? r.text.slice(0, 1000) : undefined,
-              publishedDate: r.publishedDate,
-            }));
-            
-            await agentLogger.logToolCall(sessionId, TOOL_NAMES.web_search, toolCallId, { query }, { results: output.length, data: output }, Date.now() - startTime);
-            return output;
-          } catch (err: unknown) {
-            const error = { error: err instanceof Error ? err.message : String(err) };
-            await agentLogger.logError(sessionId, err as Error, { toolName: TOOL_NAMES.web_search, query });
-            await agentLogger.logToolCall(sessionId, TOOL_NAMES.web_search, toolCallId, { query }, error, Date.now() - startTime);
-            return error;
-          }
-        },
-      }),
-
-      // AI Media Tools (client-executed)
-      [TOOL_NAMES.ai_fal]: {
-        description: 'Generate media using FAL models. Supports image, video, and audio generation.',
-        inputSchema: AiFalInput,
-      },
-      [TOOL_NAMES.ai_eleven_music]: {
-        description: 'Generate music using ElevenLabs Music API.',
-        inputSchema: ElevenMusicInput,
-      },
-      [TOOL_NAMES.media_list]: {
-        description: 'List previously generated or ingested media assets.',
-        inputSchema: MediaListInput,
-      },
-      [TOOL_NAMES.code_edit_ast]: {
-        description: 'Edit TypeScript/JavaScript files using AST-based transformations. Supports import management, function body updates, JSX element manipulation, and code insertion.',
-        inputSchema: CodeEditAstInput,
-      },
-    },
+    system: systemPrompt,
+    tools,
   });
 
   console.log('📤 [AGENT] Returning streaming response');
   return result.toUIMessageStreamResponse();
 }
-
