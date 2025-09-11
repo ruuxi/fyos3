@@ -57,6 +57,17 @@
         e.preventDefault();
         console.error('[App iframe] window error:', e.error || e.message);
         showOverlay(String(e?.error?.message || e?.message || 'Unknown error'));
+        // Forward runtime error to host for automatic diagnostics
+        try {
+          window.top?.postMessage({
+            type: 'APP_RUNTIME_ERROR',
+            message: String(e?.error?.message || e?.message || 'Unknown error'),
+            stack: String((e?.error && e.error.stack) || ''),
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash
+          }, '*');
+        } catch {}
       }, true);
       
       window.addEventListener('unhandledrejection', (e) => {
@@ -64,6 +75,17 @@
         e.preventDefault();
         console.error('[App iframe] unhandledrejection:', e.reason);
         showOverlay(String(e?.reason?.message || e?.reason || 'Unhandled promise rejection'));
+        // Forward promise rejection to host for automatic diagnostics
+        try {
+          window.top?.postMessage({
+            type: 'APP_RUNTIME_ERROR',
+            message: String(e?.reason?.message || e?.reason || 'Unhandled promise rejection'),
+            stack: String((e?.reason && e.reason.stack) || ''),
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash
+          }, '*');
+        } catch {}
       }, true);
 
       // Prevent errors from bubbling to parent
@@ -71,6 +93,47 @@
       console.error = function(...args) {
         try {
           originalConsoleError.apply(console, ['[App iframe]', ...args]);
+        } catch {}
+        // Forward to host for automatic diagnostics
+        try {
+          const safeArgs = args.map(a => {
+            try {
+              if (typeof a === 'string') return a;
+              if (a && typeof a === 'object') return a.message || JSON.stringify(a).slice(0, 1200);
+              return String(a);
+            } catch { return '[unserializable]'; }
+          });
+          window.top?.postMessage({
+            type: 'APP_CONSOLE',
+            level: 'error',
+            args: safeArgs,
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash
+          }, '*');
+        } catch {}
+      };
+
+      // Also forward console.warn (lower priority; host may ignore)
+      const originalConsoleWarn = console.warn;
+      console.warn = function(...args) {
+        try { originalConsoleWarn.apply(console, ['[App iframe]', ...args]); } catch {}
+        try {
+          const safeArgs = args.map(a => {
+            try {
+              if (typeof a === 'string') return a;
+              if (a && typeof a === 'object') return a.message || JSON.stringify(a).slice(0, 800);
+              return String(a);
+            } catch { return '[unserializable]'; }
+          });
+          window.top?.postMessage({
+            type: 'APP_CONSOLE',
+            level: 'warn',
+            args: safeArgs,
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash
+          }, '*');
         } catch {}
       };
 

@@ -87,6 +87,34 @@ export default function WebContainer() {
             } catch {}
           });
         } catch {}
+        // Inject a lightweight preview script to forward console errors from non-app previews
+        try {
+          const script = `(() => {
+            try {
+              const origErr = console.error;
+              console.error = function(...args){
+                try { origErr.apply(console, args); } catch {}
+                try {
+                  const safe = args.map(a => {
+                    try { if (typeof a === 'string') return a; if (a && typeof a === 'object') return a.message || JSON.stringify(a).slice(0,800); return String(a); } catch { return '[unserializable]'; }
+                  });
+                  window.top?.postMessage({ type: 'APP_CONSOLE', level: 'error', args: safe, pathname: location.pathname, search: location.search, hash: location.hash }, '*');
+                } catch {}
+              };
+              window.addEventListener('error', (e) => {
+                try {
+                  window.top?.postMessage({ type: 'APP_RUNTIME_ERROR', message: String(e?.error?.message || e?.message || 'Unknown error'), stack: String((e?.error && e.error.stack) || ''), pathname: location.pathname, search: location.search, hash: location.hash }, '*');
+                } catch {}
+              }, true);
+              window.addEventListener('unhandledrejection', (e) => {
+                try {
+                  window.top?.postMessage({ type: 'APP_RUNTIME_ERROR', message: String(e?.reason?.message || e?.reason || 'Unhandled promise rejection'), stack: String((e?.reason && e.reason.stack) || ''), pathname: location.pathname, search: location.search, hash: location.hash }, '*');
+                } catch {}
+              }, true);
+            } catch {}
+          })();`;
+          try { await (instance as any).setPreviewScript?.(script); } catch {}
+        } catch {}
         setLoadingStage('Preparing workspace…');
         setTargetProgress((p) => Math.max(p, 26));
 
@@ -322,6 +350,34 @@ export default function Document() {
             } catch (e: any) {
               reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: false, error: e?.message || 'Ingest failed' });
             }
+            return;
+          }
+
+          // Forward app runtime errors from app iframes to the host diagnostic bus
+          if (event.data && event.data.type === 'APP_RUNTIME_ERROR') {
+            try {
+              const d = event.data as any;
+              const title = 'App Runtime Error';
+              const description = d?.message || 'Unknown app error';
+              const loc = `${d?.pathname || ''}${d?.search || ''}${d?.hash || ''}`;
+              const stack = d?.stack || '';
+              const detail = { source: 'preview' as const, title, description, content: `Error at ${loc}\n\nStack trace:\n${stack}` };
+              window.dispatchEvent(new CustomEvent('wc-preview-error', { detail }));
+            } catch {}
+            return;
+          }
+
+          // Optionally surface app console errors as diagnostics (warnings ignored)
+          if (event.data && event.data.type === 'APP_CONSOLE') {
+            try {
+              const d = event.data as any;
+              if (d?.level === 'error') {
+                const loc = `${d?.pathname || ''}${d?.search || ''}${d?.hash || ''}`;
+                const msg = Array.isArray(d?.args) ? d.args.join(' ') : String(d?.args || '');
+                const detail = { source: 'preview' as const, title: 'App Console Error', description: msg, content: `Console error at ${loc}\n\n${msg}` };
+                window.dispatchEvent(new CustomEvent('wc-preview-error', { detail }));
+              }
+            } catch {}
             return;
           }
 
