@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Download, Star, TrendingUp, Sparkles } from 'lucide-react';
+import { Search, Download, Star, TrendingUp, Sparkles, Upload } from 'lucide-react';
 import { useWebContainer } from './WebContainerProvider';
 
 type AppRecord = {
@@ -28,6 +28,8 @@ export function AppStoreScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [installingIds, setInstallingIds] = useState<Set<string>>(new Set());
+  const [localApps, setLocalApps] = useState<Array<{id: string; name: string; icon?: string; path: string}>>([]);
+  const [publishingIds, setPublishingIds] = useState<Set<string>>(new Set());
   const { instance } = useWebContainer();
 
   useEffect(() => {
@@ -50,6 +52,30 @@ export function AppStoreScreen() {
     return () => { mounted = false; };
   }, []);
 
+  // Load local apps from the WebContainer registry
+  useEffect(() => {
+    if (!instance) return;
+    
+    let mounted = true;
+    const loadLocalApps = async () => {
+      try {
+        const registryContent = await instance.fs.readFile('/public/apps/registry.json', 'utf8');
+        const registry = JSON.parse(registryContent as string);
+        if (mounted) {
+          setLocalApps(Array.isArray(registry) ? registry : []);
+        }
+      } catch (e) {
+        console.warn('Failed to load local apps registry:', e);
+        if (mounted) {
+          setLocalApps([]);
+        }
+      }
+    };
+
+    loadLocalApps();
+    return () => { mounted = false; };
+  }, [instance]);
+
   const handleInstall = async (appId: string) => {
     if (installingIds.has(appId) || !instance) return;
 
@@ -68,6 +94,69 @@ export function AppStoreScreen() {
       setInstallingIds(prev => {
         const next = new Set(prev);
         next.delete(appId);
+        return next;
+      });
+    }
+  };
+
+  const handlePublish = async (localApp: {id: string; name: string; icon?: string; path: string}) => {
+    if (publishingIds.has(localApp.id) || !instance) return;
+
+    setPublishingIds(prev => new Set(prev).add(localApp.id));
+    
+    try {
+      const { buildAppTarGz } = await import('@/utils/app-packaging');
+      
+      // Create manifest for the app
+      const manifest = {
+        schemaVersion: 1 as const,
+        id: localApp.id,
+        name: localApp.name,
+        icon: localApp.icon || '📦',
+        entry: localApp.path,
+        dependencies: {},
+        description: `Published from desktop: ${localApp.name}`,
+        tags: ['user-created'],
+      };
+
+      // Build the package
+      const pkg = await buildAppTarGz(instance, localApp.id, manifest);
+      const blobBase64 = btoa(String.fromCharCode(...pkg.tarGz));
+
+      // Publish to store
+      const res = await fetch('/api/publish/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: localApp.id,
+          name: localApp.name,
+          version: '1.0.0',
+          description: manifest.description,
+          icon: manifest.icon,
+          tags: manifest.tags,
+          size: pkg.size,
+          manifestHash: pkg.manifestHash,
+          depsHash: pkg.depsHash,
+          blobBase64,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Publish failed: ${errorText}`);
+      }
+
+      // Refresh the apps list to show the newly published app
+      const data = await fetchJSON<{ apps: AppRecord[] }>('/api/store/apps');
+      setApps(data.apps || []);
+      
+    } catch (e) {
+      console.error('Publish failed:', e);
+      alert(`Failed to publish ${localApp.name}: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setPublishingIds(prev => {
+        const next = new Set(prev);
+        next.delete(localApp.id);
         return next;
       });
     }
@@ -120,7 +209,7 @@ export function AppStoreScreen() {
 
       <main className="max-w-6xl mx-auto px-6 py-8">
         <Tabs defaultValue="discover" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-3 max-w-md bg-white/10 border-white/20">
+          <TabsList className="grid w-full grid-cols-4 max-w-lg bg-white/10 border-white/20">
             <TabsTrigger value="discover" className="gap-2 text-white/70 data-[state=active]:text-white data-[state=active]:bg-white/20">
               <Sparkles className="w-4 h-4" />
               Discover
@@ -132,6 +221,10 @@ export function AppStoreScreen() {
             <TabsTrigger value="trending" className="gap-2 text-white/70 data-[state=active]:text-white data-[state=active]:bg-white/20">
               <TrendingUp className="w-4 h-4" />
               Trending
+            </TabsTrigger>
+            <TabsTrigger value="publish" className="gap-2 text-white/70 data-[state=active]:text-white data-[state=active]:bg-white/20">
+              <Upload className="w-4 h-4" />
+              Publish
             </TabsTrigger>
           </TabsList>
 
@@ -292,6 +385,62 @@ export function AppStoreScreen() {
                   </Card>
                 ))}
               </div>
+            </section>
+          </TabsContent>
+
+          <TabsContent value="publish" className="space-y-8">
+            <section>
+              <h3 className="text-2xl font-bold text-white mb-6">Publish Your Apps</h3>
+              <p className="text-white/70 mb-6">Share your locally created apps with the community by publishing them to the App Store.</p>
+              
+              {localApps.length === 0 ? (
+                <Card className="bg-white/5 border-white/20">
+                  <CardContent className="p-8 text-center">
+                    <Upload className="w-12 h-12 text-white/40 mx-auto mb-4" />
+                    <h4 className="text-lg font-semibold text-white mb-2">No Local Apps Found</h4>
+                    <p className="text-white/60 mb-4">
+                      Create apps using the AI agent first, then come back here to publish them.
+                    </p>
+                    <p className="text-white/50 text-sm">
+                      Try saying: "Create a calculator app" or "Build a todo list app"
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {localApps.map((app) => (
+                    <Card key={app.id} className="hover:shadow-lg transition-shadow bg-white/5 border-white/20">
+                      <CardHeader>
+                        <div className="flex items-start gap-3">
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center text-3xl">
+                            {app.icon || '📦'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-xl text-white">{app.name}</CardTitle>
+                            <CardDescription className="text-white/60">
+                              Local app • Ready to publish
+                            </CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20">
+                            {app.id}
+                          </Badge>
+                          <Button
+                            onClick={() => handlePublish(app)}
+                            disabled={publishingIds.has(app.id)}
+                            className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+                          >
+                            {publishingIds.has(app.id) ? 'Publishing...' : 'Publish'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </section>
           </TabsContent>
         </Tabs>

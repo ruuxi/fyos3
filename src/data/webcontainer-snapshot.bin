@@ -1,4 +1,4 @@
-Å°dç®app.htmlÅ°fÅ°c≈<!doctype html>
+Å°dç®app.htmlÅ°fÅ°c≈%r<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -57,6 +57,17 @@
         e.preventDefault();
         console.error('[App iframe] window error:', e.error || e.message);
         showOverlay(String(e?.error?.message || e?.message || 'Unknown error'));
+        // Forward runtime error to host for automatic diagnostics
+        try {
+          window.top?.postMessage({
+            type: 'APP_RUNTIME_ERROR',
+            message: String(e?.error?.message || e?.message || 'Unknown error'),
+            stack: String((e?.error && e.error.stack) || ''),
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash
+          }, '*');
+        } catch {}
       }, true);
       
       window.addEventListener('unhandledrejection', (e) => {
@@ -64,6 +75,17 @@
         e.preventDefault();
         console.error('[App iframe] unhandledrejection:', e.reason);
         showOverlay(String(e?.reason?.message || e?.reason || 'Unhandled promise rejection'));
+        // Forward promise rejection to host for automatic diagnostics
+        try {
+          window.top?.postMessage({
+            type: 'APP_RUNTIME_ERROR',
+            message: String(e?.reason?.message || e?.reason || 'Unhandled promise rejection'),
+            stack: String((e?.reason && e.reason.stack) || ''),
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash
+          }, '*');
+        } catch {}
       }, true);
 
       // Prevent errors from bubbling to parent
@@ -71,6 +93,47 @@
       console.error = function(...args) {
         try {
           originalConsoleError.apply(console, ['[App iframe]', ...args]);
+        } catch {}
+        // Forward to host for automatic diagnostics
+        try {
+          const safeArgs = args.map(a => {
+            try {
+              if (typeof a === 'string') return a;
+              if (a && typeof a === 'object') return a.message || JSON.stringify(a).slice(0, 1200);
+              return String(a);
+            } catch { return '[unserializable]'; }
+          });
+          window.top?.postMessage({
+            type: 'APP_CONSOLE',
+            level: 'error',
+            args: safeArgs,
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash
+          }, '*');
+        } catch {}
+      };
+
+      // Also forward console.warn (lower priority; host may ignore)
+      const originalConsoleWarn = console.warn;
+      console.warn = function(...args) {
+        try { originalConsoleWarn.apply(console, ['[App iframe]', ...args]); } catch {}
+        try {
+          const safeArgs = args.map(a => {
+            try {
+              if (typeof a === 'string') return a;
+              if (a && typeof a === 'object') return a.message || JSON.stringify(a).slice(0, 800);
+              return String(a);
+            } catch { return '[unserializable]'; }
+          });
+          window.top?.postMessage({
+            type: 'APP_CONSOLE',
+            level: 'warn',
+            args: safeArgs,
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash
+          }, '*');
         } catch {}
       };
 
@@ -2590,32 +2653,7 @@ export async function multiviewTo3D(images: Array<File | string>, options: any =
   for (const img of images) image_urls.push(await ensurePublicUrl(img));
   return callFal('tripo3d/tripo/v2.5/multiview-to-3d', { image_urls, ...options });
 }
-§appsÅ°dá¶finderÅ°dÅ©index.tsxÅ°fÅ°c≈import React from 'react'
-export default function Finder(){
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Finder</div>
-        <span className="badge">Home</span>
-      </div>
-      <p className="muted">This is a simple Finder. It lists installed apps:</p>
-      <AppsList />
-    </div>
-  )
-}
-
-type App = { id: string; name: string; icon: string }
-
-function AppsList(){
-  const [apps, setApps] = React.useState<App[]>([])
-  React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
-  return (
-    <ul className="list">
-      {apps.map(a=> <li key={a.id}>{a.icon} {a.name} <code style={{color:'#6b7280'}}>{a.id.slice(0,8)}</code></li>)}
-    </ul>
-  )
-}
-©app-storeÅ°dÅ©index.tsxÅ°fÅ°c≈ìimport { useEffect, useMemo, useState } from 'react'
+§appsÅ°dá©app-storeÅ°dÅ©index.tsxÅ°fÅ°c≈ìimport { useEffect, useMemo, useState } from 'react'
 
 type AppRecord = {
   _id: string;
@@ -2703,6 +2741,31 @@ export default function AppStore() {
 }
 
 
+¶finderÅ°dÅ©index.tsxÅ°fÅ°c≈import React from 'react'
+export default function Finder(){
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Finder</div>
+        <span className="badge">Home</span>
+      </div>
+      <p className="muted">This is a simple Finder. It lists installed apps:</p>
+      <AppsList />
+    </div>
+  )
+}
+
+type App = { id: string; name: string; icon: string }
+
+function AppsList(){
+  const [apps, setApps] = React.useState<App[]>([])
+  React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
+  return (
+    <ul className="list">
+      {apps.map(a=> <li key={a.id}>{a.icon} {a.name} <code style={{color:'#6b7280'}}>{a.id.slice(0,8)}</code></li>)}
+    </ul>
+  )
+}
 •notesÅ°dÅ©index.tsxÅ°fÅ°c≈öimport React from 'react'
 export default function Notes(){
   const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])

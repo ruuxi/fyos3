@@ -46,6 +46,20 @@ export function ScreenCarousel({ children }: ScreenCarouselProps) {
     const handlePointerDown = (e: PointerEvent) => {
       if (isTransitioning) return;
       
+      // Don't interfere with interactive elements
+      const target = e.target as Element;
+      if (target && (
+        target.closest('button') || 
+        target.closest('a') || 
+        target.closest('input') || 
+        target.closest('textarea') || 
+        target.closest('select') ||
+        target.closest('[role="button"]') ||
+        target.closest('[tabindex]')
+      )) {
+        return;
+      }
+      
       startX = e.clientX;
       startY = e.clientY;
       currentX = e.clientX;
@@ -55,8 +69,8 @@ export function ScreenCarousel({ children }: ScreenCarouselProps) {
       setHasHorizontalIntent(false);
       setDragOffset(0);
       
-      container.setPointerCapture(e.pointerId);
-      e.preventDefault();
+      // Don't capture pointer or prevent default immediately
+      // Wait until we detect horizontal intent
     };
 
     const handlePointerMove = (e: PointerEvent) => {
@@ -70,6 +84,8 @@ export function ScreenCarousel({ children }: ScreenCarouselProps) {
       if (!hasHorizontalIntent && (Math.abs(deltaX) > 16 || Math.abs(deltaY) > 16)) {
         if (Math.abs(deltaX) > Math.abs(deltaY)) {
           setHasHorizontalIntent(true);
+          // Now that we know it's a horizontal swipe, capture the pointer
+          container.setPointerCapture(e.pointerId);
           // Prevent page scroll when we detect horizontal intent
           document.body.style.overflow = 'hidden';
         } else {
@@ -92,17 +108,20 @@ export function ScreenCarousel({ children }: ScreenCarouselProps) {
       const deltaTime = Date.now() - startTime;
       const velocity = Math.abs(deltaX) / deltaTime; // px/ms
       
-      // Determine if we should commit to next/prev screen
-      const threshold = window.innerWidth * 0.28; // 28% of viewport width (slightly easier)
-      const velocityThreshold = 0.45; // px/ms (slightly easier)
-      
+      // Only process swipe if we had horizontal intent
       let targetIndex = activeIndex;
       
-      if (Math.abs(deltaX) > threshold || velocity > velocityThreshold) {
-        if (deltaX > 0 && activeIndex > 0) {
-          targetIndex = activeIndex - 1; // Swipe right = go to previous (left) screen
-        } else if (deltaX < 0 && activeIndex < children.length - 1) {
-          targetIndex = activeIndex + 1; // Swipe left = go to next (right) screen
+      if (hasHorizontalIntent) {
+        // Determine if we should commit to next/prev screen
+        const threshold = window.innerWidth * 0.28; // 28% of viewport width (slightly easier)
+        const velocityThreshold = 0.45; // px/ms (slightly easier)
+        
+        if (Math.abs(deltaX) > threshold || velocity > velocityThreshold) {
+          if (deltaX > 0 && activeIndex > 0) {
+            targetIndex = activeIndex - 1; // Swipe right = go to previous (left) screen
+          } else if (deltaX < 0 && activeIndex < children.length - 1) {
+            targetIndex = activeIndex + 1; // Swipe left = go to next (right) screen
+          }
         }
       }
 
@@ -121,15 +140,31 @@ export function ScreenCarousel({ children }: ScreenCarouselProps) {
         goTo(targetIndex, { durationMs });
       }
 
-      container.releasePointerCapture(e.pointerId);
+      // Only release pointer capture if we captured it
+      if (hasHorizontalIntent) {
+        try {
+          container.releasePointerCapture(e.pointerId);
+        } catch {
+          // Ignore if pointer wasn't captured
+        }
+      }
     };
 
     const handlePointerCancel = (e: PointerEvent) => {
+      const hadHorizontalIntent = hasHorizontalIntent;
       setIsDragging(false);
       setHasHorizontalIntent(false);
       setDragOffset(0);
       document.body.style.overflow = '';
-      container.releasePointerCapture(e.pointerId);
+      
+      // Only release pointer capture if we captured it
+      if (hadHorizontalIntent) {
+        try {
+          container.releasePointerCapture(e.pointerId);
+        } catch {
+          // Ignore if pointer wasn't captured
+        }
+      }
     };
 
     container.addEventListener('pointerdown', handlePointerDown);
