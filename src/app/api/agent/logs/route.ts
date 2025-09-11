@@ -4,64 +4,29 @@ import { agentLogger } from '@/lib/agentLogger';
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const limit = parseInt(url.searchParams.get('limit') || '100');
     const sessionId = url.searchParams.get('sessionId');
-    const format = url.searchParams.get('format') || 'json';
 
     if (sessionId) {
-      // Get session summary
+      // Get session summary - will return empty data since we don't persist logs
       const summary = await agentLogger.getSessionSummary(sessionId);
       return NextResponse.json(summary);
     }
 
-    const logs = await agentLogger.getRecentLogs(limit);
-    
-    if (format === 'csv') {
-      // Convert to CSV format
-      const csvHeaders = 'timestamp,sessionId,type,messageId,role,toolName,toolCallId,toolDuration,promptTokens,completionTokens,totalTokens,estimatedCost,model,error\n';
-      const csvRows = logs.map(log => {
-        const data = log.data;
-        return [
-          log.timestamp,
-          log.sessionId,
-          log.type,
-          data.messageId || '',
-          data.role || '',
-          data.toolName || '',
-          data.toolCallId || '',
-          data.toolDuration || '',
-          data.promptTokens || '',
-          data.completionTokens || '',
-          data.totalTokens || '',
-          data.estimatedCost || '',
-          data.model || '',
-          data.error || ''
-        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
-      }).join('\n');
-      
-      return new NextResponse(csvHeaders + csvRows, {
-        headers: {
-          'Content-Type': 'text/csv',
-          'Content-Disposition': 'attachment; filename="agent-logs.csv"'
-        }
-      });
-    }
+    // Return empty logs since we don't persist them to files
+    const logs: any[] = [];
 
     return NextResponse.json({
       logs,
-      count: logs.length,
+      count: 0,
       summary: {
-        totalSessions: new Set(logs.map(l => l.sessionId)).size,
-        totalMessages: logs.filter(l => l.type === 'message').length,
-        totalToolCalls: logs.filter(l => l.type === 'tool_call').length,
-        totalTokens: logs.filter(l => l.type === 'token_usage').reduce((sum, l) => sum + (l.data.totalTokens || 0), 0),
-        totalCost: logs.filter(l => l.type === 'token_usage').reduce((sum, l) => sum + (l.data.estimatedCost || 0), 0),
-        toolUsage: logs.filter(l => l.type === 'tool_call').reduce((acc, l) => {
-          const tool = l.data.toolName || 'unknown';
-          acc[tool] = (acc[tool] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>)
-      }
+        totalSessions: 0,
+        totalMessages: 0,
+        totalToolCalls: 0,
+        totalTokens: 0,
+        totalCost: 0,
+        toolUsage: {}
+      },
+      message: 'Logging is now console-only. No persistent logs are stored.'
     });
   } catch (error) {
     console.error('[Agent Logs API] Error:', error);
@@ -76,21 +41,19 @@ export async function DELETE(request: Request) {
   try {
     const url = new URL(request.url);
     const sessionId = url.searchParams.get('sessionId');
-    
+
     if (sessionId) {
-      // For now, we don't support deleting specific sessions
-      // This could be implemented by filtering the log file
-      return NextResponse.json(
-        { error: 'Session deletion not implemented yet' },
-        { status: 501 }
-      );
+      // No persistent logs to delete
+      return NextResponse.json({
+        message: 'No persistent logs to delete - logging is console-only',
+        sessionId
+      });
     }
 
-    // Clear all logs (this would require implementing a clear method in agentLogger)
-    return NextResponse.json(
-      { error: 'Log clearing not implemented yet' },
-      { status: 501 }
-    );
+    // No persistent logs to clear
+    return NextResponse.json({
+      message: 'No persistent logs to clear - logging is console-only'
+    });
   } catch (error) {
     console.error('[Agent Logs API] Delete error:', error);
     return NextResponse.json(

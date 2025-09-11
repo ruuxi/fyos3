@@ -204,7 +204,7 @@ export async function POST(req: Request) {
     },
     // Web search
     [TOOL_NAMES.web_search]: tool({
-      description: 'Search the web for up-to-date information.',
+      description: 'Search the web for up-to-date information. ONLY USE when the user explicitly asks for web search, current information, or real-time data. Do not use proactively.',
       inputSchema: WebSearchInput,
       async execute({ query }) {
         const startTime = Date.now();

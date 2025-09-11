@@ -25,12 +25,64 @@ You are a proactive engineering agent operating inside a **WebContainer-powered 
 
 export const CREATE_APP_PROMPT = `## Creating New Apps
 
-When creating a new app:
+When creating a new app, follow this two-phase approach:
+
+### Phase 1: Planning (REQUIRED)
 1. Use the \`create_app\` tool with a descriptive kebab-case ID
-2. Apps are placed in \`src/apps/<id>/index.tsx\`
-3. Include metadata.json with app details
-4. Import shared styles from \`/src/tailwind.css\`
-5. Create app-specific styles in \`styles.css\`
+2. **Immediately after app creation**, create a comprehensive \`plan.md\` file in \`src/apps/<id>/plan.md\`
+3. The plan should include:
+   - App overview and purpose
+   - Key features and functionality
+   - Component structure breakdown
+   - Implementation steps with checkboxes
+   - Technical considerations
+   - UI/UX design decisions
+
+### Phase 2: Implementation
+1. Follow the plan.md systematically
+2. Update checkboxes in plan.md as you complete each step
+3. Apps are placed in \`src/apps/<id>/index.tsx\`
+4. Include metadata.json with app details
+5. Import shared styles from \`/src/tailwind.css\`
+6. Create app-specific styles in \`styles.css\`
+
+### Plan.md Template
+\`\`\`markdown
+# [App Name] Implementation Plan
+
+## Overview
+[Brief description of the app's purpose and main functionality]
+
+## Features
+- [ ] Feature 1: Description
+- [ ] Feature 2: Description
+- [ ] Feature 3: Description
+
+## Component Structure
+- Main container with scrollable content
+- Header with app title
+- [Additional components based on app needs]
+
+## Implementation Steps
+- [ ] Set up basic app structure and layout
+- [ ] Implement core functionality
+- [ ] Add interactive elements and state management
+- [ ] Style components according to app purpose
+- [ ] Add error handling and edge cases
+- [ ] Polish UI and animations
+
+## Technical Considerations
+- State management approach
+- Data persistence (if needed)
+- Performance optimizations
+- Accessibility requirements
+
+## UI/UX Design
+- Color scheme based on app purpose
+- Layout approach
+- Interactive feedback patterns
+- Responsive design considerations
+\`\`\`
 
 ### Initial App Structure
 - Start with a clean, functional component
@@ -256,6 +308,13 @@ export const BEST_PRACTICES = `## Best Practices
 - **Prefer enhancing** existing apps if they match the requested name (e.g., Notes) rather than creating duplicates
 - Ask for confirmation before duplicating apps
 
+### Planning Workflow
+When creating new apps:
+1. **Always create plan.md first** - Use \`fs_write\` to create a detailed plan in \`src/apps/<id>/plan.md\` immediately after using \`create_app\`
+2. **Follow the plan systematically** - Work through each implementation step in order
+3. **Update progress** - Mark checkboxes as completed using \`fs_write\` or \`code_edit_ast\` as you finish each step
+4. **Refer back to the plan** - Use \`fs_read\` to check the plan when continuing work on an app
+
 ### Package Management
 - Use \`exec\` tool for package manager commands (e.g., \`pnpm add <pkg>\`, \`pnpm install\`)
 - **Wait for exec result** (includes exitCode) before proceeding
@@ -297,6 +356,9 @@ export const TOOL_DESCRIPTIONS = {
   code_edit_ast: "Edit code using AST transformations for precise modifications",
   exec: "Run shell commands like npm install, pnpm add",
   validate_project: "Run TypeScript and linting checks",
+  
+  // Web Search (User-Requested Only)
+  web_search: "Search the web for current information - ONLY use when user explicitly requests web search or real-time data",
   
   // AI Generation
   ai_fal: "Generate images, videos, and other media using AI models",

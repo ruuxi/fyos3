@@ -11,6 +11,7 @@ import { useWebContainer } from './WebContainerProvider';
 import { useScreens } from './ScreensProvider';
 import { persistAssetsFromAIResult } from '@/utils/ai-media';
 import { autoIngestInputs } from '@/utils/auto-ingest';
+import { agentLogger } from '@/lib/agentLogger';
 // Persistence is handled by WebContainer visibility/unload hooks
 
 export default function AIAgentBar() {
@@ -282,6 +283,21 @@ export default function AIAgentBar() {
       const tc = toolCall as ToolCall;
 
       const task = async () => {
+        const startTime = Date.now();
+        
+        // Helper function to log tool call and add result
+        const logAndAddResult = async (output: any) => {
+          const duration = Date.now() - startTime;
+          addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output });
+          
+          // Log to our simplified conversation flow
+          try {
+            await agentLogger.logToolCall('client', tc.toolName, tc.toolCallId, tc.input, output, duration);
+          } catch (err) {
+            console.warn('Failed to log tool call:', err);
+          }
+        };
+        
         try {
           switch (tc.toolName) {
             case 'fs_find': {
@@ -312,7 +328,7 @@ export default function AIAgentBar() {
               const page = filtered.slice(start, end);
               const nextOffset = end < filtered.length ? end : null;
               console.log(`📊 [Agent] fs_find matched ${filtered.length} items; returning ${page.length} (offset ${start})`);
-              addToolResult({ tool: 'fs_find', toolCallId: tc.toolCallId, output: { files: page, count: page.length, total: filtered.length, root, offset: start, nextOffset, hasMore: end < filtered.length, applied: { glob: !!glob, prefix: !!prefix } } });
+              await logAndAddResult({ files: page, count: page.length, total: filtered.length, root, offset: start, nextOffset, hasMore: end < filtered.length, applied: { glob: !!glob, prefix: !!prefix } });
               break;
             }
             case 'fs_read': {
@@ -320,7 +336,7 @@ export default function AIAgentBar() {
               console.log(`🔧 [Agent] fs_read: ${path} (${encoding})`);
               const content = await fnsRef.current.readFile(path, encoding);
               const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
-              addToolResult({ tool: 'fs_read', toolCallId: tc.toolCallId, output: { content, path, size: `${sizeKB}KB` } });
+              await logAndAddResult({ content, path, size: `${sizeKB}KB` });
               break;
             }
             case 'fs_write': {
@@ -333,7 +349,7 @@ export default function AIAgentBar() {
                 await fnsRef.current.mkdir(dir, true);
               }
               await fnsRef.current.writeFile(path, content);
-              addToolResult({ tool: 'fs_write', toolCallId: tc.toolCallId, output: { ok: true, path, size: `${sizeKB}KB` } });
+              await logAndAddResult({ ok: true, path, size: `${sizeKB}KB` });
 
               // Async media ingest hook (non-blocking)
               try {
@@ -515,6 +531,50 @@ export default function AIAgentBar() {
               await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
               const appStylesCss = `:root{--app-accent:#22c55e;}\nbody{font-family:Inter,ui-sans-serif,system-ui,Arial}\na{color:var(--app-accent)}`;
               await fnsRef.current.writeFile(`${base}/styles.css`, appStylesCss);
+              
+              // Create initial plan.md file
+              const planMd = `# ${finalName} Implementation Plan
+
+## Overview
+[Brief description of the app's purpose and main functionality]
+
+## Features
+- [ ] Feature 1: Description
+- [ ] Feature 2: Description
+- [ ] Feature 3: Description
+
+## Component Structure
+- Main container with scrollable content
+- Header with app title
+- [Additional components based on app needs]
+
+## Implementation Steps
+- [ ] Set up basic app structure and layout
+- [ ] Implement core functionality
+- [ ] Add interactive elements and state management
+- [ ] Style components according to app purpose
+- [ ] Add error handling and edge cases
+- [ ] Test all features
+- [ ] Polish UI and animations
+
+## Technical Considerations
+- State management approach
+- Data persistence (if needed)
+- Performance optimizations
+- Accessibility requirements
+
+## UI/UX Design
+- Color scheme based on app purpose
+- Layout approach
+- Interactive feedback patterns
+- Responsive design considerations
+
+## Notes
+Created: ${new Date().toISOString()}
+App ID: ${finalId}
+`;
+              await fnsRef.current.writeFile(`${base}/plan.md`, planMd);
+              
               // Update registry once
               registry.push({ id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` });
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
@@ -526,7 +586,7 @@ export default function AIAgentBar() {
                 }
               } catch {}
               console.log(`✅ [Agent] App created: ${finalName} (${finalId})`);
-              addToolResult({ tool: 'create_app', toolCallId: tc.toolCallId, output: { id: finalId, path: base, name: finalName, icon: metadata.icon } });
+              await logAndAddResult({ id: finalId, path: base, name: finalName, icon: metadata.icon });
               break;
             }
             case 'rename_app': {
@@ -704,11 +764,11 @@ export default function AIAgentBar() {
             }
             default:
               // Unknown tool on client
-              addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output: { error: `Unhandled client tool: ${tc.toolName}` } });
+              await logAndAddResult({ error: `Unhandled client tool: ${tc.toolName}` });
           }
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
-          addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output: { error: message } });
+          await logAndAddResult({ error: message });
         }
       };
 

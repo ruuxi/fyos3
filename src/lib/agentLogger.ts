@@ -1,7 +1,3 @@
-import { writeFile, readFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
-
 export interface AgentLogEntry {
   timestamp: string;
   sessionId: string;
@@ -11,21 +7,21 @@ export interface AgentLogEntry {
     messageId?: string;
     role?: 'user' | 'assistant';
     content?: string;
-    
+
     // Tool call data
     toolName?: string;
     toolCallId?: string;
     toolInput?: any;
     toolOutput?: any;
     toolDuration?: number;
-    
+
     // Token usage data
     promptTokens?: number;
     completionTokens?: number;
     totalTokens?: number;
     estimatedCost?: number;
     model?: string;
-    
+
     // Error data
     error?: string;
     stack?: string;
@@ -33,41 +29,18 @@ export interface AgentLogEntry {
 }
 
 class AgentLogger {
-  private logDir: string;
-  private logFile: string;
-  
-  constructor() {
-    this.logDir = path.join(process.cwd(), 'logs');
-    this.logFile = path.join(this.logDir, 'agent-activity.jsonl');
-  }
-  
-  private async ensureLogDir() {
-    if (!existsSync(this.logDir)) {
-      await mkdir(this.logDir, { recursive: true });
-    }
-  }
-  
   private generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   }
-  
+
   async logEntry(entry: Omit<AgentLogEntry, 'timestamp'>) {
-    try {
-      await this.ensureLogDir();
-      
-      const logEntry: AgentLogEntry = {
-        timestamp: new Date().toISOString(),
-        ...entry,
-      };
-      
-      const logLine = JSON.stringify(logEntry) + '\n';
-      await writeFile(this.logFile, logLine, { flag: 'a' });
-      
-      // Also log to console for development
-      console.log(`[AgentLog] ${entry.type}:`, entry.data);
-    } catch (error) {
-      console.error('[AgentLogger] Failed to write log:', error);
-    }
+    const logEntry: AgentLogEntry = {
+      timestamp: new Date().toISOString(),
+      ...entry,
+    };
+
+    // Log to console for development
+    console.log(`[AgentLog] ${entry.type}:`, entry.data);
   }
   
   async logMessage(sessionId: string, messageId: string, role: 'user' | 'assistant', content: string) {
@@ -153,24 +126,11 @@ class AgentLogger {
   }
   
   async getRecentLogs(limit: number = 100): Promise<AgentLogEntry[]> {
-    try {
-      if (!existsSync(this.logFile)) {
-        return [];
-      }
-      
-      const content = await readFile(this.logFile, 'utf-8');
-      const lines = content.trim().split('\n').filter(Boolean);
-      
-      return lines
-        .slice(-limit)
-        .map(line => JSON.parse(line))
-        .reverse(); // Most recent first
-    } catch (error) {
-      console.error('[AgentLogger] Failed to read logs:', error);
-      return [];
-    }
+    // Return empty array since we're not storing logs to files
+    console.log(`[AgentLogger] getRecentLogs called with limit ${limit} - returning empty array`);
+    return [];
   }
-  
+
   async getSessionSummary(sessionId: string): Promise<{
     totalMessages: number;
     totalToolCalls: number;
@@ -179,57 +139,17 @@ class AgentLogger {
     duration: number;
     toolCallBreakdown: Record<string, number>;
   }> {
-    try {
-      const logs = await this.getRecentLogs(10000); // Get more logs for analysis
-      const sessionLogs = logs.filter(log => log.sessionId === sessionId);
-      
-      if (sessionLogs.length === 0) {
-        return {
-          totalMessages: 0,
-          totalToolCalls: 0,
-          totalTokens: 0,
-          totalCost: 0,
-          duration: 0,
-          toolCallBreakdown: {},
-        };
-      }
-      
-      const messages = sessionLogs.filter(log => log.type === 'message');
-      const toolCalls = sessionLogs.filter(log => log.type === 'tool_call');
-      const tokenUsage = sessionLogs.filter(log => log.type === 'token_usage');
-      
-      const totalTokens = tokenUsage.reduce((sum, log) => sum + (log.data.totalTokens || 0), 0);
-      const totalCost = tokenUsage.reduce((sum, log) => sum + (log.data.estimatedCost || 0), 0);
-      
-      const toolCallBreakdown: Record<string, number> = {};
-      toolCalls.forEach(log => {
-        const toolName = log.data.toolName || 'unknown';
-        toolCallBreakdown[toolName] = (toolCallBreakdown[toolName] || 0) + 1;
-      });
-      
-      const firstLog = sessionLogs[sessionLogs.length - 1];
-      const lastLog = sessionLogs[0];
-      const duration = new Date(lastLog.timestamp).getTime() - new Date(firstLog.timestamp).getTime();
-      
-      return {
-        totalMessages: messages.length,
-        totalToolCalls: toolCalls.length,
-        totalTokens,
-        totalCost,
-        duration,
-        toolCallBreakdown,
-      };
-    } catch (error) {
-      console.error('[AgentLogger] Failed to generate session summary:', error);
-      return {
-        totalMessages: 0,
-        totalToolCalls: 0,
-        totalTokens: 0,
-        totalCost: 0,
-        duration: 0,
-        toolCallBreakdown: {},
-      };
-    }
+    console.log(`[AgentLogger] getSessionSummary called for session ${sessionId} - returning empty summary`);
+
+    // Return empty summary since we don't have persistent logs
+    return {
+      totalMessages: 0,
+      totalToolCalls: 0,
+      totalTokens: 0,
+      totalCost: 0,
+      duration: 0,
+      toolCallBreakdown: {},
+    };
   }
 }
 

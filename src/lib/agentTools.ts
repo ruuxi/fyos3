@@ -158,7 +158,7 @@ export const WebSearchInput = z.object({
     .string()
     .min(1)
     .max(100)
-    .describe('The web search query for up-to-date information.'),
+    .describe('The web search query for up-to-date information. ONLY USE when the user explicitly requests web search, current information, or real-time data.'),
 });
 export type TWebSearchInput = z.infer<typeof WebSearchInput>;
 
