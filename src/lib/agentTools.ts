@@ -4,48 +4,48 @@ import { z } from 'zod';
 // Keep fields minimal, add clear descriptions, avoid strict refinements that block LLMs
 
 export const FSFindInput = z.object({
-  root: z.string().default('.').describe('Directory to list from (absolute or project-relative).'),
+  root: z.string().default('.').describe('Start directory (absolute or project-relative). Use project root "." unless you know a narrower folder.'),
   maxDepth: z
     .number()
     .int()
     .min(0)
     .max(20)
     .default(10)
-    .describe('Maximum folder depth to traverse (0 lists only the root).'),
+    .describe('Max depth to traverse (0 lists only root). Keep low to reduce tokens (e.g., 2–5).'),
   glob: z
     .string()
     .optional()
-    .describe('Optional glob filter (e.g., "**/*.tsx"). Applied to full paths.'),
+    .describe('Optional glob filter (e.g., "**/*.tsx"). Strongly prefer using this to target only relevant files.'),
   prefix: z
     .string()
     .optional()
-    .describe('Optional path prefix filter. Only include entries starting with this prefix.'),
+    .describe('Optional path prefix filter. Only include entries that start with this prefix.'),
   limit: z
     .number()
     .int()
     .min(1)
     .max(5000)
     .default(200)
-    .describe('Maximum number of entries to return (default 200).'),
+    .describe('Max entries to return (default 200). Use small pages (e.g., 50–200) to stay token‑efficient.'),
   offset: z
     .number()
     .int()
     .min(0)
     .default(0)
-    .describe('Pagination offset. Use nextOffset from the previous result for the next page.'),
+    .describe('Pagination offset. Use nextOffset from the previous result to fetch the next page.'),
 });
 
 export const FSReadInput = z.object({
-  path: z.string().describe('File path to read (absolute or project-relative).'),
+  path: z.string().describe('Exact file path to read (absolute or project-relative). Read only the files you truly need.'),
   encoding: z
     .enum(['utf-8', 'base64'])
     .default('utf-8')
-    .describe('How to decode the file contents.'),
+    .describe('Decoding for the file contents.'),
 });
 
 export const FSWriteInput = z.object({
   path: z.string().describe('Target file path. Creates missing folders when createDirs is true.'),
-  content: z.string().describe('Full file content to write.'),
+  content: z.string().describe('Full file content to write. Prefer minimal, targeted edits (consider code_edit_ast when appropriate).'),
   createDirs: z.boolean().default(true).describe('Create parent directories when needed.'),
 });
 
@@ -56,13 +56,13 @@ export const FSMkdirInput = z.object({
 
 export const FSRmInput = z.object({
   path: z.string().describe('File or directory path to remove.'),
-  recursive: z.boolean().default(true).describe('Remove directories recursively.'),
+  recursive: z.boolean().default(true).describe('Remove directories recursively. Use with care; destructive.'),
 });
 
 export const ExecInput = z.object({
   command: z
     .string()
-    .describe('CLI to run. For package installs prefer pnpm/npm/yarn/bun. Never run dev/build/start.'),
+    .describe('CLI to run. Use for package management only (e.g., pnpm add). Do NOT run dev/build/start servers.'),
   args: z.array(z.string()).default([]).describe('Arguments for the command.'),
   cwd: z.string().optional().describe('Working directory (optional).'),
 });
@@ -86,13 +86,13 @@ export const RemoveAppInput = z.object({
 
 export const ValidateProjectInput = z.object({
   scope: z
-    .enum(['quick', 'full'])
+    .literal('quick')
     .default('quick')
-    .describe('quick: typecheck + lint (changed files); full: also run build.'),
+    .describe('quick: typecheck + lint (changed files).'),
   files: z
     .array(z.string())
     .optional()
-    .describe('Optional list of files to lint (paths relative to project root).'),
+    .describe('Optional explicit file list to lint (paths relative to project root).'),
 });
 
 export const CodeEditAstInput = z.object({
@@ -112,7 +112,7 @@ export const CodeEditAstInput = z.object({
     }).optional().describe('Import details (for upsertImport).'),
     functionBody: z.string().optional().describe('New function body content (for updateFunctionBody).'),
     jsxReplaceWith: z.string().optional().describe('JSX string to replace element with (for replaceJsxElement).'),
-    jsxAttributes: z.record(z.string(), z.union([z.string(), z.boolean(), z.number()])).optional().describe('JSX attributes to set (for replaceJsxAttributes).'),
+    jsxAttributes: z.record(z.string(), z.union([z.string(), z.boolean(), z.number()])).optional().describe('JSX attributes to set (for replaceJsxAttributes). Provide only the attributes you want changed.'),
     insertText: z.string().optional().describe('Text to insert (for insertAfterLastImport/insertAtTop).'),
   }).optional().describe('Payload data for the edit operation.'),
   dryRun: z.boolean().default(false).describe('If true, perform analysis but do not write changes to file.'),
@@ -197,5 +197,4 @@ export const MediaListInput = z.object({
 export type TAiFalInput = z.infer<typeof AiFalInput>;
 export type TElevenMusicInput = z.infer<typeof ElevenMusicInput>;
 export type TMediaListInput = z.infer<typeof MediaListInput>;
-
 

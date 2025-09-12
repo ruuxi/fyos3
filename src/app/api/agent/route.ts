@@ -160,15 +160,15 @@ export async function POST(req: Request) {
   const allTools = {
     // File operations
     [TOOL_NAMES.fs_find]: {
-      description: 'List files and folders recursively starting at a directory.',
+      description: 'List files/folders starting at a directory. Prefer small pages (limit/offset) and targeted filters (glob/prefix) to minimize tokens.',
       inputSchema: FSFindInput,
     },
     [TOOL_NAMES.fs_read]: {
-      description: 'Read a file from the filesystem.',
+      description: 'Read a single file by exact path. Only read what you need; avoid large, unrelated files.',
       inputSchema: FSReadInput,
     },
     [TOOL_NAMES.fs_write]: {
-      description: 'Write file contents. Creates parent directories when needed.',
+      description: 'Write file contents. Creates parent directories when needed. Prefer precise edits (consider code_edit_ast).',
       inputSchema: FSWriteInput,
     },
     [TOOL_NAMES.fs_mkdir]: {
@@ -176,21 +176,21 @@ export async function POST(req: Request) {
       inputSchema: FSMkdirInput,
     },
     [TOOL_NAMES.fs_rm]: {
-      description: 'Remove a file or directory (recursive by default).',
+      description: 'Remove a file or directory (recursive by default). Destructive—use with care.',
       inputSchema: FSRmInput,
     },
     // Process execution
     [TOOL_NAMES.exec]: {
-      description: 'Run shell commands. Prefer pnpm for installs. Never run dev/build/start.',
+      description: 'Run shell commands for package management (e.g., pnpm add). Do NOT run dev/build/start servers.',
       inputSchema: ExecInput,
     },
     // App management
     [TOOL_NAMES.create_app]: {
-      description: 'Create a new app under src/apps/<id> + update public/apps/registry.json.',
+      description: 'Create a new app under src/apps/<id> and update the app registry.',
       inputSchema: CreateAppInput,
     },
     [TOOL_NAMES.rename_app]: {
-      description: 'Rename an app in public/apps/registry.json by id.',
+      description: 'Rename an app in the registry by id.',
       inputSchema: RenameAppInput,
     },
     [TOOL_NAMES.remove_app]: {
@@ -199,12 +199,12 @@ export async function POST(req: Request) {
     },
     // Validation
     [TOOL_NAMES.validate_project]: {
-      description: 'Run validation checks (TypeScript noEmit; optionally ESLint on files; full also runs build).',
+      description: 'Validate the project: typecheck + lint (changed files).',
       inputSchema: ValidateProjectInput,
     },
     // Web search
     [TOOL_NAMES.web_search]: tool({
-      description: 'Search the web for up-to-date information. ONLY USE when the user explicitly asks for web search, current information, or real-time data. Do not use proactively.',
+      description: 'Search the web for current information. ONLY use when the user explicitly requests web search or real-time data—do not use proactively.',
       inputSchema: WebSearchInput,
       async execute({ query }) {
         const startTime = Date.now();
@@ -243,20 +243,20 @@ export async function POST(req: Request) {
     }),
     // AI Media Tools
     [TOOL_NAMES.ai_fal]: {
-      description: 'Generate media using FAL models. Supports image, video, and audio generation.',
+      description: 'Generate media using FAL models (images, video, audio). Outputs are auto‑ingested and returned with durable URLs.',
       inputSchema: AiFalInput,
     },
     [TOOL_NAMES.ai_eleven_music]: {
-      description: 'Generate music using ElevenLabs Music API.',
+      description: 'Generate music using the ElevenLabs Music API. Outputs are auto‑ingested and returned with durable URLs.',
       inputSchema: ElevenMusicInput,
     },
     [TOOL_NAMES.media_list]: {
-      description: 'List previously generated or ingested media assets.',
+      description: 'List previously generated or ingested media assets with optional filters.',
       inputSchema: MediaListInput,
     },
     // Code editing
     [TOOL_NAMES.code_edit_ast]: {
-      description: 'Edit TypeScript/JavaScript files using AST-based transformations. Supports import management, function body updates, JSX element manipulation, and code insertion.',
+      description: 'Edit TypeScript/JavaScript via AST transformations (imports, function bodies, JSX, code insertion). Prefer this over full rewrites for precise changes.',
       inputSchema: CodeEditAstInput,
     },
   };

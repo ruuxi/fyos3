@@ -55,14 +55,13 @@ These route through a message bridge and keep keys on the server.
 - create_app: Scaffold an app entry in `src/apps/<id>` and update registry
 - rename_app: Rename app in registry by id
 - remove_app: Remove app folder and registry entry
-- validate_project: Run checks (scope: `quick` or `full`)
+- validate_project: Run checks (scope: `quick`)
 - submit_plan: Submit a structured execution plan before edits
 - web_search: Server-side web search via Exa (requires `EXA_API_KEY`)
 
 ## Validation & Diagnostics
 - Manual validation: Use the `validate_project` tool.
   - `quick`: TypeScript `pnpm exec tsc --noEmit` and ESLint on changed files (`pnpm exec eslint --max-warnings=0 <files>`).
-  - `full`: Includes the above and also runs a production build.
 - Preview errors: The host dispatches a `wc-preview-error` event for uncaught exceptions/unhandled rejections from preview iframes; `AIAgentBar` auto‑posts a diagnostic to the agent on first occurrence.
 
 ##Architecture

@@ -627,7 +627,7 @@ App ID: ${finalId}
               break;
             }
             case 'validate_project': {
-              const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
+              const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick'; files?: string[] };
               console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
               await runValidation(scope, files);
               addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true, scope, files } });
@@ -948,7 +948,7 @@ App ID: ${finalId}
 
   // No per-change validation debounce
 
-  async function runValidation(scope: 'quick' | 'full', changed: string[] = []) {
+  async function runValidation(scope: 'quick', changed: string[] = []) {
     if (!instanceRef.current) return;
     if (validateRunningRef.current) return;
     validateRunningRef.current = true;
@@ -990,17 +990,6 @@ App ID: ${finalId}
         }
       }
 
-      // Optional full build (heavier)
-      if (scope === 'full') {
-        try {
-          const build = await fnsRef.current.spawn('pnpm', ['run', 'build']);
-          if (build.exitCode !== 0) {
-            logs.push(`[Build] exit=${build.exitCode}\n${trimForChat(build.output)}`);
-          }
-        } catch (e: unknown) {
-          logs.push(`[Build] failed to run: ${e instanceof Error ? e.message : String(e)}`);
-        }
-      }
 
       const final = logs.filter(Boolean).join('\n\n');
          if (final.trim().length > 0) {
