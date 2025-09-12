@@ -519,7 +519,50 @@ export default function AIAgentBar() {
                 await fnsRef.current.writeFile(`${base}/metadata.json`, JSON.stringify(metadata, null, 2));
                 const appIndexTsx = `import React from 'react'\nimport '/src/tailwind.css'\nimport './styles.css'\nexport default function App(){\n  return (\n    <div className=\"h-full overflow-auto bg-gradient-to-b from-white to-slate-50\">\n      <div className=\"sticky top-0 bg-white/80 backdrop-blur border-b px-3 py-2\">\n        <div className=\"font-semibold tracking-tight\">${finalName}</div>\n      </div>\n      <div className=\"p-3 space-y-3\">\n        <div className=\"rounded-lg border bg-white shadow-sm p-3\">\n          <p className=\"text-slate-600 text-sm\">This is a new app. Build your UI here. The container fills the window and scrolls as needed.</p>\n        </div>\n      </div>\n    </div>\n  )\n}`;
                 await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
-                const appStylesCss = `:root{--app-accent:#22c55e;}\nbody{font-family:Inter,ui-sans-serif,system-ui,Arial}\na{color:var(--app-accent)}`;
+                const appStylesCss = `/* App-specific theme variables */
+:root {
+  --app-accent: #22c55e;
+  --app-secondary: #64748b;
+  --app-background: #ffffff;
+  --app-surface: #f8fafc;
+  --app-border: #e2e8f0;
+  --app-text: #1e293b;
+  --app-text-muted: #64748b;
+  --app-hover: #16a34a;
+}
+
+/* Base app styling */
+body {
+  font-family: Inter, ui-sans-serif, system-ui, Arial, sans-serif;
+}
+
+/* App-specific utility classes */
+.app-button {
+  background: var(--app-accent);
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.app-button:hover {
+  background: var(--app-hover);
+  transform: translateY(-1px);
+}
+
+.app-surface {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+}
+
+/* Links */
+a {
+  color: var(--app-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--app-hover);
+  text-decoration: underline;
+}`;
                 await fnsRef.current.writeFile(`${base}/styles.css`, appStylesCss);
                 registry.push({ id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` });
                 await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));

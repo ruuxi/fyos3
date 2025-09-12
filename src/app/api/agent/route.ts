@@ -104,7 +104,19 @@ export async function POST(req: Request) {
     await agentLogger.logMessage(sessionId, lastMessage.id, 'user', content);
   }
 
-  console.log('🔵 [AGENT] Incoming request with messages:', messages.map(m => ({
+  // Sanitize/dedupe messages to avoid downstream gateway duplicate-id issues
+  const seenHashes = new Set<string>();
+  const sanitizedMessages: UIMessage[] = [] as any;
+  for (const m of messages) {
+    const text = (m as any).parts?.map((p: any) => (p.type === 'text' ? p.text : '')).join('') || (m as any).content || '';
+    const key = `${m.role}|${text}`;
+    if (seenHashes.has(key)) continue;
+    seenHashes.add(key);
+    const { id: _omit, ...rest } = m as any;
+    sanitizedMessages.push(rest);
+  }
+
+  console.log('🔵 [AGENT] Incoming request with messages:', sanitizedMessages.map(m => ({
     role: m.role,
     content: 'content' in m && typeof m.content === 'string' ? (m.content.length > 100 ? m.content.substring(0, 100) + '...' : m.content) : '[non-text content]',
     toolCalls: 'toolCalls' in m && Array.isArray(m.toolCalls) ? m.toolCalls.length : 0
@@ -304,13 +316,13 @@ export async function POST(req: Request) {
   const toolCallTimings = new Map<string, number>();
 
   const result = streamText({
-    model: 'alibaba/qwen3-coder',
+    model: 'openai/gpt-5',
     providerOptions: {
       gateway: {
         order: ['cerebras', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
       },
     },
-    messages: convertToModelMessages(messages),
+    messages: convertToModelMessages(sanitizedMessages as any),
     stopWhen: stepCountIs(15),
     onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }: any) => {
       console.log('📊 [USAGE-STEP] Step finished:', {
