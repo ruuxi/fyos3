@@ -20,10 +20,9 @@ Server storage:
 - Convex table: `desktops_private` stores metadata and R2 key.
 - R2 object: `desktops/private/{ownerId}/{desktopId}/snapshot.gz`.
 
-Endpoints:
-- `POST /api/user/desktops/save` – Uploads a snapshot (requires auth).
-- `GET /api/user/desktops/latest` – Latest private snapshot + signed URL.
-- `GET /api/user/desktops/[id]/url` – Signed URL for specific snapshot.
+Client calls (Convex):
+- Save: `desktops_private.saveDesktopStart` → PUT upload → `desktops_private.saveDesktopFinalize`.
+- Restore: `desktops_private.getLatestDesktop` → `desktops_private.getDesktopSnapshotUrl` → fetch and restore.
 
 ## Chat Persistence
 
@@ -31,10 +30,11 @@ Schema:
 - `chat_threads(ownerId, title, createdAt, updatedAt, lastMessageAt)`
 - `chat_messages(threadId, ownerId, role, content, createdAt)`
 
-Endpoints:
-- `POST /api/user/chat/threads` – Create a new thread (returns thread id).
-- `GET /api/user/chat/threads?limit=N` – List threads.
-- `GET /api/user/chat/messages?threadId=...&limit=N` – List messages.
+Client calls (Convex):
+- `chat.createThread` – Create a new thread.
+- `chat.listThreads` – List threads.
+- `chat.listMessages` – List messages in a thread.
+- `chat.renameThread`, `chat.deleteThread` – Manage threads.
 
 Agent integration:
 - The chat UI creates a default thread and stores its id in `localStorage('agent.threadId')`.
@@ -59,4 +59,3 @@ AI provider keys remain the same (see `.env.example`).
 - Apps are included in the private snapshot, so installed apps and the apps registry are restored on login.
 - If unauthenticated, the app falls back to IndexedDB local persistence and the default snapshot.
 - Cloud saves are throttled to once per 60 seconds, with a final attempt on page unload.
-

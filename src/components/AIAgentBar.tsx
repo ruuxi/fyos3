@@ -6,6 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Send, Search, Store, Monitor, Image as ImageIcon, Home, Paperclip, X, FileVideo, FileAudio2, FileText, File as FileIcon } from 'lucide-react';
 import { Plus, History as HistoryIcon } from 'lucide-react';
+import { useConvexClient } from '@/lib/useConvexClient';
+import { api as convexApi } from '../../convex/_generated/api';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
@@ -51,13 +53,17 @@ export default function AIAgentBar() {
   const [chatSessionKey, setChatSessionKey] = useState<string>('agent-chat');
   const [showThreadHistory, setShowThreadHistory] = useState<boolean>(false);
 
+  const { client: convexClient, ready: convexReady } = useConvexClient();
+
   async function loadThreads(selectFirstIfAny = true) {
     setThreadsLoading(true); setThreadsError(null);
     try {
-      const res = await fetch('/api/user/chat/threads?limit=100', { cache: 'no-store' });
-      if (!res.ok) throw new Error(`Failed (${res.status})`);
-      const json = await res.json();
-      const list: ChatThread[] = Array.isArray(json?.threads) ? json.threads : [];
+      if (!convexReady || !convexClient) {
+        setThreads([]);
+        if (selectFirstIfAny) setActiveThreadId(null);
+        return;
+      }
+      const list = await convexClient.query(convexApi.chat.listThreads as any, { limit: 100 } as any) as any[];
       setThreads(list);
       if (selectFirstIfAny) {
         if (list.length > 0) {
@@ -78,10 +84,8 @@ export default function AIAgentBar() {
   async function loadMessagesForThread(tid: string) {
     try {
       setInitialChatMessages(undefined);
-      const res = await fetch(`/api/user/chat/messages?threadId=${encodeURIComponent(tid)}&limit=200`, { cache: 'no-store' });
-      if (!res.ok) return;
-      const json = await res.json();
-      const msgs = Array.isArray(json?.messages) ? json.messages : [];
+      if (!convexReady || !convexClient) { setInitialChatMessages([]); setChatSessionKey(`ephemeral:${Date.now()}`); return; }
+      const msgs = await convexClient.query(convexApi.chat.listMessages as any, { threadId: tid as any, limit: 200 } as any) as any[];
       const converted = msgs.map((m: any) => ({ id: String(m._id || m.id || Math.random().toString(36).slice(2)), role: m.role === 'assistant' ? 'assistant' : 'user', parts: [{ type: 'text', text: String(m.content || '') }] }));
       setInitialChatMessages(converted);
       setChatSessionKey(`${tid}:${Date.now()}`);
@@ -92,20 +96,23 @@ export default function AIAgentBar() {
 
   async function createNewThread(title = 'New Chat') {
     try {
-      const res = await fetch('/api/user/chat/threads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
-      if (!res.ok) throw new Error('Create thread failed');
-      const json = await res.json();
-      const tid = String(json.id || json._id || json.threadId);
+      if (!convexReady || !convexClient) {
+        setActiveThreadId(null);
+        setInitialChatMessages([]);
+        setChatSessionKey(`ephemeral:${Date.now()}`);
+        return;
+      }
+      const tid = await convexClient.mutation(convexApi.chat.createThread as any, { title } as any) as any;
       await loadThreads(false);
-      setActiveThreadId(tid);
-      await loadMessagesForThread(tid);
+      setActiveThreadId(String(tid));
+      await loadMessagesForThread(String(tid));
     } catch (e) {
       console.error('Failed to create thread', e);
     }
   }
 
-  // Initial load of threads and messages
-  useEffect(() => { void loadThreads(true); }, []);
+  // Initial load after auth state known
+  useEffect(() => { if (convexReady) { void loadThreads(true); } }, [convexReady]);
 
   // When active thread changes, load its messages
   useEffect(() => { if (activeThreadId) { void loadMessagesForThread(activeThreadId); } }, [activeThreadId]);
@@ -176,7 +183,7 @@ export default function AIAgentBar() {
           const result = await res.json();
           setAttachments(prev => [...prev, {
             name: file.name,
-            publicUrl: result.publicUrl || '',
+            publicUrl: (result && result.id) ? `/api/media/${result.id}` : (result.publicUrl || ''),
             contentType: file.type || result.contentType || guessContentTypeFromFilename(file.name),
           }]);
         } catch {
@@ -212,7 +219,7 @@ export default function AIAgentBar() {
         const inferred = guessContentTypeFromFilename(name);
         setAttachments(prev => [...prev, {
           name,
-          publicUrl: result.publicUrl || url,
+          publicUrl: (result && result.id) ? `/api/media/${result.id}` : (result.publicUrl || url),
           contentType: result.contentType || inferred,
         }]);
       } catch {
@@ -264,7 +271,7 @@ export default function AIAgentBar() {
             const result = await res.json().catch(() => ({}));
             setAttachments(prev => [...prev, {
               name: 'dropped',
-              publicUrl: result.publicUrl || '',
+              publicUrl: (result && result.id) ? `/api/media/${result.id}` : (result.publicUrl || ''),
               contentType: contentType || result.contentType || 'application/octet-stream',
             }]);
             setMode('chat');
@@ -293,7 +300,7 @@ export default function AIAgentBar() {
           const name = url.split('/').pop() || 'link';
           setAttachments(prev => [...prev, {
             name,
-            publicUrl: result.publicUrl || url,
+            publicUrl: (result && result.id) ? `/api/media/${result.id}` : (result.publicUrl || url),
             contentType: result.contentType || guessContentTypeFromFilename(name),
           }]);
         } catch (e: any) {
@@ -448,7 +455,8 @@ export default function AIAgentBar() {
       api: '/api/agent',
       prepareSendMessagesRequest({ messages, id }) {
         // Include classification if available
-        const body: any = { messages, id, threadId: activeThreadId };
+        const body: any = { messages, id };
+        if (activeThreadId && threads.length > 0) body.threadId = activeThreadId;
         if (classificationRef.current) {
           body.classification = classificationRef.current;
         }
@@ -1525,7 +1533,7 @@ a:hover {
                         </label>
                       </Button>
                     </div>
-                    <Button type="submit" disabled={!input.trim() || status !== 'ready' || !activeThreadId} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
+                    <Button type="submit" disabled={!input.trim() || status !== 'ready' || (threads.length > 0 && !activeThreadId)} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
                       <Send className="w-4 h-4" />
                     </Button>
                   </div>
@@ -1573,9 +1581,11 @@ a:hover {
                                   title="Close"
                                   onClick={async () => {
                                     const closingId = t._id;
-                                    try {
-                                      await fetch(`/api/user/chat/threads/${encodeURIComponent(closingId)}`, { method: 'DELETE' });
-                                      const remaining = threads.filter(th => th._id !== closingId);
+                                try {
+                                  if (convexReady && convexClient) {
+                                    await convexClient.mutation(convexApi.chat.deleteThread as any, { threadId: closingId as any } as any);
+                                  }
+                                  const remaining = threads.filter(th => th._id !== closingId);
                                       setThreads(remaining);
                                       if (activeThreadId === closingId) {
                                         const idx = threads.findIndex(th => th._id === closingId);

@@ -7,6 +7,8 @@ import { useWebContainer } from './WebContainerProvider';
 import BootScreen from './BootScreen';
 import { hasPersistedVfs, restoreFromPersistence, persistNow } from '@/utils/vfs-persistence';
 import { persistAssetsFromAIResult } from '@/utils/ai-media';
+import { useConvexClient } from '@/lib/useConvexClient';
+import { api as convexApi } from '../../convex/_generated/api';
 import { useAuth, useClerk } from '@clerk/nextjs';
 
 export default function WebContainer() {
@@ -30,6 +32,7 @@ export default function WebContainer() {
   const desktopReadyRef = useRef<boolean>(false);
   const lastRemoteSaveRef = useRef<number>(0);
   const remoteSaveInFlightRef = useRef<boolean>(false);
+  const { client: convexClient, ready: convexReady } = useConvexClient();
 
   useEffect(() => {
     let mounted = true;
@@ -126,15 +129,15 @@ export default function WebContainer() {
         // Try restoring a private desktop snapshot from server, then local IndexedDB, else default snapshot
         let restored = false;
         try {
-          setLoadingStage('Checking cloud snapshot…');
-          setTargetProgress((p) => Math.max(p, 30));
-          const latestRes = await fetch('/api/user/desktops/latest', { cache: 'no-store' });
-          if (latestRes.ok) {
-            const latest = await latestRes.json();
-            if (latest?.url) {
+          if (convexReady && convexClient) {
+            setLoadingStage('Checking cloud snapshot…');
+            setTargetProgress((p) => Math.max(p, 30));
+            const record = await convexClient.query(convexApi.desktops_private.getLatestDesktop as any, {} as any) as any;
+            if (record && record._id) {
               setLoadingStage('Restoring from cloud…');
               setTargetProgress((p) => Math.max(p, 34));
-              const snapRes = await fetch(latest.url, { cache: 'no-store' });
+              const url = await convexClient.query(convexApi.desktops_private.getDesktopSnapshotUrl as any, { id: record._id } as any) as string;
+              const snapRes = await fetch(url, { cache: 'no-store' });
               if (snapRes.ok) {
                 const buf = new Uint8Array(await snapRes.arrayBuffer());
                 try {
@@ -330,21 +333,28 @@ export default function Document() {
                 await instance.fs.writeFile('/public/_fyos/desktop-state.json', new TextEncoder().encode(JSON.stringify(state, null, 2)) as any);
               } catch {}
             }
-            const { buildDesktopSnapshot } = await import('@/utils/desktop-snapshot');
-            const snap = await buildDesktopSnapshot(instance);
-            const gzBase64 = btoa(String.fromCharCode(...snap.gz));
-            await fetch('/api/user/desktops/save', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
+            if (convexReady && convexClient) {
+              const { buildDesktopSnapshot } = await import('@/utils/desktop-snapshot');
+              const snap = await buildDesktopSnapshot(instance);
+              const start = await convexClient.mutation(convexApi.desktops_private.saveDesktopStart as any, {
                 desktopId: 'default',
                 title: 'My Desktop',
-                gzBase64,
                 size: snap.size,
                 fileCount: snap.fileCount,
                 contentSha256: snap.contentSha256,
-              }),
-            }).catch(() => {});
+              } as any) as any;
+              if (start?.url && start?.r2KeySnapshot) {
+                await fetch(start.url, { method: 'PUT', body: new Uint8Array(snap.gz), headers: { 'Content-Type': 'application/octet-stream' } }).catch(() => {});
+                await convexClient.mutation(convexApi.desktops_private.saveDesktopFinalize as any, {
+                  desktopId: 'default',
+                  title: 'My Desktop',
+                  r2KeySnapshot: start.r2KeySnapshot,
+                  size: snap.size,
+                  fileCount: snap.fileCount,
+                  contentSha256: snap.contentSha256,
+                } as any).catch(() => {});
+              }
+            }
             lastRemoteSaveRef.current = now;
           } catch (e) {
             // ignore network or build errors
