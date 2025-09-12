@@ -86,14 +86,14 @@ export async function POST(req: NextRequest) {
 
     // Map tool categories to actual tool names
     const toolMapping: Record<string, string[]> = {
-      'file_operations': ['fs_find', 'fs_read', 'fs_write', 'fs_mkdir', 'fs_rm'],
-      'app_management': ['create_app', 'rename_app', 'remove_app'],
-      'code_editing': ['code_edit_ast'],
-      'run_commands': ['exec'],
-      'validation': ['validate_project'],
-      'image_video_generation': ['ai_fal'],
-      'music_generation': ['ai_eleven_music'],
-      'media_browsing': ['media_list'],
+      file_ops: ['web_fs_find', 'web_fs_read', 'web_fs_write', 'web_fs_rm'],
+      app_management: ['app_manage', 'submit_plan'],
+      code_editing: ['code_edit_ast'],
+      package_management: ['web_exec'],
+      validation: ['validate_project'],
+      ai_generation: ['ai_generate'],
+      media_browsing: ['media_list'],
+      web_search: ['web_search'],
     };
 
     // Convert tool categories to actual tool names

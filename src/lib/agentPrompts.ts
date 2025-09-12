@@ -36,8 +36,8 @@ export const CREATE_APP_PROMPT = `## Creating New Apps
 When creating a new app, follow this two-phase approach:
 
 ### Phase 1: Planning (REQUIRED)
-1. Use the \`create_app\` tool with a descriptive kebab-case ID
-2. **Immediately after app creation**, create a comprehensive \`plan.md\` file in \`src/apps/<id>/plan.md\`
+1. Use the \`app_manage\` tool with \`action: "create"\`, a descriptive kebab-case \`id\`, and a user-friendly \`name\`
+2. **Immediately after app creation**, use \`submit_plan\` to create a comprehensive \`plan.md\` file in \`src/apps/<id>/plan.md\`
 3. The plan should include:
    - App overview and purpose
    - Key features and functionality
@@ -101,11 +101,11 @@ When creating a new app, follow this two-phase approach:
 export const EDIT_APP_PROMPT = `## Editing Existing Apps
 
 When modifying apps:
-1. First use \`fs_find\` with sensible filters (glob/prefix) to locate files
-2. Read only the necessary files to understand structure and conventions
+1. First use \`web_fs_find\` with sensible filters (glob/prefix) to locate files
+2. Read only the necessary files with \`web_fs_read\` to understand structure and conventions
 3. Use \`code_edit_ast\` for precise modifications when possible
 4. Maintain existing code style and component structure
-5. Validate changes with \`validate_project\` (quick validation)
+5. Validate changes with \`validate_project\` (quick or full)
 
 ### Code Modification Best Practices
 - Prefer AST edits over full file rewrites
@@ -172,7 +172,7 @@ export const STYLING_GUIDELINES = `## Styling & Layout Guidelines
 
 **Import syntax:** \`import { Button } from "@/components/ui/button"\`
 
-**If not listed above, add new components:** Use \`exec\` with \`pnpm dlx shadcn@latest add [component-name]\`
+**If not listed above, add new components:** Use \`web_exec\` with \`pnpm dlx shadcn@latest add [component-name]\`
 
 **Tailwind Styling Examples:**
 - **Headers**: \`bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-t-lg\`
@@ -318,14 +318,14 @@ export const BEST_PRACTICES = `## Best Practices
 
 ### Planning Workflow
 When creating new apps:
-1. **Always create plan.md first** - Use \`fs_write\` to create a detailed plan in \`src/apps/<id>/plan.md\` immediately after using \`create_app\`
+1. **Always create plan.md first** - Use \`submit_plan\` to create a detailed plan in \`src/apps/<id>/plan.md\` immediately after using \`app_manage (create)\`
 2. **Follow the plan systematically** - Work through each implementation step in order
-3. **Update progress** - Mark checkboxes as completed using \`fs_write\` or \`code_edit_ast\` as you finish each step
-4. **Refer back to the plan** - Use \`fs_read\` to check the plan when continuing work on an app
+3. **Update progress** - Mark checkboxes as completed using \`web_fs_write\` or \`code_edit_ast\` as you finish each step
+4. **Refer back to the plan** - Use \`web_fs_read\` to check the plan when continuing work on an app
 
 ### Package Management
-- Use \`exec\` only for package manager commands (e.g., \`pnpm add <pkg>\`, \`pnpm install\`)
-- **Wait for exec result** (includes exitCode) before proceeding
+- Use \`web_exec\` only for package manager commands (e.g., \`pnpm add <pkg>\`, \`pnpm install\`)
+- **Wait for web_exec result** (includes exitCode) before proceeding
 - If install fails (non‑zero exitCode), report the error and suggest fixes or alternatives
 
 ### Styling Implementation Strategy
@@ -348,30 +348,27 @@ When creating new apps:
 // ===== TOOL DESCRIPTIONS FOR CLASSIFICATION =====
 
 export const TOOL_DESCRIPTIONS = {
-  // File Operations
-  fs_find: "List files and folders from a start directory. Prefer using glob/prefix filters and small pages (limit/offset) to minimize tokens.",
-  fs_read: "Read a single file by exact path. Only read what is necessary; avoid large, unrelated files.",
-  fs_write: "Write or create files. Prefer precise, minimal edits (consider code_edit_ast) and keep diffs focused.",
-  fs_mkdir: "Create directories (optionally recursive).",
-  fs_rm: "Remove files or directories (recursive by default). Destructive—use with care.",
-  
+  // File Operations (web_fs_*)
+  web_fs_find: 'List files/folders with glob/prefix and pagination; prefer concise pages to minimize tokens.',
+  web_fs_read: 'Read a single file by exact path; default to concise output with size metadata.',
+  web_fs_write: 'Write/create files; auto‑mkdir when needed. Prefer precise edits (consider code_edit_ast).',
+  web_fs_rm: 'Remove files or directories (recursive by default). Destructive—use with care.',
+
   // App Management
-  create_app: "Create a new app with boilerplate",
-  rename_app: "Rename an existing app",
-  remove_app: "Delete an app and its files",
-  
+  app_manage: 'Manage apps via action=create|rename|remove. Handles scaffolding and registry updates.',
+  submit_plan: 'Create or update src/apps/<id>/plan.md with structured plan text.',
+
   // Code Operations
-  code_edit_ast: "Edit code using AST transformations for precise, minimal modifications.",
-  exec: "Run package manager commands (e.g., pnpm add). Do NOT run dev/build/start.",
-  validate_project: "Validate project: typecheck + lint (changed files).",
-  
+  code_edit_ast: 'Edit code using AST transformations for precise, minimal modifications.',
+  web_exec: 'Run package manager commands (e.g., pnpm add). Do NOT run dev/build/start.',
+  validate_project: 'Validate project: typecheck + lint; full includes production build.',
+
   // Web Search (User-Requested Only)
-  web_search: "Search the web for current information. ONLY use when the user explicitly requests web search or real‑time data.",
-  
-  // AI Generation
-  ai_fal: "Generate images, video, and other media via FAL. Outputs are auto‑ingested with durable URLs.",
-  ai_eleven_music: "Generate music/audio tracks via ElevenLabs Music. Outputs are auto‑ingested with durable URLs.",
-  media_list: "Browse and retrieve generated media assets (supports basic filters)."
+  web_search: 'Search the web for current information. ONLY use when the user explicitly requests web search or real‑time data.',
+
+  // AI Generation (Unified)
+  ai_generate: 'Generate media via provider=fal|eleven with model/input. Outputs auto‑ingested; returns durable URLs.',
+  media_list: 'Browse and retrieve generated/ingested media assets (supports filters).',
 };
 
 // ===== CLASSIFIER CONFIGURATION =====
@@ -423,9 +420,9 @@ User: "create a todo list app"
 create_app
 
 ## Tools Required
-- file_operations
+- file_ops
 - app_management
-- run_commands
+- package_management
 - validation
 
 ## Prompt Sections
@@ -440,9 +437,9 @@ User: "add a delete button to my notes app"
 edit_app
 
 ## Tools Required
-- file_operations
+- file_ops
 - code_editing
-- run_commands
+- package_management
 - validation
 
 ## Prompt Sections
@@ -457,7 +454,7 @@ User: "generate an image of a sunset"
 generate
 
 ## Tools Required
-- image_video_generation
+- ai_generation
 - media_browsing
 
 ## Prompt Sections
@@ -471,14 +468,14 @@ User: "what apps do I have installed?"
 chat
 
 ## Tools Required
-- file_operations
+- file_ops
 
 ## Prompt Sections
 - BASE_SYSTEM_PROMPT
 - CHAT_PROMPT
 \`\`\`
 
-Remember: Analyze the user's intent carefully. If they want to create an app that generates images, that's create_app (making an image generation app), not generate (directly generating an image).`;
+Remember: Analyze the user's intent carefully. If they want to create an app that generates images, that's app_manage (create) (making an image generation app), not generate (directly generating an image).`;
 
 // ===== LEGACY PROMPTS (for backwards compatibility) =====
 

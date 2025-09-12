@@ -300,7 +300,7 @@ export default function AIAgentBar() {
         
         try {
           switch (tc.toolName) {
-            case 'fs_find': {
+            case 'web_fs_find': {
               const { root = '.', maxDepth = 10, glob, prefix, limit = 200, offset = 0 } = (tc.input as { root?: string; maxDepth?: number; glob?: string; prefix?: string; limit?: number; offset?: number }) ?? {};
               console.log(`🔧 [Agent] fs_find: ${root} (depth: ${maxDepth}) glob=${glob ?? '-'} prefix=${prefix ?? '-'} limit=${limit} offset=${offset}`);
               const results = await fnsRef.current.readdirRecursive(root, maxDepth);
@@ -331,7 +331,7 @@ export default function AIAgentBar() {
               await logAndAddResult({ files: page, count: page.length, total: filtered.length, root, offset: start, nextOffset, hasMore: end < filtered.length, applied: { glob: !!glob, prefix: !!prefix } });
               break;
             }
-            case 'fs_read': {
+            case 'web_fs_read': {
               const { path, encoding = 'utf-8' } = tc.input as { path: string; encoding?: 'utf-8' | 'base64' };
               console.log(`🔧 [Agent] fs_read: ${path} (${encoding})`);
               const content = await fnsRef.current.readFile(path, encoding);
@@ -339,7 +339,7 @@ export default function AIAgentBar() {
               await logAndAddResult({ content, path, size: `${sizeKB}KB` });
               break;
             }
-            case 'fs_write': {
+            case 'web_fs_write': {
               const { path, content, createDirs = true } = tc.input as { path: string; content: string; createDirs?: boolean };
               const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
               console.log(`🔧 [Agent] fs_write: ${path} (${sizeKB}KB)`);
@@ -382,21 +382,14 @@ export default function AIAgentBar() {
               } catch {}
               break;
             }
-            case 'fs_mkdir': {
-              const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
-              console.log(`🔧 [Agent] fs_mkdir: ${path} ${recursive ? '(recursive)' : ''}`);
-              await fnsRef.current.mkdir(path, recursive);
-              addToolResult({ tool: 'fs_mkdir', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
-              break;
-            }
-            case 'fs_rm': {
+            case 'web_fs_rm': {
               const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
               console.log(`🔧 [Agent] fs_rm: ${path} ${recursive ? '(recursive)' : ''}`);
               await fnsRef.current.remove(path, { recursive });
-              addToolResult({ tool: 'fs_rm', toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
+              addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
               break;
             }
-            case 'exec': {
+            case 'web_exec': {
               let { command, args = [], cwd } = tc.input as { command: string; args?: string[]; cwd?: string };
 
               // If the model sent the entire command as a single string, split into cmd + argv
@@ -479,7 +472,7 @@ export default function AIAgentBar() {
 
               if (isPkgMgrCmd) {
                 addToolResult({
-                  tool: 'exec',
+                  tool: tc.toolName,
                   toolCallId: tc.toolCallId,
                   output: {
                     command: fullCommand,
@@ -490,7 +483,7 @@ export default function AIAgentBar() {
                 });
               } else {
                 addToolResult({
-                  tool: 'exec',
+                  tool: tc.toolName,
                   toolCallId: tc.toolCallId,
                   output: {
                     command: fullCommand,
@@ -502,197 +495,116 @@ export default function AIAgentBar() {
               }
               break;
             }
-            case 'create_app': {
-              const { id: requestedId, name, icon } = tc.input as { id: string; name: string; icon?: string };
-              let registry: Array<{ id: string; name: string; icon?: string; path: string }>; 
-              try {
-                const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
-                registry = JSON.parse(regRaw);
-              } catch {
-                registry = [];
+            case 'app_manage': {
+              const { action, id: requestedId, name, icon } = tc.input as { action: 'create'|'rename'|'remove'; id: string; name?: string; icon?: string };
+              if (action === 'create') {
+                const id = requestedId;
+                if (!name) throw new Error('app_manage.create requires name');
+                let registry: Array<{ id: string; name: string; icon?: string; path: string }> = [];
+                try {
+                  const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
+                  registry = JSON.parse(regRaw);
+                } catch {}
+                let finalName = name;
+                let finalId = id;
+                const existingNames = new Set(registry.map(app => app.name));
+                const existingIds = new Set(registry.map(app => app.id));
+                let counter = 1;
+                while (existingNames.has(finalName)) { finalName = `${name} (${counter})`; counter++; }
+                counter = 1;
+                while (existingIds.has(finalId)) { finalId = `${id}-${counter}`; counter++; }
+
+                const base = `src/apps/${finalId}`;
+                console.log(`🔧 [Agent] app_manage.create: "${finalName}" -> ${base} (${icon ?? '📦'})`);
+                await fnsRef.current.mkdir(base, true);
+                const metadata = { id: finalId, name: finalName, icon: icon ?? '📦', createdAt: Date.now() } as const;
+                await fnsRef.current.writeFile(`${base}/metadata.json`, JSON.stringify(metadata, null, 2));
+                const appIndexTsx = `import React from 'react'\nimport '/src/tailwind.css'\nimport './styles.css'\nexport default function App(){\n  return (\n    <div className=\"h-full overflow-auto bg-gradient-to-b from-white to-slate-50\">\n      <div className=\"sticky top-0 bg-white/80 backdrop-blur border-b px-3 py-2\">\n        <div className=\"font-semibold tracking-tight\">${finalName}</div>\n      </div>\n      <div className=\"p-3 space-y-3\">\n        <div className=\"rounded-lg border bg-white shadow-sm p-3\">\n          <p className=\"text-slate-600 text-sm\">This is a new app. Build your UI here. The container fills the window and scrolls as needed.</p>\n        </div>\n      </div>\n    </div>\n  )\n}`;
+                await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
+                const appStylesCss = `:root{--app-accent:#22c55e;}\nbody{font-family:Inter,ui-sans-serif,system-ui,Arial}\na{color:var(--app-accent)}`;
+                await fnsRef.current.writeFile(`${base}/styles.css`, appStylesCss);
+                registry.push({ id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` });
+                await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
+                try {
+                  const appIndexPath = `/${base}/index.tsx`;
+                  if (typeof window !== 'undefined') {
+                    window.postMessage({ type: 'FYOS_OPEN_APP', delayMs: 2000, app: { id: finalId, name: finalName, icon: metadata.icon, path: appIndexPath } }, '*');
+                  }
+                } catch {}
+                addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, id: finalId, name: finalName, base } });
+                break;
               }
-              // Deduplicate name/id using one registry read
-              let finalName = name;
-              let finalId = requestedId;
-              const existingNames = new Set(registry.map(app => app.name));
-              const existingIds = new Set(registry.map(app => app.id));
-              let counter = 1;
-              while (existingNames.has(finalName)) { finalName = `${name} (${counter})`; counter++; }
-              counter = 1;
-              while (existingIds.has(finalId)) { finalId = `${requestedId}-${counter}`; counter++; }
-
-              const base = `src/apps/${finalId}`;
-              console.log(`🔧 [Agent] create_app: "${finalName}" -> ${base} (${icon ?? '📦'})`);
-
-              await fnsRef.current.mkdir(base, true);
-              const metadata = { id: finalId, name: finalName, icon: icon ?? '📦', createdAt: Date.now() };
-              await fnsRef.current.writeFile(`${base}/metadata.json`, JSON.stringify(metadata, null, 2));
-              const appIndexTsx = `import React from 'react'\nimport '/src/tailwind.css'\nimport './styles.css'\nexport default function App(){\n  return (\n    <div className=\"h-full overflow-auto bg-gradient-to-b from-white to-slate-50\">\n      <div className=\"sticky top-0 bg-white/80 backdrop-blur border-b px-3 py-2\">\n        <div className=\"font-semibold tracking-tight\">${finalName}</div>\n      </div>\n      <div className=\"p-3 space-y-3\">\n        <div className=\"rounded-lg border bg-white shadow-sm p-3\">\n          <p className=\"text-slate-600 text-sm\">This is a new app. Build your UI here. The container fills the window and scrolls as needed.</p>\n        </div>\n      </div>\n    </div>\n  )\n}`;
-              await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
-              const appStylesCss = `:root{--app-accent:#22c55e;}\nbody{font-family:Inter,ui-sans-serif,system-ui,Arial}\na{color:var(--app-accent)}`;
-              await fnsRef.current.writeFile(`${base}/styles.css`, appStylesCss);
-              
-              // Create initial plan.md file
-              const planMd = `# ${finalName} Implementation Plan
-
-## Overview
-[Brief description of the app's purpose and main functionality]
-
-## Features
-- [ ] Feature 1: Description
-- [ ] Feature 2: Description
-- [ ] Feature 3: Description
-
-## Component Structure
-- Main container with scrollable content
-- Header with app title
-- [Additional components based on app needs]
-
-## Implementation Steps
-- [ ] Set up basic app structure and layout
-- [ ] Implement core functionality
-- [ ] Add interactive elements and state management
-- [ ] Style components according to app purpose
-- [ ] Add error handling and edge cases
-- [ ] Test all features
-- [ ] Polish UI and animations
-
-## Technical Considerations
-- State management approach
-- Data persistence (if needed)
-- Performance optimizations
-- Accessibility requirements
-
-## UI/UX Design
-- Color scheme based on app purpose
-- Layout approach
-- Interactive feedback patterns
-- Responsive design considerations
-
-## Notes
-Created: ${new Date().toISOString()}
-App ID: ${finalId}
-`;
-              await fnsRef.current.writeFile(`${base}/plan.md`, planMd);
-              
-              // Update registry once
-              registry.push({ id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` });
-              await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
-              // Notify desktop to open the newly created app after a short delay
-              try {
-                const appIndexPath = `/${base}/index.tsx`;
-                if (typeof window !== 'undefined') {
-                  window.postMessage({ type: 'FYOS_OPEN_APP', delayMs: 2000, app: { id: finalId, name: finalName, icon: metadata.icon, path: appIndexPath } }, '*');
-                }
-              } catch {}
-              console.log(`✅ [Agent] App created: ${finalName} (${finalId})`);
-              await logAndAddResult({ id: finalId, path: base, name: finalName, icon: metadata.icon });
-              break;
-            }
-            case 'rename_app': {
-              const { id, name } = tc.input as { id: string; name: string };
-              console.log(`🔧 [Agent] rename_app: ${id} -> "${name}"`);
-              const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
-              const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>;
-              const idx = registry.findIndex((r) => r.id === id);
-              if (idx === -1) throw new Error('App not found in registry');
-              const oldName = registry[idx].name;
-              registry[idx].name = name;
-              await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
-              console.log(`✅ [Agent] App renamed: "${oldName}" -> "${name}"`);
-              addToolResult({ tool: 'rename_app', toolCallId: tc.toolCallId, output: { ok: true, id, oldName, newName: name } });
-              break;
-            }
-            case 'remove_app': {
-              const { id } = tc.input as { id: string };
-              console.log(`🔧 [Agent] remove_app: ${id}`);
-              // Remove from registry
-              let reg: Array<{ id: string; name: string; icon?: string; path: string }> = [];
-              let appName = 'Unknown';
-              try {
+              if (action === 'rename') {
+                const { id, name: newName } = tc.input as { action: 'rename'; id: string; name: string };
+                console.log(`🔧 [Agent] app_manage.rename: ${id} -> "${newName}"`);
                 const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
-                reg = JSON.parse(regRaw);
-                const app = reg.find(r => r.id === id);
-                if (app) appName = app.name;
-              } catch {}
-              const next = reg.filter((r) => r.id !== id);
-              await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(next, null, 2));
-              // Remove folder: try src/apps/<id> first, then src/apps/app-<id>
-              const p1 = `src/apps/${id}`;
-              const p2 = `src/apps/app-${id}`;
-              try { await fnsRef.current.remove(p1, { recursive: true }); } catch {}
-              try { await fnsRef.current.remove(p2, { recursive: true }); } catch {}
-              console.log(`✅ [Agent] App removed: "${appName}" (${id})`);
-              addToolResult({ tool: 'remove_app', toolCallId: tc.toolCallId, output: { ok: true, id, name: appName, removedPaths: [p1, p2] } });
+                const registry = JSON.parse(regRaw) as Array<{ id: string; name: string; icon?: string; path: string }>;
+                const idx = registry.findIndex((r) => r.id === id);
+                if (idx === -1) {
+                  addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: false, error: `App not found: ${id}` } });
+                  break;
+                }
+                const oldName = registry[idx].name;
+                registry[idx].name = newName;
+                await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
+                addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, id, oldName, newName } });
+                break;
+              }
+              if (action === 'remove') {
+                const { id } = tc.input as { action: 'remove'; id: string };
+                console.log(`🔧 [Agent] app_manage.remove: ${id}`);
+                let reg: Array<{ id: string; name: string; icon?: string; path: string }> = [];
+                let appName = 'Unknown';
+                try {
+                  const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
+                  reg = JSON.parse(regRaw);
+                  const app = reg.find(r => r.id === id);
+                  if (app) appName = app.name;
+                } catch {}
+                const next = reg.filter((r) => r.id !== id);
+                await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(next, null, 2));
+                const p1 = `src/apps/${id}`;
+                const p2 = `src/apps/app-${id}`;
+                try { await fnsRef.current.remove(p1, { recursive: true }); } catch {}
+                try { await fnsRef.current.remove(p2, { recursive: true }); } catch {}
+                addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, id, name: appName, removedPaths: [p1, p2] } });
+                break;
+              }
+              addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: false, error: `Unsupported action: ${String(action)}` } });
               break;
             }
             case 'validate_project': {
-              const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick'; files?: string[] };
+              const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
               console.log(`🔧 [Agent] validate_project: scope=${scope} files=${files.length}`);
               await runValidation(scope, files);
-              addToolResult({ tool: 'validate_project', toolCallId: tc.toolCallId, output: { ok: true, scope, files } });
+              addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, scope, files } });
               break;
             }
-            case 'ai_fal': {
-              const { model, input, scope } = tc.input as { model: string; input: Record<string, any>; scope?: { desktopId?: string; appId?: string; appName?: string } };
-              console.log(`🔧 [Agent] ai_fal: model=${model}`);
+            case 'ai_generate': {
+              const { provider, model, input, scope } = tc.input as { provider: 'fal'|'eleven'; model?: string; input: Record<string, any>; scope?: { desktopId?: string; appId?: string; appName?: string } };
+              console.log(`🔧 [Agent] ai_generate: provider=${provider} model=${model ?? '-'} `);
               try {
-                // Auto-ingest any external URLs or base64 data in the input
                 const { processedInput, ingestedCount } = await autoIngestInputs(input, scope);
-                if (ingestedCount > 0) {
-                  console.log(`🔄 [Agent] ai_fal: auto-ingested ${ingestedCount} media items`);
+                if (ingestedCount > 0) console.log(`🔄 [Agent] ai_generate: auto-ingested ${ ingestedCount } media items`);
+
+                if (provider === 'fal') {
+                  const res = await fetch('/api/ai/fal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, input: processedInput }) });
+                  if (!res.ok) throw new Error(`FAL API error: ${res.status} ${res.statusText}`);
+                  const json = await res.json();
+                  const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, scope);
+                  addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, result: updated, persistedAssets, autoIngestedCount: ingestedCount } });
+                } else if (provider === 'eleven') {
+                  const res = await fetch('/api/ai/eleven', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(processedInput) });
+                  if (!res.ok) throw new Error(`ElevenLabs API error: ${res.status} ${res.statusText}`);
+                  const json = await res.json();
+                  const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, scope);
+                  addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, result: updated, persistedAssets, autoIngestedCount: ingestedCount } });
+                } else {
+                  throw new Error(`Unsupported provider: ${String(provider)}`);
                 }
-                
-                const res = await fetch('/api/ai/fal', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ model, input: processedInput }),
-                });
-                if (!res.ok) {
-                  throw new Error(`FAL API error: ${res.status} ${res.statusText}`);
-                }
-                const json = await res.json();
-                const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, scope);
-                addToolResult({
-                  tool: 'ai_fal',
-                  toolCallId: tc.toolCallId,
-                  output: { ok: true, result: updated, persistedAssets, autoIngestedCount: ingestedCount },
-                });
               } catch (err: unknown) {
                 const message = err instanceof Error ? err.message : String(err);
-                addToolResult({ tool: 'ai_fal', toolCallId: tc.toolCallId, output: { error: message } });
-              }
-              break;
-            }
-            case 'ai_eleven_music': {
-              const input = tc.input as { prompt: string; musicLengthMs?: number; outputFormat?: string; scope?: { desktopId?: string; appId?: string; appName?: string } };
-              const { scope, ...params } = input;
-              console.log(`🔧 [Agent] ai_eleven_music: ${params.prompt.slice(0, 50)}...`);
-              try {
-                // Auto-ingest any external URLs or base64 data in the params
-                const { processedInput: processedParams, ingestedCount } = await autoIngestInputs(params, scope);
-                if (ingestedCount > 0) {
-                  console.log(`🔄 [Agent] ai_eleven_music: auto-ingested ${ingestedCount} media items`);
-                }
-                
-                const res = await fetch('/api/ai/eleven', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(processedParams),
-                });
-                if (!res.ok) {
-                  throw new Error(`ElevenLabs API error: ${res.status} ${res.statusText}`);
-                }
-                const json = await res.json();
-                const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, scope);
-                addToolResult({
-                  tool: 'ai_eleven_music',
-                  toolCallId: tc.toolCallId,
-                  output: { ok: true, result: updated, persistedAssets, autoIngestedCount: ingestedCount },
-                });
-              } catch (err: unknown) {
-                const message = err instanceof Error ? err.message : String(err);
-                addToolResult({ tool: 'ai_eleven_music', toolCallId: tc.toolCallId, output: { error: message } });
+                addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { error: message } });
               }
               break;
             }
@@ -717,6 +629,21 @@ App ID: ${finalId}
               } catch (err: unknown) {
                 const message = err instanceof Error ? err.message : String(err);
                 addToolResult({ tool: 'media_list', toolCallId: tc.toolCallId, output: { error: message } });
+              }
+              break;
+            }
+            case 'submit_plan': {
+              const { appId, planText } = tc.input as { appId: string; planText: string; mode?: 'create'|'update'; section?: string };
+              console.log(`🔧 [Agent] submit_plan: ${appId}`);
+              try {
+                const base = `src/apps/${appId}`;
+                await fnsRef.current.mkdir(base, true);
+                const path = `${base}/plan.md`;
+                await fnsRef.current.writeFile(path, planText);
+                addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, path, bytes: planText.length } });
+              } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : String(err);
+                addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: false, error: message } });
               }
               break;
             }
@@ -948,7 +875,7 @@ App ID: ${finalId}
 
   // No per-change validation debounce
 
-  async function runValidation(scope: 'quick', changed: string[] = []) {
+  async function runValidation(scope: 'quick' | 'full', changed: string[] = []) {
     if (!instanceRef.current) return;
     if (validateRunningRef.current) return;
     validateRunningRef.current = true;
@@ -1574,4 +1501,3 @@ App ID: ${finalId}
     </>
   );
 }
-

@@ -2,21 +2,18 @@ import { convertToModelMessages, streamText, UIMessage, stepCountIs, tool, gener
 // z is used in tool schemas but not directly here
 import {
   TOOL_NAMES,
-  FSFindInput,
-  FSReadInput,
-  FSWriteInput,
-  FSMkdirInput,
-  FSRmInput,
-  ExecInput,
-  CreateAppInput,
-  RenameAppInput,
-  RemoveAppInput,
+  WebFsFindInput,
+  WebFsReadInput,
+  WebFsWriteInput,
+  WebFsRmInput,
+  WebExecInput,
+  AppManageInput,
   ValidateProjectInput,
   WebSearchInput,
-  AiFalInput,
-  ElevenMusicInput,
+  AiGenerateInput,
   MediaListInput,
   CodeEditAstInput,
+  SubmitPlanInput,
 } from '@/lib/agentTools';
 import { agentLogger } from '@/lib/agentLogger';
 import { 
@@ -36,7 +33,7 @@ import Exa from 'exa-js';
 // Helper function to sanitize tool inputs for logging (removes large content)
 function sanitizeToolInput(toolName: string, input: any): any {
   try {
-    if (toolName === 'fs_write' && input?.content) {
+    if (toolName === 'web_fs_write' && input?.content) {
       const contentBytes = typeof input.content === 'string' ? new TextEncoder().encode(input.content).length : 0;
       return {
         path: input.path,
@@ -46,7 +43,7 @@ function sanitizeToolInput(toolName: string, input: any): any {
         contentPreview: typeof input.content === 'string' ? input.content.slice(0, 100) + (input.content.length > 100 ? '...' : '') : undefined
       };
     }
-    if (toolName === 'fs_read') {
+    if (toolName === 'web_fs_read') {
       return { path: input?.path, encoding: input?.encoding };
     }
     return input;
@@ -159,47 +156,39 @@ export async function POST(req: Request) {
   // Define all available tools
   const allTools = {
     // File operations
-    [TOOL_NAMES.fs_find]: {
-      description: 'List files/folders starting at a directory. Prefer small pages (limit/offset) and targeted filters (glob/prefix) to minimize tokens.',
-      inputSchema: FSFindInput,
+    [TOOL_NAMES.web_fs_find]: {
+      description: 'List files/folders with glob/prefix and pagination; keep pages small.',
+      inputSchema: WebFsFindInput,
     },
-    [TOOL_NAMES.fs_read]: {
-      description: 'Read a single file by exact path. Only read what you need; avoid large, unrelated files.',
-      inputSchema: FSReadInput,
+    [TOOL_NAMES.web_fs_read]: {
+      description: 'Read a single file by exact path; default to concise output.',
+      inputSchema: WebFsReadInput,
     },
-    [TOOL_NAMES.fs_write]: {
-      description: 'Write file contents. Creates parent directories when needed. Prefer precise edits (consider code_edit_ast).',
-      inputSchema: FSWriteInput,
+    [TOOL_NAMES.web_fs_write]: {
+      description: 'Write/create files; auto‑mkdir when needed. Prefer precise edits (consider code_edit_ast).',
+      inputSchema: WebFsWriteInput,
     },
-    [TOOL_NAMES.fs_mkdir]: {
-      description: 'Create a directory (optionally recursive).',
-      inputSchema: FSMkdirInput,
-    },
-    [TOOL_NAMES.fs_rm]: {
+    [TOOL_NAMES.web_fs_rm]: {
       description: 'Remove a file or directory (recursive by default). Destructive—use with care.',
-      inputSchema: FSRmInput,
+      inputSchema: WebFsRmInput,
     },
     // Process execution
-    [TOOL_NAMES.exec]: {
-      description: 'Run shell commands for package management (e.g., pnpm add). Do NOT run dev/build/start servers.',
-      inputSchema: ExecInput,
+    [TOOL_NAMES.web_exec]: {
+      description: 'Run package manager commands (e.g., pnpm add). Do NOT run dev/build/start.',
+      inputSchema: WebExecInput,
     },
     // App management
-    [TOOL_NAMES.create_app]: {
-      description: 'Create a new app under src/apps/<id> and update the app registry.',
-      inputSchema: CreateAppInput,
+    [TOOL_NAMES.app_manage]: {
+      description: 'Manage apps via action=create|rename|remove; handles scaffolding and registry updates.',
+      inputSchema: AppManageInput,
     },
-    [TOOL_NAMES.rename_app]: {
-      description: 'Rename an app in the registry by id.',
-      inputSchema: RenameAppInput,
-    },
-    [TOOL_NAMES.remove_app]: {
-      description: 'Remove an app folder and its registry entry by id.',
-      inputSchema: RemoveAppInput,
+    [TOOL_NAMES.submit_plan]: {
+      description: 'Create or update src/apps/<id>/plan.md with structured plan text.',
+      inputSchema: SubmitPlanInput,
     },
     // Validation
     [TOOL_NAMES.validate_project]: {
-      description: 'Validate the project: typecheck + lint (changed files).',
+      description: 'Validate the project: typecheck + lint (changed files); full also runs production build.',
       inputSchema: ValidateProjectInput,
     },
     // Web search
@@ -241,14 +230,10 @@ export async function POST(req: Request) {
         }
       },
     }),
-    // AI Media Tools
-    [TOOL_NAMES.ai_fal]: {
-      description: 'Generate media using FAL models (images, video, audio). Outputs are auto‑ingested and returned with durable URLs.',
-      inputSchema: AiFalInput,
-    },
-    [TOOL_NAMES.ai_eleven_music]: {
-      description: 'Generate music using the ElevenLabs Music API. Outputs are auto‑ingested and returned with durable URLs.',
-      inputSchema: ElevenMusicInput,
+    // AI Media Tools (unified)
+    [TOOL_NAMES.ai_generate]: {
+      description: 'Generate media using provider=fal|eleven with model/input. Outputs auto‑ingested and returned with durable URLs.',
+      inputSchema: AiGenerateInput,
     },
     [TOOL_NAMES.media_list]: {
       description: 'List previously generated or ingested media assets with optional filters.',
