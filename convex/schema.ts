@@ -86,6 +86,45 @@ export default defineSchema({
     .index("by_owner_app", ["ownerId", "appId"])
     .index("by_owner_desktop", ["ownerId", "desktopId"])
     .index("by_createdAt", ["createdAt"]),
-});
 
+  // Private desktop snapshots (per-user, not publicly listed)
+  desktops_private: defineTable({
+    ownerId: v.string(),
+    desktopId: v.string(),
+    title: v.string(),
+    description: v.optional(v.string()),
+    icon: v.optional(v.string()),
+    r2KeySnapshot: v.string(),
+    size: v.optional(v.number()),
+    fileCount: v.optional(v.number()),
+    contentSha256: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"]) 
+    .index("by_desktopId", ["desktopId"]) 
+    .index("by_updatedAt", ["updatedAt"]),
+
+  // Chat threads per user
+  chat_threads: defineTable({
+    ownerId: v.string(),
+    title: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    lastMessageAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"]) 
+    .index("by_updatedAt", ["updatedAt"]),
+
+  // Chat messages per thread
+  chat_messages: defineTable({
+    threadId: v.id("chat_threads"),
+    ownerId: v.string(),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_thread", ["threadId"]) 
+    .index("by_createdAt", ["createdAt"]),
+});
 

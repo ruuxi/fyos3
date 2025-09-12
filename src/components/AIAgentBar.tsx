@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Send, Search, Store, Monitor, Image as ImageIcon, Home, Paperclip, X } from 'lucide-react';
+import { Plus, History as HistoryIcon } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useWebContainer } from './WebContainerProvider';
@@ -37,6 +38,82 @@ export default function AIAgentBar() {
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [ingestUrl, setIngestUrl] = useState('');
+
+  // Chat threads state (no localStorage for chat)
+  type ChatThread = { _id: string; title: string; updatedAt?: number; lastMessageAt?: number };
+  const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [threadsLoading, setThreadsLoading] = useState<boolean>(false);
+  const [threadsError, setThreadsError] = useState<string | null>(null);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [initialChatMessages, setInitialChatMessages] = useState<any[] | undefined>(undefined);
+  const [chatSessionKey, setChatSessionKey] = useState<string>('agent-chat');
+  const [showThreadHistory, setShowThreadHistory] = useState<boolean>(false);
+
+  async function loadThreads(selectFirstIfAny = true) {
+    setThreadsLoading(true); setThreadsError(null);
+    try {
+      const res = await fetch('/api/user/chat/threads?limit=100', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Failed (${res.status})`);
+      const json = await res.json();
+      const list: ChatThread[] = Array.isArray(json?.threads) ? json.threads : [];
+      setThreads(list);
+      if (selectFirstIfAny) {
+        if (list.length > 0) {
+          setActiveThreadId(String(list[0]._id));
+        } else {
+          // Create default thread automatically if none
+          await createNewThread('Default');
+          return;
+        }
+      }
+    } catch (e: any) {
+      setThreadsError(e?.message || 'Failed to load threads');
+    } finally {
+      setThreadsLoading(false);
+    }
+  }
+
+  async function loadMessagesForThread(tid: string) {
+    try {
+      setInitialChatMessages(undefined);
+      const res = await fetch(`/api/user/chat/messages?threadId=${encodeURIComponent(tid)}&limit=200`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const json = await res.json();
+      const msgs = Array.isArray(json?.messages) ? json.messages : [];
+      const converted = msgs.map((m: any) => ({ id: String(m._id || m.id || Math.random().toString(36).slice(2)), role: m.role === 'assistant' ? 'assistant' : 'user', parts: [{ type: 'text', text: String(m.content || '') }] }));
+      setInitialChatMessages(converted);
+      setChatSessionKey(`${tid}:${Date.now()}`);
+    } catch {
+      setInitialChatMessages(undefined);
+    }
+  }
+
+  async function createNewThread(title = 'New Chat') {
+    try {
+      const res = await fetch('/api/user/chat/threads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
+      if (!res.ok) throw new Error('Create thread failed');
+      const json = await res.json();
+      const tid = String(json.id || json._id || json.threadId);
+      await loadThreads(false);
+      setActiveThreadId(tid);
+      await loadMessagesForThread(tid);
+    } catch (e) {
+      console.error('Failed to create thread', e);
+    }
+  }
+
+  // Initial load of threads and messages
+  useEffect(() => { void loadThreads(true); }, []);
+
+  // When active thread changes, load its messages
+  useEffect(() => { if (activeThreadId) { void loadMessagesForThread(activeThreadId); } }, [activeThreadId]);
+
+  // Refresh threads when window gains focus (helps after interactive login)
+  useEffect(() => {
+    const onFocus = () => { if (!threadsLoading) { void loadThreads(false); } };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [threadsLoading]);
 
   function formatBytes(n?: number): string {
     if (!n || n <= 0) return '';
@@ -247,12 +324,13 @@ export default function AIAgentBar() {
   const classificationRef = useRef<any>(null);
 
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
-    id: 'agent-chat',
+    id: chatSessionKey,
+    messages: initialChatMessages,
     transport: new DefaultChatTransport({ 
       api: '/api/agent',
       prepareSendMessagesRequest({ messages, id }) {
         // Include classification if available
-        const body: any = { messages, id };
+        const body: any = { messages, id, threadId: activeThreadId };
         if (classificationRef.current) {
           body.classification = classificationRef.current;
         }
@@ -1259,7 +1337,7 @@ a:hover {
                         </label>
                       </Button>
                     </div>
-                    <Button type="submit" disabled={!input.trim() || status !== 'ready'} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
+                    <Button type="submit" disabled={!input.trim() || status !== 'ready' || !activeThreadId} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
                       <Send className="w-4 h-4" />
                     </Button>
                   </div>
@@ -1277,6 +1355,76 @@ a:hover {
 
                  {mode === 'chat' && (
                    <div className="px-4 pt-3">
+                    {/* Chat Threads Tabs */}
+                    {/* Browser-style tabs bar */}
+                    <div className="mb-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="h-8 w-8 inline-flex items-center justify-center rounded border border-white/15 text-white/80 hover:bg-white/10"
+                          title="History"
+                          onClick={() => { setShowThreadHistory(v => !v); if (!threadsLoading) void loadThreads(false); }}
+                        >
+                          <HistoryIcon className="w-4 h-4" />
+                        </button>
+                        <div className="flex-1 overflow-x-auto">
+                          <div className="flex items-center gap-1 min-h-[32px]">
+                            {threadsLoading && (
+                              <div className="text-xs text-white/60 px-2">Loading…</div>
+                            )}
+                            {threadsError && (
+                              <div className="text-xs text-red-300 px-2">{threadsError}</div>
+                            )}
+                            {threads.map((t) => (
+                              <div key={t._id} className={`group flex items-center max-w-[220px] pl-3 pr-1 h-8 rounded-t bg-white/10 border border-white/20 border-b-0 ${activeThreadId === t._id ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15'}`}>
+                                <button className="flex-1 truncate text-xs text-left" onClick={() => setActiveThreadId(t._id)} title={t.title || 'Chat'}>
+                                  {t.title || 'Chat'}
+                                </button>
+                                <button
+                                  className="ml-1 inline-flex items-center justify-center h-5 w-5 rounded hover:bg-white/20"
+                                  title="Close"
+                                  onClick={async () => {
+                                    const closingId = t._id;
+                                    try {
+                                      await fetch(`/api/user/chat/threads/${encodeURIComponent(closingId)}`, { method: 'DELETE' });
+                                      const remaining = threads.filter(th => th._id !== closingId);
+                                      setThreads(remaining);
+                                      if (activeThreadId === closingId) {
+                                        const idx = threads.findIndex(th => th._id === closingId);
+                                        const candidate = remaining[Math.min(idx, remaining.length - 1)] || remaining[idx - 1] || remaining[0];
+                                        setActiveThreadId(candidate ? candidate._id : null);
+                                      }
+                                    } catch (e) {
+                                      console.error('Delete thread failed', e);
+                                    }
+                                  }}
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="h-8 w-8 inline-flex items-center justify-center rounded border border-white/15 text-white/80 hover:bg-white/10"
+                          title="New chat"
+                          onClick={() => createNewThread('New Chat')}
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {showThreadHistory && (
+                        <div className="mt-2 max-h-[220px] overflow-auto rounded border border-white/20 bg-white/10 p-2">
+                          {threads.map((t) => (
+                            <button key={t._id} onClick={() => { setActiveThreadId(t._id); setShowThreadHistory(false); }} className={`w-full text-left text-xs rounded px-2 py-1 ${activeThreadId === t._id ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15'}`}>
+                              <div className="truncate">{t.title || 'Chat'}</div>
+                              {t.updatedAt && (<div className="text-[10px] text-white/50">{new Date(t.updatedAt).toLocaleString()}</div>)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
                     <div
                       ref={messagesContainerRef}
@@ -1292,14 +1440,16 @@ a:hover {
                       }}
                     >
                       <div ref={messagesInnerRef} className="space-y-3 px-1">
-                        <div className="text-sm flex justify-start" aria-label="Welcome message">
-                          <div className="max-w-full flex-1">
-                            <div className="text-xs mb-1 text-white/60 pl-1">AI Agent</div>
-                            <div className={`inline-block max-w-[80%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words bg-white/10 border border-white/15 text-white ${!didAnimateWelcome ? 'ios-pop' : ''}`}>
-                              {"Hello! I'm your AI assistant. I can help you create apps, modify files, and manage your WebContainer workspace."}
+                        {messages.length === 0 && (
+                          <div className="text-sm flex justify-start" aria-label="Welcome message">
+                            <div className="max-w-full flex-1">
+                              <div className="text-xs mb-1 text-white/60 pl-1">AI Agent</div>
+                              <div className={`inline-block max-w-[80%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words bg-white/10 border border-white/15 text-white ${!didAnimateWelcome ? 'ios-pop' : ''}`}>
+                                {"Hello! I'm your AI assistant. I can help you create apps, modify files, and manage your WebContainer workspace."}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
                         {messages.map(m => (
                           <div key={m.id} className={`text-sm flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                             <div className={`${m.role === 'user' ? 'flex flex-col items-end max-w-[80%]' : 'max-w-full flex-1'}`}>

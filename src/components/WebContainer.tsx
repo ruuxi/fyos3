@@ -25,6 +25,8 @@ export default function WebContainer() {
   const devUrlRef = useRef<string | null>(null);
   const pendingOpenAppsRef = useRef<any[]>([]);
   const desktopReadyRef = useRef<boolean>(false);
+  const lastRemoteSaveRef = useRef<number>(0);
+  const remoteSaveInFlightRef = useRef<boolean>(false);
 
   useEffect(() => {
     let mounted = true;
@@ -118,19 +120,48 @@ export default function WebContainer() {
         setLoadingStage('Preparing workspace…');
         setTargetProgress((p) => Math.max(p, 26));
 
-        // Prefer restoring the user's persisted VFS if available; otherwise mount default snapshot
+        // Try restoring a private desktop snapshot from server, then local IndexedDB, else default snapshot
         let restored = false;
         try {
-          const hasSaved = await hasPersistedVfs();
-          if (hasSaved) {
-            setLoadingStage('Restoring your workspace…');
-            setTargetProgress((p) => Math.max(p, 32));
-            restored = await restoreFromPersistence(instance);
-            if (restored) {
-              console.log('[WebContainer] Restored from persisted VFS');
+          setLoadingStage('Checking cloud snapshot…');
+          setTargetProgress((p) => Math.max(p, 30));
+          const latestRes = await fetch('/api/user/desktops/latest', { cache: 'no-store' });
+          if (latestRes.ok) {
+            const latest = await latestRes.json();
+            if (latest?.url) {
+              setLoadingStage('Restoring from cloud…');
+              setTargetProgress((p) => Math.max(p, 34));
+              const snapRes = await fetch(latest.url, { cache: 'no-store' });
+              if (snapRes.ok) {
+                const buf = new Uint8Array(await snapRes.arrayBuffer());
+                try {
+                  const { restoreDesktopSnapshot } = await import('@/utils/desktop-snapshot');
+                  await restoreDesktopSnapshot(instance, buf);
+                  restored = true;
+                  console.log('[WebContainer] Restored from private cloud snapshot');
+                } catch (e) {
+                  console.warn('[WebContainer] Cloud snapshot restore failed, falling back:', e);
+                }
+              }
             }
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[WebContainer] Could not check latest private snapshot:', e);
+        }
+
+        if (!restored) {
+          try {
+            const hasSaved = await hasPersistedVfs();
+            if (hasSaved) {
+              setLoadingStage('Restoring your workspace…');
+              setTargetProgress((p) => Math.max(p, 38));
+              restored = await restoreFromPersistence(instance);
+              if (restored) {
+                console.log('[WebContainer] Restored from persisted VFS');
+              }
+            }
+          } catch {}
+        }
 
         if (!restored) {
           // Mount files using binary snapshot for faster cold start
@@ -254,14 +285,80 @@ export default function Document() {
 
         // Removed periodic autosave; persist on visibility/unload only
 
-        // Save on tab hide or before unload
+        // Save on tab hide or before unload (local + cloud)
+        const savePrivateSnapshot = async () => {
+          try {
+            if (remoteSaveInFlightRef.current) return;
+            const now = Date.now();
+            if (now - lastRemoteSaveRef.current < 60000) return; // throttle 60s
+            remoteSaveInFlightRef.current = true;
+            // Ask desktop iframe for current UI state and persist to FS before building snapshot
+            const fetchDesktopState = async (timeoutMs = 1500): Promise<any | null> => {
+              try {
+                const cw = iframeRef.current?.contentWindow;
+                if (!cw) return null;
+                return await new Promise((resolve) => {
+                  let done = false;
+                  const timer = window.setTimeout(() => { if (!done) { done = true; try { window.removeEventListener('message', onMsg as any); } catch {}; resolve(null); } }, timeoutMs);
+                  const onMsg = (event: MessageEvent) => {
+                    if (event.source !== cw) return;
+                    const data: any = (event as any).data;
+                    if (data && data.type === 'FYOS_DESKTOP_STATE') {
+                      try { window.clearTimeout(timer); } catch {}
+                      done = true;
+                      try { window.removeEventListener('message', onMsg as any); } catch {}
+                      resolve(data.payload || null);
+                    }
+                  };
+                  window.addEventListener('message', onMsg as any);
+                  try { cw.postMessage({ type: 'FYOS_REQUEST_DESKTOP_STATE' }, '*'); } catch {}
+                });
+              } catch {
+                return null;
+              }
+            };
+
+            const state = await fetchDesktopState().catch(() => null);
+            if (state) {
+              try {
+                await instance.fs.mkdir('/public/_fyos', { recursive: true } as any);
+              } catch {}
+              try {
+                await instance.fs.writeFile('/public/_fyos/desktop-state.json', new TextEncoder().encode(JSON.stringify(state, null, 2)) as any);
+              } catch {}
+            }
+            const { buildDesktopSnapshot } = await import('@/utils/desktop-snapshot');
+            const snap = await buildDesktopSnapshot(instance);
+            const gzBase64 = btoa(String.fromCharCode(...snap.gz));
+            await fetch('/api/user/desktops/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                desktopId: 'default',
+                title: 'My Desktop',
+                gzBase64,
+                size: snap.size,
+                fileCount: snap.fileCount,
+                contentSha256: snap.contentSha256,
+              }),
+            }).catch(() => {});
+            lastRemoteSaveRef.current = now;
+          } catch (e) {
+            // ignore network or build errors
+          } finally {
+            remoteSaveInFlightRef.current = false;
+          }
+        };
+
         const handleVisibility = () => {
           if (document.visibilityState === 'hidden') {
             void persistNow(instance);
+            void savePrivateSnapshot();
           }
         };
         const handleBeforeUnload = () => {
           void persistNow(instance);
+          void savePrivateSnapshot();
         };
         document.addEventListener('visibilitychange', handleVisibility);
         visibilityHandler = handleVisibility;

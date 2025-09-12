@@ -45,6 +45,11 @@
 These route through a message bridge and keep keys on the server.
   - AI outputs containing media URLs or base64 are post‑processed: assets are ingested via `/api/media/ingest` and results are rewritten to durable FYOS public URLs.
 
+### Persistence
+- Private desktop snapshots (files, apps, registry) and desktop layout state are saved per user and restored on login.
+- AI chat messages are persisted per user/thread.
+- See docs/persistence.md for details on endpoints, schemas, and environment configuration.
+
 ## Agent Tools
 - web_fs_find: List files/folders in WebContainer
 - web_fs_read: Read a file

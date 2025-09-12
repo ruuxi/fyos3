@@ -22,15 +22,16 @@ import {
   EDIT_APP_PROMPT,
   GENERATION_PROMPT,
   CHAT_PROMPT,
-  STYLING_GUIDELINES,
   AI_INTEGRATION_PATTERNS,
   BEST_PRACTICES,
-  PERSONA_PROMPT,
-  MAIN_SYSTEM_PROMPT 
+  PERSONA_PROMPT 
 } from '@/lib/agentPrompts';
 import Exa from 'exa-js';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { ConvexHttpClient } from 'convex/browser';
+import { auth } from '@clerk/nextjs/server';
+import { api as convexApi } from '../../../../convex/_generated/api';
 
 async function getInstalledAppNames(): Promise<string[]> {
   try {
@@ -90,9 +91,24 @@ function sanitizeToolInput(toolName: string, input: any): any {
 // Some tool actions (like package installs) may take longer than 30s
 export const maxDuration = 300;
 
+async function getConvexClientOptional() {
+  try {
+    const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+    if (!url) return null;
+    const client = new ConvexHttpClient(url);
+    const { getToken } = await auth();
+    const token = await getToken({ template: 'convex' });
+    if (!token) return null;
+    client.setAuth(token);
+    return client;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   const body = await req.json();
-  const { messages, classification }: { messages: UIMessage[], classification?: any } = body;
+  const { messages, classification, threadId }: { messages: UIMessage[], classification?: any, threadId?: string } = body;
   
   // Generate session ID for this conversation
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -102,6 +118,15 @@ export async function POST(req: Request) {
   if (lastMessage && lastMessage.role === 'user') {
     const content = lastMessage.parts?.map(p => p.type === 'text' ? p.text : '').join('') || '';
     await agentLogger.logMessage(sessionId, lastMessage.id, 'user', content);
+    // Persist user message to Convex if threadId and auth are present
+    if (threadId) {
+      try {
+        const client = await getConvexClientOptional();
+        if (client) {
+          await client.mutation(convexApi.chat.appendMessage as any, { threadId: threadId as any, role: 'user', content } as any);
+        }
+      } catch {}
+    }
   }
 
   // Sanitize/dedupe messages to avoid downstream gateway duplicate-id issues
@@ -124,10 +149,22 @@ export async function POST(req: Request) {
 
   // Log classification if provided
   if (classification) {
+    const allowedSections = [
+      'BASE_SYSTEM_PROMPT',
+      'CREATE_APP_PROMPT',
+      'EDIT_APP_PROMPT',
+      'GENERATION_PROMPT',
+      'CHAT_PROMPT',
+      'STYLING_GUIDELINES',
+      'AI_INTEGRATION_PATTERNS',
+      'BEST_PRACTICES',
+    ];
+    const recognizedSections = (classification.promptSections || []).filter((s: string) => allowedSections.includes(s));
+    
     console.log('🏷️ [AGENT] Using classification:', {
       taskType: classification.taskType,
       toolsCount: classification.availableTools?.length || 0,
-      promptSections: classification.promptSections
+      promptSections: recognizedSections
     });
   }
 
@@ -177,7 +214,7 @@ export async function POST(req: Request) {
   }
 
   // Build system prompt based on classification
-  let systemPrompt = MAIN_SYSTEM_PROMPT; // Default to full prompt if no classification
+  let systemPrompt = BASE_SYSTEM_PROMPT; // Default to base prompt if no classification
   
   if (classification && classification.promptSections) {
     const promptMap: Record<string, string> = {
@@ -186,7 +223,6 @@ export async function POST(req: Request) {
       'EDIT_APP_PROMPT': EDIT_APP_PROMPT,
       'GENERATION_PROMPT': GENERATION_PROMPT,
       'CHAT_PROMPT': CHAT_PROMPT,
-      'STYLING_GUIDELINES': STYLING_GUIDELINES,
       'AI_INTEGRATION_PATTERNS': AI_INTEGRATION_PATTERNS,
       'BEST_PRACTICES': BEST_PRACTICES,
     };
@@ -321,6 +357,9 @@ export async function POST(req: Request) {
       gateway: {
         order: ['cerebras', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
       },
+      openai: {
+        reasoningEffort: 'low',
+      },
     },
     messages: convertToModelMessages(sanitizedMessages as any),
     stopWhen: stepCountIs(15),
@@ -393,6 +432,15 @@ export async function POST(req: Request) {
       // Log the complete assistant response including tool calls
       if (event.text) {
         await agentLogger.logMessage(sessionId, `assistant_${Date.now()}`, 'assistant', event.text);
+        // Persist assistant message to Convex if threadId and auth are present
+        if (threadId) {
+          try {
+            const client = await getConvexClientOptional();
+            if (client) {
+              await client.mutation(convexApi.chat.appendMessage as any, { threadId: threadId as any, role: 'assistant', content: event.text } as any);
+            }
+          } catch {}
+        }
       }
 
       // Tool calls are now logged in onStepFinish with proper timing and results

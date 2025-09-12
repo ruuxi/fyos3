@@ -406,6 +406,21 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
 export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
   const appsByIdRef = useRef<Record<string, App>>({})
+  // Seed localStorage desktop state from persisted file if present
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/_fyos/desktop-state.json?_=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json && typeof json === 'object') {
+          try { if (json.iconPositions) localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(json.iconPositions)); } catch {}
+          try { if (json.windowGeometries) localStorage.setItem(LS_WINDOW_GEOM_KEY, JSON.stringify(json.windowGeometries)); } catch {}
+          try { if (json.windowTabs) localStorage.setItem(LS_WINDOW_TABS_KEY, JSON.stringify(json.windowTabs)); } catch {}
+        }
+      } catch {}
+    })();
+  }, [])
   // Announce readiness to host so it can flush any pending open-app messages
   useEffect(()=>{
     try { window.parent?.postMessage({ type: EVT_DESKTOP_READY }, '*') } catch {}
@@ -888,7 +903,17 @@ export default function Desktop(){
     window.addEventListener('FYOS_TILING' as any, onTiling)
     function onMessage(e: MessageEvent){
       const d: any = (e as any).data
-      if (!d || d.type !== EVT_OPEN_APP) return
+      if (!d) return
+      if (d.type === 'FYOS_REQUEST_DESKTOP_STATE') {
+        try {
+          const iconPositions = loadIconPositions();
+          const windowGeometries = loadWindowGeometries();
+          const windowTabs = loadWindowTabs();
+          window.parent?.postMessage({ type: 'FYOS_DESKTOP_STATE', payload: { iconPositions, windowGeometries, windowTabs } }, '*')
+        } catch {}
+        return
+      }
+      if (d.type !== EVT_OPEN_APP) return
       const app: App | null = (d.app && typeof d.app === 'object') ? d.app as App : null
       if (!app || !app.id) return
       // If app exists in registry, prefer that canonical entry
