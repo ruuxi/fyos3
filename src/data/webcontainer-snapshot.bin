@@ -3540,7 +3540,7 @@ const Textarea = React.forwardRef<
 Textarea.displayName = "Textarea"
 
 export { Textarea }
-§desktop¡d‚«Desktop.tsx¡f¡cÅ—fimport React, { useEffect, useRef, useState } from 'react'
+§desktop¡d‚«Desktop.tsx¡f¡cÅ©Îimport React, { useEffect, useRef, useState } from 'react'
 
 // Shared constants
 const DEFAULT_WINDOW_POS = { left: 90, top: 90 }
@@ -3556,11 +3556,15 @@ const MINIMIZE_MS = 220
 const LS_ICON_POS_KEY = 'desktop.iconPositions'
 const LS_WINDOW_GEOM_KEY = 'desktop.windowGeometries'
 const LS_WINDOW_TABS_KEY = 'desktop.windowTabs'
+const LS_APP_ORDER_KEY = 'desktop.appOrder'
 
 const EVT_OPEN_APP = 'FYOS_OPEN_APP'
 const EVT_DESKTOP_READY = 'FYOS_DESKTOP_READY'
 
 const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: 16, startY: 52, maxPerCol: 6 }
+
+// Reserved sidebar width for the new left app list
+const SIDEBAR_WIDTH = 96
 
 type Geometry = { left: number; top: number; width: number; height: number }
 type SnapZoneId =
@@ -3575,8 +3579,8 @@ function clampToViewport(left: number, top: number, width: number, height: numbe
   const vw = window.innerWidth
   const vh = window.innerHeight
   // Enforce a consistent visual gap from all edges (instead of partial visibility)
-  const minLeft = GAP
-  const maxLeft = Math.max(GAP, vw - width - GAP)
+  const minLeft = GAP + SIDEBAR_WIDTH
+  const maxLeft = Math.max(GAP + SIDEBAR_WIDTH, vw - width - GAP)
   const minTop = GAP
   const maxTop = Math.max(GAP, vh - height - GAP)
   return {
@@ -3629,6 +3633,14 @@ function loadWindowTabs(): Record<string, WindowTabsState> {
 
 function saveWindowTabs(map: Record<string, WindowTabsState>) {
   try { localStorage.setItem(LS_WINDOW_TABS_KEY, JSON.stringify(map)); } catch {}
+}
+
+function loadAppOrder(): string[] {
+  try { return JSON.parse(localStorage.getItem(LS_APP_ORDER_KEY) || '[]') || []; } catch { return []; }
+}
+
+function saveAppOrder(order: string[]) {
+  try { localStorage.setItem(LS_APP_ORDER_KEY, JSON.stringify(order)); } catch {}
 }
 
 async function loadRegistry(): Promise<App[]>{
@@ -3897,8 +3909,8 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
   const iframeSrc = !isBlank ? `/app.html?path=${encodeURIComponent(activeTab.path||'')}&id=${encodeURIComponent(activeTab.appId||'')}&name=${encodeURIComponent(activeTab.title)}&base=0&ui=1&tw=1` : '';
 
   return (
-    <div ref={rootRef} className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex }} onMouseDown={onFocus}>
-      <div className="titlebar" onMouseDown={startMove}>
+    <div ref={rootRef} className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex, background: 'white', color: 'black', border: '1px solid rgba(0,0,0,0.1)', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }} onMouseDown={onFocus}>
+      <div className="titlebar" onMouseDown={startMove} style={{ background: 'white', color: 'black', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
         <div className="traffic" onMouseDown={(e)=>e.stopPropagation()}>
           <div className="b red" onClick={onClose} title="Close" />
           <div className="b yellow" onClick={onMinimize} title="Minimize" />
@@ -3907,7 +3919,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
         <div className="title">{activeTab?.title || app.name}</div>
         <div style={{marginLeft:'auto'}} className="badge">{app.id.slice(0,8)}</div>
       </div>
-      <nav className="tabstrip" role="tablist" aria-label="Tabs" onMouseDown={e=>e.stopPropagation()}>
+      <nav className="tabstrip" role="tablist" aria-label="Tabs" onMouseDown={e=>e.stopPropagation()} style={{ background: 'white', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
         {tabs.map((t) => (
           <button key={t.id} role="tab" aria-selected={t.id===activeTabId}
             className={`tab${t.id===activeTabId?' active':''}`}
@@ -3948,6 +3960,23 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
 export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
   const appsByIdRef = useRef<Record<string, App>>({})
+  const [appOrder, setAppOrder] = useState<string[]>([])
+  // Seed localStorage desktop state from persisted file if present
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/_fyos/desktop-state.json?_=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json && typeof json === 'object') {
+          try { if (json.iconPositions) localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(json.iconPositions)); } catch {}
+          try { if (json.windowGeometries) localStorage.setItem(LS_WINDOW_GEOM_KEY, JSON.stringify(json.windowGeometries)); } catch {}
+          try { if (json.windowTabs) localStorage.setItem(LS_WINDOW_TABS_KEY, JSON.stringify(json.windowTabs)); } catch {}
+          try { if (json.appOrder) localStorage.setItem(LS_APP_ORDER_KEY, JSON.stringify(json.appOrder)); } catch {}
+        }
+      } catch {}
+    })();
+  }, [])
   // Announce readiness to host so it can flush any pending open-app messages
   useEffect(()=>{
     try { window.parent?.postMessage({ type: EVT_DESKTOP_READY }, '*') } catch {}
@@ -3971,6 +4000,13 @@ export default function Desktop(){
   const [windowTabs, setWindowTabs] = useState<Record<string, WindowTabsState>>({})
 
   useEffect(() => { setWindowTabs(loadWindowTabs()); }, []);
+
+  function mergeOrderWithRegistry(order: string[], list: App[]): string[] {
+    const ids = new Set(list.map(a => a.id))
+    const filtered = order.filter(id => ids.has(id))
+    const missing = list.map(a => a.id).filter(id => !filtered.includes(id))
+    return [...filtered, ...missing]
+  }
 
   const persistWindowTabs = (updater: (prev: Record<string, WindowTabsState>) => Record<string, WindowTabsState>) => {
     setWindowTabs(prev => { const next = updater(prev); saveWindowTabs(next); return next; });
@@ -4094,6 +4130,13 @@ export default function Desktop(){
             if (geoms && Object.keys(geoms).length > 0){
               setWindowGeometries(geoms)
             }
+            // Initialize app order
+            try {
+              const loaded = loadAppOrder()
+              const merged = mergeOrderWithRegistry(loaded, list)
+              setAppOrder(merged)
+              saveAppOrder(merged)
+            } catch {}
           } catch {}
           
           // build quick lookup
@@ -4118,6 +4161,13 @@ export default function Desktop(){
           if (curr !== next) {
             setApps(list)
             try { appsByIdRef.current = Object.fromEntries(list.map(a=>[a.id,a])) } catch {}
+            // merge app order with potential new/removed apps
+            setAppOrder(prev => {
+              const base = prev.length ? prev : loadAppOrder()
+              const merged = mergeOrderWithRegistry(base, list)
+              saveAppOrder(merged)
+              return merged
+            })
           }
         })
         .catch(()=>{})
@@ -4243,36 +4293,39 @@ export default function Desktop(){
     const vw = window.innerWidth
     const vh = window.innerHeight
     const g2 = gap * 2
-    const halfW = Math.floor(vw / 2)
+    const workLeft = SIDEBAR_WIDTH
+    const workW = vw - workLeft
+    const halfW = Math.floor(workW / 2)
     const halfH = Math.floor(vh / 2)
     switch(zone){
-      case 'left-half': return { left: gap, top: gap, width: Math.max(0, halfW - gap - gap/2), height: vh - g2 }
-      case 'right-half': return { left: halfW + gap/2, top: gap, width: Math.max(0, halfW - gap - gap/2), height: vh - g2 }
-      case 'top-half': return { left: gap, top: gap, width: vw - g2, height: Math.max(0, halfH - gap - gap/2) }
-      case 'bottom-half': return { left: gap, top: halfH + gap/2, width: vw - g2, height: Math.max(0, halfH - gap - gap/2) }
-      case 'top-left': return { left: gap, top: gap, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
-      case 'top-right': return { left: halfW + gap/2, top: gap, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
-      case 'bottom-left': return { left: gap, top: halfH + gap/2, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
-      case 'bottom-right': return { left: halfW + gap/2, top: halfH + gap/2, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
+      case 'left-half': return { left: workLeft + gap, top: gap, width: Math.max(0, halfW - gap - gap/2), height: vh - g2 }
+      case 'right-half': return { left: workLeft + halfW + gap/2, top: gap, width: Math.max(0, halfW - gap - gap/2), height: vh - g2 }
+      case 'top-half': return { left: workLeft + gap, top: gap, width: workW - g2, height: Math.max(0, halfH - gap - gap/2) }
+      case 'bottom-half': return { left: workLeft + gap, top: halfH + gap/2, width: workW - g2, height: Math.max(0, halfH - gap - gap/2) }
+      case 'top-left': return { left: workLeft + gap, top: gap, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
+      case 'top-right': return { left: workLeft + halfW + gap/2, top: gap, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
+      case 'bottom-left': return { left: workLeft + gap, top: halfH + gap/2, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
+      case 'bottom-right': return { left: workLeft + halfW + gap/2, top: halfH + gap/2, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
     }
   }
 
   function detectSnap(x: number, y: number, T = 120): SnapZoneId | null{
     const vw = window.innerWidth
     const vh = window.innerHeight
-    const nearLeft = x <= T
+    const workLeft = SIDEBAR_WIDTH
+    const nearLeft = x <= workLeft + T
     const nearRight = x >= vw - T
     const nearTop = y <= T
     const nearBottom = y >= vh - T
     if (!(nearLeft || nearRight || nearTop || nearBottom)) return null
 
     const cornerRatio = 0.3 // widen corner segments for easier corner snaps
-    const cornerW = vw * cornerRatio
+    const cornerW = (vw - workLeft) * cornerRatio
     const cornerH = vh * cornerRatio
 
     // Top edge
     if (nearTop) {
-      if (x <= cornerW) return 'top-left'
+      if (x <= workLeft + cornerW) return 'top-left'
       if (x >= vw - cornerW) return 'top-right'
       return 'top-half'
     }
@@ -4352,7 +4405,8 @@ export default function Desktop(){
   const iconPositionsRef = useRef(iconPositions)
   useEffect(()=>{ iconPositionsRef.current = iconPositions }, [iconPositions])
 
-  const [launchingIconId, setLaunchingIconId] = useState<string | null>(null)
+  // keep setter for bounceIcon compatibility (state value unused)
+  const [, setLaunchingIconId] = useState<string | null>(null)
 
   // Listen for requests to auto-open an app
   useEffect(()=>{
@@ -4430,7 +4484,18 @@ export default function Desktop(){
     window.addEventListener('FYOS_TILING' as any, onTiling)
     function onMessage(e: MessageEvent){
       const d: any = (e as any).data
-      if (!d || d.type !== EVT_OPEN_APP) return
+      if (!d) return
+      if (d.type === 'FYOS_REQUEST_DESKTOP_STATE') {
+        try {
+          const iconPositions = loadIconPositions();
+          const windowGeometries = loadWindowGeometries();
+          const windowTabs = loadWindowTabs();
+          const appOrder = loadAppOrder();
+          window.parent?.postMessage({ type: 'FYOS_DESKTOP_STATE', payload: { iconPositions, windowGeometries, windowTabs, appOrder } }, '*')
+        } catch {}
+        return
+      }
+      if (d.type !== EVT_OPEN_APP) return
       const app: App | null = (d.app && typeof d.app === 'object') ? d.app as App : null
       if (!app || !app.id) return
       // If app exists in registry, prefer that canonical entry
@@ -4455,44 +4520,66 @@ export default function Desktop(){
   }, [])
 
   return (
-    <div className="desktop">
-      <div className="wallpaper" />
+    <div className="desktop" style={{ background: 'white', color: 'black' }}>
+      <div className="wallpaper" style={{ background: 'white' }} />
       {/* MenuBar removed */}
+
+      {/* Sidebar */}
+      <aside
+        className="desktop-sidebar"
+        style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: SIDEBAR_WIDTH, background: 'white', borderRight: '1px solid rgba(0,0,0,0.1)', paddingTop: 12 }}
+        aria-label="Applications"
+      >
+        <nav>
+          {(appOrder.length ? appOrder : apps.map(a=>a.id)).map(id => {
+            const a = appsByIdRef.current[id]
+            if (!a) return null
+            const isOpen = open.some(w => w.id === id)
+            return (
+              <div
+                key={id}
+                role="button"
+                tabIndex={0}
+                draggable
+                onDragStart={e=>{ try { e.dataTransfer?.setData('text/plain', id) } catch {} }}
+                onDragOver={e=>{ e.preventDefault() }}
+                onDrop={e=>{ e.preventDefault(); const fromId = e.dataTransfer?.getData('text/plain') || ''; if (fromId) {
+                  if (fromId !== id) {
+                    setAppOrder(prev => {
+                      const base = prev.length ? prev.slice() : apps.map(x=>x.id)
+                      const fromIdx = base.indexOf(fromId)
+                      const toIdx = base.indexOf(id)
+                      if (fromIdx < 0 || toIdx < 0) return prev
+                      base.splice(fromIdx, 1)
+                      base.splice(toIdx, 0, fromId)
+                      saveAppOrder(base)
+                      return base
+                    })
+                  }
+                } }}
+                onClick={()=> launch(a)}
+                onKeyDown={e=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); launch(a) } }}
+                className={`sidebar-item${isOpen?' active':''}`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 10px',
+                  margin: '0 6px 4px 6px', borderRadius: 8,
+                  background: isOpen?'rgba(0,0,0,0.06)':'transparent'
+                }}
+              >
+                <span aria-hidden style={{ width: 28, textAlign: 'center' }}>{a.icon ?? 'ðŸ“¦'}</span>
+                <span style={{ fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</span>
+              </div>
+            )
+          })}
+        </nav>
+      </aside>
 
       <div ref={overlayRef} className="snap-overlay" aria-hidden style={{display:'none'}}>
         <div ref={previewRef} className="snap-preview" />
       </div>
 
-      <div className="desktop-icons">
-        {apps.slice(0,20).map(a => {
-          const pos = iconPositions[a.id] || { left: 16, top: 52 }
-          return (
-            <div
-              key={a.id}
-              className={`desktop-icon${launchingIconId===a.id ? ' launching' : ''}`}
-              style={{ left: pos.left, top: pos.top }}
-              onMouseDown={(e)=>{
-                dragIconRef.current = {
-                  id: a.id,
-                  startX: e.clientX,
-                  startY: e.clientY,
-                  startLeft: pos.left,
-                  startTop: pos.top,
-                  dragging: false
-                }
-              }}
-              onClick={(e)=>{
-                if (suppressClickRef.current.has(a.id)) { e.preventDefault(); return }
-                bounceIcon(setLaunchingIconId, a.id)
-                launch(a)
-              }}
-            >
-              <div className="glyph">{a.icon ?? 'ðŸ“¦'}</div>
-              <div style={{fontSize:12,marginTop:6}}>{a.name}</div>
-            </div>
-          )
-        })}
-      </div>
+      {/* Main desktop area (windows); icons grid removed */}
+      <div className="desktop-main" style={{ marginLeft: SIDEBAR_WIDTH }} />
 
       {open.map((app, idx) => {
         const tabsState = windowTabs[app.id] || { activeTabId: '', tabs: [] };

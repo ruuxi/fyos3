@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Send, Search, Store, Monitor, Image as ImageIcon, Home, Paperclip, X } from 'lucide-react';
+import { Send, Search, Store, Monitor, Image as ImageIcon, Home, Paperclip, X, FileVideo, FileAudio2, FileText, File as FileIcon } from 'lucide-react';
 import { Plus, History as HistoryIcon } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
@@ -19,6 +19,8 @@ export default function AIAgentBar() {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'compact' | 'chat' | 'visit' | 'media'>('chat');
   const [attachments, setAttachments] = useState<Array<{ name: string; publicUrl: string; contentType: string }>>([]);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const dragCounterRef = useRef(0);
   const { goTo, activeIndex } = useScreens();
   const [desktopsListing, setDesktopsListing] = useState<Array<{ _id: string; title: string; description?: string; icon?: string }>>([]);
   const [desktopsLoading, setDesktopsLoading] = useState(false);
@@ -123,6 +125,15 @@ export default function AIAgentBar() {
     return `${v.toFixed(1)} ${units[i]}`;
   }
 
+  function guessContentTypeFromFilename(name: string): string {
+    const lower = (name || '').toLowerCase();
+    if (/\.(png|jpg|jpeg|gif|webp|svg)$/.test(lower)) return 'image/*';
+    if (/\.(mp4|webm|mov|m4v|mkv)$/.test(lower)) return 'video/*';
+    if (/\.(mp3|wav|m4a|aac|flac|ogg)$/.test(lower)) return 'audio/*';
+    if (/\.(txt|md|json|csv|log)$/.test(lower)) return 'text/plain';
+    return 'application/octet-stream';
+  }
+
   async function loadMedia() {
     if (mode !== 'media') return;
     setMediaLoading(true); setMediaError(null);
@@ -143,12 +154,12 @@ export default function AIAgentBar() {
 
   useEffect(() => { if (mode === 'media') { void loadMedia(); } }, [mode, mediaType]);
 
-  async function handleUploadFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
+  async function handleUploadFiles(files: FileList | File[] | null) {
+    if (!files || (Array.isArray(files) ? files.length === 0 : files.length === 0)) return;
     setUploadBusy(true); setUploadError(null);
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      const list: File[] = Array.isArray(files) ? files : Array.from(files);
+      for (const file of list) {
         const base64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result));
@@ -161,7 +172,21 @@ export default function AIAgentBar() {
           const text = await res.text().catch(() => '');
           throw new Error(text || `Upload failed (${res.status})`);
         }
-        // Optional: const json = await res.json();
+        try {
+          const result = await res.json();
+          setAttachments(prev => [...prev, {
+            name: file.name,
+            publicUrl: result.publicUrl || '',
+            contentType: file.type || result.contentType || guessContentTypeFromFilename(file.name),
+          }]);
+        } catch {
+          // Fallback: still add attachment without server response
+          setAttachments(prev => [...prev, {
+            name: file.name,
+            publicUrl: '',
+            contentType: file.type || guessContentTypeFromFilename(file.name),
+          }]);
+        }
       }
       await loadMedia();
     } catch (e: any) {
@@ -181,12 +206,105 @@ export default function AIAgentBar() {
         const text = await res.text().catch(() => '');
         throw new Error(text || `Ingest failed (${res.status})`);
       }
+      try {
+        const result = await res.json();
+        const name = url.split('/').pop() || 'link';
+        const inferred = guessContentTypeFromFilename(name);
+        setAttachments(prev => [...prev, {
+          name,
+          publicUrl: result.publicUrl || url,
+          contentType: result.contentType || inferred,
+        }]);
+      } catch {
+        // Best-effort attachment if JSON parse fails
+        const name = url.split('/').pop() || 'link';
+        setAttachments(prev => [...prev, {
+          name,
+          publicUrl: url,
+          contentType: guessContentTypeFromFilename(name),
+        }]);
+      }
       setIngestUrl('');
       await loadMedia();
     } catch (e: any) {
       setUploadError(e?.message || 'Ingest failed');
     } finally {
       setUploadBusy(false);
+    }
+  }
+
+  async function handleGlobalDrop(dt: DataTransfer) {
+    try {
+      if (dt.files && dt.files.length > 0) {
+        await handleUploadFiles(dt.files);
+        setMode('chat');
+        return;
+      }
+      // Try URI list first
+      const uriList = dt.getData('text/uri-list');
+      let url = (uriList || '').split('\n')[0].trim();
+      if (!url) {
+        const text = dt.getData('text/plain');
+        const maybe = (text || '').trim();
+        if (/^https?:\/\//i.test(maybe)) {
+          url = maybe;
+        } else if (/^data:[^;]+;base64,/i.test(maybe)) {
+          // Handle data URL
+          const comma = maybe.indexOf(',');
+          const header = maybe.slice(5, comma); // e.g., image/png;base64
+          const contentType = header.split(';')[0] || 'application/octet-stream';
+          const base64 = maybe; // API accepts full data URL as base64 field
+          try {
+            const res = await fetch('/api/media/ingest', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ base64, contentType, metadata: { filename: 'dropped' } }),
+            });
+            if (!res.ok) throw new Error(`Ingest failed (${res.status})`);
+            const result = await res.json().catch(() => ({}));
+            setAttachments(prev => [...prev, {
+              name: 'dropped',
+              publicUrl: result.publicUrl || '',
+              contentType: contentType || result.contentType || 'application/octet-stream',
+            }]);
+            setMode('chat');
+            return;
+          } catch (e) {
+            // Fall through to treat as plain text
+          }
+        } else if (maybe) {
+          // Treat plain text as a text file attachment
+          const file = new File([maybe], 'dropped.txt', { type: 'text/plain' });
+          await handleUploadFiles([file]);
+          setMode('chat');
+          return;
+        }
+      }
+      if (url) {
+        // Ingest by URL and attach
+        setUploadBusy(true); setUploadError(null);
+        try {
+          const res = await fetch('/api/media/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceUrl: url }) });
+          if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            throw new Error(text || `Ingest failed (${res.status})`);
+          }
+          const result = await res.json().catch(() => ({}));
+          const name = url.split('/').pop() || 'link';
+          setAttachments(prev => [...prev, {
+            name,
+            publicUrl: result.publicUrl || url,
+            contentType: result.contentType || guessContentTypeFromFilename(name),
+          }]);
+        } catch (e: any) {
+          setUploadError(e?.message || 'Ingest failed');
+        } finally {
+          setUploadBusy(false);
+        }
+        setMode('chat');
+      }
+    } catch {
+      // ignore
     }
   }
 
@@ -935,6 +1053,50 @@ a:hover {
     return () => window.removeEventListener('keydown', onKey);
   }, [mode]);
 
+  // Global drag & drop to attach files/URLs/text anywhere on the page
+  useEffect(() => {
+    const hasDroppableData = (e: any) => {
+      const dt = e?.dataTransfer;
+      if (!dt) return false;
+      const types = Array.from(dt.types || []);
+      return types.includes('Files') || types.includes('text/uri-list') || types.includes('text/plain');
+    };
+
+    const onDragEnter = (e: any) => {
+      if (!hasDroppableData(e)) return;
+      e.preventDefault();
+      dragCounterRef.current++;
+      setIsDraggingOver(true);
+    };
+    const onDragOver = (e: any) => {
+      if (!hasDroppableData(e)) return;
+      e.preventDefault();
+    };
+    const onDragLeave = (e: any) => {
+      if (!hasDroppableData(e)) return;
+      dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+      if (dragCounterRef.current === 0) setIsDraggingOver(false);
+    };
+    const onDrop = (e: any) => {
+      if (!hasDroppableData(e)) return;
+      e.preventDefault();
+      dragCounterRef.current = 0;
+      setIsDraggingOver(false);
+      void handleGlobalDrop(e.dataTransfer);
+    };
+
+    window.addEventListener('dragenter', onDragEnter as EventListener);
+    window.addEventListener('dragover', onDragOver as EventListener);
+    window.addEventListener('dragleave', onDragLeave as EventListener);
+    window.addEventListener('drop', onDrop as EventListener);
+    return () => {
+      window.removeEventListener('dragenter', onDragEnter as EventListener);
+      window.removeEventListener('dragover', onDragOver as EventListener);
+      window.removeEventListener('dragleave', onDragLeave as EventListener);
+      window.removeEventListener('drop', onDrop as EventListener);
+    };
+  }, []);
+
   // Overlay click handled via a fixed backdrop element in the JSX
 
   // === Automatic diagnostics ===
@@ -1269,20 +1431,46 @@ a:hover {
 
                   {/* Center chat input */}
                   <div className="flex-1 relative">
-                    {/* Attachment chips */}
+                    {/* Attachments preview grid */}
                     {attachments.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-2 px-16">
-                        {attachments.map((attachment, index) => (
-                          <div key={index} className="flex items-center gap-1 bg-white/20 rounded px-2 py-1 text-xs text-white">
-                            <span className="truncate max-w-32">{attachment.name}</span>
-                            <button
-                              onClick={() => removeAttachment(index)}
-                              className="hover:bg-white/20 rounded p-0.5"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
+                        {attachments.map((a, index) => {
+                          const ct = (a.contentType || '').toLowerCase();
+                          const isImage = ct.startsWith('image/');
+                          const isVideo = ct.startsWith('video/');
+                          const isAudio = ct.startsWith('audio/');
+                          const isText = ct.startsWith('text/') || /\.(txt|md|json|csv|log)$/i.test(a.name);
+                          return (
+                            <div key={index} className="relative w-28 h-20 rounded border border-white/20 overflow-hidden bg-white/10">
+                              {isImage && a.publicUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={a.publicUrl} alt={a.name} className="w-full h-full object-cover" />
+                              ) : isVideo && a.publicUrl ? (
+                                <video src={a.publicUrl} className="w-full h-full object-cover" muted playsInline />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-white/90">
+                                  {isAudio ? (
+                                    <FileAudio2 className="w-6 h-6" />
+                                  ) : isText ? (
+                                    <FileText className="w-6 h-6" />
+                                  ) : (
+                                    <FileIcon className="w-6 h-6" />
+                                  )}
+                                </div>
+                              )}
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-[10px] px-1 py-0.5 truncate" title={a.name}>
+                                {a.name}
+                              </div>
+                              <button
+                                onClick={() => removeAttachment(index)}
+                                className="absolute top-1 right-1 bg-black/50 hover:bg-black/70 rounded p-0.5 text-white"
+                                aria-label="Remove attachment"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                     <Search className="absolute left-16 top-1/2 -translate-y-1/2 h-4 w-4 text-white" />
@@ -1314,7 +1502,7 @@ a:hover {
                     <div className="relative">
                       <input
                         type="file"
-                        accept="image/*,video/*,audio/*"
+                        accept="image/*,video/*,audio/*,.txt,.md,.json,.csv"
                         multiple
                         onChange={(e) => {
                           if (e.target.files) {
