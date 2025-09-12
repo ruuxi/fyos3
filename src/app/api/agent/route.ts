@@ -29,6 +29,41 @@ import {
   MAIN_SYSTEM_PROMPT 
 } from '@/lib/agentPrompts';
 import Exa from 'exa-js';
+import { promises as fs } from 'fs';
+import path from 'path';
+
+async function getInstalledAppNames(): Promise<string[]> {
+  try {
+    const regPath = path.join(process.cwd(), 'public', 'apps', 'registry.json');
+    const buf = await fs.readFile(regPath, 'utf-8');
+    const data = JSON.parse(buf);
+    if (Array.isArray(data)) {
+      return data.map((x: any) => (typeof x?.name === 'string' ? x.name : undefined)).filter(Boolean);
+    }
+    if (Array.isArray(data?.apps)) {
+      return data.apps.map((x: any) => (typeof x?.name === 'string' ? x.name : undefined)).filter(Boolean);
+    }
+  } catch {}
+  // Fallback: scan src/apps
+  try {
+    const appsDir = path.join(process.cwd(), 'src', 'apps');
+    const entries = (await fs.readdir(appsDir, { withFileTypes: true } as any)) as unknown as Array<{ isDirectory: () => boolean; name: string }>;
+    const names: string[] = [];
+    for (const e of entries) {
+      if (e.isDirectory && e.isDirectory()) {
+        const id = e.name;
+        try {
+          const meta = JSON.parse(await fs.readFile(path.join(appsDir, id, 'metadata.json'), 'utf-8'));
+          names.push(typeof meta?.name === 'string' ? meta.name : id);
+        } catch {
+          names.push(id);
+        }
+      }
+    }
+    return names;
+  } catch {}
+  return [];
+}
 
 // Helper function to sanitize tool inputs for logging (removes large content)
 function sanitizeToolInput(toolName: string, input: any): any {
@@ -152,6 +187,14 @@ export async function POST(req: Request) {
       systemPrompt = sections.join('\n\n');
     }
   }
+
+  // Append list of installed apps as plain names (one per line)
+  try {
+    const installed = await getInstalledAppNames();
+    if (installed.length > 0) {
+      systemPrompt += '\n\nCurrent apps installed:\n' + installed.map(n => `- ${n}`).join('\n');
+    }
+  } catch {}
 
   // Define all available tools
   const allTools = {

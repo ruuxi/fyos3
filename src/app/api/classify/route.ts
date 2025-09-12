@@ -1,6 +1,41 @@
 import { generateText, convertToModelMessages } from 'ai';
 import { NextRequest, NextResponse } from 'next/server';
 import { CLASSIFIER_PROMPT } from '@/lib/agentPrompts';
+import { promises as fs } from 'fs';
+import path from 'path';
+
+async function getInstalledAppNames(): Promise<string[]> {
+  try {
+    const regPath = path.join(process.cwd(), 'public', 'apps', 'registry.json');
+    const buf = await fs.readFile(regPath, 'utf-8');
+    const data = JSON.parse(buf);
+    if (Array.isArray(data)) {
+      return data.map((x: any) => (typeof x?.name === 'string' ? x.name : undefined)).filter(Boolean);
+    }
+    if (Array.isArray(data?.apps)) {
+      return data.apps.map((x: any) => (typeof x?.name === 'string' ? x.name : undefined)).filter(Boolean);
+    }
+  } catch {}
+  // Fallback: scan src/apps
+  try {
+    const appsDir = path.join(process.cwd(), 'src', 'apps');
+    const entries = (await fs.readdir(appsDir, { withFileTypes: true } as any)) as unknown as Array<{ isDirectory: () => boolean; name: string }>;
+    const names: string[] = [];
+    for (const e of entries) {
+      if (e.isDirectory && e.isDirectory()) {
+        const id = e.name;
+        try {
+          const meta = JSON.parse(await fs.readFile(path.join(appsDir, id, 'metadata.json'), 'utf-8'));
+          names.push(typeof meta?.name === 'string' ? meta.name : id);
+        } catch {
+          names.push(id);
+        }
+      }
+    }
+    return names;
+  } catch {}
+  return [];
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,6 +64,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Use AI to classify the user's intent with conversation context
+    const installed = await getInstalledAppNames();
+    const appsList = installed.length > 0
+      ? '\n\nCurrent apps installed:\n' + installed.map(n => `- ${n}`).join('\n')
+      : '';
+
     const { text } = await generateText({
       model: 'meta/llama-4-scout',
       providerOptions: {
@@ -36,7 +76,7 @@ export async function POST(req: NextRequest) {
           order: ['cerebras', 'alibaba'],
         },
       },
-      system: CLASSIFIER_PROMPT,
+      system: CLASSIFIER_PROMPT + appsList,
       prompt: message + conversationContext,
       temperature: 0.2, // Lower temperature for more consistent classification
     });
