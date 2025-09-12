@@ -7,8 +7,11 @@ import { useWebContainer } from './WebContainerProvider';
 import BootScreen from './BootScreen';
 import { hasPersistedVfs, restoreFromPersistence, persistNow } from '@/utils/vfs-persistence';
 import { persistAssetsFromAIResult } from '@/utils/ai-media';
+import { useAuth, useClerk } from '@clerk/nextjs';
 
 export default function WebContainer() {
+  const { isSignedIn } = useAuth();
+  const { openSignIn } = useClerk();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [webcontainerInstance, setWebcontainerInstance] = useState<WebContainerAPI | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -682,6 +685,10 @@ export default function Document() {
           progress={displayProgress}
           complete={shouldExitBoot}
           onExited={() => setIsLoading(false)}
+          isSignedIn={Boolean(isSignedIn)}
+          onSignIn={() => {
+            try { openSignIn({}) } catch { try { window.location.href = '/sign-in'; } catch {} }
+          }}
         />
       )}
       <iframe
@@ -689,7 +696,7 @@ export default function Document() {
         className={`block absolute inset-0 w-full h-full border-0 opacity-0 will-change-[opacity] transition-opacity duration-[500ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${isLoading ? '' : 'opacity-100'}`}
         title="Preview"
         sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts allow-downloads"
-        style={{ backgroundColor: 'rgb(11, 16, 32)' }}
+        style={{ backgroundColor: 'white' }}
       />
       <style jsx>{`
         .iframe-ready { opacity: 1; }
