@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server';
 
 // POST /api/ai/fal
-// Body: { model: string, input: any }
+// Body: { input: any, task?: 'image'|'video'|'audio'|'3d', model?: string }
+// Model is optional; when omitted we select a sensible default per task behind the scenes.
 export async function POST(req: NextRequest) {
   try {
     const apiKey = process.env.FAL_API_KEY || process.env.NEXT_PUBLIC_FAL_API_KEY;
@@ -9,11 +10,27 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: 'FAL_API_KEY not configured' }), { status: 500 });
     }
 
-    const { model, input } = await req.json();
-    const selectedModel = (typeof model === 'string' && model.trim()) ? model : 'fal-ai/flux-1/schnell';
-    if (typeof model !== 'string' || !model) {
-      return new Response(JSON.stringify({ error: 'Missing model' }), { status: 400 });
-    }
+    const { model, input, task } = await req.json();
+
+    // Choose default model behind the scenes when none is provided
+    const pickDefaultModel = (t?: string): string => {
+      switch ((t || '').toLowerCase()) {
+        case 'video':
+          return 'fal-ai/runway-gen3/turbo/image-to-video';
+        case 'image':
+          return 'fal-ai/flux-1/schnell';
+        case 'audio':
+          // Fallback; most audio/music is via ElevenLabs route in this app
+          return 'fal-ai/flux-1/schnell';
+        case '3d':
+          // Fallback default; adjust when a preferred 3D model is adopted
+          return 'fal-ai/flux-1/schnell';
+        default:
+          return 'fal-ai/flux-1/schnell';
+      }
+    };
+
+    const selectedModel = (typeof model === 'string' && model.trim()) ? model.trim() : pickDefaultModel(task);
 
     // FAL REST expects model path segments (do not encode slashes)
     const url = `https://fal.run/${selectedModel}`;
@@ -39,5 +56,4 @@ export async function POST(req: NextRequest) {
     return new Response('Internal Server Error', { status: 500 });
   }
 }
-
 

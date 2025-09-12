@@ -129,6 +129,7 @@ You can generate images, videos, music, and other media using AI tools.
 - Use descriptive prompts for better results
 - Generated media is automatically saved and accessible
 - Keep responses minimal - the UI renders media players automatically`;
+// Note to agent (implicit via tool): Do not specify a model; the server chooses sensible defaults per task and provider.
 
 export const CHAT_PROMPT = `## Conversational Mode
 
@@ -367,7 +368,7 @@ export const TOOL_DESCRIPTIONS = {
   web_search: 'Search the web for current information. ONLY use when the user explicitly requests web search or real‑time data.',
 
   // AI Generation (Unified)
-  ai_generate: 'Generate media via provider=fal|eleven with model/input. Outputs auto‑ingested; returns durable URLs.',
+  ai_generate: 'Generate media via provider=fal|eleven with input only. The server selects an appropriate default model behind the scenes. Outputs auto‑ingested; returns durable URLs.',
   media_list: 'Browse and retrieve generated/ingested media assets (supports filters).',
 };
 

@@ -255,8 +255,6 @@ export default function AIAgentBar() {
         const body: any = { messages, id };
         if (classificationRef.current) {
           body.classification = classificationRef.current;
-          // Clear classification after use
-          classificationRef.current = null;
         }
         return { body };
       }
@@ -581,14 +579,14 @@ export default function AIAgentBar() {
               break;
             }
             case 'ai_generate': {
-              const { provider, model, input, scope } = tc.input as { provider: 'fal'|'eleven'; model?: string; input: Record<string, any>; scope?: { desktopId?: string; appId?: string; appName?: string } };
-              console.log(`🔧 [Agent] ai_generate: provider=${provider} model=${model ?? '-'} `);
+              const { provider, model, task, input, scope } = tc.input as { provider: 'fal'|'eleven'; model?: string; task?: 'image'|'video'|'music'|'audio'|'3d'; input: Record<string, any>; scope?: { desktopId?: string; appId?: string; appName?: string } };
+              console.log(`🔧 [Agent] ai_generate: provider=${provider} task=${task ?? '-'} `);
               try {
                 const { processedInput, ingestedCount } = await autoIngestInputs(input, scope);
                 if (ingestedCount > 0) console.log(`🔄 [Agent] ai_generate: auto-ingested ${ ingestedCount } media items`);
 
                 if (provider === 'fal') {
-                  const res = await fetch('/api/ai/fal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, input: processedInput }) });
+                  const res = await fetch('/api/ai/fal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: processedInput, task }) });
                   if (!res.ok) throw new Error(`FAL API error: ${res.status} ${res.statusText}`);
                   const json = await res.json();
                   const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, scope);
@@ -1049,6 +1047,9 @@ export default function AIAgentBar() {
     if (!input.trim()) return;
     forceFollowRef.current = true;
     let userText = input;
+    // Reset classification for the new user turn; the next successful
+    // classification will populate this again and persist for the full turn
+    classificationRef.current = null;
     
     // Append attachments if any
     if (attachments.length > 0) {

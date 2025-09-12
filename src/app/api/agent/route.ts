@@ -232,7 +232,7 @@ export async function POST(req: Request) {
     }),
     // AI Media Tools (unified)
     [TOOL_NAMES.ai_generate]: {
-      description: 'Generate media using provider=fal|eleven with model/input. Outputs auto‑ingested and returned with durable URLs.',
+      description: 'Generate media using provider=fal|eleven with input only. Model selection happens behind the scenes; outputs are auto‑ingested and returned with durable URLs.',
       inputSchema: AiGenerateInput,
     },
     [TOOL_NAMES.media_list]: {
