@@ -463,18 +463,35 @@ generate
 - GENERATION_PROMPT
 \`\`\`
 
-User: "what apps do I have installed?"
-\`\`\`markdown
-## Task Type
-chat
+  User: "what apps do I have installed?"
+  \`\`\`markdown
+  ## Task Type
+  chat
 
-## Tools Required
-- file_ops
+  ## Tools Required
+  - file_ops
 
-## Prompt Sections
-- BASE_SYSTEM_PROMPT
-- CHAT_PROMPT
-\`\`\`
+  ## Prompt Sections
+  - BASE_SYSTEM_PROMPT
+  - CHAT_PROMPT
+  \`\`\`
+
+  User: "I want to play chess"
+  \`\`\`markdown
+  ## Task Type
+  create_app
+
+  ## Tools Required
+  - file_ops
+  - app_management
+  - package_management
+  - validation
+
+  ## Prompt Sections
+  - BASE_SYSTEM_PROMPT
+  - CREATE_APP_PROMPT
+  - STYLING_GUIDELINES
+  \`\`\`
 
 Remember: Analyze the user's intent carefully. If they want to create an app that generates images, that's app_manage (create) (making an image generation app), not generate (directly generating an image).`;
 
