@@ -69,15 +69,17 @@ export function useGlobalDrop({ onFiles, onUrl, onTextAsFile, setIsDraggingOver 
       }
     };
 
-    window.addEventListener('dragenter', onDragEnter as EventListener);
-    window.addEventListener('dragover', onDragOver as EventListener);
-    window.addEventListener('dragleave', onDragLeave as EventListener);
-    window.addEventListener('drop', onDrop as EventListener);
+    // Use capture-phase listeners so drops work even when other layers intercept events.
+    window.addEventListener('dragenter', onDragEnter as EventListener, { capture: true });
+    // Explicitly non-passive so preventDefault is honored for dragover
+    window.addEventListener('dragover', onDragOver as EventListener, { capture: true, passive: false });
+    window.addEventListener('dragleave', onDragLeave as EventListener, { capture: true });
+    window.addEventListener('drop', onDrop as EventListener, { capture: true });
     return () => {
-      window.removeEventListener('dragenter', onDragEnter as EventListener);
-      window.removeEventListener('dragover', onDragOver as EventListener);
-      window.removeEventListener('dragleave', onDragLeave as EventListener);
-      window.removeEventListener('drop', onDrop as EventListener);
+      window.removeEventListener('dragenter', onDragEnter as EventListener, { capture: true });
+      window.removeEventListener('dragover', onDragOver as EventListener, { capture: true });
+      window.removeEventListener('dragleave', onDragLeave as EventListener, { capture: true });
+      window.removeEventListener('drop', onDrop as EventListener, { capture: true });
     };
   }, [onFiles, onUrl, onTextAsFile, setIsDraggingOver]);
 }
