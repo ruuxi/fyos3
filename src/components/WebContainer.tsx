@@ -33,6 +33,8 @@ export default function WebContainer() {
   const lastRemoteSaveRef = useRef<number>(0);
   const remoteSaveInFlightRef = useRef<boolean>(false);
   const { client: convexClient, ready: convexReady } = useConvexClient();
+  const [userMode, setUserMode] = useState<'auth'|'anon'>('auth');
+  const canProceed = isSignedIn || userMode === 'anon';
 
   useEffect(() => {
     let mounted = true;
@@ -129,7 +131,7 @@ export default function WebContainer() {
         // Try restoring a private desktop snapshot from server, then local IndexedDB, else default snapshot
         let restored = false;
         try {
-          if (convexReady && convexClient) {
+          if (userMode === 'auth' && convexReady && convexClient) {
             setLoadingStage('Checking cloud snapshot…');
             setTargetProgress((p) => Math.max(p, 30));
             const record = await convexClient.query(convexApi.desktops_private.getLatestDesktop as any, {} as any) as any;
@@ -155,7 +157,7 @@ export default function WebContainer() {
           console.warn('[WebContainer] Could not check latest private snapshot:', e);
         }
 
-        if (!restored) {
+        if (!restored && userMode === 'auth') {
           try {
             const hasSaved = await hasPersistedVfs();
             if (hasSaved) {
@@ -291,7 +293,7 @@ export default function Document() {
 
         // Removed periodic autosave; persist on visibility/unload only
 
-        // Save on tab hide or before unload (local + cloud)
+        // Save on tab hide or before unload (local + cloud) for auth users only
         const savePrivateSnapshot = async () => {
           try {
             if (remoteSaveInFlightRef.current) return;
@@ -324,16 +326,18 @@ export default function Document() {
               }
             };
 
-            const state = await fetchDesktopState().catch(() => null);
-            if (state) {
-              try {
-                await instance.fs.mkdir('/public/_fyos', { recursive: true } as any);
-              } catch {}
-              try {
-                await instance.fs.writeFile('/public/_fyos/desktop-state.json', new TextEncoder().encode(JSON.stringify(state, null, 2)) as any);
-              } catch {}
+            if (userMode === 'auth') {
+              const state = await fetchDesktopState().catch(() => null);
+              if (state) {
+                try {
+                  await instance.fs.mkdir('/public/_fyos', { recursive: true } as any);
+                } catch {}
+                try {
+                  await instance.fs.writeFile('/public/_fyos/desktop-state.json', new TextEncoder().encode(JSON.stringify(state, null, 2)) as any);
+                } catch {}
+              }
             }
-            if (convexReady && convexClient) {
+            if (userMode === 'auth' && convexReady && convexClient) {
               const { buildDesktopSnapshot } = await import('@/utils/desktop-snapshot');
               const snap = await buildDesktopSnapshot(instance);
               const start = await convexClient.mutation(convexApi.desktops_private.saveDesktopStart as any, {
@@ -365,13 +369,17 @@ export default function Document() {
 
         const handleVisibility = () => {
           if (document.visibilityState === 'hidden') {
-            void persistNow(instance);
-            void savePrivateSnapshot();
+            if (userMode === 'auth') {
+              void persistNow(instance);
+              void savePrivateSnapshot();
+            }
           }
         };
         const handleBeforeUnload = () => {
-          void persistNow(instance);
-          void savePrivateSnapshot();
+          if (userMode === 'auth') {
+            void persistNow(instance);
+            void savePrivateSnapshot();
+          }
         };
         document.addEventListener('visibilitychange', handleVisibility);
         visibilityHandler = handleVisibility;
@@ -444,6 +452,11 @@ export default function Document() {
             const srcWin = (event.source as Window | null);
             const reply = (resp: any) => { try { srcWin?.postMessage(resp, event.origin); } catch {} };
             try {
+              if (userMode === 'anon') {
+                // In anon mode, skip persistence; return original payload
+                reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: true, result: { ...payload, persisted: false } });
+                return;
+              }
               const body = { ...(payload || {}), scope };
               const res = await fetch('/api/media/ingest', {
                 method: 'POST',
@@ -515,6 +528,8 @@ export default function Document() {
           if (event.data && event.data.type === 'FYOS_DESKTOP_READY') {
             desktopReadyRef.current = true;
             const target = iframeRef.current?.contentWindow;
+            // Announce user mode to the desktop iframe
+            try { target?.postMessage({ type: 'FYOS_USER_MODE', payload: { mode: userMode } }, '*') } catch {}
             if (target && pendingOpenAppsRef.current.length > 0) {
               try {
                 pendingOpenAppsRef.current.forEach(payload => {
@@ -696,9 +711,11 @@ export default function Document() {
           complete={shouldExitBoot}
           onExited={() => setIsLoading(false)}
           isSignedIn={Boolean(isSignedIn)}
+          canProceed={Boolean(canProceed)}
           onSignIn={() => {
             try { openSignIn({}) } catch { try { window.location.href = '/sign-in'; } catch {} }
           }}
+          onContinue={() => { setUserMode('anon'); }}
         />
       )}
       <iframe

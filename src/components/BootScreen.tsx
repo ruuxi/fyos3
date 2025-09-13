@@ -9,21 +9,23 @@ type BootScreenProps = {
   onExited?: () => void; // called after exit animation completes
   isSignedIn?: boolean; // auth gate
   onSignIn?: () => void; // sign-in action
+  canProceed?: boolean; // true if user can proceed (signed in or continued anon)
+  onContinue?: () => void; // continue without sign-in
 };
 
-export default function BootScreen({ message = 'Preparing…', progress, complete = false, onExited, isSignedIn = false, onSignIn }: BootScreenProps) {
+export default function BootScreen({ message = 'Preparing…', progress, complete = false, onExited, isSignedIn = false, onSignIn, canProceed = false, onContinue }: BootScreenProps) {
   const clamped = Math.max(0, Math.min(100, progress));
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
-    if (complete && isSignedIn && !exiting) {
+    if (complete && canProceed && !exiting) {
       setExiting(true);
       const t = window.setTimeout(() => {
         onExited?.();
       }, 800);
       return () => window.clearTimeout(t);
     }
-  }, [complete, isSignedIn, exiting, onExited]);
+  }, [complete, canProceed, exiting, onExited]);
 
   const widthStyle = useMemo(() => ({ width: `${clamped}%` }), [clamped]);
 
@@ -49,7 +51,7 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
             {message}
           </div>
           {!isSignedIn && (
-            <div className="mt-6 flex items-center justify-center">
+            <div className="mt-6 flex items-center justify-center gap-3">
               <button
                 type="button"
                 onClick={onSignIn}
@@ -57,6 +59,14 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
                 aria-label="Sign in to continue"
               >
                 Sign in
+              </button>
+              <button
+                type="button"
+                onClick={onContinue}
+                className="px-5 py-2 rounded-full border border-black/15 text-black bg-white/80 hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-black/30 transition-colors"
+                aria-label="Continue without signing in"
+              >
+                Continue
               </button>
             </div>
           )}

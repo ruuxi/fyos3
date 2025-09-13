@@ -18,6 +18,7 @@ const LS_APP_ORDER_KEY = 'desktop.appOrder'
 
 const EVT_OPEN_APP = 'FYOS_OPEN_APP'
 const EVT_DESKTOP_READY = 'FYOS_DESKTOP_READY'
+const EVT_USER_MODE = 'FYOS_USER_MODE'
 
 const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: 16, startY: 52, maxPerCol: 6 }
 
@@ -422,6 +423,7 @@ export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
   const appsByIdRef = useRef<Record<string, App>>({})
   const [appOrder, setAppOrder] = useState<string[]>([])
+  const [userMode, setUserMode] = useState<'auth'|'anon'>('auth')
   // const [bootscreen, setBootscreen] = useState<boolean>(false)
   // const [gradientKey, setGradientKey] = useState<string>('1')
   // const gradientVar = `var(--desktop-gradient-${gradientKey})`
@@ -429,6 +431,7 @@ export default function Desktop(){
   useEffect(() => {
     (async () => {
       try {
+        if (userMode === 'anon') return;
         const res = await fetch('/_fyos/desktop-state.json?_=' + Date.now(), { cache: 'no-store' });
         if (!res.ok) return;
         const json = await res.json();
@@ -440,7 +443,7 @@ export default function Desktop(){
         }
       } catch {}
     })();
-  }, [])
+  }, [userMode])
   // Announce readiness to host so it can flush any pending open-app messages
   useEffect(()=>{
     try { window.parent?.postMessage({ type: EVT_DESKTOP_READY }, '*') } catch {}
@@ -483,7 +486,7 @@ export default function Desktop(){
   const [open, setOpen] = useState<App[]>([])
   const [windowTabs, setWindowTabs] = useState<Record<string, WindowTabsState>>({})
 
-  useEffect(() => { setWindowTabs(loadWindowTabs()); }, []);
+  useEffect(() => { if (userMode === 'auth') setWindowTabs(loadWindowTabs()); }, [userMode]);
 
   function mergeOrderWithRegistry(order: string[], list: App[]): string[] {
     const ids = new Set(list.map(a => a.id))
@@ -493,7 +496,7 @@ export default function Desktop(){
   }
 
   const persistWindowTabs = (updater: (prev: Record<string, WindowTabsState>) => Record<string, WindowTabsState>) => {
-    setWindowTabs(prev => { const next = updater(prev); saveWindowTabs(next); return next; });
+    setWindowTabs(prev => { const next = updater(prev); if (userMode === 'auth') saveWindowTabs(next); return next; });
   };
 
   function ensureWindowTabsFor(app: App) {
@@ -591,7 +594,7 @@ export default function Desktop(){
         setApps(() => {
           // load icon positions from localStorage if present
           try{
-            let currentPositions = loadIconPositions()
+            let currentPositions = userMode === 'auth' ? loadIconPositions() : {}
             if (!currentPositions || Object.keys(currentPositions).length === 0){
               const seed: Record<string,{left:number;top:number}> = {}
               list.forEach(app => {
@@ -610,16 +613,16 @@ export default function Desktop(){
             
             setIconPositions(newPositions)
             
-            const geoms = loadWindowGeometries()
+            const geoms = userMode === 'auth' ? loadWindowGeometries() : {}
             if (geoms && Object.keys(geoms).length > 0){
               setWindowGeometries(geoms)
             }
             // Initialize app order
             try {
-              const loaded = loadAppOrder()
+              const loaded = userMode === 'auth' ? loadAppOrder() : []
               const merged = mergeOrderWithRegistry(loaded, list)
               setAppOrder(merged)
-              saveAppOrder(merged)
+              if (userMode === 'auth') saveAppOrder(merged)
             } catch {}
           } catch {}
           
@@ -629,7 +632,7 @@ export default function Desktop(){
         })
       })
       .catch(()=> setApps([]))
-  }, [])
+  }, [userMode])
 
   // Dock removed for now.
 
@@ -647,9 +650,9 @@ export default function Desktop(){
             try { appsByIdRef.current = Object.fromEntries(list.map(a=>[a.id,a])) } catch {}
             // merge app order with potential new/removed apps
             setAppOrder(prev => {
-              const base = prev.length ? prev : loadAppOrder()
+              const base = prev.length ? prev : (userMode === 'auth' ? loadAppOrder() : [])
               const merged = mergeOrderWithRegistry(base, list)
-              saveAppOrder(merged)
+              if (userMode === 'auth') saveAppOrder(merged)
               return merged
             })
           }
@@ -657,7 +660,7 @@ export default function Desktop(){
         .catch(()=>{})
     }, 2500)
     return ()=> clearInterval(iv)
-  }, [])
+  }, [userMode])
 
   // Helper function to find next available window position
   const findNextWindowPosition = (openWindows: App[]) => {
@@ -756,7 +759,7 @@ export default function Desktop(){
   const saveGeometries = (updater: (g: Record<string,{left:number;top:number;width:number;height:number}>)=>Record<string,{left:number;top:number;width:number;height:number}>) => {
     setWindowGeometries(prev => {
       const next = updater(prev)
-      saveWindowGeometries(next)
+      if (userMode === 'auth') saveWindowGeometries(next)
       return next
     })
   }
@@ -861,7 +864,7 @@ export default function Desktop(){
       if (d.id){
         // persist positions
         setTimeout(()=>{
-          try{ localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(iconPositionsRef.current)) } catch{}
+          try{ if (userMode === 'auth') localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(iconPositionsRef.current)) } catch{}
         }, 0)
       }
       dragIconRef.current = { id: null, startX: 0, startY: 0, startLeft: 0, startTop: 0, dragging: false }
@@ -969,13 +972,16 @@ export default function Desktop(){
     function onMessage(e: MessageEvent){
       const d: any = (e as any).data
       if (!d) return
+      if (d.type === EVT_USER_MODE) {
+        try { const mode = d?.payload?.mode; if (mode === 'auth' || mode === 'anon') setUserMode(mode) } catch {}
+        return
+      }
       if (d.type === 'FYOS_REQUEST_DESKTOP_STATE') {
         try {
-          const iconPositions = loadIconPositions();
-          const windowGeometries = loadWindowGeometries();
-          const windowTabs = loadWindowTabs();
-          const appOrder = loadAppOrder();
-          window.parent?.postMessage({ type: 'FYOS_DESKTOP_STATE', payload: { iconPositions, windowGeometries, windowTabs, appOrder } }, '*')
+          const payload = (userMode === 'auth')
+            ? { iconPositions: loadIconPositions(), windowGeometries: loadWindowGeometries(), windowTabs: loadWindowTabs(), appOrder: loadAppOrder() }
+            : { iconPositions, windowGeometries, windowTabs, appOrder }
+          window.parent?.postMessage({ type: 'FYOS_DESKTOP_STATE', payload }, '*')
         } catch {}
         return
       }
@@ -995,7 +1001,7 @@ export default function Desktop(){
         if (prev[toLaunch.id]) return prev
         const nextPos = findNextIconPosition(prev, appsRef.current || [])
         const next = { ...prev, [toLaunch.id]: nextPos }
-        saveIconPositions(next)
+        if (userMode === 'auth') saveIconPositions(next)
         return next
       })
     }
@@ -1008,6 +1014,14 @@ export default function Desktop(){
       <div className="wallpaper" style={{ backgroundImage: 'url(/2.webp)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }} />
       <div className="wallpaper-glass" />
       {/* MenuBar removed */}
+
+      {userMode === 'anon' && (
+        <div style={{ position: 'fixed', top: 8, left: 110, right: 12, zIndex: 9999, pointerEvents: 'none' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 999, background: 'rgba(255,255,255,0.8)', backdropFilter: 'saturate(140%) blur(6px)', color: '#111', border: '1px solid rgba(0,0,0,0.08)', pointerEvents: 'auto' }}>
+            <span style={{ fontSize: 12 }}>You’re not signed in. Work won’t be saved.</span>
+          </div>
+        </div>
+      )}
 
       {/* Sidebar */}
       <aside
