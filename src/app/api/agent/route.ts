@@ -26,85 +26,14 @@ import {
   BEST_PRACTICES,
   PERSONA_PROMPT 
 } from '@/lib/agentPrompts';
-import Exa from 'exa-js';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { ConvexHttpClient } from 'convex/browser';
-import { auth } from '@clerk/nextjs/server';
 import { api as convexApi } from '../../../../convex/_generated/api';
-
-async function getInstalledAppNames(): Promise<string[]> {
-  try {
-    const regPath = path.join(process.cwd(), 'public', 'apps', 'registry.json');
-    const buf = await fs.readFile(regPath, 'utf-8');
-    const data = JSON.parse(buf);
-    if (Array.isArray(data)) {
-      return data.map((x: any) => (typeof x?.name === 'string' ? x.name : undefined)).filter(Boolean);
-    }
-    if (Array.isArray(data?.apps)) {
-      return data.apps.map((x: any) => (typeof x?.name === 'string' ? x.name : undefined)).filter(Boolean);
-    }
-  } catch {}
-  // Fallback: scan src/apps
-  try {
-    const appsDir = path.join(process.cwd(), 'src', 'apps');
-    const entries = (await fs.readdir(appsDir, { withFileTypes: true } as any)) as unknown as Array<{ isDirectory: () => boolean; name: string }>;
-    const names: string[] = [];
-    for (const e of entries) {
-      if (e.isDirectory && e.isDirectory()) {
-        const id = e.name;
-        try {
-          const meta = JSON.parse(await fs.readFile(path.join(appsDir, id, 'metadata.json'), 'utf-8'));
-          names.push(typeof meta?.name === 'string' ? meta.name : id);
-        } catch {
-          names.push(id);
-        }
-      }
-    }
-    return names;
-  } catch {}
-  return [];
-}
-
-// Helper function to sanitize tool inputs for logging (removes large content)
-function sanitizeToolInput(toolName: string, input: any): any {
-  try {
-    if (toolName === 'web_fs_write' && input?.content) {
-      const contentBytes = typeof input.content === 'string' ? new TextEncoder().encode(input.content).length : 0;
-      return {
-        path: input.path,
-        createDirs: input.createDirs,
-        contentSize: contentBytes,
-        contentSizeKB: Number((contentBytes / 1024).toFixed(1)),
-        contentPreview: typeof input.content === 'string' ? input.content.slice(0, 100) + (input.content.length > 100 ? '...' : '') : undefined
-      };
-    }
-    if (toolName === 'web_fs_read') {
-      return { path: input?.path, encoding: input?.encoding };
-    }
-    return input;
-  } catch {
-    return { sanitizationError: true, originalKeys: Object.keys(input || {}) };
-  }
-}
+import { getInstalledAppNames, sanitizeToolInput, getConvexClientOptional } from '@/lib/agent/server/agentServerHelpers';
+import { buildServerTools } from '@/lib/agent/server/agentServerTools';
 
 // Some tool actions (like package installs) may take longer than 30s
 export const maxDuration = 300;
-
-async function getConvexClientOptional() {
-  try {
-    const url = process.env.NEXT_PUBLIC_CONVEX_URL;
-    if (!url) return null;
-    const client = new ConvexHttpClient(url);
-    const { getToken } = await auth();
-    const token = await getToken({ template: 'convex' });
-    if (!token) return null;
-    client.setAuth(token);
-    return client;
-  } catch {
-    return null;
-  }
-}
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -282,45 +211,8 @@ export async function POST(req: Request) {
       description: 'Validate the project: typecheck + lint (changed files); full also runs production build.',
       inputSchema: ValidateProjectInput,
     },
-    // Web search
-    [TOOL_NAMES.web_search]: tool({
-      description: 'Search the web for current information. ONLY use when the user explicitly requests web search or real-time data—do not use proactively.',
-      inputSchema: WebSearchInput,
-      async execute({ query }) {
-        const startTime = Date.now();
-        const toolCallId = `search_${Date.now()}`;
-        
-        try {
-          const apiKey = process.env.EXA_API_KEY;
-          if (!apiKey) {
-            const error = { error: 'Missing EXA_API_KEY in environment.' };
-            await agentLogger.logToolCall(sessionId, TOOL_NAMES.web_search, toolCallId, { query }, error, Date.now() - startTime);
-            return error;
-          }
-          
-          const exa = new Exa(apiKey);
-          const { results } = await exa.searchAndContents(query, {
-            livecrawl: 'always',
-            numResults: 3,
-          } as any);
-          
-          const output = (results || []).map((r: any) => ({
-            title: r.title,
-            url: r.url,
-            content: typeof r.text === 'string' ? r.text.slice(0, 1000) : undefined,
-            publishedDate: r.publishedDate,
-          }));
-          
-          await agentLogger.logToolCall(sessionId, TOOL_NAMES.web_search, toolCallId, { query }, { results: output.length, data: output }, Date.now() - startTime);
-          return output;
-        } catch (err: unknown) {
-          const error = { error: err instanceof Error ? err.message : String(err) };
-          await agentLogger.logError(sessionId, err as Error, { toolName: TOOL_NAMES.web_search, query });
-          await agentLogger.logToolCall(sessionId, TOOL_NAMES.web_search, toolCallId, { query }, error, Date.now() - startTime);
-          return error;
-        }
-      },
-    }),
+    // Web search (server-side implementation)
+    ...buildServerTools(sessionId),
     // AI Media Tools (unified)
     [TOOL_NAMES.ai_generate]: {
       description: 'Generate media using provider=fal|eleven with input only. Model selection happens behind the scenes; outputs are auto‑ingested and returned with durable URLs.',
