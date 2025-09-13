@@ -167,32 +167,51 @@ export default function AIAgentBar() {
     try {
       const list: File[] = Array.isArray(files) ? files : Array.from(files);
       for (const file of list) {
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(new Error('Read failed'));
-          reader.readAsDataURL(file);
-        });
-        const body: any = { base64, contentType: file.type || undefined, metadata: { filename: file.name } };
-        const res = await fetch('/api/media/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        if (!res.ok) {
-          const text = await res.text().catch(() => '');
-          throw new Error(text || `Upload failed (${res.status})`);
-        }
+        // Optimistic local preview
+        let objectUrl: string | null = null;
         try {
+          objectUrl = URL.createObjectURL(file);
+          const previewIndex = (() => {
+            let idx = -1;
+            setAttachments(prev => {
+              const next = prev.slice();
+              next.push({ name: file.name, publicUrl: objectUrl!, contentType: file.type || guessContentTypeFromFilename(file.name) });
+              idx = next.length - 1;
+              return next;
+            });
+            return idx;
+          })();
+
+          // Proceed with ingest
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = () => reject(new Error('Read failed'));
+            reader.readAsDataURL(file);
+          });
+          const body: any = { base64, contentType: file.type || undefined, metadata: { filename: file.name } };
+          const res = await fetch('/api/media/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            throw new Error(text || `Upload failed (${res.status})`);
+          }
           const result = await res.json();
-          setAttachments(prev => [...prev, {
-            name: file.name,
-            publicUrl: (result && result.id) ? `/api/media/${result.id}` : (result.publicUrl || ''),
-            contentType: file.type || result.contentType || guessContentTypeFromFilename(file.name),
-          }]);
-        } catch {
-          // Fallback: still add attachment without server response
-          setAttachments(prev => [...prev, {
-            name: file.name,
-            publicUrl: '',
-            contentType: file.type || guessContentTypeFromFilename(file.name),
-          }]);
+          // Replace preview with durable URL
+          setAttachments(prev => {
+            const next = prev.slice();
+            if (previewIndex >= 0 && previewIndex < next.length) {
+              next[previewIndex] = {
+                name: file.name,
+                publicUrl: (result && result.id) ? `/api/media/${result.id}` : (result.publicUrl || objectUrl || ''),
+                contentType: file.type || result.contentType || guessContentTypeFromFilename(file.name),
+              };
+            }
+            return next;
+          });
+        } finally {
+          if (objectUrl) {
+            try { URL.revokeObjectURL(objectUrl); } catch {}
+          }
         }
       }
       await loadMedia();
@@ -1382,6 +1401,31 @@ a:hover {
 
   return (
     <>
+      {/* Global drag overlay to capture drops even over iframes */}
+      {isDraggingOver && (
+        <div
+          className="fixed inset-0 z-[60] pointer-events-auto"
+          onDragOver={(e) => { e.preventDefault(); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDraggingOver(false);
+            dragCounterRef.current = 0;
+            if (e.dataTransfer) void handleGlobalDrop(e.dataTransfer);
+          }}
+          onDragLeave={() => {
+            dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+            if (dragCounterRef.current === 0) setIsDraggingOver(false);
+          }}
+          aria-label="Drop files to attach"
+        >
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <div className="rounded border-2 border-dashed border-sky-300/70 bg-black/40 text-white px-4 py-3 text-sm">
+              Drop to attach
+            </div>
+          </div>
+        </div>
+      )}
       <div
         className={`fixed inset-0 z-40 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
         onClick={() => setMode('compact')}

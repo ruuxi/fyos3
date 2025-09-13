@@ -28,7 +28,7 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
   const widthStyle = useMemo(() => ({ width: `${clamped}%` }), [clamped]);
 
   return (
-    <div className={`boot-overlay absolute inset-0 z-20 flex items-center justify-center bg-white text-black ${exiting ? 'boot-overlay--exit' : ''}`} aria-busy={!exiting}>
+    <div className={`boot-overlay absolute inset-0 z-20 flex items-center justify-center bg-neutral-50 text-black ${exiting ? 'boot-overlay--exit' : ''}`} aria-busy={!exiting}>
       <div className="relative text-center px-6">
         <div className="mb-7">
           <h1 className="select-none font-semibold tracking-tight text-4xl md:text-6xl">
@@ -53,7 +53,7 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
               <button
                 type="button"
                 onClick={onSignIn}
-                className="px-5 py-2 rounded-full border border-black/15 text-black bg-white hover:bg-black/5 focus:outline-none focus:ring-2 focus:ring-black/30 transition-colors"
+                className="px-5 py-2 rounded-full border border-black/15 text-black bg-white hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-black/30 transition-colors"
                 aria-label="Sign in to continue"
               >
                 Sign in
