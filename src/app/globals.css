@@ -125,3 +125,53 @@
 :root {
   --agentbar-height: 56px;
 }
+
+/* Glass and gradient utilities (inspired by fromyou story AppShell aesthetics) */
+@layer utilities {
+  .glass-primary {
+    /* Darker, denser glass (collapsed surfaces) */
+    background: color-mix(in oklab, black 72%, white 0%);
+    background: rgba(8, 12, 24, 0.58);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+      0 0 0 1px rgba(56,189,248,0.35),
+      0 10px 28px rgba(0,0,0,0.36),
+      0 24px 56px rgba(0,0,0,0.42);
+    -webkit-backdrop-filter: saturate(150%) blur(18px);
+    backdrop-filter: saturate(150%) blur(18px);
+  }
+  .glass-secondary {
+    /* Lighter, more elevated glass (expanded surfaces) */
+    background: rgba(12, 18, 36, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow:
+      0 0 0 1px rgba(56,189,248,0.45),
+      0 12px 32px rgba(0,0,0,0.30),
+      0 28px 64px rgba(0,0,0,0.34);
+    -webkit-backdrop-filter: saturate(160%) blur(22px);
+    backdrop-filter: saturate(160%) blur(22px);
+  }
+  .glass-thin-frame {
+    border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.25);
+    -webkit-backdrop-filter: saturate(150%) blur(16px);
+    backdrop-filter: saturate(150%) blur(16px);
+    background: rgba(10,16,32,0.45);
+  }
+  .glass-border {
+    border: 1px solid rgba(255,255,255,0.14);
+  }
+  .glass-divider {
+    border-color: rgba(255,255,255,0.12);
+  }
+}
+
+/* Desktop gradient themes (BootScreen will toggle these) */
+:root {
+  --fyos-gradient-1: linear-gradient(180deg, #0b1020 0%, #1e2760 60%, #462e7e 100%);
+  --fyos-gradient-2: linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #0b1020 100%);
+  --fyos-gradient-3: linear-gradient(180deg, #0b1020 0%, #0b3a23 60%, #04210f 100%);
+  --fyos-gradient-4: linear-gradient(180deg, #12081f 0%, #3a103a 60%, #7a1a4a 100%);
+  --fyos-gradient-5: linear-gradient(180deg, #0b1020 0%, #0e223f 45%, #0f1b2e 100%);
+  --fyos-desktop-gradient: var(--fyos-gradient-1);
+}

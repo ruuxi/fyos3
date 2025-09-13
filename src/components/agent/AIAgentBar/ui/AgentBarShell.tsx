@@ -24,7 +24,7 @@ export default function AgentBarShell(props: AgentBarShellProps) {
       />
       <div className="flex justify-center">
         <div className="w-full max-w-4xl mx-4 relative z-50" ref={barAreaRef}>
-          <div className={`rounded-none border border-sky-400/70 supports-[backdrop-filter]:backdrop-blur-xl backdrop-saturate-150 bg-neutral-950/70 text-white ${isOpen ? 'shadow-[0_0_0_1px_rgba(56,189,248,0.50),0_12px_28px_rgba(0,0,0,0.28),0_24px_56px_rgba(0,0,0,0.38)]' : 'shadow-[0_0_0_1px_rgba(56,189,248,0.45),0_8px_24px_rgba(56,189,248,0.22)]'} transition-shadow overflow-hidden`}>
+          <div className={`rounded-none text-white ${isOpen ? 'glass-secondary' : 'glass-primary'} transition-shadow overflow-hidden`}>
             <div className="flex flex-col-reverse">
               {/* Bottom bar (fixed) */}
               {bottomBar}

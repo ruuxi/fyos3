@@ -367,32 +367,35 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
   const iframeSrc = !isBlank ? `/app.html?path=${encodeURIComponent(activeTab.path||'')}&id=${encodeURIComponent(activeTab.appId||'')}&name=${encodeURIComponent(activeTab.title)}&base=0&ui=1&tw=1` : '';
 
   return (
-    <div ref={rootRef} className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex, background: 'white', color: 'black', border: '1px solid rgba(0,0,0,0.1)', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }} onMouseDown={onFocus}>
-      <div className="titlebar" onMouseDown={startMove} style={{ background: 'white', color: 'black', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-        <div className="traffic" onMouseDown={(e)=>e.stopPropagation()}>
-          <div className="b red" onClick={onClose} title="Close" />
-          <div className="b yellow" onClick={onMinimize} title="Minimize" />
-          <div className="b green" title="Zoom" />
-        </div>
-        <div className="title">{activeTab?.title || app.name}</div>
-        <div style={{marginLeft:'auto'}} className="badge">{app.id.slice(0,8)}</div>
-      </div>
-      <nav className="tabstrip" role="tablist" aria-label="Tabs" onMouseDown={e=>e.stopPropagation()} style={{ background: 'white', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+    <div ref={rootRef} className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex, background: 'rgba(12,18,36,0.10)' }} onMouseDown={onFocus}>
+      <nav className="tabstrip" role="tablist" aria-label="Tabs" onMouseDown={startMove}>
         {tabs.map((t) => (
           <button key={t.id} role="tab" aria-selected={t.id===activeTabId}
             className={`tab${t.id===activeTabId?' active':''}`}
-            onClick={()=>onTabActivate(t.id)}>
+            onClick={()=>onTabActivate(t.id)}
+            onMouseDown={(e)=>e.stopPropagation()}>
             <span className="tab-ico">{t.icon||'📦'}</span>
             <span className="tab-title">{t.title}</span>
             <span className="tab-close" onClick={(e)=>{ e.stopPropagation(); onTabClose(t.id); }}>×</span>
           </button>
         ))}
-        <button className="tab-add" aria-label="New tab" onClick={onNewTab}>+</button>
+        <button className="tab-add" aria-label="New tab" onClick={onNewTab} onMouseDown={(e)=>e.stopPropagation()}>+</button>
+        <div className="win-controls" onMouseDown={(e)=>e.stopPropagation()}>
+          <button className="ctl ctl-close" aria-label="Close" onClick={onClose} />
+          <button className="ctl ctl-min" aria-label="Minimize" onClick={onMinimize} />
+          <button className="ctl ctl-expand" aria-label="Expand" onClick={()=>{
+            try {
+              const vw = window.innerWidth; const vh = window.innerHeight; const M = 12;
+              const left = SIDEBAR_WIDTH + M; const top = M; const width = Math.max(0, vw - SIDEBAR_WIDTH - (M*2)); const height = Math.max(0, vh - (M*2));
+              onMove({ left, top }); onResize({ width, height });
+            } catch {}
+          }} />
+        </div>
         <div className="tab-gradient-left" />
         <div className="tab-gradient-right" />
         <div className="tab-insert-marker" aria-hidden />
       </nav>
-      <div className="content" style={{ top: '64px' }}>
+      <div className="content" style={{ top: '32px', background: 'transparent' }}>
         {isBlank ? (
           <LauncherGrid apps={availableApps} onPick={(a) => onOpenAppInTab(activeTab?.id || tabs[0]?.id || '', a)} />
         ) : (
@@ -419,6 +422,9 @@ export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
   const appsByIdRef = useRef<Record<string, App>>({})
   const [appOrder, setAppOrder] = useState<string[]>([])
+  // const [bootscreen, setBootscreen] = useState<boolean>(false)
+  // const [gradientKey, setGradientKey] = useState<string>('1')
+  // const gradientVar = `var(--desktop-gradient-${gradientKey})`
   // Seed localStorage desktop state from persisted file if present
   useEffect(() => {
     (async () => {
@@ -454,6 +460,26 @@ export default function Desktop(){
       document.body.style.margin = '0'
     } catch {}
   }, [])
+  // Load persisted gradient - disabled for now
+  // useEffect(()=>{
+  //   try {
+  //     const saved = localStorage.getItem('fyos.desktop.gradient')
+  //     if (saved) {
+  //       setGradientKey(saved)
+  //     }
+  //   } catch {}
+  //   // Show bootscreen the very first time only
+  //   try {
+  //     const seen = localStorage.getItem('fyos.desktop.seenBoot')
+  //     if (!seen) setBootscreen(true)
+  //   } catch {}
+  // }, [])
+  // function chooseGradient(key: string){
+  //   try { localStorage.setItem('fyos.desktop.gradient', key) } catch {}
+  //   try { localStorage.setItem('fyos.desktop.seenBoot', '1') } catch {}
+  //   setGradientKey(key)
+  //   setBootscreen(false)
+  // }
   const [open, setOpen] = useState<App[]>([])
   const [windowTabs, setWindowTabs] = useState<Record<string, WindowTabsState>>({})
 
@@ -978,14 +1004,15 @@ export default function Desktop(){
   }, [])
 
   return (
-    <div className="desktop" style={{ background: 'white', color: 'black' }}>
-      <div className="wallpaper" style={{ background: 'white' }} />
+    <div className="desktop" style={{ background: 'transparent', color: 'inherit' }}>
+      <div className="wallpaper" style={{ backgroundImage: 'url(/2.webp)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }} />
+      <div className="wallpaper-glass" />
       {/* MenuBar removed */}
 
       {/* Sidebar */}
       <aside
         className="desktop-sidebar"
-        style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: SIDEBAR_WIDTH, background: 'white', borderRight: '1px solid rgba(0,0,0,0.1)', paddingTop: 12 }}
+        style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: SIDEBAR_WIDTH, paddingTop: 12 }}
         aria-label="Applications"
       >
         <nav>
