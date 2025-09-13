@@ -333,7 +333,11 @@ export default function Document() {
                   await instance.fs.mkdir('/public/_fyos', { recursive: true } as any);
                 } catch {}
                 try {
-                  await instance.fs.writeFile('/public/_fyos/desktop-state.json', new TextEncoder().encode(JSON.stringify(state, null, 2)) as any);
+                  // Attach theme selection from localStorage
+                  let theme: any = null;
+                  try { const raw = window.localStorage.getItem('fyos.desktop.theme'); if (raw) theme = JSON.parse(raw); } catch {}
+                  const toWrite = { ...(state || {}), theme };
+                  await instance.fs.writeFile('/public/_fyos/desktop-state.json', new TextEncoder().encode(JSON.stringify(toWrite, null, 2)) as any);
                 } catch {}
               }
             }
@@ -530,6 +534,14 @@ export default function Document() {
             const target = iframeRef.current?.contentWindow;
             // Announce user mode to the desktop iframe
             try { target?.postMessage({ type: 'FYOS_USER_MODE', payload: { mode: userMode } }, '*') } catch {}
+            // Send current theme as soon as desktop is ready
+            try {
+              const raw = window.localStorage.getItem('fyos.desktop.theme');
+              if (raw && target) {
+                const theme = JSON.parse(raw);
+                target.postMessage({ type: 'FYOS_SET_THEME', payload: theme }, '*');
+              }
+            } catch {}
             if (target && pendingOpenAppsRef.current.length > 0) {
               try {
                 pendingOpenAppsRef.current.forEach(payload => {
