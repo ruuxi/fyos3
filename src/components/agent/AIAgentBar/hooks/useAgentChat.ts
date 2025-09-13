@@ -272,12 +272,12 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             break;
           }
           case 'code_edit_ast': {
-            const input = tc.input as { path: string; action: string; selector?: any; payload?: any; dryRun?: boolean };
+            const input = tc.input as { path: string; action: 'upsertImport' | 'updateFunctionBody' | 'replaceJsxElement' | 'replaceJsxAttributes' | 'insertAfterLastImport' | 'insertAtTop'; selector?: any; payload?: any };
             try {
               const content = await fnsRef.current.readFile(input.path, 'utf-8');
               const { applyAstEdit } = await import('@/lib/code-edit/recastEdit');
-              const result = await applyAstEdit({ ...input, content, dryRun: input.dryRun || false });
-              if (!input.dryRun && result.applied) {
+              const result = await applyAstEdit({ ...input, content });
+              if (result.applied) {
                 await fnsRef.current.writeFile(input.path, result.code);
               }
               addToolResult({ tool: 'code_edit_ast', toolCallId: tc.toolCallId, output: { ok: true, applied: result.applied, edits: result.edits, previewDiff: result.previewDiff, path: input.path, elapsedMs: result.elapsedMs, bytesChanged: result.applied ? Math.abs(result.code.length - content.length) : 0 } });

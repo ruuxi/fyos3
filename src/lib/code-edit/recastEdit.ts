@@ -11,7 +11,7 @@ interface EditResult {
   elapsedMs: number;
 }
 
-interface AstEditInput extends TCodeEditAstInput {
+interface AstEditInput extends Omit<TCodeEditAstInput, 'dryRun'> {
   content: string;
 }
 
