@@ -51,7 +51,17 @@ export async function callFal(model: string, input: any): Promise<any> {
 }
 
 export async function callFluxSchnell(input: any): Promise<any> {
-  return aiRequest('fal', 'fal-ai/flux-1/schnell', input);
+  return aiRequest('fal', 'fal-ai/nano-banana', input);
+}
+
+// New Nano Banana text-to-image helper (replaces FLUX Schnell)
+export async function callNanaBanana(input: any): Promise<any> {
+  return aiRequest('fal', 'fal-ai/nano-banana', input);
+}
+
+// Text-to-image using Nano Banana
+export async function textToImage(prompt: string, options: any = {}): Promise<any> {
+  return callFal('fal-ai/nano-banana', { prompt, ...options });
 }
 
 export interface ComposeMusicParams {
@@ -181,13 +191,20 @@ export async function referenceToVideo(referenceImage: File | string, options: a
 }
 
 export async function imageToImage(image: File | string, prompt: string, options: any = {}): Promise<any> {
-  const image_url = await ensurePublicUrl(image);
-  return callFal('fal-ai/qwen-image/image-to-image', { image_url, prompt, ...options });
+  const image_urls = [await ensurePublicUrl(image)];
+  return callFal('fal-ai/nano-banana/edit', { image_urls, prompt, ...options });
 }
 
 export async function imageEdit(image: File | string, instruction: string, options: any = {}): Promise<any> {
-  const image_url = await ensurePublicUrl(image);
-  return callFal('fal-ai/qwen-image-edit', { image_url, instruction, ...options });
+  const image_urls = [await ensurePublicUrl(image)];
+  return callFal('fal-ai/nano-banana/edit', { image_urls, prompt: instruction, ...options });
+}
+
+// Multiple image editing using Nano Banana
+export async function multiImageEdit(images: Array<File | string>, prompt: string, options: any = {}): Promise<any> {
+  const image_urls: string[] = [];
+  for (const img of images) image_urls.push(await ensurePublicUrl(img));
+  return callFal('fal-ai/nano-banana/edit', { image_urls, prompt, ...options });
 }
 
 export async function textToVideo(prompt: string, options: any = {}): Promise<any> {

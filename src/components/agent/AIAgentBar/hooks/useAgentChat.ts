@@ -18,16 +18,16 @@ type UseAgentChatOptions = {
   initialMessages?: any[];
   activeThreadId: string | null;
   threadsCount: number;
-  classificationRef: React.MutableRefObject<any>;
   wc: { instanceRef: React.MutableRefObject<any>; fnsRef: React.MutableRefObject<WebContainerFns> };
   media: {
     loadMedia: () => Promise<void>;
   };
   runValidation: (scope: 'quick' | 'full', files?: string[]) => Promise<void>;
+  attachmentsProvider?: () => Array<{ name: string; publicUrl: string; contentType: string }>;
 };
 
 export function useAgentChat(opts: UseAgentChatOptions) {
-  const { id, initialMessages, activeThreadId, threadsCount, classificationRef, wc, media, runValidation } = opts;
+  const { id, initialMessages, activeThreadId, threadsCount, wc, media, runValidation, attachmentsProvider } = opts;
 
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id,
@@ -35,9 +35,8 @@ export function useAgentChat(opts: UseAgentChatOptions) {
     transport: new DefaultChatTransport({
       api: '/api/agent',
       prepareSendMessagesRequest({ messages, id }) {
-        const body: any = { messages, id };
+        const body: any = { id, messages };
         if (activeThreadId && threadsCount > 0) body.threadId = activeThreadId;
-        if (classificationRef.current) body.classification = classificationRef.current;
         return { body };
       },
     }),

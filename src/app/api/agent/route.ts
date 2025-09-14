@@ -17,15 +17,9 @@ import {
 } from '@/lib/agentTools';
 import { agentLogger } from '@/lib/agentLogger';
 import { 
-  BASE_SYSTEM_PROMPT,
-  CREATE_APP_PROMPT,
-  EDIT_APP_PROMPT,
-  GENERATION_PROMPT,
-  CHAT_PROMPT,
-  AI_INTEGRATION_PATTERNS,
-  BEST_PRACTICES,
-  PERSONA_PROMPT 
-} from '@/lib/agentPrompts';
+  SYSTEM_PROMPT,
+  PERSONA_PROMPT
+} from '@/lib/prompts';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { api as convexApi } from '../../../../convex/_generated/api';
@@ -37,13 +31,85 @@ export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const { messages, classification, threadId }: { messages: UIMessage[], classification?: any, threadId?: string } = body;
+  const { messages, threadId, attachmentHints }: { messages: UIMessage[]; threadId?: string; attachmentHints?: Array<{ contentType: string; url: string }> } = body as any;
+
+  // If the client provided attachment hints, append them to the last user message
+  const hints: Array<{ contentType: string; url: string }> = Array.isArray(attachmentHints) ? attachmentHints : [];
+  const messagesWithHints: UIMessage[] = Array.isArray(messages) ? [...messages] : [];
+  console.log('🧩 [AGENT] attachmentHints received:', Array.isArray(hints) ? hints : 'none');
+  // Also detect client-side appended hint user message
+  try {
+    const last = messagesWithHints[messagesWithHints.length - 1] as any;
+    if (last?.role === 'user' && Array.isArray(last.parts)) {
+      const txt = last.parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join('');
+      if (/^Attached\s+/i.test((txt || '').trim())) {
+        console.log('🧩 [AGENT] client-appended hints present in last message');
+      }
+    }
+  } catch {}
+  if (messagesWithHints.length > 0) {
+    const lastUserIdx = (() => {
+      for (let i = messagesWithHints.length - 1; i >= 0; i--) {
+        if ((messagesWithHints[i] as any)?.role === 'user') return i;
+      }
+      return -1;
+    })();
+    if (lastUserIdx >= 0) {
+      let appended = false;
+      if (hints.length > 0) {
+        const lines = hints
+          .filter(h => typeof h?.url === 'string' && /^https?:\/\//i.test(h.url))
+          .map(h => `Attached ${h.contentType || 'file'}: ${h.url}`);
+        if (lines.length > 0) {
+          const hintText = `\n${lines.join('\n')}`;
+          const target: any = messagesWithHints[lastUserIdx];
+          if (Array.isArray(target.parts)) {
+            target.parts = [...target.parts, { type: 'text', text: hintText }];
+          } else if (typeof target.content === 'string') {
+            target.content = (target.content || '') + hintText;
+          } else {
+            target.content = hintText.trimStart();
+          }
+          appended = true;
+        }
+      }
+      // Fallback: parse legacy Attachments block in the last user message and synthesize lines
+      if (!appended) {
+        const target: any = messagesWithHints[lastUserIdx];
+        const text = Array.isArray(target.parts)
+          ? target.parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join('')
+          : (typeof target.content === 'string' ? target.content : '');
+        const m = text && text.match(/Attachments:\s*\n([\s\S]*)$/i);
+        if (m) {
+          const section = (m[1] || '').split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);
+          const urls: string[] = [];
+          for (const line of section) {
+            const mm = line.match(/^[-•]\s*(.+?):\s*(\S+)\s*$/);
+            if (!mm) continue;
+            const url = mm[2].trim();
+            if (/^https?:\/\//i.test(url)) urls.push(url);
+          }
+          if (urls.length > 0) {
+            const lines = urls.map(u => `Attached file: ${u}`).join('\n');
+            const hintText = `\n${lines}`;
+            if (Array.isArray(target.parts)) {
+              target.parts = [...target.parts, { type: 'text', text: hintText }];
+            } else if (typeof target.content === 'string') {
+              target.content = (target.content || '') + hintText;
+            } else {
+              target.content = hintText.trimStart();
+            }
+          }
+        }
+      }
+    }
+  }
   
   // Generate session ID for this conversation
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   
   // Log the incoming user message
-  const lastMessage = messages[messages.length - 1];
+  const lastMessage = messagesWithHints[messagesWithHints.length - 1];
   if (lastMessage && lastMessage.role === 'user') {
     const content = lastMessage.parts?.map(p => p.type === 'text' ? p.text : '').join('') || '';
     await agentLogger.logMessage(sessionId, lastMessage.id, 'user', content);
@@ -61,7 +127,7 @@ export async function POST(req: Request) {
   // Sanitize/dedupe messages to avoid downstream gateway duplicate-id issues
   const seenHashes = new Set<string>();
   const sanitizedMessages: UIMessage[] = [] as any;
-  for (const m of messages) {
+  for (const m of messagesWithHints) {
     const text = (m as any).parts?.map((p: any) => (p.type === 'text' ? p.text : '')).join('') || (m as any).content || '';
     const key = `${m.role}|${text}`;
     if (seenHashes.has(key)) continue;
@@ -70,32 +136,21 @@ export async function POST(req: Request) {
     sanitizedMessages.push(rest);
   }
 
-  console.log('🔵 [AGENT] Incoming request with messages:', sanitizedMessages.map(m => ({
-    role: m.role,
-    content: 'content' in m && typeof m.content === 'string' ? (m.content.length > 100 ? m.content.substring(0, 100) + '...' : m.content) : '[non-text content]',
-    toolCalls: 'toolCalls' in m && Array.isArray(m.toolCalls) ? m.toolCalls.length : 0
-  })));
+  console.log('🔵 [AGENT] Incoming request with messages:', sanitizedMessages.map(m => {
+    const raw = (m as any);
+    const text = typeof raw.content === 'string' && raw.content
+      ? raw.content
+      : Array.isArray(raw.parts)
+        ? raw.parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join('')
+        : '';
+    const preview = text ? (text.length > 160 ? text.slice(0, 160) + '…' : text) : '[non-text content]';
+    return {
+      role: m.role,
+      textPreview: preview,
+      toolCalls: 'toolCalls' in m && Array.isArray((m as any).toolCalls) ? (m as any).toolCalls.length : 0,
+    };
+  }));
 
-  // Log classification if provided
-  if (classification) {
-    const allowedSections = [
-      'BASE_SYSTEM_PROMPT',
-      'CREATE_APP_PROMPT',
-      'EDIT_APP_PROMPT',
-      'GENERATION_PROMPT',
-      'CHAT_PROMPT',
-      'STYLING_GUIDELINES',
-      'AI_INTEGRATION_PATTERNS',
-      'BEST_PRACTICES',
-    ];
-    const recognizedSections = (classification.promptSections || []).filter((s: string) => allowedSections.includes(s));
-    
-    console.log('🏷️ [AGENT] Using classification:', {
-      taskType: classification.taskType,
-      toolsCount: classification.availableTools?.length || 0,
-      promptSections: recognizedSections
-    });
-  }
 
   // Persona-only mode: returns a parallel, personality-driven stream that does not use tools
   const url = new URL(req.url);
@@ -142,28 +197,10 @@ export async function POST(req: Request) {
     return result.toUIMessageStreamResponse();
   }
 
-  // Build system prompt based on classification
-  let systemPrompt = BASE_SYSTEM_PROMPT; // Default to base prompt if no classification
-  
-  if (classification && classification.promptSections) {
-    const promptMap: Record<string, string> = {
-      'BASE_SYSTEM_PROMPT': BASE_SYSTEM_PROMPT,
-      'CREATE_APP_PROMPT': CREATE_APP_PROMPT,
-      'EDIT_APP_PROMPT': EDIT_APP_PROMPT,
-      'GENERATION_PROMPT': GENERATION_PROMPT,
-      'CHAT_PROMPT': CHAT_PROMPT,
-      'AI_INTEGRATION_PATTERNS': AI_INTEGRATION_PATTERNS,
-      'BEST_PRACTICES': BEST_PRACTICES,
-    };
+  // Use the comprehensive system prompt
+  let systemPrompt = SYSTEM_PROMPT;
 
-    const sections = classification.promptSections
-      .map((section: string) => promptMap[section])
-      .filter(Boolean);
-    
-    if (sections.length > 0) {
-      systemPrompt = sections.join('\n\n');
-    }
-  }
+  // Attachments guidance is now included in the main SYSTEM_PROMPT
 
   // Append list of installed apps as plain names (one per line)
   try {
@@ -229,16 +266,8 @@ export async function POST(req: Request) {
     },
   };
 
-  // Filter tools based on classification
-  let tools: any = allTools;
-  if (classification && classification.availableTools && classification.availableTools.length > 0) {
-    const allowedTools = new Set(classification.availableTools);
-    tools = Object.fromEntries(
-      Object.entries(allTools).filter(([toolName]) => allowedTools.has(toolName))
-    );
-    
-    console.log('🔧 [AGENT] Filtered tools:', Object.keys(tools));
-  }
+  // Use all available tools
+  const tools = allTools;
 
   // Track tool call timings to avoid duplicate logging
   const toolCallTimings = new Map<string, number>();

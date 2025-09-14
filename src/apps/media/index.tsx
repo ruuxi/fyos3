@@ -69,17 +69,17 @@ export default function App(){
               <div className="text-xs text-gray-500">{new Date(m.createdAt).toLocaleString()} • {formatBytes(m.size)}</div>
               <div className="mt-2">
                 {m.contentType.startsWith('image/') && (
-                  <img src={m.publicUrl || `/api/media/${m._id}`} alt={m.r2Key} className="w-full h-auto rounded" />
+                  <img src={m.publicUrl || ''} alt={m.r2Key} className="w-full h-auto rounded" />
                 )}
                 {m.contentType.startsWith('audio/') && (
-                  <audio controls src={m.publicUrl || `/api/media/${m._id}`} className="w-full" />
+                  <audio controls src={m.publicUrl || ''} className="w-full" />
                 )}
                 {m.contentType.startsWith('video/') && (
-                  <video controls src={m.publicUrl || `/api/media/${m._id}`} className="w-full rounded" />
+                  <video controls src={m.publicUrl || ''} className="w-full rounded" />
                 )}
               </div>
               <div className="mt-2 flex items-center gap-2">
-                <a href={m.publicUrl || `/api/media/${m._id}`} target="_blank" className="text-xs px-2 py-1 rounded border">Open</a>
+                <a href={m.publicUrl || '#'} target="_blank" className="text-xs px-2 py-1 rounded border">Open</a>
                 <div className="text-xs text-gray-600 truncate" title={m.r2Key}>{m.r2Key}</div>
               </div>
             </div>

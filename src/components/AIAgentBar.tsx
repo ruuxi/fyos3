@@ -15,7 +15,7 @@ import AgentBarShell from '@/components/agent/AIAgentBar/ui/AgentBarShell';
 import Toolbar from '@/components/agent/AIAgentBar/ui/Toolbar';
 import ChatTabs from '@/components/agent/AIAgentBar/ui/ChatTabs';
 import MessagesPane from '@/components/agent/AIAgentBar/ui/MessagesPane';
-import ChatComposer from '@/components/agent/AIAgentBar/ui/ChatComposer';
+import ChatComposer, { type Attachment } from '@/components/agent/AIAgentBar/ui/ChatComposer';
 import MediaPane from '@/components/agent/AIAgentBar/ui/MediaPane';
 
 export default function AIAgentBar() {
@@ -26,6 +26,7 @@ export default function AIAgentBar() {
   const [showThreadHistory, setShowThreadHistory] = useState<boolean>(false);
   const [didAnimateWelcome, setDidAnimateWelcome] = useState(false);
   const [bubbleAnimatingIds, setBubbleAnimatingIds] = useState<Set<string>>(new Set());
+  const [lastSentAttachments, setLastSentAttachments] = useState<Attachment[] | null>(null);
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
   
   const { goTo, activeIndex } = useScreens();
@@ -62,6 +63,7 @@ export default function AIAgentBar() {
     uploadFiles,
     ingestFromUrl,
     busyFlags,
+    projectAttachmentsToDurable,
   } = useMediaLibrary();
 
   const { messagesContainerRef, messagesInnerRef, containerHeight, forceFollow } = useScrollSizing(mode);
@@ -72,10 +74,13 @@ export default function AIAgentBar() {
   useEffect(() => { instanceRef.current = instance; }, [instance]);
   useEffect(() => { fnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
 
-  // Classification ref used by chat
-  const classificationRef = useRef<any>(null);
   const statusRef = useRef<string>('ready');
   const sendMessageRef = useRef<(content: string) => Promise<void>>(async () => {});
+  const attachmentsRef = useRef(attachments);
+  useEffect(() => { attachmentsRef.current = attachments; }, [attachments]);
+  const pendingAttachmentsRef = useRef<Attachment[] | null>(null);
+  const uploadBusyRef = useRef<boolean>(false);
+  useEffect(() => { uploadBusyRef.current = !!busyFlags.uploadBusy; }, [busyFlags.uploadBusy]);
   
   const { runValidation } = useValidationDiagnostics({
     spawn: (cmd, args, opts) => fnsRef.current.spawn(cmd, args, opts),
@@ -88,10 +93,10 @@ export default function AIAgentBar() {
     initialMessages: initialChatMessages,
     activeThreadId,
     threadsCount: threads.length,
-    classificationRef,
     wc: { instanceRef, fnsRef },
     media: { loadMedia },
     runValidation,
+    attachmentsProvider: () => (pendingAttachmentsRef.current || attachmentsRef.current || []),
   });
 
   useEffect(() => { statusRef.current = status; }, [status]);
@@ -201,29 +206,41 @@ export default function AIAgentBar() {
     if (!input.trim()) return;
     forceFollow();
     let userText = input;
-    classificationRef.current = null;
-    
-    if (attachments.length > 0) {
-      userText += '\n\nAttachments:\n' + attachments.map(a => `- ${a.name}: ${a.publicUrl}`).join('\n');
-    }
-    
-    try {
-      const classifyResponse = await fetch('/api/classify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText, messages }),
-      });
-      
-      if (classifyResponse.ok) {
-        const classification = await classifyResponse.json();
-        classificationRef.current = classification;
+    // Ensure we pick up durable URLs if ingestion just finished
+    const waitForDurable = async (timeoutMs = 6000, intervalMs = 80) => {
+      const started = Date.now();
+      while (Date.now() - started < timeoutMs) {
+        const curr = attachmentsRef.current || [];
+        const hasDurable = curr.some(a => /^https?:\/\//i.test(a.publicUrl));
+        const hasBlobOnly = curr.length > 0 && curr.every(a => /^blob:/i.test(a.publicUrl));
+        const stillUploading = uploadBusyRef.current;
+        if (hasDurable || (!hasBlobOnly && !stillUploading)) break;
+        await new Promise(r => setTimeout(r, intervalMs));
       }
-    } catch (error) {
-      console.error('Error classifying message:', error);
-      classificationRef.current = null;
+    };
+    await waitForDurable();
+    // Project any blob: attachments to known durable URLs just in case state hasn't flushed
+    const snapshot = projectAttachmentsToDurable((attachmentsRef.current || attachments).slice());
+    
+    if (snapshot.length > 0) {
+      // Only include durable, fetchable URLs for the LLM (avoid blob:)
+      const durable = snapshot.filter(a => /^https?:\/\//i.test(a.publicUrl));
+      if (durable.length > 0) {
+        // Append concise attachment hints per request into the user's message only
+        const lines = durable.map(a => `Attached ${a.contentType || 'file'}: ${a.publicUrl}`);
+        userText += '\n' + lines.join('\n');
+      }
     }
     
+    // Debug log the snapshot before sending
+    console.log('📤 [CHAT] Sending with attachments snapshot:', snapshot);
+    
+    // Ensure server receives a stable view even if UI clears attachments immediately
+    pendingAttachmentsRef.current = snapshot;
+    setLastSentAttachments(snapshot);
     void sendMessage({ text: userText });
+    // Clear the pending ref shortly after dispatch
+    setTimeout(() => { pendingAttachmentsRef.current = null; }, 1500);
     setInput('');
     setAttachments([]);
   };
@@ -273,6 +290,7 @@ export default function AIAgentBar() {
             onFileSelect={handleUploadFiles}
             onStop={() => stop()}
             onFocus={() => setMode('chat')}
+            uploadBusy={busyFlags.uploadBusy}
           />
         </div>
       </div>
@@ -312,6 +330,7 @@ export default function AIAgentBar() {
               containerHeight={containerHeight}
               didAnimateWelcome={didAnimateWelcome}
               bubbleAnimatingIds={bubbleAnimatingIds}
+              lastSentAttachments={lastSentAttachments || undefined}
             />
             <style jsx>{`
               .ios-pop { animation: iosPop 420ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: bottom left; }

@@ -11,7 +11,7 @@ export type MediaPaneProps = {
   ingestUrl: string;
   setIngestUrl: (v: string) => void;
   onIngest: () => Promise<void> | void;
-  items: Array<{ _id: string; contentType: string; r2Key: string; createdAt: number; size?: number }>;
+  items: Array<{ _id: string; contentType: string; r2Key: string; createdAt: number; size?: number; publicUrl?: string }>;
   disabled: boolean;
   formatBytes: (n?: number) => string;
 };
@@ -69,17 +69,17 @@ export default function MediaPane(props: MediaPaneProps) {
             <div className="mt-2">
               {m.contentType.startsWith('image/') && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/api/media/${m._id}`} alt={m.r2Key} className="w-full h-auto" />
+                <img src={m.publicUrl || ''} alt={m.r2Key} className="w-full h-auto" />
               )}
               {m.contentType.startsWith('audio/') && (
-                <audio controls src={`/api/media/${m._id}`} className="w-full" />
+                <audio controls src={m.publicUrl || ''} className="w-full" />
               )}
               {m.contentType.startsWith('video/') && (
-                <video controls src={`/api/media/${m._id}`} className="w-full" />
+                <video controls src={m.publicUrl || ''} className="w-full" />
               )}
             </div>
             <div className="mt-2 flex items-center gap-2">
-              <a href={`/api/media/${m._id}`} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 border rounded-none">Open</a>
+              <a href={m.publicUrl || '#'} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 border rounded-none">Open</a>
               <div className="text-xs text-white/70 truncate" title={m.r2Key}>{m.r2Key}</div>
             </div>
           </div>

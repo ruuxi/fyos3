@@ -18,15 +18,15 @@ export async function POST(req: NextRequest) {
         case 'video':
           return 'fal-ai/runway-gen3/turbo/image-to-video';
         case 'image':
-          return 'fal-ai/flux-1/schnell';
+          return 'fal-ai/nano-banana';
         case 'audio':
           // Fallback; most audio/music is via ElevenLabs route in this app
-          return 'fal-ai/flux-1/schnell';
+          return 'fal-ai/nano-banana';
         case '3d':
           // Fallback default; adjust when a preferred 3D model is adopted
-          return 'fal-ai/flux-1/schnell';
+          return 'fal-ai/nano-banana';
         default:
-          return 'fal-ai/flux-1/schnell';
+          return 'fal-ai/nano-banana';
       }
     };
 

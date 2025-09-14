@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MediaItem } from '@/lib/agent/agentTypes';
 import { guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 
@@ -16,6 +16,8 @@ type UseMediaLibraryState = {
   uploadFiles: (files: FileList | File[] | null) => Promise<void>;
   ingestFromUrl: (url: string) => Promise<void>;
   busyFlags: BusyFlags;
+  getDurableAttachments: () => Array<{ name: string; publicUrl: string; contentType: string }>;
+  projectAttachmentsToDurable: (list: Array<{ name: string; publicUrl: string; contentType: string }>) => Array<{ name: string; publicUrl: string; contentType: string }>;
 };
 
 export function useMediaLibrary(): UseMediaLibraryState {
@@ -26,6 +28,32 @@ export function useMediaLibrary(): UseMediaLibraryState {
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<Array<{ name: string; publicUrl: string; contentType: string }>>([]);
+
+  // Short-lived map from blob: URL -> durable URL returned by ingest
+  const blobToDurableRef = useRef<Map<string, { publicUrl: string; contentType?: string }>>(new Map());
+
+  const projectAttachmentsToDurable = useCallback((list: Array<{ name: string; publicUrl: string; contentType: string }>) => {
+    try {
+      const map = blobToDurableRef.current;
+      return list.map(a => {
+        if (/^https?:\/\//i.test(a.publicUrl)) return a;
+        if (/^blob:/i.test(a.publicUrl)) {
+          const m = map.get(a.publicUrl);
+          if (m && m.publicUrl && /^https?:\/\//i.test(m.publicUrl)) {
+            return { ...a, publicUrl: m.publicUrl, contentType: a.contentType || (m.contentType || 'application/octet-stream') };
+          }
+        }
+        return a;
+      });
+    } catch {
+      return list;
+    }
+  }, []);
+
+  const getDurableAttachments = useCallback(() => {
+    const projected = projectAttachmentsToDurable(attachments);
+    return projected.filter(a => /^https?:\/\//i.test(a.publicUrl));
+  }, [attachments, projectAttachmentsToDurable]);
 
   const loadMedia = useCallback(async () => {
     setMediaLoading(true); setMediaError(null);
@@ -49,17 +77,22 @@ export function useMediaLibrary(): UseMediaLibraryState {
   const uploadFiles = useCallback(async (files: FileList | File[] | null) => {
     if (!files || (Array.isArray(files) ? files.length === 0 : files.length === 0)) return;
     setUploadBusy(true); setUploadError(null);
+    console.log('🔄 [MEDIA] Starting upload for', Array.from(files).map(f => f.name));
     try {
       const list: File[] = Array.isArray(files) ? files : Array.from(files);
       for (const file of list) {
+        console.log('📁 [MEDIA] Processing file:', file.name, 'type:', file.type, 'size:', file.size);
         let objectUrl: string | null = null;
         try {
           objectUrl = URL.createObjectURL(file);
+          console.log('🔗 [MEDIA] Created blob URL:', objectUrl);
           const previewIndex = (() => {
             let idx = -1;
             setAttachments(prev => {
               const next = prev.slice();
-              next.push({ name: file.name, publicUrl: objectUrl!, contentType: file.type || guessContentTypeFromFilename(file.name) });
+              const contentType = file.type || guessContentTypeFromFilename(file.name);
+              console.log('📝 [MEDIA] Adding to attachments:', { name: file.name, publicUrl: objectUrl!, contentType });
+              next.push({ name: file.name, publicUrl: objectUrl!, contentType });
               idx = next.length - 1;
               return next;
             });
@@ -79,16 +112,31 @@ export function useMediaLibrary(): UseMediaLibraryState {
             throw new Error(text || `Upload failed (${res.status})`);
           }
           const result = await res.json();
-          setAttachments(prev => {
-            const next = prev.slice();
-            if (previewIndex >= 0 && previewIndex < next.length) {
-              next[previewIndex] = {
-                name: file.name,
-                publicUrl: (result && result.id) ? `/api/media/${result.id}` : (result.publicUrl || objectUrl || ''),
-                contentType: file.type || result.contentType || guessContentTypeFromFilename(file.name),
-              };
-            }
-            return next;
+          console.log('✅ [MEDIA] Ingest response:', result);
+          
+          // Use a promise to ensure state update completes
+          await new Promise<void>(resolve => {
+            setAttachments(prev => {
+              const next = prev.slice();
+              if (previewIndex >= 0 && previewIndex < next.length) {
+                const updated = {
+                  name: file.name,
+                  publicUrl: result.publicUrl || objectUrl || '',
+                  contentType: file.type || result.contentType || guessContentTypeFromFilename(file.name),
+                };
+                console.log('🔄 [MEDIA] Updating attachment:', updated);
+                next[previewIndex] = updated;
+              }
+              // Record mapping from blob -> durable for use during send
+              try {
+                if (objectUrl && result.publicUrl) {
+                  blobToDurableRef.current.set(objectUrl, { publicUrl: result.publicUrl, contentType: result.contentType });
+                }
+              } catch {}
+              // Resolve after state update
+              setTimeout(resolve, 0);
+              return next;
+            });
           });
         } finally {
           if (objectUrl) { try { URL.revokeObjectURL(objectUrl); } catch {} }
@@ -116,11 +164,7 @@ export function useMediaLibrary(): UseMediaLibraryState {
         const result = await res.json();
         const name = trimmed.split('/').pop() || 'link';
         const inferred = guessContentTypeFromFilename(name);
-        setAttachments(prev => [...prev, {
-          name,
-          publicUrl: (result && result.id) ? `/api/media/${result.id}` : (result.publicUrl || trimmed),
-          contentType: result.contentType || inferred,
-        }]);
+        setAttachments(prev => [...prev, { name, publicUrl: result.publicUrl || trimmed, contentType: result.contentType || inferred }]);
       } catch {
         const name = trimmed.split('/').pop() || 'link';
         setAttachments(prev => [...prev, { name, publicUrl: trimmed, contentType: guessContentTypeFromFilename(name) }]);
@@ -145,6 +189,8 @@ export function useMediaLibrary(): UseMediaLibraryState {
     uploadFiles,
     ingestFromUrl,
     busyFlags: { loading: mediaLoading, uploadBusy },
+    getDurableAttachments,
+    projectAttachmentsToDurable,
   };
 }
 

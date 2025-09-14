@@ -14,10 +14,11 @@ export type ChatComposerProps = {
   onFileSelect: (files: FileList) => void;
   onStop: () => void;
   onFocus?: () => void;
+  uploadBusy?: boolean;
 };
 
 export default function ChatComposer(props: ChatComposerProps) {
-  const { input, setInput, status, attachments, removeAttachment, onSubmit, onFileSelect, onStop, onFocus } = props;
+  const { input, setInput, status, attachments, removeAttachment, onSubmit, onFileSelect, onStop, onFocus, uploadBusy } = props;
   return (
     <form onSubmit={onSubmit}>
       <div className="flex items-center gap-2">
@@ -74,7 +75,7 @@ export default function ChatComposer(props: ChatComposerProps) {
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (input.trim() && status === 'ready') onSubmit(e as any);
+                if (input.trim() && status === 'ready' && !uploadBusy) onSubmit(e as any);
               }
             }}
           />
@@ -100,7 +101,7 @@ export default function ChatComposer(props: ChatComposerProps) {
               </label>
             </Button>
           </div>
-          <Button type="submit" disabled={!input.trim() || status !== 'ready'} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
+          <Button type="submit" disabled={!input.trim() || status !== 'ready' || !!uploadBusy} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
             <Send className="w-4 h-4" />
           </Button>
         </div>
