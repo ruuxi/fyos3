@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
+import { useEffect, useRef, useState, useMemo } from 'react';
+import { Search, RotateCcw } from 'lucide-react';
 import { useWebContainer } from './WebContainerProvider';
 import { useScreens } from './ScreensProvider';
 import { formatBytes } from '@/lib/agent/agentUtils';
@@ -17,6 +17,9 @@ import ChatTabs from '@/components/agent/AIAgentBar/ui/ChatTabs';
 import MessagesPane from '@/components/agent/AIAgentBar/ui/MessagesPane';
 import ChatComposer, { type Attachment } from '@/components/agent/AIAgentBar/ui/ChatComposer';
 import MediaPane from '@/components/agent/AIAgentBar/ui/MediaPane';
+import { buildDesktopSnapshot, restoreDesktopSnapshot } from '@/utils/desktop-snapshot';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
@@ -27,6 +30,8 @@ export default function AIAgentBar() {
   const [didAnimateWelcome, setDidAnimateWelcome] = useState(false);
   const [bubbleAnimatingIds, setBubbleAnimatingIds] = useState<Set<string>>(new Set());
   const [lastSentAttachments, setLastSentAttachments] = useState<Attachment[] | null>(null);
+  // Undo stack depth for UI invalidation
+  const [undoDepth, setUndoDepth] = useState<number>(0);
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
   
   const { goTo, activeIndex } = useScreens();
@@ -70,9 +75,35 @@ export default function AIAgentBar() {
 
   // Keep latest instance and fs helpers in refs so tool callbacks don't capture stale closures
   const instanceRef = useRef(instance);
+  const baseFnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
   const fnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
   useEffect(() => { instanceRef.current = instance; }, [instance]);
-  useEffect(() => { fnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
+  useEffect(() => { baseFnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
+
+  // Track whether the agent mutated the filesystem during a run
+  const fsChangedRef = useRef<boolean>(false);
+  const markFsChanged = () => { fsChangedRef.current = true; };
+
+  // Install tracked wrappers so agent tool calls can flip fsChangedRef when mutating
+  useEffect(() => {
+    const base = baseFnsRef.current;
+    const tracked = {
+      mkdir: base.mkdir,
+      writeFile: async (path: string, content: string) => { markFsChanged(); return base.writeFile(path, content); },
+      readFile: base.readFile,
+      readdirRecursive: base.readdirRecursive,
+      remove: async (path: string, opts?: { recursive?: boolean }) => { markFsChanged(); return base.remove(path, opts); },
+      spawn: async (command: string, args: string[] = [], opts?: { cwd?: string }) => {
+        const cmdLower = (command || '').toLowerCase();
+        const firstArg = (args[0] || '').toLowerCase();
+        const isPkgMgr = /^(pnpm|npm|yarn|bun)$/.test(cmdLower);
+        const isInstallLike = /^(add|install|update|remove|uninstall|i)$/i.test(firstArg);
+        if (isPkgMgr && isInstallLike) { markFsChanged(); }
+        return base.spawn(command, args, opts);
+      },
+    } as typeof fnsRef.current;
+    fnsRef.current = tracked;
+  }, [undoDepth]);
 
   const statusRef = useRef<string>('ready');
   const sendMessageRef = useRef<(content: string) => Promise<void>>(async () => {});
@@ -81,6 +112,8 @@ export default function AIAgentBar() {
   const pendingAttachmentsRef = useRef<Attachment[] | null>(null);
   const uploadBusyRef = useRef<boolean>(false);
   useEffect(() => { uploadBusyRef.current = !!busyFlags.uploadBusy; }, [busyFlags.uploadBusy]);
+  const undoStackRef = useRef<Uint8Array[]>([]);
+  const prevStatusRef = useRef<string>('ready');
   
   const { runValidation } = useValidationDiagnostics({
     spawn: (cmd, args, opts) => fnsRef.current.spawn(cmd, args, opts),
@@ -102,6 +135,63 @@ export default function AIAgentBar() {
   useEffect(() => { statusRef.current = status; }, [status]);
   useEffect(() => { sendMessageRef.current = (content: string) => sendMessageRaw({ text: content }); }, [sendMessageRaw]);
   const sendMessage = (args: { text: string }) => sendMessageRaw(args);
+
+  // Capture initial snapshot once the WebContainer is ready
+  useEffect(() => {
+    (async () => {
+      if (!instanceRef.current) return;
+      if (undoStackRef.current.length > 0) return;
+      try {
+        const { gz } = await buildDesktopSnapshot(instanceRef.current as any);
+        undoStackRef.current.push(gz);
+        setUndoDepth(undoStackRef.current.length);
+        console.log('📸 [UNDO] Initial snapshot captured');
+      } catch (e) {
+        console.warn('[UNDO] Initial snapshot failed', e);
+      }
+    })();
+  }, [instance]);
+
+  // On agent run completion: if FS changed, push a new snapshot and reset flag
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    const now = status;
+    const finished = (prev === 'submitted' || prev === 'streaming') && now === 'ready';
+    if (finished && fsChangedRef.current && instanceRef.current) {
+      (async () => {
+        try {
+          const { gz } = await buildDesktopSnapshot(instanceRef.current as any);
+          undoStackRef.current.push(gz);
+          setUndoDepth(undoStackRef.current.length);
+          fsChangedRef.current = false;
+          console.log('📸 [UNDO] Snapshot captured after agent run. Depth:', undoStackRef.current.length);
+        } catch (e) {
+          console.warn('[UNDO] Snapshot after run failed', e);
+        }
+      })();
+    }
+    prevStatusRef.current = now;
+  }, [status]);
+
+  // Undo handler
+  const handleUndo = useMemo(() => {
+    return async () => {
+      const inst = instanceRef.current;
+      const stack = undoStackRef.current;
+      if (!inst) return;
+      if (stack.length < 2) return;
+      try {
+        // Drop the current snapshot and restore the previous
+        stack.pop();
+        const prev = stack[stack.length - 1];
+        await restoreDesktopSnapshot(inst as any, prev);
+        setUndoDepth(stack.length);
+        console.log('↩️ [UNDO] Restored previous snapshot. Depth:', stack.length);
+      } catch (e) {
+        console.error('[UNDO] Restore failed', e);
+      }
+    };
+  }, []);
 
   // Global drag & drop handled by useGlobalDrop hook
   useGlobalDrop({
@@ -278,6 +368,22 @@ export default function AIAgentBar() {
           onVisit={() => setMode('visit')}
           onMedia={() => setMode('media')}
         />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-none text-white hover:bg-white/10 disabled:opacity-40"
+                onClick={() => { void handleUndo(); }}
+                disabled={!(undoDepth > 1 && status === 'ready')}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="rounded-none">Undo last agent changes</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <div className="flex-1 relative">
           <Search className="absolute left-16 top-1/2 -translate-y-1/2 h-4 w-4 text-white" />
           <ChatComposer
