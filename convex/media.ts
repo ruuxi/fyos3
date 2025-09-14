@@ -65,6 +65,8 @@ export const finalizeIngest = mutation({
   args: {
     desktopId: v.optional(v.string()),
     appId: v.optional(v.string()),
+    threadId: v.optional(v.string()),
+    requestId: v.optional(v.string()),
     sha256: v.string(),
     size: v.number(),
     contentType: v.string(),
@@ -90,6 +92,8 @@ export const finalizeIngest = mutation({
         r2Key: args.r2Key,
         publicUrl: args.publicUrl,
         metadata: args.metadata,
+        threadId: args.threadId,
+        requestId: args.requestId,
         updatedAt: now,
       });
       return existing._id;
@@ -99,6 +103,8 @@ export const finalizeIngest = mutation({
       ownerId,
       desktopId: args.desktopId,
       appId: args.appId,
+      threadId: args.threadId,
+      requestId: args.requestId,
       sha256: args.sha256,
       size: args.size,
       contentType: args.contentType,
@@ -131,24 +137,75 @@ export const listMedia = query({
     ownerId: v.optional(v.string()),
     appId: v.optional(v.string()),
     desktopId: v.optional(v.string()),
-    type: v.optional(v.string()),
+    threadId: v.optional(v.string()),
+    type: v.optional(v.string()), // image|audio|video
     from: v.optional(v.number()),
     to: v.optional(v.number()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    let q = ctx.db.query("media_public").withIndex("by_createdAt");
-    const all = await q.collect();
-    const filtered = all.filter((m) => {
-      if (args.ownerId && m.ownerId !== args.ownerId) return false;
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const ownerId = args.ownerId || (identity.subject ?? identity.tokenIdentifier ?? identity.email ?? "unknown");
+
+    const limit = Math.min(Math.max(args.limit ?? 100, 1), 500);
+    const from = args.from ?? 0;
+    const to = args.to ?? Number.MAX_SAFE_INTEGER;
+    const typePrefix = args.type ? `${args.type}/` : null;
+
+    // Prefer thread-scoped index when provided for efficiency
+    if (args.threadId) {
+      const rows = await ctx.db
+        .query("media_public")
+        .withIndex("by_owner_thread_createdAt", (q) => q.eq("ownerId", ownerId).eq("threadId", args.threadId!))
+        .filter((q) => q.and(q.gte(q.field("createdAt"), from), q.lte(q.field("createdAt"), to)))
+        .take(limit);
+      return rows.filter((m) => (typePrefix ? m.contentType.startsWith(typePrefix) : true));
+    }
+
+    // Otherwise, use owner+createdAt index, then filter app/desktop/type/time
+    const rows = await ctx.db
+      .query("media_public")
+      .withIndex("by_owner_createdAt", (q) => q.eq("ownerId", ownerId))
+      .filter((q) => q.and(q.gte(q.field("createdAt"), from), q.lte(q.field("createdAt"), to)))
+      .take(limit * 2); // simple headroom before final in-memory filters
+
+    const filtered = rows.filter((m) => {
       if (args.appId && m.appId !== args.appId) return false;
       if (args.desktopId && m.desktopId !== args.desktopId) return false;
-      if (args.type && !m.contentType.startsWith(args.type + "/")) return false;
-      if (args.from && m.createdAt < args.from) return false;
-      if (args.to && m.createdAt > args.to) return false;
+      if (typePrefix && !m.contentType.startsWith(typePrefix)) return false;
       return true;
     });
-    return args.limit ? filtered.slice(0, args.limit) : filtered;
+    return filtered.slice(0, limit);
+  },
+});
+
+export const listMediaPage = query({
+  args: {
+    ownerId: v.optional(v.string()),
+    threadId: v.optional(v.string()),
+    type: v.optional(v.string()),
+    cursor: v.optional(v.string()),
+    pageSize: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const ownerId = args.ownerId || (identity.subject ?? identity.tokenIdentifier ?? identity.email ?? "unknown");
+    const pageSize = Math.min(Math.max(args.pageSize ?? 50, 1), 200);
+    const typePrefix = args.type ? `${args.type}/` : null;
+
+    const base = ctx.db.query("media_public");
+    const q = args.threadId
+      ? base.withIndex("by_owner_thread_createdAt", (q) => q.eq("ownerId", ownerId).eq("threadId", args.threadId!))
+      : base.withIndex("by_owner_createdAt", (q) => q.eq("ownerId", ownerId));
+
+    const page = await q
+      .order("desc")
+      .paginate({ cursor: (args.cursor ?? null) as any, numItems: pageSize });
+
+    const pageFiltered = page.page.filter((m) => (typePrefix ? m.contentType.startsWith(typePrefix) : true));
+    return { page: pageFiltered, isDone: page.isDone, continueCursor: page.continueCursor };
   },
 });
 

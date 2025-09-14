@@ -385,6 +385,7 @@ You can generate images, videos, music, and other media using AI tools.
 
 ### Integrating Results
 - When generation supports an app request (create/edit), immediately integrate the URLs into the app using the \`/src/ai\` wrappers from AI_INTEGRATION_PATTERNS.
+- Do not include raw media URLs in your chat replies. The UI renders media inline from tool results;
 
 ## Conversational Mode
 

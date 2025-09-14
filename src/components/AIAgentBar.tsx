@@ -331,6 +331,7 @@ export default function AIAgentBar() {
               didAnimateWelcome={didAnimateWelcome}
               bubbleAnimatingIds={bubbleAnimatingIds}
               lastSentAttachments={lastSentAttachments || undefined}
+              activeThreadId={activeThreadId || undefined}
             />
             <style jsx>{`
               .ios-pop { animation: iosPop 420ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: bottom left; }

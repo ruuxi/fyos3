@@ -10,7 +10,7 @@ type IngestBody = {
   base64?: string;
   contentType?: string;
   filenameHint?: string;
-  scope?: { desktopId?: string; appId?: string };
+  scope?: { desktopId?: string; appId?: string; threadId?: string; requestId?: string };
   metadata?: Record<string, string>;
 };
 
@@ -162,6 +162,8 @@ export async function POST(req: NextRequest) {
     const id = await client.mutation(api.media.finalizeIngest, {
       desktopId: body.scope?.desktopId,
       appId: body.scope?.appId,
+      threadId: body.scope?.threadId,
+      requestId: body.scope?.requestId,
       sha256,
       size,
       contentType: detected,

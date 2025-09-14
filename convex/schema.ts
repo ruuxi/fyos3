@@ -71,6 +71,8 @@ export default defineSchema({
     ownerId: v.string(),
     desktopId: v.optional(v.string()),
     appId: v.optional(v.string()),
+    threadId: v.optional(v.string()),
+    requestId: v.optional(v.string()),
     sha256: v.string(),
     size: v.number(),
     contentType: v.string(),
@@ -81,6 +83,9 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_owner", ["ownerId"])
+    .index("by_owner_thread", ["ownerId", "threadId"]) 
+    .index("by_owner_createdAt", ["ownerId", "createdAt"]) 
+    .index("by_owner_thread_createdAt", ["ownerId", "threadId", "createdAt"]) 
     .index("by_sha256", ["sha256"])
     .index("by_owner_sha", ["ownerId", "sha256"])
     .index("by_owner_app", ["ownerId", "appId"])

@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get('type') ?? undefined;
     const appId = searchParams.get('appId') ?? undefined;
     const desktopId = searchParams.get('desktopId') ?? undefined;
+    const threadId = searchParams.get('threadId') ?? undefined;
     const fromStr = searchParams.get('from') ?? undefined;
     const toStr = searchParams.get('to') ?? undefined;
     const limitStr = searchParams.get('limit') ?? undefined;
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
     const limit = limitStr ? Number(limitStr) : undefined;
 
     const client = await getClient();
-    const items = await client.query(api.media.listMedia, { type, appId, desktopId, from, to, limit } as any);
+    const items = await client.query(api.media.listMedia, { type, appId, desktopId, threadId, from, to, limit } as any);
     return NextResponse.json({ items });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Failed to list media' }, { status: 500 });

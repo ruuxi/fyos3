@@ -241,3 +241,61 @@ export async function persistAssetsFromAIResult<T = any>(inputResult: T, scope?:
 }
 
 
+// Extract provider-returned media URLs before ingestion for immediate rendering
+export function extractOriginalMediaUrlsFromResult(inputResult: any): Array<{ url: string; contentType?: string }>{
+  const urls: Array<{ url: string; contentType?: string }> = [];
+  const seen = new Set<string>();
+
+  const push = (u: string, ct?: string) => {
+    if (!u || !isHttpUrl(u)) return;
+    if (seen.has(u)) return;
+    seen.add(u);
+    urls.push({ url: u, contentType: ct });
+  };
+
+  function visit(node: any, parentKey: string | number | null) {
+    if (node == null) return;
+    const t = typeof node;
+    if (t === 'string') return;
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) {
+        const v = node[i];
+        if (typeof v === 'string') {
+          if (isHttpUrl(v) && (ARRAY_KEYS.has(String(parentKey)) || MEDIA_KEYS.has(String(parentKey)))) {
+            push(v);
+          }
+        } else {
+          visit(v, i);
+        }
+      }
+      return;
+    }
+    if (t === 'object') {
+      for (const k of Object.keys(node)) {
+        const v = (node as any)[k];
+        if (typeof v === 'string') {
+          if (isHttpUrl(v) && (URL_KEYS.has(k) || MEDIA_KEYS.has(k))) {
+            push(v);
+          }
+        } else if (Array.isArray(v)) {
+          visit(v, k);
+        } else if (typeof v === 'object' && v !== null) {
+          // Common pattern: { url: '...' }
+          if (typeof (v as any).url === 'string' && isHttpUrl((v as any).url)) {
+            push((v as any).url);
+          }
+          visit(v, k);
+        }
+      }
+    }
+  }
+
+  try {
+    if (typeof inputResult === 'object' && inputResult !== null) {
+      visit(inputResult, null);
+    }
+  } catch {}
+
+  return urls;
+}
+

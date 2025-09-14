@@ -85,6 +85,30 @@ export const listMessages = query({
   },
 });
 
+export const listMessagesPage = query({
+  args: {
+    threadId: v.id("chat_threads"),
+    cursor: v.optional(v.string()),
+    pageSize: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const ownerId = getOwnerId(identity);
+
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread || thread.ownerId !== ownerId) throw new Error("Not found");
+
+    const pageSize = Math.min(Math.max(args.pageSize ?? 50, 1), 200);
+    const page = await ctx.db
+      .query("chat_messages")
+      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+      .order("asc")
+      .paginate({ cursor: (args.cursor ?? null) as any, numItems: pageSize });
+    return { page: page.page, isDone: page.isDone, continueCursor: page.continueCursor };
+  },
+});
+
 export const renameThread = mutation({
   args: { threadId: v.id("chat_threads"), title: v.string() },
   handler: async (ctx, args) => {

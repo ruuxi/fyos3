@@ -1,8 +1,9 @@
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useChat } from '@ai-sdk/react';
 import { agentLogger } from '@/lib/agentLogger';
-import { persistAssetsFromAIResult } from '@/utils/ai-media';
+import { persistAssetsFromAIResult, extractOriginalMediaUrlsFromResult } from '@/utils/ai-media';
 import { autoIngestInputs } from '@/utils/auto-ingest';
+import { guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 
 type WebContainerFns = {
   mkdir: (path: string, recursive?: boolean) => Promise<void>;
@@ -216,10 +217,25 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             try {
               const { processedInput, ingestedCount } = await autoIngestInputs(input, scope);
               if (provider === 'fal') {
-                const res = await fetch('/api/ai/fal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: processedInput, task }) });
+                const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+                const res = await fetch('/api/ai/fal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: processedInput, task, requestId }) });
                 if (!res.ok) throw new Error(`FAL API error: ${res.status} ${res.statusText}`);
                 const json = await res.json();
-                const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, scope);
+                // Immediately surface provider URLs for inline rendering (ephemeral)
+                try {
+                  const originals = extractOriginalMediaUrlsFromResult(json);
+                  const ephemeralAssets = originals.map(({ url }) => {
+                    const fileName = url.split('#')[0].split('?')[0].split('/').pop() || '';
+                    const ct = guessContentTypeFromFilename(fileName);
+                    return { publicUrl: url, contentType: ct };
+                  });
+                  if (ephemeralAssets.length > 0) {
+                    addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, ephemeralAssets } });
+                  }
+                } catch {}
+                // Enrich scope with threadId/requestId for ingestion tracking
+                const enrichedScope = { ...scope, threadId: activeThreadId || undefined, appId: scope?.appId, desktopId: scope?.desktopId, requestId } as any;
+                const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, enrichedScope);
                 addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, result: updated, persistedAssets, autoIngestedCount: ingestedCount } });
               } else if (provider === 'eleven') {
                 const res = await fetch('/api/ai/eleven', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(processedInput) });

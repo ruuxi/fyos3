@@ -1,4 +1,6 @@
 import type { RefObject } from 'react';
+import { useConvexAuth, useQuery } from 'convex/react';
+import { api as convexApi } from '../../../../../convex/_generated/api';
 import { formatBytes, guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 
 export type MessagesPaneProps = {
@@ -10,16 +12,30 @@ export type MessagesPaneProps = {
   didAnimateWelcome: boolean;
   bubbleAnimatingIds: Set<string>;
   lastSentAttachments?: Array<{ name: string; publicUrl: string; contentType: string }>;
+  activeThreadId?: string;
 };
 
 type AttachmentPreview = { name: string; publicUrl: string; contentType: string };
 
 function extractAttachmentsFromText(text: string): { cleanedText: string; items: AttachmentPreview[] } {
   try {
-    // Collect attachments from two patterns:
+    // Collect attachments from:
     // 1) Legacy block: "Attachments:\n- filename: url"
     // 2) New concise lines: "Attached {contentType}: {url}"
+    // 3) Bare media URLs inside the text (e.g., https://.../image.jpg)
     const items: AttachmentPreview[] = [];
+    const seenUrls = new Set<string>();
+    const bareMediaUrls = new Set<string>();
+
+    const pushItem = (name: string, url: string, contentTypeGuess?: string) => {
+      if (seenUrls.has(url)) return;
+      seenUrls.add(url);
+      const guessed = (contentTypeGuess || guessContentTypeFromFilename(name) || '').toLowerCase();
+      const isMedia = guessed.startsWith('image/') || guessed.startsWith('audio/') || guessed.startsWith('video/');
+      items.push({ name, publicUrl: url, contentType: isMedia ? guessed : (contentTypeGuess || guessed || 'application/octet-stream') });
+    };
+
+    const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // Legacy block parsing
     const legacy = text.match(/Attachments:\s*\n([\s\S]*)$/i);
@@ -33,7 +49,7 @@ function extractAttachmentsFromText(text: string): { cleanedText: string; items:
         const url = m[2].trim();
         if (!/^https?:\/\//i.test(url) && !/^blob:/i.test(url)) continue;
         const contentType = guessContentTypeFromFilename(name);
-        items.push({ name, publicUrl: url, contentType });
+        pushItem(name, url, contentType);
       }
     }
 
@@ -45,7 +61,24 @@ function extractAttachmentsFromText(text: string): { cleanedText: string; items:
       const ct = m[1].trim();
       const url = m[2].trim();
       if (!/^https?:\/\//i.test(url) && !/^blob:/i.test(url)) continue;
-      items.push({ name: ct, publicUrl: url, contentType: ct });
+      pushItem(ct, url, ct);
+    }
+
+    // Bare media URLs in free text
+    const urlRegex = /https?:\/\/[^\s<>()'"`]+/gi;
+    const rawUrls = (text.match(urlRegex) || []) as string[];
+    for (let raw of rawUrls) {
+      // Trim common trailing punctuation
+      const trimmed = raw.replace(/[),.;!?\]\}"']+$/g, '');
+      if (!/^https?:\/\//i.test(trimmed)) continue;
+      const withoutQuery = trimmed.split('#')[0].split('?')[0];
+      const fileName = decodeURIComponent((withoutQuery.split('/').pop() || '').trim());
+      const inferred = guessContentTypeFromFilename(fileName);
+      const low = (inferred || '').toLowerCase();
+      const looksMedia = low.startsWith('image/') || low.startsWith('audio/') || low.startsWith('video/') || /\.(png|jpe?g|webp|gif|svg|mp4|webm|mov|m4v|mkv|mp3|wav|m4a|aac|flac|ogg)$/i.test(withoutQuery);
+      if (!looksMedia) continue;
+      pushItem(fileName || (inferred || 'media'), trimmed, inferred);
+      bareMediaUrls.add(trimmed);
     }
 
     // Clean text by removing both forms
@@ -54,6 +87,15 @@ function extractAttachmentsFromText(text: string): { cleanedText: string; items:
       .replace(/\n?The user has uploaded this[^\n]+/gi, '')
       .replace(/\n?Attached\s+[^:]+:\s+\S+/gi, '')
       .trimEnd();
+
+    // Strip recognized bare media URLs from the text
+    if (bareMediaUrls.size > 0) {
+      for (const u of bareMediaUrls) {
+        const re = new RegExp(`\\s*${escapeRegExp(u)}\\s*`, 'g');
+        cleanedText = cleanedText.replace(re, match => (match.includes('\n') ? '\n' : ' '));
+      }
+      cleanedText = cleanedText.replace(/\n{3,}/g, '\n\n').trimEnd();
+    }
 
     return { cleanedText, items };
   } catch {
@@ -94,7 +136,12 @@ function renderAttachments(items: AttachmentPreview[]) {
 }
 
 export default function MessagesPane(props: MessagesPaneProps) {
-  const { messages, status, messagesContainerRef, messagesInnerRef, containerHeight, didAnimateWelcome, bubbleAnimatingIds, lastSentAttachments } = props;
+  const { messages, status, messagesContainerRef, messagesInnerRef, containerHeight, didAnimateWelcome, bubbleAnimatingIds, lastSentAttachments, activeThreadId } = props;
+  const { isAuthenticated } = useConvexAuth();
+  const liveMedia = useQuery(
+    convexApi.media.listMedia as any,
+    isAuthenticated && activeThreadId ? ({ threadId: activeThreadId as any, limit: 50 } as any) : 'skip'
+  ) as Array<{ publicUrl?: string; contentType: string; size?: number; createdAt: number; r2Key: string }> | undefined;
   const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
   const lastUserMessageId = lastUserMessage?.id;
   return (
@@ -122,7 +169,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
             </div>
           </div>
         )}
-        {messages.map(m => {
+        {messages.map((m, idx) => {
           // Build content and collect any attachments referenced in text
           const textNodes: any[] = [];
           let collectedFromText: AttachmentPreview[] = [];
@@ -142,6 +189,10 @@ export default function MessagesPane(props: MessagesPaneProps) {
             ? collectedFromText
             : (isLastUser && (lastSentAttachments?.length || 0) > 0 ? (lastSentAttachments as AttachmentPreview[]) : []);
 
+          // Determine if this is the last assistant message to attach live media below
+          const isAssistant = m.role === 'assistant';
+          const isLastAssistant = isAssistant && messages.slice(idx + 1).every(mm => mm.role !== 'assistant');
+
           return (
             <div key={m.id} className={`text-sm flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`${m.role === 'user' ? 'flex flex-col items-end max-w-[80%]' : 'max-w-full flex-1'}`}>
@@ -155,6 +206,27 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   {(m.parts || []).map((part: any, index: number) => {
                     if (part.type !== 'tool-result') return null;
                     const payload = part.result ?? part.output ?? null;
+                    // Ephemeral assets from provider (surface immediately)
+                    if (payload?.ephemeralAssets?.length) {
+                      return (
+                        <div key={`ep-${index}`} className="mt-2 space-y-2">
+                          {payload.ephemeralAssets.map((asset: any, assetIndex: number) => {
+                            const { publicUrl, contentType } = asset || {};
+                            if (!publicUrl) return null;
+                            const isImage = (contentType || '').startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(publicUrl);
+                            const isAudio = (contentType || '').startsWith('audio/') || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(publicUrl);
+                            const isVideo = (contentType || '').startsWith('video/') || /\.(mp4|webm|mov|m4v|mkv)$/i.test(publicUrl);
+                            return (
+                              <div key={assetIndex} className="w-full">
+                                {isImage && (<img src={publicUrl} alt="Generated content" className="w-full rounded max-w-sm" />)}
+                                {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
+                                {isVideo && (<video controls src={publicUrl} className="w-full rounded max-w-sm" />)}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
                     if (payload?.persistedAssets?.length) {
                       return (
                         <div key={`tr-${index}`} className="mt-2 space-y-2">
@@ -195,6 +267,27 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   {/* Render attachments parsed from text or last-sent preview */}
                   {previewItems && previewItems.length > 0 && (
                     <div className="mt-2">{renderAttachments(previewItems)}</div>
+                  )}
+
+                  {/* Reactive media: if authenticated and thread-bound media exists, show new thumbnails below last assistant message */}
+                  {isLastAssistant && Array.isArray(liveMedia) && liveMedia.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      {liveMedia.map((asset, assetIndex) => {
+                        const publicUrl = asset.publicUrl || '';
+                        if (!publicUrl) return null;
+                        const contentType = asset.contentType || '';
+                        const isImage = contentType.startsWith('image/');
+                        const isAudio = contentType.startsWith('audio/');
+                        const isVideo = contentType.startsWith('video/');
+                        return (
+                          <div key={`live-${assetIndex}`} className="w-full">
+                            {isImage && (<img src={publicUrl} alt="Generated content" className="w-full rounded max-w-sm" />)}
+                            {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
+                            {isVideo && (<video controls src={publicUrl} className="w-full rounded max-w-sm" />)}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
