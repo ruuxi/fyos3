@@ -10,6 +10,7 @@ import { useMediaLibrary } from '@/components/agent/AIAgentBar/hooks/useMediaLib
 import { useGlobalDrop } from '@/components/agent/AIAgentBar/hooks/useGlobalDrop';
 import { useScrollSizing } from '@/components/agent/AIAgentBar/hooks/useScrollSizing';
 import { useValidationDiagnostics } from '@/components/agent/AIAgentBar/hooks/useValidationDiagnostics';
+import { useFriends } from '@/components/agent/AIAgentBar/hooks/useFriends';
 import { useAgentChat } from '@/components/agent/AIAgentBar/hooks/useAgentChat';
 import AgentBarShell from '@/components/agent/AIAgentBar/ui/AgentBarShell';
 import Toolbar from '@/components/agent/AIAgentBar/ui/Toolbar';
@@ -17,13 +18,16 @@ import ChatTabs from '@/components/agent/AIAgentBar/ui/ChatTabs';
 import MessagesPane from '@/components/agent/AIAgentBar/ui/MessagesPane';
 import ChatComposer, { type Attachment } from '@/components/agent/AIAgentBar/ui/ChatComposer';
 import MediaPane from '@/components/agent/AIAgentBar/ui/MediaPane';
+import AddFriendForm from '@/components/agent/AIAgentBar/ui/AddFriendForm';
+import FriendMessagesPane from '@/components/agent/AIAgentBar/ui/FriendMessagesPane';
 import { buildDesktopSnapshot, restoreDesktopSnapshot } from '@/utils/desktop-snapshot';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
-  const [mode, setMode] = useState<'compact' | 'chat' | 'visit' | 'media'>('chat');
+  const [mode, setMode] = useState<'compact' | 'chat' | 'visit' | 'media' | 'friends'>('chat');
+  const [leftPane, setLeftPane] = useState<'agent' | 'friend'>('agent');
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [ingestUrl, setIngestUrl] = useState('');
   const [showThreadHistory, setShowThreadHistory] = useState<boolean>(false);
@@ -71,7 +75,7 @@ export default function AIAgentBar() {
     projectAttachmentsToDurable,
   } = useMediaLibrary();
 
-  const { messagesContainerRef, messagesInnerRef, containerHeight, forceFollow } = useScrollSizing(mode);
+  const { messagesContainerRef, messagesInnerRef, containerHeight, forceFollow } = useScrollSizing(mode === 'friends' ? 'chat' : mode);
 
   // Keep latest instance and fs helpers in refs so tool callbacks don't capture stale closures
   const instanceRef = useRef(instance);
@@ -136,6 +140,21 @@ export default function AIAgentBar() {
       try { window.postMessage({ type: 'FYOS_AGENT_RUN_STARTED' }, '*'); } catch {}
     },
   });
+
+  // Friends hook
+  const {
+    isAuthenticated: isAuthed,
+    me,
+    setNickname,
+    friends,
+    friendsLoading,
+    friendsError,
+    addFriend,
+    activePeerId,
+    setActivePeerId,
+    dmMessages,
+    sendDm,
+  } = useFriends();
 
   useEffect(() => { statusRef.current = status; }, [status]);
   useEffect(() => { sendMessageRef.current = (content: string) => sendMessageRaw({ text: content }); }, [sendMessageRaw]);
@@ -382,11 +401,13 @@ export default function AIAgentBar() {
           onToggleHomeStore={() => goTo(activeIndex === 0 ? 1 : 0)}
           onVisit={() => setMode('visit')}
           onMedia={() => setMode('media')}
+          onFriends={() => setMode('friends')}
         />
         {/* Left Undo removed */}
         <div className="flex-1 relative">
           <Search className="absolute left-16 top-1/2 -translate-y-1/2 h-4 w-4 text-white" />
-          <ChatComposer
+          {leftPane === 'agent' && (
+            <ChatComposer
             input={input}
             setInput={setInput}
             status={status}
@@ -398,6 +419,21 @@ export default function AIAgentBar() {
             onFocus={() => setMode('chat')}
             uploadBusy={busyFlags.uploadBusy}
           />
+          )}
+          {leftPane === 'friend' && (
+            <ChatComposer
+              input={input}
+              setInput={setInput}
+              status={status === 'ready' ? 'ready' : status}
+              attachments={[]}
+              removeAttachment={() => {}}
+              onSubmit={(e)=>{ e.preventDefault(); if (input.trim() && activePeerId) { void sendDm(input); setInput(''); } }}
+              onFileSelect={()=>{}}
+              onStop={()=>{}}
+              onFocus={() => setMode('chat')}
+              uploadBusy={false}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -414,31 +450,101 @@ export default function AIAgentBar() {
       bottomBar={bottomBar}
     >
       <div className="bg-transparent text-white">
-        {mode === 'chat' && (
-          <div className="px-4 pt-3 relative">
-            <ChatTabs
-              threads={threads}
-              threadsLoading={threadsLoading}
-              threadsError={threadsError}
-              activeThreadId={activeThreadId}
-              setActiveThreadId={setActiveThreadId}
-              showHistory={showThreadHistory}
-              setShowHistory={setShowThreadHistory}
-              onRefresh={() => refreshThreads(false)}
-              onCreate={() => createNewThread('New Chat')}
-              onDelete={deleteThread}
-            />
-            <MessagesPane
-              messages={messages}
-              status={status}
-              messagesContainerRef={messagesContainerRef}
-              messagesInnerRef={messagesInnerRef}
-              containerHeight={containerHeight}
-              didAnimateWelcome={didAnimateWelcome}
-              bubbleAnimatingIds={bubbleAnimatingIds}
-              lastSentAttachments={lastSentAttachments || undefined}
-              activeThreadId={activeThreadId || undefined}
-            />
+        {(mode === 'chat' || mode === 'friends') && (
+          <div className={`${leftPane === 'friend' ? 'relative' : 'px-4 pt-3 relative'}`}>
+            <div className="grid grid-cols-[220px_1fr] gap-3">
+              {/* Left switcher: Agent vs Friends */}
+              <div className="border border-white/15 bg-white/5 p-2">
+                <div className="text-xs text-white/70 mb-1">Chats</div>
+                <div className="flex flex-col gap-1">
+                  <button
+                    className={`text-left text-sm px-2 py-1 rounded ${leftPane==='agent' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
+                    onClick={()=>{ setLeftPane('agent'); setMode('chat'); }}
+                  >
+                    Agent
+                  </button>
+                  <button
+                    className={`text-left text-sm px-2 py-1 rounded ${leftPane==='friend' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
+                    onClick={()=>{ setLeftPane('friend'); setMode('friends'); }}
+                  >
+                    Friends
+                  </button>
+                </div>
+
+                {leftPane==='friend' && (
+                  <div className="mt-1">
+                    <div className="text-xs text-white/70 mb-1">Me</div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="text"
+                        className="rounded-none text-black px-2 py-1 text-xs flex-1"
+                        placeholder="Nickname"
+                        defaultValue={me?.nickname || ''}
+                        onBlur={(e)=>{ const v = e.target.value.trim(); if (v && v !== (me?.nickname||'')) void setNickname(v); }}
+                        disabled={!isAuthed}
+                      />
+                    </div>
+                    <div className="text-xs text-white/70 mt-2 mb-1">Friends</div>
+                    {friendsLoading && (<div className="text-xs text-white/60">Loading…</div>)}
+                    {friendsError && (<div className="text-xs text-red-300">{friendsError}</div>)}
+                    <div className="flex flex-col gap-1 max-h-[240px] overflow-auto">
+                      {friends.map((f)=> (
+                        <button key={f.ownerId}
+                          className={`text-left text-xs px-2 py-1 rounded ${activePeerId===f.ownerId ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
+                          onClick={()=> setActivePeerId(f.ownerId)}
+                          title={f.email || f.ownerId}
+                        >
+                          {f.nickname || f.email || f.ownerId.slice(0,8)}
+                        </button>
+                      ))}
+                      {friends.length===0 && (<div className="text-xs text-white/60">No friends yet</div>)}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className={`${leftPane==='friend' ? 'min-h-[420px] p-3' : ''}`}>
+                {leftPane==='agent' && (
+                  <>
+                    <ChatTabs
+                      threads={threads}
+                      threadsLoading={threadsLoading}
+                      threadsError={threadsError}
+                      activeThreadId={activeThreadId}
+                      setActiveThreadId={setActiveThreadId}
+                      showHistory={showThreadHistory}
+                      setShowHistory={setShowThreadHistory}
+                      onRefresh={() => refreshThreads(false)}
+                      onCreate={() => createNewThread('New Chat')}
+                      onDelete={deleteThread}
+                    />
+                    <MessagesPane
+                      messages={messages}
+                      status={status}
+                      messagesContainerRef={messagesContainerRef}
+                      messagesInnerRef={messagesInnerRef}
+                      containerHeight={containerHeight}
+                      didAnimateWelcome={didAnimateWelcome}
+                      bubbleAnimatingIds={bubbleAnimatingIds}
+                      lastSentAttachments={lastSentAttachments || undefined}
+                      activeThreadId={activeThreadId || undefined}
+                    />
+                  </>
+                )}
+                {leftPane==='friend' && (
+                  <>
+                    <div className="mb-3">
+                      <div className="text-xs text-white/70 mb-1">Add friend</div>
+                      <AddFriendForm onAdd={(nickname)=> addFriend(nickname)} disabled={!isAuthed} />
+                    </div>
+                    <FriendMessagesPane
+                      messages={dmMessages || []}
+                      activePeerId={activePeerId}
+                    />
+                  </>
+                )}
+              </div>
+            </div>
             {status === 'ready' && undoDepth > 1 && (
               <button
                 onClick={handleUndo}

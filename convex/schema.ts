@@ -131,5 +131,37 @@ export default defineSchema({
   })
     .index("by_thread", ["threadId"]) 
     .index("by_createdAt", ["createdAt"]),
+
+  // User profile (nickname, email for friend discovery)
+  profiles: defineTable({
+    ownerId: v.string(),
+    email: v.optional(v.string()),
+    nickname: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"]) 
+    .index("by_email", ["email"]) 
+    .index("by_nickname", ["nickname"]),
+
+  // Friendships are stored as directed edges (ownerId -> friendId). Insert both directions to make it symmetric.
+  friendships: defineTable({
+    ownerId: v.string(),
+    friendId: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"]) 
+    .index("by_owner_friend", ["ownerId", "friendId"]),
+
+  // Direct messages duplicated per owner for efficient per-user queries
+  dm_messages: defineTable({
+    ownerId: v.string(),
+    peerId: v.string(),
+    senderId: v.string(),
+    content: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_owner_peer_createdAt", ["ownerId", "peerId", "createdAt"]) 
+    .index("by_owner_createdAt", ["ownerId", "createdAt"]),
 });
 
