@@ -24,8 +24,8 @@ const EVT_USER_MODE = 'FYOS_USER_MODE'
 
 const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: 16, startY: 52, maxPerCol: 6 }
 
-// Reserved sidebar width for the new left app list
-const SIDEBAR_WIDTH = 96
+// Reserved sidebar width for the new left app list (disabled)
+const SIDEBAR_WIDTH = 0
 
 type Geometry = { left: number; top: number; width: number; height: number }
 type SnapZoneId =
@@ -1063,62 +1063,47 @@ export default function Desktop(){
         </div>
       )}
 
-      {/* Sidebar */}
-      <aside
-        className="desktop-sidebar"
-        style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: SIDEBAR_WIDTH, paddingTop: 12 }}
-        aria-label="Applications"
-      >
-        <nav>
-          {(appOrder.length ? appOrder : apps.map(a=>a.id)).map(id => {
-            const a = appsByIdRef.current[id]
-            if (!a) return null
-            const isOpen = open.some(w => w.id === id)
-            return (
-              <div
-                key={id}
-                role="button"
-                tabIndex={0}
-                draggable
-                onDragStart={e=>{ try { e.dataTransfer?.setData('text/plain', id) } catch {} }}
-                onDragOver={e=>{ e.preventDefault() }}
-                onDrop={e=>{ e.preventDefault(); const fromId = e.dataTransfer?.getData('text/plain') || ''; if (fromId) {
-                  if (fromId !== id) {
-                    setAppOrder(prev => {
-                      const base = prev.length ? prev.slice() : apps.map(x=>x.id)
-                      const fromIdx = base.indexOf(fromId)
-                      const toIdx = base.indexOf(id)
-                      if (fromIdx < 0 || toIdx < 0) return prev
-                      base.splice(fromIdx, 1)
-                      base.splice(toIdx, 0, fromId)
-                      saveAppOrder(base)
-                      return base
-                    })
-                  }
-                } }}
-                onClick={()=> launch(a)}
-                onKeyDown={e=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); launch(a) } }}
-                className={`sidebar-item${isOpen?' active':''}`}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 10px',
-                  margin: '0 6px 4px 6px', borderRadius: 8,
-                  background: isOpen?'rgba(0,0,0,0.06)':'transparent'
-                }}
-              >
-                <span aria-hidden style={{ width: 28, textAlign: 'center' }}>{a.icon ?? '📦'}</span>
-                <span style={{ fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</span>
-              </div>
-            )
-          })}
-        </nav>
-      </aside>
+      {/* Sidebar removed */}
 
       <div ref={overlayRef} className="snap-overlay" aria-hidden style={{display:'none'}}>
         <div ref={previewRef} className="snap-preview" />
       </div>
 
+      {/* Center brand (offset upward to account for bottom agent bar) */}
+      <div className="center-brand" aria-hidden={open.length > 0}>
+        <div className="brand-text">fromyou</div>
+      </div>
+
       {/* Main desktop area (windows); icons grid removed */}
-      <div className="desktop-main" style={{ marginLeft: SIDEBAR_WIDTH }} />
+      <div className="desktop-main" />
+
+      {/* Desktop icons grid (draggable) */}
+      <div className="desktop-icons" aria-label="Desktop icons">
+        {(appOrder.length ? appOrder : apps.map(a=>a.id)).map(id => {
+          const a = appsByIdRef.current[id]
+          if (!a) return null
+          const p = iconPositions[id] || { left: 16, top: 52 }
+          return (
+            <div
+              key={id}
+              className={`desktop-icon`}
+              style={{ left: p.left, top: p.top }}
+              onMouseDown={(e)=>{
+                e.preventDefault()
+                const cur = iconPositions[id] || { left: 16, top: 52 }
+                dragIconRef.current = { id, startX: e.clientX, startY: e.clientY, startLeft: cur.left, startTop: cur.top, dragging: false }
+              }}
+              onClick={()=>{
+                if (suppressClickRef.current.has(id)) return
+                launch(a)
+              }}
+            >
+              <div className="glyph">{a.icon ?? '📦'}</div>
+              <div style={{ marginTop: 6, fontSize: 11, color: '#e5e7eb', textAlign: 'center', maxWidth: 64, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
+            </div>
+          )
+        })}
+      </div>
 
       {open.map((app, idx) => {
         const tabsState = windowTabs[app.id] || { activeTabId: '', tabs: [] };

@@ -483,6 +483,11 @@ export default function Document() {
           // Forward app runtime errors from app iframes to the host diagnostic bus
           if (event.data && event.data.type === 'APP_RUNTIME_ERROR') {
             try {
+              const suppressUntil = (window as any).__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL as number | undefined;
+              if (typeof suppressUntil === 'number' && Date.now() < suppressUntil) {
+                // Suppress transient preview errors during controlled operations (e.g., undo restore)
+                return;
+              }
               const d = event.data as any;
               const title = 'App Runtime Error';
               const description = d?.message || 'Unknown app error';
@@ -497,6 +502,11 @@ export default function Document() {
           // Optionally surface app console errors as diagnostics (warnings ignored)
           if (event.data && event.data.type === 'APP_CONSOLE') {
             try {
+              const suppressUntil = (window as any).__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL as number | undefined;
+              if (typeof suppressUntil === 'number' && Date.now() < suppressUntil) {
+                // Suppress transient preview console errors during controlled operations (e.g., undo restore)
+                return;
+              }
               const d = event.data as any;
               if (d?.level === 'error') {
                 const loc = `${d?.pathname || ''}${d?.search || ''}${d?.hash || ''}`;

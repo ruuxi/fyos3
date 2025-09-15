@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { Search, RotateCcw } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useWebContainer } from './WebContainerProvider';
 import { useScreens } from './ScreensProvider';
 import { formatBytes } from '@/lib/agent/agentUtils';
@@ -181,6 +181,8 @@ export default function AIAgentBar() {
       if (!inst) return;
       if (stack.length < 2) return;
       try {
+        // Temporarily suppress preview errors during restore to avoid false alarms
+        try { (window as any).__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL = Date.now() + 1500; } catch {}
         // Drop the current snapshot and restore the previous
         stack.pop();
         const prev = stack[stack.length - 1];
@@ -189,6 +191,9 @@ export default function AIAgentBar() {
         console.log('↩️ [UNDO] Restored previous snapshot. Depth:', stack.length);
       } catch (e) {
         console.error('[UNDO] Restore failed', e);
+      } finally {
+        // Clear suppression shortly after
+        setTimeout(() => { try { (window as any).__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL = 0; } catch {} }, 1600);
       }
     };
   }, []);
@@ -368,22 +373,7 @@ export default function AIAgentBar() {
           onVisit={() => setMode('visit')}
           onMedia={() => setMode('media')}
         />
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-none text-white hover:bg-white/10 disabled:opacity-40"
-                onClick={() => { void handleUndo(); }}
-                disabled={!(undoDepth > 1 && status === 'ready')}
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent className="rounded-none">Undo last agent changes</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        {/* Left Undo removed */}
         <div className="flex-1 relative">
           <Search className="absolute left-16 top-1/2 -translate-y-1/2 h-4 w-4 text-white" />
           <ChatComposer
@@ -397,6 +387,8 @@ export default function AIAgentBar() {
             onStop={() => stop()}
             onFocus={() => setMode('chat')}
             uploadBusy={busyFlags.uploadBusy}
+            canUndo={undoDepth > 1}
+            onUndo={handleUndo}
           />
         </div>
       </div>
@@ -506,3 +498,4 @@ export default function AIAgentBar() {
     </AgentBarShell>
   );
 }
+

@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Paperclip, Send, X, FileAudio2, FileText, File as FileIcon } from 'lucide-react';
+import { Paperclip, Send, X, FileAudio2, FileText, File as FileIcon, RotateCcw } from 'lucide-react';
 
 export type Attachment = { name: string; publicUrl: string; contentType: string };
 
@@ -15,10 +15,12 @@ export type ChatComposerProps = {
   onStop: () => void;
   onFocus?: () => void;
   uploadBusy?: boolean;
+  canUndo?: boolean;
+  onUndo?: () => void;
 };
 
 export default function ChatComposer(props: ChatComposerProps) {
-  const { input, setInput, status, attachments, removeAttachment, onSubmit, onFileSelect, onStop, onFocus, uploadBusy } = props;
+  const { input, setInput, status, attachments, removeAttachment, onSubmit, onFileSelect, onStop, onFocus, uploadBusy, canUndo, onUndo } = props;
   return (
     <form onSubmit={onSubmit}>
       <div className="flex items-center gap-2">
@@ -68,7 +70,7 @@ export default function ChatComposer(props: ChatComposerProps) {
             value={input}
             onFocus={onFocus}
             onChange={e => setInput(e.target.value)}
-            placeholder="Ask the AI agent… Try: 'Create a Notes app, Change my background!'"
+            placeholder="'Create a Notes app, Change my background!'"
             className="pl-24 pr-12 h-10 min-h-0 py-2 resize-none rounded-none bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none text-white placeholder:text-white/60 caret-sky-300 text-base leading-6"
             rows={1}
             disabled={status === 'submitted' || status === 'streaming'}
@@ -101,7 +103,20 @@ export default function ChatComposer(props: ChatComposerProps) {
               </label>
             </Button>
           </div>
-          <Button type="submit" disabled={!input.trim() || status !== 'ready' || !!uploadBusy} size="sm" className="h-10 rounded-none text-white hover:bg-white/10">
+          {canUndo && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-10 rounded-none text-white hover:bg-white/10"
+              onClick={onUndo}
+              disabled={status !== 'ready'}
+              aria-label="Undo last agent changes"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </Button>
+          )}
+          <Button type="submit" disabled={!input.trim() || status !== 'ready' || !!uploadBusy} size="sm" variant="ghost" className="h-10 rounded-none text-white hover:bg-white/10">
             <Send className="w-4 h-4" />
           </Button>
         </div>
