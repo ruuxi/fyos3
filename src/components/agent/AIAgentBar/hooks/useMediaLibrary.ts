@@ -154,23 +154,35 @@ export function useMediaLibrary(): UseMediaLibraryState {
     const trimmed = (url || '').trim();
     if (!trimmed) return;
     setUploadBusy(true); setUploadError(null);
+    // Add immediately so the chat can reference the URL even if ingest fails
+    const name = trimmed.split('/').pop() || 'link';
+    const inferred = guessContentTypeFromFilename(name);
+    let attachIndex = -1;
+    setAttachments(prev => {
+      const next = prev.slice();
+      next.push({ name, publicUrl: trimmed, contentType: inferred });
+      attachIndex = next.length - 1;
+      return next;
+    });
     try {
       const res = await fetch('/api/media/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceUrl: trimmed }) });
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        throw new Error(text || `Ingest failed (${res.status})`);
-      }
-      try {
+      if (res.ok) {
         const result = await res.json();
-        const name = trimmed.split('/').pop() || 'link';
-        const inferred = guessContentTypeFromFilename(name);
-        setAttachments(prev => [...prev, { name, publicUrl: result.publicUrl || trimmed, contentType: result.contentType || inferred }]);
-      } catch {
-        const name = trimmed.split('/').pop() || 'link';
-        setAttachments(prev => [...prev, { name, publicUrl: trimmed, contentType: guessContentTypeFromFilename(name) }]);
+        setAttachments(prev => {
+          const next = prev.slice();
+          if (attachIndex >= 0 && attachIndex < next.length) {
+            next[attachIndex] = { name, publicUrl: result.publicUrl || trimmed, contentType: result.contentType || inferred };
+          }
+          return next;
+        });
+        await loadMedia();
+      } else {
+        // Leave the original URL in place; record error for UI
+        const text = await res.text().catch(() => '');
+        setUploadError(text || `Ingest failed (${res.status})`);
       }
-      await loadMedia();
     } catch (e: any) {
+      // Leave the original URL; just record the error
       setUploadError(e?.message || 'Ingest failed');
     } finally {
       setUploadBusy(false);
