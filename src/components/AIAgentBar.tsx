@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Undo2 } from 'lucide-react';
 import { useWebContainer } from './WebContainerProvider';
 import { useScreens } from './ScreensProvider';
 import { formatBytes } from '@/lib/agent/agentUtils';
@@ -398,8 +398,6 @@ export default function AIAgentBar() {
             onStop={() => stop()}
             onFocus={() => setMode('chat')}
             uploadBusy={busyFlags.uploadBusy}
-            canUndo={undoDepth > 1}
-            onUndo={handleUndo}
           />
         </div>
       </div>
@@ -418,7 +416,7 @@ export default function AIAgentBar() {
     >
       <div className="bg-transparent text-white">
         {mode === 'chat' && (
-          <div className="px-4 pt-3">
+          <div className="px-4 pt-3 relative">
             <ChatTabs
               threads={threads}
               threadsLoading={threadsLoading}
@@ -442,6 +440,16 @@ export default function AIAgentBar() {
               lastSentAttachments={lastSentAttachments || undefined}
               activeThreadId={activeThreadId || undefined}
             />
+            {status === 'ready' && undoDepth > 1 && (
+              <button
+                onClick={handleUndo}
+                className="absolute right-6 bottom-2 z-40 p-3 text-white/70 hover:text-white transition-colors flex items-center gap-2"
+                title="Undo changes"
+              >
+                <Undo2 className="h-4 w-4" />
+                <span className="text-sm">undo</span>
+              </button>
+            )}
             <style jsx>{`
               .ios-pop { animation: iosPop 420ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: bottom left; }
               @keyframes iosPop {
