@@ -1004,6 +1004,15 @@ export default function Desktop(){
     function onMessage(e: MessageEvent){
       const d: any = (e as any).data
       if (!d) return
+      if (d.type === 'FYOS_AGENT_RUN_STARTED' || d.type === 'FYOS_AGENT_RUN_ENDED') {
+        try {
+          const frames = Array.from(document.querySelectorAll('iframe')) as HTMLIFrameElement[]
+          frames.forEach(f => {
+            try { f.contentWindow?.postMessage(d, '*') } catch {}
+          })
+        } catch {}
+        return
+      }
       if (d.type === EVT_USER_MODE) {
         try { const mode = d?.payload?.mode; if (mode === 'auth' || mode === 'anon') setUserMode(mode) } catch {}
         return

@@ -156,7 +156,16 @@ export default function AIAgentBar() {
   useEffect(() => {
     const prev = prevStatusRef.current;
     const now = status;
+    const started = (prev === 'ready') && (now === 'submitted' || now === 'streaming');
     const finished = (prev === 'submitted' || prev === 'streaming') && now === 'ready';
+    // Signal run start when status transitions out of ready
+    if (started) {
+      try { window.postMessage({ type: 'FYOS_AGENT_RUN_STARTED' }, '*'); } catch {}
+    }
+    // Signal run end to preview so HMR can resume and apply once done
+    if (finished) {
+      try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
+    }
     if (finished && fsChangedRef.current && instanceRef.current) {
       (async () => {
         try {
@@ -301,6 +310,8 @@ export default function AIAgentBar() {
     if (!input.trim()) return;
     forceFollow();
     let userText = input;
+    // Signal run start to preview so HMR pauses during multi-step edits
+    try { window.postMessage({ type: 'FYOS_AGENT_RUN_STARTED' }, '*'); } catch {}
     // Ensure we pick up durable URLs if ingestion just finished
     const waitForDurable = async (timeoutMs = 6000, intervalMs = 80) => {
       const started = Date.now();

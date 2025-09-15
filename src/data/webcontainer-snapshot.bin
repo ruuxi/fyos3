@@ -1,4 +1,4 @@
-Å°dç®app.htmlÅ°fÅ°c≈%r<!doctype html>
+Å°dç®app.htmlÅ°fÅ°c≈'¬<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -209,15 +209,24 @@
         }
       }
 
-      // HMR anti-flash inside app iframe
+      // HMR anti-flash + gating inside app iframe
       try {
         const mask = document.getElementById('vite-hmr-mask')
         const show = () => { if (mask) { mask.style.opacity = '.9' } }
         const hideSoon = () => { setTimeout(() => { if (mask) mask.style.opacity = '0' }, 120) }
         if (import.meta && import.meta.hot) {
-          import.meta.hot.on('vite:beforeUpdate', show)
-          import.meta.hot.on('vite:afterUpdate', hideSoon)
-          import.meta.hot.on('full-reload', show)
+          // Gating: drop HMR updates while paused; resume on run end with a reload
+          let paused = false
+          window.addEventListener('message', (e) => {
+            try {
+              if (!e || !e.data || typeof e.data.type !== 'string') return
+              if (e.data.type === 'FYOS_AGENT_RUN_STARTED') paused = true
+              if (e.data.type === 'FYOS_AGENT_RUN_ENDED') { paused = false; location.reload() }
+            } catch {}
+          })
+          import.meta.hot.on('vite:beforeUpdate', (payload) => { if (paused) return; show() })
+          import.meta.hot.on('vite:afterUpdate', (payload) => { if (paused) return; hideSoon() })
+          import.meta.hot.on('full-reload', (payload) => { if (paused) return; show() })
         }
       } catch {}
     </script>
@@ -3715,7 +3724,7 @@ const Textarea = React.forwardRef<
 Textarea.displayName = "Textarea"
 
 export { Textarea }
-ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈«import React, { useEffect, useRef, useState } from 'react'
+ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈∑nimport React, { useEffect, useRef, useState } from 'react'
 
 // Shared constants
 const DEFAULT_WINDOW_POS = { left: 90, top: 90 }
@@ -3867,7 +3876,6 @@ interface WindowProps {
   onNewTab: () => void
   onOpenAppInTab: (tabId: string, app: App) => void
   availableApps: App[]
-  onDialOpen: (x: number, y: number) => void
 }
 
 // Top menubar removed
@@ -3885,7 +3893,7 @@ function LauncherGrid({ apps, onPick }: { apps: App[]; onPick: (a: App) => void 
   );
 }
 
-function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, tabs, activeTabId, onTabActivate, onTabClose, onNewTab, onOpenAppInTab, availableApps, onDialOpen }: WindowProps){
+function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, tabs, activeTabId, onTabActivate, onTabClose, onNewTab, onOpenAppInTab, availableApps }: WindowProps){
   const rootRef = useRef<HTMLDivElement | null>(null)
   const rafIdRef = useRef<number | null>(null)
   const draggingRef = useRef<{
@@ -4087,17 +4095,8 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
   const isBlank = !activeTab || !activeTab.appId;
   const iframeSrc = !isBlank ? `/app.html?path=${encodeURIComponent(activeTab.path||'')}&id=${encodeURIComponent(activeTab.appId||'')}&name=${encodeURIComponent(activeTab.title)}&base=0&ui=1&tw=1` : '';
 
-  function handleContextMenu(e: React.MouseEvent){
-    try { e.preventDefault(); e.stopPropagation(); onDialOpen(e.clientX, e.clientY) } catch {}
-  }
-  function handleMouseDown(e: React.MouseEvent){
-    if (e.button === 2){
-      try { e.preventDefault(); e.stopPropagation(); onDialOpen(e.clientX, e.clientY) } catch {}
-    }
-  }
-
   return (
-    <div ref={rootRef} className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex, background: 'rgba(12,18,36,0.10)' }} onMouseDown={(e)=>{ onFocus(); handleMouseDown(e) }} onContextMenu={handleContextMenu}>
+    <div ref={rootRef} className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex, background: 'rgba(12,18,36,0.10)' }} onMouseDown={onFocus}>
       <nav className="tabstrip" role="tablist" aria-label="Tabs" onMouseDown={startMove}>
         {tabs.map((t) => (
           <button key={t.id} role="tab" aria-selected={t.id===activeTabId}
@@ -4134,9 +4133,6 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
             src={iframeSrc}
             style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'transparent' }}
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads"
-            data-app-id={app.id}
-            onMouseDown={(e)=>{ if ((e as any).button === 2) { try { e.preventDefault(); e.stopPropagation(); onDialOpen(e.clientX, e.clientY) } catch {} } }}
-            onContextMenu={(e) => { try { e.preventDefault(); e.stopPropagation(); onDialOpen(e.clientX, e.clientY) } catch {} }}
             onError={(e) => {
               console.warn('Iframe error for app:', activeTab.title, e);
             }}
@@ -4734,6 +4730,15 @@ export default function Desktop(){
     function onMessage(e: MessageEvent){
       const d: any = (e as any).data
       if (!d) return
+      if (d.type === 'FYOS_AGENT_RUN_STARTED' || d.type === 'FYOS_AGENT_RUN_ENDED') {
+        try {
+          const frames = Array.from(document.querySelectorAll('iframe')) as HTMLIFrameElement[]
+          frames.forEach(f => {
+            try { f.contentWindow?.postMessage(d, '*') } catch {}
+          })
+        } catch {}
+        return
+      }
       if (d.type === EVT_USER_MODE) {
         try { const mode = d?.payload?.mode; if (mode === 'auth' || mode === 'anon') setUserMode(mode) } catch {}
         return
@@ -4778,63 +4783,6 @@ export default function Desktop(){
   const wallpaperStyle: React.CSSProperties = theme?.mode === 'gradient'
     ? { background: theme.value }
     : { backgroundImage: `url(${theme?.value || '/2.webp'})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }
-
-  // Radial dial state
-  const [dial, setDial] = useState<{ open: boolean; x: number; y: number; windowId: string | null }>(() => ({ open: false, x: 0, y: 0, windowId: null }))
-  const dialRef = useRef<HTMLDivElement | null>(null)
-
-  function openDial(x: number, y: number, windowId: string | null){
-    setDial({ open: true, x, y, windowId })
-  }
-  function closeDial(){ setDial(prev => ({ ...prev, open: false })) }
-
-  // Close dial on global left-click or Escape
-  useEffect(()=>{
-    function onDown(e: MouseEvent){ try { if (!(e as any).dial) closeDial() } catch {} }
-    function onKey(e: KeyboardEvent){ if ((e.key||'').toLowerCase() === 'escape') closeDial() }
-    window.addEventListener('mousedown', onDown)
-    window.addEventListener('keydown', onKey)
-    return ()=>{ window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
-  }, [])
-
-  // Gesture tracking for dial selection
-  const dialGestureRef = useRef<{ startX: number; startY: number; selected: number | null }>({ startX: 0, startY: 0, selected: null })
-  function onDialMouseDown(e: React.MouseEvent){ (e as any).dial = true; dialGestureRef.current.startX = e.clientX; dialGestureRef.current.startY = e.clientY }
-  function onDialMouseMove(e: React.MouseEvent){
-    (e as any).dial = true
-    if (!dial.open) return
-    const dx = e.clientX - dial.x
-    const dy = e.clientY - dial.y
-    const angle = Math.atan2(dy, dx) // -PI..PI
-    // Map angle to 5 sectors; start at -PI/2 upwards, clockwise
-    const rot = angle + Math.PI/2
-    let sector = Math.floor(((rot<0?rot+2*Math.PI:rot) / (2*Math.PI)) * 5)
-    if (sector < 0) sector = 0; if (sector > 4) sector = 4
-    dialGestureRef.current.selected = sector
-    try {
-      const el = dialRef.current
-      if (el){ el.setAttribute('data-selected', String(sector)) }
-    } catch {}
-  }
-  function onDialMouseUp(e: React.MouseEvent){
-    (e as any).dial = true
-    if (!dial.open) return
-    const sel = dialGestureRef.current.selected
-    const id = dial.windowId
-    closeDial()
-    if (sel == null || !id) return
-    // 0: close, 1: maximize, 2: minimize, 3: new tab, 4: open chat
-    switch(sel){
-      case 0: close(id); break
-      case 1: {
-        try { const vw = window.innerWidth; const vh = window.innerHeight; const M = 12; const left = M; const top = M; const width = Math.max(0, vw - (M*2)); const height = Math.max(0, vh - (M*2)); updateWindow(id, { left, top }); updateWindow(id, { width, height }); } catch {}
-        break
-      }
-      case 2: minimize(id); break
-      case 3: addTab(id); break
-      case 4: try { window.parent?.postMessage({ type: 'FYOS_OPEN_CHAT' }, '*') } catch {} break
-    }
-  }
 
   return (
     <div className="desktop" style={{ background: 'transparent', color: 'inherit' }}>
@@ -4911,34 +4859,13 @@ export default function Desktop(){
             onNewTab={()=>addTab(app.id)}
             onOpenAppInTab={(tabId, a)=>openAppIntoTab(app.id, tabId, a)}
             availableApps={apps}
-            onDialOpen={(x, y)=> openDial(x, y, app.id)}
           />
         );
       })}
-
-      {/* Radial Dial */}
-      {dial.open && (
-        <div
-          ref={dialRef}
-          className="dial"
-          style={{ position:'fixed', left: dial.x, top: dial.y, transform:'translate(-50%,-50%)', zIndex: 2147482000 }}
-          onMouseDown={onDialMouseDown}
-          onMouseMove={onDialMouseMove}
-          onMouseUp={onDialMouseUp}
-          onContextMenu={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
-        >
-          <div className="dial-core" />
-          <div className="dial-sector s0" title="Close">√ó</div>
-          <div className="dial-sector s1" title="Maximize">‚ñ¢</div>
-          <div className="dial-sector s2" title="Minimize">‚Äì</div>
-          <div className="dial-sector s3" title="New Tab">+</div>
-          <div className="dial-sector s4" title="Open Chat">üí¨</div>
-        </div>
-      )}
     </div>
   )
 }
-™styles.cssÅ°fÅ°c≈0Ó/* Base variables and layout */
+™styles.cssÅ°fÅ°c≈*∂/* Base variables and layout */
 :root{--bar:#f6f6f6;--text:#f7fafc;--muted:#cbd5e1;--bg:#0b1020;--glass:rgba(255,255,255,0.25);--dock:rgba(255,255,255,0.3);
   /* Desktop gradient themes */
   --desktop-gradient-1: linear-gradient(180deg, #0b1020 0%, #1e2760 60%, #462e7e 100%);
@@ -5092,20 +5019,6 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .app-chip:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,0.28);background:rgba(12,18,36,0.6)}
 .app-chip .ico{font-size:24px;line-height:1}
 .app-chip .lbl{margin-top:6px;font-size:12px;white-space:nowrap;max-width:84px;overflow:hidden;text-overflow:ellipsis}
-
-/* Radial Dial */
-.dial{width:184px;height:184px;border-radius:50%;position:fixed;display:grid;place-items:center;background:rgba(12,18,36,0.55);backdrop-filter:saturate(160%) blur(10px);-webkit-backdrop-filter:saturate(160%) blur(10px);border:1px solid rgba(255,255,255,0.18);box-shadow:0 14px 32px rgba(0,0,0,0.35)}
-.dial::before{content:"";position:absolute;left:50%;top:50%;width:2px;height:0;transform-origin:top;transform:translate(-50%,-50%);background:#38bdf8;box-shadow:0 0 8px rgba(56,189,248,0.6);transition:height .06s linear}
-.dial[data-selected]::before{height:80px}
-.dial-core{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.24)}
-.dial-sector{position:absolute;width:64px;height:64px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#f7fafc;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.16);transition:transform .12s ease, background .12s ease, box-shadow .12s ease}
-.dial-sector:hover{background:rgba(255,255,255,0.14)}
-.dial[data-selected="0"] .s0,.dial[data-selected="1"] .s1,.dial[data-selected="2"] .s2,.dial[data-selected="3"] .s3,.dial[data-selected="4"] .s4{background:rgba(56,189,248,0.22);box-shadow:0 6px 18px rgba(56,189,248,0.35)}
-.dial .s0{left:50%;top:4px;transform:translate(-50%,0)}
-.dial .s1{right:4px;top:50%;transform:translate(0,-50%)}
-.dial .s2{left:50%;bottom:4px;transform:translate(-50%,0)}
-.dial .s3{left:4px;top:50%;transform:translate(0,-50%)}
-.dial .s4{left:50%;top:50%;transform:translate(-50%,-50%) scale(0.68)}
 Æiframe-root.jsÅ°fÅ°c≈ˆimport React, { StrictMode } from 'react'
 import { createRoot as createReactRoot } from 'react-dom/client'
 

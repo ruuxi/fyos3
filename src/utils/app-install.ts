@@ -96,10 +96,7 @@ export async function installAppFromBundle(instance: WebContainerAPI, bundleByte
     }
   }
 
-  // Auto-open app on desktop
-  try {
-    (window as any).parent?.postMessage({ type: 'FYOS_OPEN_APP', app: entry }, '*');
-  } catch {}
+  // Auto-open removed; the app will appear in registry and can be launched by the user
 
   return { id: targetId, entry };
 }

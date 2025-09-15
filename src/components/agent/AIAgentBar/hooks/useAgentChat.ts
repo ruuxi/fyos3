@@ -330,12 +330,8 @@ export function useAgentChat(opts: UseAgentChatOptions) {
               await fnsRef.current.writeFile(`${base}/styles.css`, appStylesCss);
               registry.push({ id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` });
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
-              try {
-                const appIndexPath = `/${base}/index.tsx`;
-                if (typeof window !== 'undefined') {
-                  window.postMessage({ type: 'FYOS_OPEN_APP', delayMs: 2000, app: { id: finalId, name: finalName, icon: metadata.icon, path: appIndexPath } }, '*');
-                }
-              } catch {}
+              // Auto-open of newly created app has been removed to avoid mid-run UI changes
+              // The desktop will reflect the new app via registry refresh.
               addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, id: finalId, name: finalName, base } });
               break;
             }

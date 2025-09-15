@@ -209,15 +209,24 @@
         }
       }
 
-      // HMR anti-flash inside app iframe
+      // HMR anti-flash + gating inside app iframe
       try {
         const mask = document.getElementById('vite-hmr-mask')
         const show = () => { if (mask) { mask.style.opacity = '.9' } }
         const hideSoon = () => { setTimeout(() => { if (mask) mask.style.opacity = '0' }, 120) }
         if (import.meta && import.meta.hot) {
-          import.meta.hot.on('vite:beforeUpdate', show)
-          import.meta.hot.on('vite:afterUpdate', hideSoon)
-          import.meta.hot.on('full-reload', show)
+          // Gating: drop HMR updates while paused; resume on run end with a reload
+          let paused = false
+          window.addEventListener('message', (e) => {
+            try {
+              if (!e || !e.data || typeof e.data.type !== 'string') return
+              if (e.data.type === 'FYOS_AGENT_RUN_STARTED') paused = true
+              if (e.data.type === 'FYOS_AGENT_RUN_ENDED') { paused = false; location.reload() }
+            } catch {}
+          })
+          import.meta.hot.on('vite:beforeUpdate', (payload) => { if (paused) return; show() })
+          import.meta.hot.on('vite:afterUpdate', (payload) => { if (paused) return; hideSoon() })
+          import.meta.hot.on('full-reload', (payload) => { if (paused) return; show() })
         }
       } catch {}
     </script>

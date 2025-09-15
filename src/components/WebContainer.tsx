@@ -121,6 +121,37 @@ export default function WebContainer() {
                   window.top?.postMessage({ type: 'APP_RUNTIME_ERROR', message: String(e?.reason?.message || e?.reason || 'Unhandled promise rejection'), stack: String((e?.reason && e.reason.stack) || ''), pathname: location.pathname, search: location.search, hash: location.hash }, '*');
                 } catch {}
               }, true);
+
+              // HMR gating: pause Vite HMR updates during agent runs and only apply after end
+              try {
+                window.__FYOS_HMR_PAUSED = false;
+                const origDispatch = WebSocket.prototype.dispatchEvent;
+                WebSocket.prototype.dispatchEvent = function(evt){
+                  try {
+                    if (window.__FYOS_HMR_PAUSED && evt && evt.type === 'message') {
+                      const data = evt && evt.data;
+                      const txt = typeof data === 'string' ? data : (data ? String(data) : '');
+                      if (txt && (txt.indexOf('"type":"update"') !== -1 || txt.indexOf('"type":"full-reload"') !== -1)) {
+                        // Drop HMR update while paused
+                        return true;
+                      }
+                    }
+                  } catch {}
+                  return origDispatch.call(this, evt);
+                };
+                window.addEventListener('message', (e) => {
+                  try {
+                    if (!e || !e.data || typeof e.data.type !== 'string') return;
+                    if (e.data.type === 'FYOS_AGENT_RUN_STARTED') {
+                      window.__FYOS_HMR_PAUSED = true;
+                    } else if (e.data.type === 'FYOS_AGENT_RUN_ENDED') {
+                      window.__FYOS_HMR_PAUSED = false;
+                      // Apply all changes at once
+                      try { location.reload(); } catch {}
+                    }
+                  } catch {}
+                });
+              } catch {}
             } catch {}
           })();`;
           try { await (instance as any).setPreviewScript?.(script); } catch {}
@@ -514,6 +545,15 @@ export default function Document() {
                 const detail = { source: 'preview' as const, title: 'App Console Error', description: msg, content: `Console error at ${loc}\n\n${msg}` };
                 window.dispatchEvent(new CustomEvent('wc-preview-error', { detail }));
               }
+            } catch {}
+            return;
+          }
+
+          // Forward agent run gating to preview iframe (Desktop) so it can propagate to apps
+          if (event.data && (event.data.type === 'FYOS_AGENT_RUN_STARTED' || event.data.type === 'FYOS_AGENT_RUN_ENDED')) {
+            try {
+              const target = iframeRef.current?.contentWindow;
+              if (target) { target.postMessage(event.data, '*'); }
             } catch {}
             return;
           }
