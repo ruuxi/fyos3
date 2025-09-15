@@ -1,4 +1,5 @@
 import React from 'react'
+import { useAuth } from '@clerk/nextjs'
 
 type MediaItem = {
   _id: string
@@ -20,6 +21,7 @@ function formatBytes(n?: number) {
 }
 
 export default function App(){
+  const { isSignedIn, isLoaded } = useAuth()
   const [items, setItems] = React.useState<MediaItem[]>([])
   const [type, setType] = React.useState<string>('')
   const [loading, setLoading] = React.useState(false)
@@ -28,6 +30,12 @@ export default function App(){
   async function load() {
     setLoading(true); setError(null)
     try {
+      // Only attempt to load media if user is authenticated
+      if (!isSignedIn) {
+        setItems([])
+        return
+      }
+      
       const params = new URLSearchParams()
       if (type) params.set('type', type)
       params.set('limit', '10')
@@ -41,7 +49,11 @@ export default function App(){
     }
   }
 
-  React.useEffect(()=>{ void load() }, [type])
+  React.useEffect(()=>{ 
+    if (isLoaded) {
+      void load() 
+    }
+  }, [type, isSignedIn, isLoaded])
 
   return (
     <div className="h-full overflow-auto">
@@ -60,7 +72,13 @@ export default function App(){
       <div className="p-3 space-y-3">
         {loading && <div className="text-sm text-gray-500">Loading…</div>}
         {error && <div className="text-sm text-red-600">{error}</div>}
-        {!loading && !error && items.length === 0 && (
+        {!loading && !error && !isSignedIn && isLoaded && (
+          <div className="text-sm text-gray-600 text-center py-8">
+            <div className="mb-2">🔒</div>
+            <div>Please sign in to view your media files.</div>
+          </div>
+        )}
+        {!loading && !error && isSignedIn && items.length === 0 && (
           <div className="text-sm text-gray-600">No media found.</div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
