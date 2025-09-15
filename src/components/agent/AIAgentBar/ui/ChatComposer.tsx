@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Paperclip, Send, X, FileAudio2, FileText, File as FileIcon, RotateCcw } from 'lucide-react';
+import { Paperclip, Send, X, FileAudio2, FileText, File as FileIcon, RotateCcw, Square } from 'lucide-react';
 
 export type Attachment = { name: string; publicUrl: string; contentType: string };
 
@@ -17,10 +17,14 @@ export type ChatComposerProps = {
   uploadBusy?: boolean;
   canUndo?: boolean;
   onUndo?: () => void;
+  placeholderWord?: string;
+  showAnimatedPlaceholder?: boolean;
+  placeholderTheme?: 'blue' | 'red' | 'orange' | 'green';
+  magicWord?: string;
 };
 
 export default function ChatComposer(props: ChatComposerProps) {
-  const { input, setInput, status, attachments, removeAttachment, onSubmit, onFileSelect, onStop, onFocus, uploadBusy, canUndo, onUndo } = props;
+  const { input, setInput, status, attachments, removeAttachment, onSubmit, onFileSelect, onStop, onFocus, uploadBusy, canUndo, onUndo, placeholderWord, showAnimatedPlaceholder, placeholderTheme, magicWord } = props;
   return (
     <form onSubmit={onSubmit}>
       <div className="flex items-center gap-2">
@@ -73,7 +77,7 @@ export default function ChatComposer(props: ChatComposerProps) {
             placeholder="'Create a Notes app, Change my background!'"
             className="pl-24 pr-12 h-10 min-h-0 py-2 resize-none rounded-none bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none text-white placeholder:text-white/60 caret-sky-300 text-base leading-6"
             rows={1}
-            disabled={status === 'submitted' || status === 'streaming'}
+            disabled={false}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -84,9 +88,67 @@ export default function ChatComposer(props: ChatComposerProps) {
         </div>
         <div className="flex items-center gap-2">
           {(status === 'submitted' || status === 'streaming') && (
-            <Button type="button" variant="ghost" size="sm" className="h-10 rounded-none" onClick={onStop}>
-              Stop
-            </Button>
+            <div className="flex items-center">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-10 rounded-none text-white hover:bg-white/10 flex items-center gap-2 relative"
+                onClick={onStop}
+                title="Stop"
+                aria-label="Stop"
+                style={{
+                  ['--bg-glow' as any]: placeholderTheme === 'red' ? 'rgba(244,63,94,0.15)'
+                    : placeholderTheme === 'orange' ? 'rgba(251,146,60,0.15)'
+                    : placeholderTheme === 'green' ? 'rgba(34,197,94,0.15)'
+                    : 'rgba(59,130,246,0.15)'
+                } as any}
+              >
+                {/* Background glow */}
+                <div className="absolute inset-0 rounded bg-glow opacity-80 animate-pulse" />
+                <span
+                  className="magic-stop text-base leading-6 select-none relative z-10"
+                  style={{
+                    ['--magic-c1' as any]: placeholderTheme === 'red' ? 'rgba(244,63,94,0.9)'
+                      : placeholderTheme === 'orange' ? 'rgba(251,146,60,0.9)'
+                      : placeholderTheme === 'green' ? 'rgba(34,197,94,0.9)'
+                      : 'rgba(59,130,246,0.9)',
+                    ['--magic-c2' as any]: placeholderTheme === 'red' ? 'rgba(244,63,94,1)'
+                      : placeholderTheme === 'orange' ? 'rgba(251,146,60,1)'
+                      : placeholderTheme === 'green' ? 'rgba(34,197,94,1)'
+                      : 'rgba(59,130,246,1)',
+                    ['--magic-c3' as any]: placeholderTheme === 'red' ? 'rgba(244,63,94,0.9)'
+                      : placeholderTheme === 'orange' ? 'rgba(251,146,60,0.9)'
+                      : placeholderTheme === 'green' ? 'rgba(34,197,94,0.9)'
+                      : 'rgba(59,130,246,0.9)'
+                  } as any}
+                >
+                  {(magicWord || 'Working').split('').map((ch, i) => (
+                    <span key={i} className="magic-stop-letter" style={{ ['--d' as any]: `${i * 55}ms` as any }}>{ch}</span>
+                  ))}
+                </span>
+                <Square className="w-4 h-4 relative z-10" />
+              </Button>
+              <style jsx>{`
+                .magic-stop { color: transparent; position: relative; }
+                .magic-stop .magic-stop-letter {
+                  background-image: linear-gradient(90deg, var(--magic-c1) 0%, var(--magic-c2) 50%, var(--magic-c3) 100%);
+                  -webkit-background-clip: text;
+                  background-clip: text;
+                  filter: drop-shadow(0 0 1rem rgba(255,255,255,0.7)) brightness(1.8) saturate(1.3);
+                  background-size: 220% 100%;
+                  animation: gloss 1400ms cubic-bezier(0.22, 1, 0.36, 1) infinite, float 2600ms ease-in-out infinite;
+                  animation-delay: var(--d), calc(var(--d) * 0.35);
+                  display: inline-block;
+                }
+                .bg-glow {
+                  background: var(--bg-glow);
+                  box-shadow: 0 0 20px var(--bg-glow), inset 0 0 10px var(--bg-glow);
+                }
+                @keyframes gloss { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+                @keyframes float { 0%, 100% { transform: translateY(0); opacity: 0.95 } 50% { transform: translateY(-1px); opacity: 1 } }
+              `}</style>
+            </div>
           )}
           <div className="relative">
             <input

@@ -13,6 +13,7 @@ export type MessagesPaneProps = {
   bubbleAnimatingIds: Set<string>;
   lastSentAttachments?: Array<{ name: string; publicUrl: string; contentType: string }>;
   activeThreadId?: string;
+  suppressAssistant?: boolean;
 };
 
 type AttachmentPreview = { name: string; publicUrl: string; contentType: string };
@@ -136,7 +137,7 @@ function renderAttachments(items: AttachmentPreview[]) {
 }
 
 export default function MessagesPane(props: MessagesPaneProps) {
-  const { messages, status, messagesContainerRef, messagesInnerRef, containerHeight, didAnimateWelcome, bubbleAnimatingIds, lastSentAttachments, activeThreadId } = props;
+  const { messages, status, messagesContainerRef, messagesInnerRef, containerHeight, didAnimateWelcome, bubbleAnimatingIds, lastSentAttachments, activeThreadId, suppressAssistant } = props;
   const { isAuthenticated } = useConvexAuth();
   const liveMedia = useQuery(
     convexApi.media.listMedia as any,
@@ -169,7 +170,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
             </div>
           </div>
         )}
-        {messages.map((m, idx) => {
+        {(suppressAssistant ? messages.filter(m => m.role !== 'assistant') : messages).map((m, idx) => {
           // Build content and collect any attachments referenced in text
           const textNodes: any[] = [];
           let collectedFromText: AttachmentPreview[] = [];

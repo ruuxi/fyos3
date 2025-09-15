@@ -126,6 +126,17 @@ export default function AIAgentBar() {
     getStatus: () => statusRef.current,
   });
 
+  // Magical words indicator state and helpers
+  const MAGIC_WORDS = useMemo(() => [
+    'gooping', 'gooning', 'magicking', 'imagining', 'sparkling', 'whirring', 'glitching', 'morphing', 'weaving', 'hatching',
+    'summoning', 'scribbling', 'cooking', 'zapping', 'whispering', 'bubbling', 'tinkering', 'tickling', 'twinkling', 'drifting',
+    'juggling', 'riffing', 'blooming', 'shimmering', 'swooshing', 'dreaming', 'warping', 'stitching', 'burbling', 'glooping',
+    'sparkplugging', 'spellweaving', 'sketchcasting', 'zapcrafting', 'fluxing', 'glowcoding', 'mindgardening', 'vibesmithing', 'fogweaving', 'glyphing',
+    'beamsurfing', 'notioning', 'musecalling', 'dayforging', 'pulsewriting', 'echoforming', 'holojamming', 'hyperknitting', 'ghostpainting', 'skylarking'
+  ], []);
+  const [magicWord, setMagicWord] = useState<string>('');
+  const agentActiveRef = useRef<boolean>(false);
+
   const { messages, sendMessage: sendMessageRaw, status, stop } = useAgentChat({
     id: chatSessionKey,
     initialMessages: initialChatMessages,
@@ -138,6 +149,12 @@ export default function AIAgentBar() {
     onFirstToolCall: () => {
       hmrGateActiveRef.current = true;
       try { window.postMessage({ type: 'FYOS_AGENT_RUN_STARTED' }, '*'); } catch {}
+      agentActiveRef.current = true;
+    },
+    onToolProgress: (toolName: string) => {
+      // Rotate the magical word when a tool starts
+      const idx = Math.floor(Math.random() * MAGIC_WORDS.length);
+      setMagicWord(MAGIC_WORDS[idx]);
     },
   });
 
@@ -180,11 +197,22 @@ export default function AIAgentBar() {
   useEffect(() => {
     const prev = prevStatusRef.current;
     const now = status;
+    const started = (prev === 'ready') && (now === 'submitted' || now === 'streaming');
     const finished = (prev === 'submitted' || prev === 'streaming') && now === 'ready';
+    // Reset first-tool-call gate at run start so subsequent runs can pause HMR again
+    if (started) {
+      try {
+        const ref: any = (window as any).__FYOS_FIRST_TOOL_CALLED_REF;
+        if (ref && typeof ref === 'object') ref.current = false;
+      } catch {}
+    }
     // Signal run end only if we actually paused during this run
     if (finished && hmrGateActiveRef.current) {
       try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
       hmrGateActiveRef.current = false;
+      // Reset magic word at run end
+      setMagicWord('');
+      agentActiveRef.current = false;
     }
     if (finished && fsChangedRef.current && instanceRef.current) {
       (async () => {
@@ -408,17 +436,25 @@ export default function AIAgentBar() {
           <Search className="absolute left-16 top-1/2 -translate-y-1/2 h-4 w-4 text-white" />
           {leftPane === 'agent' && (
             <ChatComposer
-            input={input}
-            setInput={setInput}
-            status={status}
-            attachments={attachments}
-            removeAttachment={removeAttachment}
-            onSubmit={onSubmit}
-            onFileSelect={handleUploadFiles}
-            onStop={() => stop()}
-            onFocus={() => setMode('chat')}
-            uploadBusy={busyFlags.uploadBusy}
-          />
+              input={input}
+              setInput={setInput}
+              status={status}
+              attachments={attachments}
+              removeAttachment={removeAttachment}
+              onSubmit={onSubmit}
+              onFileSelect={handleUploadFiles}
+              onStop={() => stop()}
+              onFocus={() => setMode('chat')}
+              uploadBusy={busyFlags.uploadBusy}
+              placeholderWord={magicWord}
+              showAnimatedPlaceholder={agentActiveRef.current}
+              placeholderTheme={(() => {
+                const palette = ['blue','red','orange','green'] as const;
+                const idx = Math.floor(Math.random() * palette.length);
+                return palette[idx];
+              })()}
+              magicWord={magicWord}
+            />
           )}
           {leftPane === 'friend' && (
             <ChatComposer
@@ -438,6 +474,17 @@ export default function AIAgentBar() {
       </div>
     </div>
   );
+
+  // Smoothly pulse the placeholder when status is streaming/submitted
+  useEffect(() => {
+    if (status === 'submitted' || status === 'streaming') return;
+    // If idle without a magic word, pick a playful default to entice typing
+    if (!magicWord) {
+      const idx = Math.floor(Math.random() * MAGIC_WORDS.length);
+      setMagicWord(MAGIC_WORDS[idx]);
+    }
+  }, [status, MAGIC_WORDS, magicWord]);
+
 
   return (
     <AgentBarShell
@@ -528,6 +575,7 @@ export default function AIAgentBar() {
                       bubbleAnimatingIds={bubbleAnimatingIds}
                       lastSentAttachments={lastSentAttachments || undefined}
                       activeThreadId={activeThreadId || undefined}
+                      suppressAssistant={true}
                     />
                   </>
                 )}

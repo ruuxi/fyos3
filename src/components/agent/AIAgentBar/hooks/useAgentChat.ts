@@ -26,6 +26,7 @@ type UseAgentChatOptions = {
   runValidation: (scope: 'quick' | 'full', files?: string[]) => Promise<void>;
   attachmentsProvider?: () => Array<{ name: string; publicUrl: string; contentType: string }>;
   onFirstToolCall?: () => void;
+  onToolProgress?: (toolName: string) => void;
 };
 
 export function useAgentChat(opts: UseAgentChatOptions) {
@@ -62,6 +63,14 @@ export function useAgentChat(opts: UseAgentChatOptions) {
         if (!firstToolCalledRef.current && typeof opts.onFirstToolCall === 'function') {
           firstToolCalledRef.current = true;
           opts.onFirstToolCall();
+        }
+      } catch {}
+
+      // Notify UI on each tool call to update progress indicator word
+      try {
+        if (typeof opts.onToolProgress === 'function') {
+          const name = (toolCall as any).toolName as string;
+          opts.onToolProgress(name);
         }
       } catch {}
 
