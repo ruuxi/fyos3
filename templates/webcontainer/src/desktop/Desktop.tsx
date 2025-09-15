@@ -28,22 +28,16 @@ const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: 16, startY: 52, maxPe
 const SIDEBAR_WIDTH = 0
 
 type Geometry = { left: number; top: number; width: number; height: number }
-type SnapZoneId =
-  | 'left-half' | 'right-half' | 'top-half' | 'bottom-half'
-  | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
-
-// Visual gap to keep from edges and between tiles
-const GAP = 16
 
 // Helpers
 function clampToViewport(left: number, top: number, width: number, height: number){
   const vw = window.innerWidth
   const vh = window.innerHeight
   // Enforce a consistent visual gap from all edges (instead of partial visibility)
-  const minLeft = GAP + SIDEBAR_WIDTH
-  const maxLeft = Math.max(GAP + SIDEBAR_WIDTH, vw - width - GAP)
-  const minTop = GAP
-  const maxTop = Math.max(GAP, vh - height - GAP)
+  const minLeft = 16 + SIDEBAR_WIDTH
+  const maxLeft = Math.max(16 + SIDEBAR_WIDTH, vw - width - 16)
+  const minTop = 16
+  const maxTop = Math.max(16, vh - height - 16)
   return {
     left: Math.min(Math.max(left, minLeft), maxLeft),
     top: Math.min(Math.max(top, minTop), maxTop)
@@ -232,12 +226,6 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
         d.curDx = dx
         d.curDy = dy
         scheduleApply()
-        // Broadcast for snap overlay
-        try {
-          const geom = resolveAppGeometry(app)
-          const pos = clampToViewport(geom.left + dx, geom.top + dy, geom.width, geom.height)
-          window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'move', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: { left: pos.left, top: pos.top, width: geom.width, height: geom.height }, altKey: e.altKey } }))
-        } catch {}
       } else if (d.type === 'resize'){
         const dx = e.clientX - d.startX
         const dy = e.clientY - d.startY
@@ -261,12 +249,9 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
         d.curWidth = newW
         d.curHeight = newH
         scheduleApply()
-        try {
-          window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'move', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: { left: pos.left, top: pos.top, width: newW, height: newH }, altKey: e.altKey } }))
-        } catch {}
       }
     }
-    function onUp(e: MouseEvent){
+    function onUp(){
       const d = draggingRef.current
       if (d.active && d.type){
         const isMove = d.type === 'move'
@@ -278,7 +263,6 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
           // Commit to React once
           onMove({ left: pos.left, top: pos.top })
           try { const el = rootRef.current; if (el){ el.style.transform = ''; } } catch {}
-          try { window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'end', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: { left: pos.left, top: pos.top, width: geom.width, height: geom.height } } })) } catch {}
         } else {
           const width = d.curWidth ?? d.startWidth
           const height = d.curHeight ?? d.startHeight
@@ -286,7 +270,6 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
           const top = d.curTop ?? d.startTop
           onMove({ left, top })
           onResize({ width, height })
-          try { window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'end', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: { left, top, width, height } } })) } catch {}
         }
         clearSelectionEverywhere()
         try{ rootRef.current?.classList.remove('resizing') } catch {}
@@ -326,7 +309,6 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
     try{ document.body.style.cursor = 'grabbing' } catch {}
     // Avoid costly selection updates during drag; clear once at start
     clearSelectionEverywhere()
-    try { window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'start', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: g } })) } catch {}
   }
 
   function startResize(handle: 'nw'|'ne'|'sw'|'se'){
@@ -356,7 +338,6 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
       } catch {}
       // Avoid costly selection updates during drag; clear once at start
       clearSelectionEverywhere()
-      try { window.dispatchEvent(new CustomEvent('FYOS_TILING', { detail: { phase: 'start', id: app.id, pointer: { x: e.clientX, y: e.clientY }, geom: g } })) } catch {}
     }
   }
   const classes = ['window']
@@ -570,16 +551,6 @@ export default function Desktop(){
     });
   }
 
-  const snapAltBypassRef = useRef(false)
-  const overlayRef = useRef<HTMLDivElement | null>(null)
-  const previewRef = useRef<HTMLDivElement | null>(null)
-  const snapAppIdRef = useRef<string | null>(null)
-  const currentZoneRef = useRef<SnapZoneId | null>(null)
-  const lastZoneSwitchTsRef = useRef<number>(0)
-  // Require a dwell period in a snap zone before arming snap
-  const SNAP_DWELL_MS = 1000
-  const zoneEnterTsRef = useRef<number>(0)
-  const zoneArmedRef = useRef<boolean>(false)
   const [iconPositions, setIconPositions] = useState<Record<string,{left:number;top:number}>>({})
   const [windowGeometries, setWindowGeometries] = useState<Record<string,{left:number;top:number;width:number;height:number}>>({})
   const dragIconRef = useRef<{
@@ -806,72 +777,6 @@ export default function Desktop(){
     }
   }
 
-  // SNAP GEOMETRY AND DETECTION
-  const GAP = 12
-  function rectForZone(zone: SnapZoneId, gap = GAP): Geometry{
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const g2 = gap * 2
-    const workLeft = SIDEBAR_WIDTH
-    const workW = vw - workLeft
-    const halfW = Math.floor(workW / 2)
-    const halfH = Math.floor(vh / 2)
-    switch(zone){
-      case 'left-half': return { left: workLeft + gap, top: gap, width: Math.max(0, halfW - gap - gap/2), height: vh - g2 }
-      case 'right-half': return { left: workLeft + halfW + gap/2, top: gap, width: Math.max(0, halfW - gap - gap/2), height: vh - g2 }
-      case 'top-half': return { left: workLeft + gap, top: gap, width: workW - g2, height: Math.max(0, halfH - gap - gap/2) }
-      case 'bottom-half': return { left: workLeft + gap, top: halfH + gap/2, width: workW - g2, height: Math.max(0, halfH - gap - gap/2) }
-      case 'top-left': return { left: workLeft + gap, top: gap, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
-      case 'top-right': return { left: workLeft + halfW + gap/2, top: gap, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
-      case 'bottom-left': return { left: workLeft + gap, top: halfH + gap/2, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
-      case 'bottom-right': return { left: workLeft + halfW + gap/2, top: halfH + gap/2, width: Math.max(0, halfW - gap - gap/2), height: Math.max(0, halfH - gap - gap/2) }
-    }
-  }
-
-  function detectSnap(x: number, y: number, T = 120): SnapZoneId | null{
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const workLeft = SIDEBAR_WIDTH
-    const nearLeft = x <= workLeft + T
-    const nearRight = x >= vw - T
-    const nearTop = y <= T
-    const nearBottom = y >= vh - T
-    if (!(nearLeft || nearRight || nearTop || nearBottom)) return null
-
-    const cornerRatio = 0.3 // widen corner segments for easier corner snaps
-    const cornerW = (vw - workLeft) * cornerRatio
-    const cornerH = vh * cornerRatio
-
-    // Top edge
-    if (nearTop) {
-      if (x <= workLeft + cornerW) return 'top-left'
-      if (x >= vw - cornerW) return 'top-right'
-      return 'top-half'
-    }
-
-    // Bottom edge
-    if (nearBottom) {
-      if (x <= cornerW) return 'bottom-left'
-      if (x >= vw - cornerW) return 'bottom-right'
-      return 'bottom-half'
-    }
-
-    // Left edge
-    if (nearLeft) {
-      if (y <= cornerH) return 'top-left'
-      if (y >= vh - cornerH) return 'bottom-left'
-      return 'left-half'
-    }
-
-    // Right edge
-    if (nearRight) {
-      if (y <= cornerH) return 'top-right'
-      if (y >= vh - cornerH) return 'bottom-right'
-      return 'right-half'
-    }
-
-    return null
-  }
 
   useEffect(()=>{
     function onMoveDoc(e: MouseEvent){
@@ -929,78 +834,6 @@ export default function Desktop(){
 
   // Listen for requests to auto-open an app
   useEffect(()=>{
-    // Tiling event bus for snap overlay (imperative updates for performance)
-    function applyPreviewRect(rect: Geometry | null, active: boolean){
-      const overlay = overlayRef.current
-      const preview = previewRef.current
-      if (!overlay || !preview) return
-      if (!rect){
-        preview.classList.remove('active')
-        return
-      }
-      preview.style.left = `${rect.left}px`
-      preview.style.top = `${rect.top}px`
-      preview.style.width = `${rect.width}px`
-      preview.style.height = `${rect.height}px`
-      if (active) preview.classList.add('active'); else preview.classList.remove('active')
-    }
-    function showOverlay(){ const o = overlayRef.current; if (o) o.style.display = 'block' }
-    function hideOverlay(){ const o = overlayRef.current; if (o) o.style.display = 'none' }
-
-    function onTiling(e: any){
-      const d = e?.detail || {}
-      if (!d || !d.phase) return
-      if (d.altKey) { snapAltBypassRef.current = true } else { snapAltBypassRef.current = false }
-      const now = Date.now()
-      if (d.phase === 'start'){
-        snapAppIdRef.current = d.id || null
-        currentZoneRef.current = null
-        lastZoneSwitchTsRef.current = now
-        zoneArmedRef.current = false
-        zoneEnterTsRef.current = now
-        showOverlay()
-        const z = snapAltBypassRef.current ? null : detectSnap(d.pointer?.x, d.pointer?.y)
-        currentZoneRef.current = z
-        // Show preview but keep inactive until dwell time has elapsed
-        applyPreviewRect(z ? rectForZone(z) : null, false)
-      } else if (d.phase === 'move'){
-        if (!snapAppIdRef.current) return
-        const candidate = snapAltBypassRef.current ? null : detectSnap(d.pointer?.x, d.pointer?.y)
-        const prev = currentZoneRef.current
-        if (candidate !== prev){
-          // hysteresis: require 60ms stability before switching
-          if (now - lastZoneSwitchTsRef.current >= 60){
-            currentZoneRef.current = candidate
-            lastZoneSwitchTsRef.current = now
-            // reset dwell when entering a new zone
-            zoneEnterTsRef.current = now
-            zoneArmedRef.current = false
-            applyPreviewRect(candidate ? rectForZone(candidate) : null, false)
-          }
-        }
-        // arm snap only after dwelling in the same zone for SNAP_DWELL_MS
-        const z = currentZoneRef.current
-        if (z && !zoneArmedRef.current && (now - zoneEnterTsRef.current) >= SNAP_DWELL_MS){
-          zoneArmedRef.current = true
-          applyPreviewRect(rectForZone(z), true)
-        }
-      } else if (d.phase === 'end'){
-        const id = snapAppIdRef.current
-        const z = snapAltBypassRef.current ? null : (currentZoneRef.current || detectSnap(d.pointer?.x, d.pointer?.y))
-        // Only snap if the zone was armed (held long enough)
-        if (z && id && zoneArmedRef.current){
-          const r = rectForZone(z)
-          updateWindow(id, { left: r.left, top: r.top, width: r.width, height: r.height })
-        }
-        hideOverlay()
-        applyPreviewRect(null, false)
-        snapAppIdRef.current = null
-        currentZoneRef.current = null
-        snapAltBypassRef.current = false
-        zoneArmedRef.current = false
-      }
-    }
-    window.addEventListener('FYOS_TILING' as any, onTiling)
     function onMessage(e: MessageEvent){
       const d: any = (e as any).data
       if (!d) return
@@ -1051,7 +884,7 @@ export default function Desktop(){
       })
     }
     window.addEventListener('message', onMessage)
-    return ()=> { window.removeEventListener('message', onMessage); window.removeEventListener('FYOS_TILING' as any, onTiling) }
+    return ()=> { window.removeEventListener('message', onMessage) }
   }, [])
 
   const wallpaperStyle: React.CSSProperties = theme?.mode === 'gradient'
@@ -1074,9 +907,6 @@ export default function Desktop(){
 
       {/* Sidebar removed */}
 
-      <div ref={overlayRef} className="snap-overlay" aria-hidden style={{display:'none'}}>
-        <div ref={previewRef} className="snap-preview" />
-      </div>
 
       {/* Center brand (offset upward to account for bottom agent bar) */}
       <div className="center-brand" aria-hidden={open.length > 0}>
