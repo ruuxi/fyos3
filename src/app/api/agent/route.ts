@@ -18,7 +18,8 @@ import {
 import { agentLogger } from '@/lib/agentLogger';
 import { 
   SYSTEM_PROMPT,
-  PERSONA_PROMPT
+  PERSONA_PROMPT,
+  CLASSIFIER_PROMPT
 } from '@/lib/prompts';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -154,12 +155,37 @@ export async function POST(req: Request) {
 
   // Persona-only mode: returns a parallel, personality-driven stream that does not use tools
   const url = new URL(req.url);
-  const personaMode = url.searchParams.get('persona') === '1' || url.searchParams.get('mode') === 'persona';
+  let personaMode = url.searchParams.get('persona') === '1' || url.searchParams.get('mode') === 'persona';
+
+  // If not explicitly forced, auto-classify last user message using CLASSIFIER_PROMPT (0=persona, 1=agent)
+  if (!personaMode) {
+    try {
+      const lastUser = sanitizedMessages.slice().reverse().find(m => (m as any).role === 'user') as any;
+      const lastText = lastUser?.parts?.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join('') || lastUser?.content || '';
+      const attachmentsMentioned = (Array.isArray(attachmentHints) && attachmentHints.length > 0) ? `\nAttachments:\n${attachmentHints.map(h => `- ${h.contentType || 'file'}: ${h.url}`).join('\n')}` : '';
+      const classifyInput = (lastText || '') + attachmentsMentioned;
+      if (classifyInput) {
+        const classification = await generateText({
+          model: 'google/gemini-2.0-flash',
+          system: CLASSIFIER_PROMPT,
+          prompt: classifyInput,
+        });
+        const raw = (classification?.text || '').trim();
+        if (raw === '0') personaMode = true;
+        else if (raw === '1') personaMode = false;
+        // If unexpected output, default to agent (personaMode=false)
+      }
+    } catch (e) {
+      // On classifier error, default to agent mode
+    }
+  }
   if (personaMode) {
     const personaSystem = PERSONA_PROMPT;
 
     // Only provide user messages as context; ignore assistant/tool messages entirely
-    const personaMessages = messages.filter(m => m.role === 'user');
+    // Use the last 20 user messages to give the persona adequate context
+    const personaMessagesAll = messages.filter(m => m.role === 'user');
+    const personaMessages = personaMessagesAll.slice(-20);
 
     const result = streamText({
       model: 'google/gemini-2.0-flash',

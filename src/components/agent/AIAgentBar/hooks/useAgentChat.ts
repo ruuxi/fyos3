@@ -25,10 +25,13 @@ type UseAgentChatOptions = {
   };
   runValidation: (scope: 'quick' | 'full', files?: string[]) => Promise<void>;
   attachmentsProvider?: () => Array<{ name: string; publicUrl: string; contentType: string }>;
+  onFirstToolCall?: () => void;
 };
 
 export function useAgentChat(opts: UseAgentChatOptions) {
   const { id, initialMessages, activeThreadId, threadsCount, wc, media, runValidation, attachmentsProvider } = opts;
+  const firstToolCalledRef = (typeof window !== 'undefined') ? (window as any).__FYOS_FIRST_TOOL_CALLED_REF || { current: false } : { current: false };
+  try { (window as any).__FYOS_FIRST_TOOL_CALLED_REF = firstToolCalledRef } catch {}
 
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id,
@@ -38,6 +41,13 @@ export function useAgentChat(opts: UseAgentChatOptions) {
       prepareSendMessagesRequest({ messages, id }) {
         const body: any = { id, messages };
         if (activeThreadId && threadsCount > 0) body.threadId = activeThreadId;
+        // Include attachment hints so server-side classifier can detect media ops
+        try {
+          if (typeof opts.attachmentsProvider === 'function') {
+            const hints = opts.attachmentsProvider()?.map(a => ({ contentType: a.contentType, url: a.publicUrl })) || [];
+            if (hints.length > 0) body.attachmentHints = hints;
+          }
+        } catch {}
         return { body };
       },
     }),
@@ -46,6 +56,14 @@ export function useAgentChat(opts: UseAgentChatOptions) {
       if (toolCall.dynamic) return;
       const instanceRef = wc.instanceRef;
       const fnsRef = wc.fnsRef;
+
+      // Signal first tool call once per run to allow HMR gating only for tool-using runs
+      try {
+        if (!firstToolCalledRef.current && typeof opts.onFirstToolCall === 'function') {
+          firstToolCalledRef.current = true;
+          opts.onFirstToolCall();
+        }
+      } catch {}
 
       async function waitForInstance(timeoutMs = 6000, intervalMs = 120) {
         const start = Date.now();

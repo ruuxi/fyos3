@@ -114,6 +114,7 @@ export default function AIAgentBar() {
   useEffect(() => { uploadBusyRef.current = !!busyFlags.uploadBusy; }, [busyFlags.uploadBusy]);
   const undoStackRef = useRef<Uint8Array[]>([]);
   const prevStatusRef = useRef<string>('ready');
+  const hmrGateActiveRef = useRef<boolean>(false);
   
   const { runValidation } = useValidationDiagnostics({
     spawn: (cmd, args, opts) => fnsRef.current.spawn(cmd, args, opts),
@@ -130,6 +131,10 @@ export default function AIAgentBar() {
     media: { loadMedia },
     runValidation,
     attachmentsProvider: () => (pendingAttachmentsRef.current || attachmentsRef.current || []),
+    onFirstToolCall: () => {
+      hmrGateActiveRef.current = true;
+      try { window.postMessage({ type: 'FYOS_AGENT_RUN_STARTED' }, '*'); } catch {}
+    },
   });
 
   useEffect(() => { statusRef.current = status; }, [status]);
@@ -156,15 +161,11 @@ export default function AIAgentBar() {
   useEffect(() => {
     const prev = prevStatusRef.current;
     const now = status;
-    const started = (prev === 'ready') && (now === 'submitted' || now === 'streaming');
     const finished = (prev === 'submitted' || prev === 'streaming') && now === 'ready';
-    // Signal run start when status transitions out of ready
-    if (started) {
-      try { window.postMessage({ type: 'FYOS_AGENT_RUN_STARTED' }, '*'); } catch {}
-    }
-    // Signal run end to preview so HMR can resume and apply once done
-    if (finished) {
+    // Signal run end only if we actually paused during this run
+    if (finished && hmrGateActiveRef.current) {
       try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
+      hmrGateActiveRef.current = false;
     }
     if (finished && fsChangedRef.current && instanceRef.current) {
       (async () => {
@@ -310,8 +311,6 @@ export default function AIAgentBar() {
     if (!input.trim()) return;
     forceFollow();
     let userText = input;
-    // Signal run start to preview so HMR pauses during multi-step edits
-    try { window.postMessage({ type: 'FYOS_AGENT_RUN_STARTED' }, '*'); } catch {}
     // Ensure we pick up durable URLs if ingestion just finished
     const waitForDurable = async (timeoutMs = 6000, intervalMs = 80) => {
       const started = Date.now();
