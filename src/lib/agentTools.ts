@@ -123,7 +123,7 @@ export const MediaListInput = z.object({
   desktopId: z.string().optional().describe('Filter by desktop ID.'),
   from: z.string().optional().describe('Filter by creation date from (ISO string).'),
   to: z.string().optional().describe('Filter by creation date to (ISO string).'),
-  limit: z.number().int().min(1).max(100).default(20).describe('Maximum number of items to return.'),
+  limit: z.number().int().min(1).max(50).default(10).describe('Maximum number of items to return.'),
   responseFormat: ResponseFormat.optional().describe('concise (default) or detailed.'),
 });
 

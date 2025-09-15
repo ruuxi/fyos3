@@ -30,7 +30,7 @@ export default function App(){
     try {
       const params = new URLSearchParams()
       if (type) params.set('type', type)
-      params.set('limit', '100')
+      params.set('limit', '10')
       const res = await fetch(`/api/media/list?${params.toString()}`)
       const json = await res.json()
       setItems(json.items || [])
