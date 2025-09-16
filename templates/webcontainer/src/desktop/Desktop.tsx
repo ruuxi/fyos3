@@ -27,6 +27,60 @@ const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: 16, startY: 52, maxPe
 // Reserved sidebar width for the new left app list (disabled)
 const SIDEBAR_WIDTH = 0
 
+type DialOption = 'expand' | 'close' | 'move' | 'chat'
+
+const DIAL_THRESHOLD = 36
+
+type DialMeta = { label: string; angle: number; icon: string }
+
+const DIAL_OPTION_META: Record<DialOption, DialMeta> = {
+  expand: { label: 'Expand', angle: -90, icon: '⤢' },
+  move: { label: 'Move', angle: 0, icon: '🪟' },
+  close: { label: 'Close', angle: 90, icon: '✕' },
+  chat: { label: 'Open Chat', angle: 180, icon: '💬' },
+}
+
+const DIAL_OPTIONS: DialOption[] = ['expand', 'move', 'close', 'chat']
+const DIAL_VIEWBOX = 224
+const DIAL_CENTER = DIAL_VIEWBOX / 2
+const DIAL_OUTER_RADIUS = 100
+const DIAL_INNER_RADIUS = 58
+const DIAL_LABEL_RADIUS = 82
+const DIAL_SWEEP = 90
+
+function degToRad(deg: number){
+  return (deg * Math.PI) / 180
+}
+
+function polarToCartesian(angleDeg: number, radius: number){
+  const rad = degToRad(angleDeg)
+  return {
+    x: DIAL_CENTER + radius * Math.cos(rad),
+    y: DIAL_CENTER + radius * Math.sin(rad),
+  }
+}
+
+function buildDialPath(angleDeg: number){
+  const start = angleDeg - DIAL_SWEEP / 2
+  const end = angleDeg + DIAL_SWEEP / 2
+  const outerStart = polarToCartesian(start, DIAL_OUTER_RADIUS)
+  const outerEnd = polarToCartesian(end, DIAL_OUTER_RADIUS)
+  const innerEnd = polarToCartesian(end, DIAL_INNER_RADIUS)
+  const innerStart = polarToCartesian(start, DIAL_INNER_RADIUS)
+  const largeArc = DIAL_SWEEP > 180 ? 1 : 0
+  return [
+    `M ${outerStart.x} ${outerStart.y}`,
+    `A ${DIAL_OUTER_RADIUS} ${DIAL_OUTER_RADIUS} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
+    `L ${innerEnd.x} ${innerEnd.y}`,
+    `A ${DIAL_INNER_RADIUS} ${DIAL_INNER_RADIUS} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}`,
+    'Z',
+  ].join(' ')
+}
+
+function computeLabelPosition(angleDeg: number){
+  return polarToCartesian(angleDeg, DIAL_LABEL_RADIUS)
+}
+
 type Geometry = { left: number; top: number; width: number; height: number }
 
 // Helpers
@@ -54,6 +108,40 @@ function resolveAppGeometry(app: App): Geometry{
 }
 
 // (removed unused resolveInitialGeometry)
+
+function determineDialOption(dx: number, dy: number, distance: number, hasWindow: boolean): DialOption | null {
+  if (distance < DIAL_THRESHOLD) return null
+  const angle = Math.atan2(dy, dx)
+  const deg = (angle * 180 / Math.PI + 360) % 360
+  if (deg >= 315 || deg < 45) return hasWindow ? 'move' : null
+  if (deg >= 45 && deg < 135) return hasWindow ? 'close' : null
+  if (deg >= 135 && deg < 225) return 'chat'
+  if (deg >= 225 && deg < 315) return hasWindow ? 'expand' : null
+  return null
+}
+
+type ContextPointerMessage = {
+  type: 'FYOS_DESKTOP_CONTEXT_POINTER'
+  phase: 'down' | 'move' | 'up' | 'cancel'
+  pointerId: number
+  clientX: number
+  clientY: number
+  button?: number
+  buttons?: number
+  pointerType?: string
+  appId?: string | null
+}
+
+function isContextPointerMessage(value: unknown): value is ContextPointerMessage {
+  if (!value || typeof value !== 'object') return false
+  const msg = value as Partial<ContextPointerMessage>
+  const phaseValid = msg.phase === 'down' || msg.phase === 'move' || msg.phase === 'up' || msg.phase === 'cancel'
+  return msg.type === 'FYOS_DESKTOP_CONTEXT_POINTER'
+    && phaseValid
+    && typeof msg.pointerId === 'number'
+    && typeof msg.clientX === 'number'
+    && typeof msg.clientY === 'number'
+}
 
 function bounceIcon(setLaunching: React.Dispatch<React.SetStateAction<string | null>>, id: string, ms = 600){
   setLaunching(id)
@@ -144,6 +232,7 @@ interface WindowProps {
   onNewTab: () => void
   onOpenAppInTab: (tabId: string, app: App) => void
   availableApps: App[]
+  isBeingMoved: boolean
 }
 
 // Top menubar removed
@@ -161,7 +250,7 @@ function LauncherGrid({ apps, onPick }: { apps: App[]; onPick: (a: App) => void 
   );
 }
 
-function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, tabs, activeTabId, onTabActivate, onTabClose, onNewTab, onOpenAppInTab, availableApps }: WindowProps){
+function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, tabs, activeTabId, onTabActivate, onTabClose, onNewTab, onOpenAppInTab, availableApps, isBeingMoved }: WindowProps){
   const rootRef = useRef<HTMLDivElement | null>(null)
   const rafIdRef = useRef<number | null>(null)
   const draggingRef = useRef<{
@@ -289,6 +378,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
   }, [app, onMove, onResize])
 
   function startMove(e: React.MouseEvent){
+    if (e.button !== 0) return
     e.preventDefault()
     onFocus()
     const g = resolveAppGeometry(app)
@@ -313,6 +403,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
 
   function startResize(handle: 'nw'|'ne'|'sw'|'se'){
     return (e: React.MouseEvent)=>{
+      if (e.button !== 0) return
       e.stopPropagation()
       e.preventDefault()
       onFocus()
@@ -345,13 +436,14 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
   if (app.anim === 'close') classes.push('closing')
   if (app.anim === 'minimize') classes.push('minimizing')
   if (app.minimized && !app.anim) classes.push('minimized')
+  if (isBeingMoved) classes.push('moving')
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
   const isBlank = !activeTab || !activeTab.appId;
   const iframeSrc = !isBlank ? `/app.html?path=${encodeURIComponent(activeTab.path||'')}&id=${encodeURIComponent(activeTab.appId||'')}&name=${encodeURIComponent(activeTab.title)}&base=0&ui=1&tw=1` : '';
 
   return (
-    <div ref={rootRef} className={classes.join(' ')} style={{ ...resolveAppGeometry(app), zIndex, background: 'rgba(12,18,36,0.10)' }} onMouseDown={onFocus}>
+    <div ref={rootRef} className={classes.join(' ')} data-app-id={app.id} style={{ ...resolveAppGeometry(app), zIndex, background: 'rgba(12,18,36,0.10)' }} onMouseDown={onFocus}>
       <nav className="tabstrip" role="tablist" aria-label="Tabs" onMouseDown={startMove}>
         {tabs.map((t) => (
           <button key={t.id} role="tab" aria-selected={t.id===activeTabId}
@@ -386,6 +478,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
           <iframe
             title={activeTab.title}
             src={iframeSrc}
+            data-app-id={app.id}
             style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'transparent' }}
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-top-navigation-by-user-activation allow-downloads"
             onError={(e) => {
@@ -497,7 +590,45 @@ export default function Desktop(){
   //   setBootscreen(false)
   // }
   const [open, setOpen] = useState<App[]>([])
+  const openWindowsRef = useRef<App[]>([])
+  useEffect(() => { openWindowsRef.current = open }, [open])
   const [windowTabs, setWindowTabs] = useState<Record<string, WindowTabsState>>({})
+
+  const [dialState, setDialState] = useState<{
+    x: number;
+    y: number;
+    active: DialOption | null;
+    distance: number;
+    available: Record<DialOption, boolean>;
+  } | null>(null)
+  const dialSessionRef = useRef<{
+    pointerId: number
+    originX: number
+    originY: number
+    targetAppId: string | null
+    source: 'native' | 'iframe'
+  } | null>(null)
+  const dialListenersRef = useRef<{
+    move?: (evt: PointerEvent) => void
+    up?: (evt: PointerEvent) => void
+    cancel?: (evt: PointerEvent) => void
+    key?: (evt: KeyboardEvent) => void
+  } | null>(null)
+
+  const moveSessionRef = useRef<{
+    appId: string
+    offsetX: number
+    offsetY: number
+    width: number
+    height: number
+    pointerId: number | null
+    pendingX: number | null
+    pendingY: number | null
+  } | null>(null)
+  const moveSessionFrameRef = useRef<number | null>(null)
+  const [movingWindowId, setMovingWindowId] = useState<string | null>(null)
+  const isMountedRef = useRef(true)
+  const skipGeometryPersistenceRef = useRef(false)
 
   useEffect(() => { if (userMode === 'auth') setWindowTabs(loadWindowTabs()); }, [userMode]);
 
@@ -762,7 +893,7 @@ export default function Desktop(){
   const saveGeometries = (updater: (g: Record<string,{left:number;top:number;width:number;height:number}>)=>Record<string,{left:number;top:number;width:number;height:number}>) => {
     setWindowGeometries(prev => {
       const next = updater(prev)
-      if (userMode === 'auth') saveWindowGeometries(next)
+      if (userMode === 'auth' && !skipGeometryPersistenceRef.current) saveWindowGeometries(next)
       return next
     })
   }
@@ -776,6 +907,297 @@ export default function Desktop(){
       })
     }
   }
+
+  const resolveDialTargetAppId = (preferredId: string | null | undefined): string | null => {
+    if (preferredId) {
+      const exists = openWindowsRef.current.find(w => w.id === preferredId)
+      if (exists) return exists.id
+    }
+    const top = openWindowsRef.current.length ? openWindowsRef.current[openWindowsRef.current.length - 1] : null
+    return top ? top.id : null
+  }
+
+  const getDialAvailability = (hasWindow: boolean): Record<DialOption, boolean> => {
+    return {
+      expand: hasWindow,
+      move: hasWindow,
+      close: hasWindow,
+      chat: true,
+    }
+  }
+
+  const startDialSession = (params: { pointerId: number; clientX: number; clientY: number; source: 'native' | 'iframe'; targetAppId?: string | null }) => {
+    const targetId = resolveDialTargetAppId(params.targetAppId ?? null)
+    const availability = getDialAvailability(Boolean(targetId))
+    const existing = dialSessionRef.current
+    if (existing) endDial()
+    dialSessionRef.current = {
+      pointerId: params.pointerId,
+      originX: params.clientX,
+      originY: params.clientY,
+      targetAppId: targetId,
+      source: params.source,
+    }
+    setDialState({
+      x: params.clientX,
+      y: params.clientY,
+      active: null,
+      distance: 0,
+      available: availability,
+    })
+
+    const keyListener = (evt: KeyboardEvent) => {
+      if (evt.key === 'Escape') {
+        endDial()
+      }
+    }
+    const listeners: {
+      move?: (evt: PointerEvent) => void
+      up?: (evt: PointerEvent) => void
+      cancel?: (evt: PointerEvent) => void
+      key?: (evt: KeyboardEvent) => void
+    } = { key: keyListener }
+
+    if (params.source === 'native') {
+      const moveListener = (evt: PointerEvent) => {
+        const session = dialSessionRef.current
+        if (!session || session.source !== 'native' || session.pointerId !== evt.pointerId) return
+        evt.preventDefault()
+        updateDialVisuals(evt.clientX, evt.clientY)
+      }
+      const upListener = (evt: PointerEvent) => {
+        const session = dialSessionRef.current
+        if (!session || session.source !== 'native' || session.pointerId !== evt.pointerId) return
+        evt.preventDefault()
+        const result = updateDialVisuals(evt.clientX, evt.clientY)
+        endDial()
+        if (result?.option) {
+          executeDialSelection(result.option, session.targetAppId, evt.clientX, evt.clientY)
+        }
+      }
+      const cancelListener = (evt: PointerEvent) => {
+        const session = dialSessionRef.current
+        if (!session || session.source !== 'native' || session.pointerId !== evt.pointerId) return
+        evt.preventDefault()
+        endDial()
+      }
+      listeners.move = moveListener
+      listeners.up = upListener
+      listeners.cancel = cancelListener
+      window.addEventListener('pointermove', moveListener, { passive: false })
+      window.addEventListener('pointerup', upListener, { passive: false })
+      window.addEventListener('pointercancel', cancelListener, { passive: false })
+    }
+
+    window.addEventListener('keydown', keyListener)
+    dialListenersRef.current = listeners
+  }
+
+  const endDial = () => {
+    const listeners = dialListenersRef.current
+    if (listeners) {
+      if (listeners.move) window.removeEventListener('pointermove', listeners.move)
+      if (listeners.up) window.removeEventListener('pointerup', listeners.up)
+      if (listeners.cancel) window.removeEventListener('pointercancel', listeners.cancel)
+      if (listeners.key) window.removeEventListener('keydown', listeners.key)
+    }
+    dialListenersRef.current = null
+    dialSessionRef.current = null
+    setDialState(null)
+  }
+
+  const updateDialVisuals = (clientX: number, clientY: number) => {
+    const session = dialSessionRef.current
+    if (!session) return null
+    const hasWindow = Boolean(session.targetAppId && openWindowsRef.current.some(w => w.id === session.targetAppId))
+    const dx = clientX - session.originX
+    const dy = clientY - session.originY
+    const distance = Math.sqrt(dx * dx + dy * dy)
+    const option = determineDialOption(dx, dy, distance, hasWindow)
+    const availability = getDialAvailability(hasWindow)
+    setDialState(prev => prev ? { ...prev, active: option, distance, available: availability } : prev)
+    return { option, distance, hasWindow }
+  }
+
+  function executeDialSelection(option: DialOption, appId: string | null, pointerX: number, pointerY: number) {
+    if (option === 'chat') {
+      try { window.parent?.postMessage({ type: 'FYOS_OPEN_CHAT' }, '*') } catch {}
+      return
+    }
+    if (!appId) return
+    const target = openWindowsRef.current.find(w => w.id === appId)
+    if (!target) return
+    focus(appId)
+    if (option === 'close') {
+      close(appId)
+      return
+    }
+    if (option === 'expand') {
+      try {
+        const vw = window.innerWidth
+        const vh = window.innerHeight
+        const M = 12
+        const left = SIDEBAR_WIDTH + M
+        const top = M
+        const width = Math.max(0, vw - SIDEBAR_WIDTH - (M * 2))
+        const height = Math.max(0, vh - (M * 2))
+        updateWindow(appId, { left, top, width, height })
+      } catch {}
+      return
+    }
+    if (option === 'move') {
+      startMoveSession(appId, pointerX, pointerY)
+    }
+  }
+
+  const applyMoveSessionPosition = (session: NonNullable<typeof moveSessionRef.current>, clientX: number, clientY: number) => {
+    const rawLeft = clientX - session.offsetX
+    const rawTop = clientY - session.offsetY
+    const clamped = clampToViewport(rawLeft, rawTop, session.width, session.height)
+    updateWindow(session.appId, { left: clamped.left, top: clamped.top })
+  }
+
+  const scheduleMoveSessionApply = () => {
+    if (moveSessionFrameRef.current != null) return
+    moveSessionFrameRef.current = requestAnimationFrame(() => {
+      moveSessionFrameRef.current = null
+      const session = moveSessionRef.current
+      if (!session || session.pendingX == null || session.pendingY == null) return
+      applyMoveSessionPosition(session, session.pendingX, session.pendingY)
+    })
+  }
+
+  const endMoveSession = (persist = true) => {
+    const session = moveSessionRef.current
+    const listenersActive = Boolean(session)
+    moveSessionRef.current = null
+    if (moveSessionFrameRef.current != null) {
+      cancelAnimationFrame(moveSessionFrameRef.current)
+      moveSessionFrameRef.current = null
+    }
+    if (listenersActive) {
+      window.removeEventListener('pointermove', onMoveSessionPointerMove)
+      window.removeEventListener('pointerdown', onMoveSessionPointerDown, true)
+      window.removeEventListener('pointerup', onMoveSessionPointerUp, true)
+      window.removeEventListener('pointercancel', onMoveSessionPointerCancel, true)
+      window.removeEventListener('keydown', onMoveSessionKeyDown)
+      try { document.body.classList.remove('desktop-window-moving') } catch {}
+    }
+    skipGeometryPersistenceRef.current = false
+    if (persist && session && isMountedRef.current) {
+      const latest = openWindowsRef.current.find(w => w.id === session.appId)
+      if (latest) {
+        const geom = resolveAppGeometry(latest)
+        saveGeometries(prev => ({ ...prev, [session.appId]: geom }))
+      }
+    }
+    if (isMountedRef.current) setMovingWindowId(null)
+  }
+
+  const onMoveSessionPointerMove = (evt: PointerEvent) => {
+    const session = moveSessionRef.current
+    if (!session) return
+    evt.preventDefault()
+    session.pendingX = evt.clientX
+    session.pendingY = evt.clientY
+    scheduleMoveSessionApply()
+  }
+
+  const onMoveSessionPointerUp = (evt: PointerEvent) => {
+    const session = moveSessionRef.current
+    if (!session) return
+    if (session.pointerId !== null && session.pointerId !== evt.pointerId) return
+    evt.preventDefault()
+    evt.stopPropagation()
+    endMoveSession()
+  }
+
+  const onMoveSessionPointerCancel = (evt: PointerEvent) => {
+    const session = moveSessionRef.current
+    if (!session) return
+    if (session.pointerId !== null && session.pointerId !== evt.pointerId) return
+    evt.preventDefault()
+    endMoveSession()
+  }
+
+  const onMoveSessionPointerDown = (evt: PointerEvent) => {
+    const session = moveSessionRef.current
+    if (!session) return
+    if (evt.button !== 0) {
+      evt.preventDefault()
+      return
+    }
+    evt.preventDefault()
+    evt.stopPropagation()
+    session.pointerId = evt.pointerId
+    window.addEventListener('pointerup', onMoveSessionPointerUp, true)
+    window.addEventListener('pointercancel', onMoveSessionPointerCancel, true)
+  }
+
+  const onMoveSessionKeyDown = (evt: KeyboardEvent) => {
+    if (evt.key === 'Escape') {
+      endMoveSession()
+    }
+  }
+
+  const startMoveSession = (appId: string, pointerX: number, pointerY: number) => {
+    const target = openWindowsRef.current.find(w => w.id === appId)
+    if (!target) return
+    endMoveSession()
+    skipGeometryPersistenceRef.current = true
+    const geom = resolveAppGeometry(target)
+    moveSessionRef.current = {
+      appId,
+      offsetX: pointerX - geom.left,
+      offsetY: pointerY - geom.top,
+      width: geom.width,
+      height: geom.height,
+      pointerId: null,
+      pendingX: null,
+      pendingY: null,
+    }
+    try { document.body.classList.add('desktop-window-moving') } catch {}
+    window.addEventListener('pointermove', onMoveSessionPointerMove, { passive: false })
+    window.addEventListener('pointerdown', onMoveSessionPointerDown, true)
+    window.addEventListener('keydown', onMoveSessionKeyDown)
+    if (isMountedRef.current) setMovingWindowId(appId)
+    applyMoveSessionPosition(moveSessionRef.current, pointerX, pointerY)
+  }
+
+  const handleDesktopPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 2) return
+    e.preventDefault()
+    e.stopPropagation()
+    const appIdFromTarget = (e.target as HTMLElement | null)?.closest('[data-app-id]')?.getAttribute('data-app-id') || null
+    if (moveSessionRef.current) {
+      endMoveSession()
+    }
+    startDialSession({
+      pointerId: e.pointerId,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      source: 'native',
+      targetAppId: appIdFromTarget,
+    })
+  }
+
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+      endMoveSession(false)
+      const listeners = dialListenersRef.current
+      if (listeners) {
+        if (listeners.move) window.removeEventListener('pointermove', listeners.move)
+        if (listeners.up) window.removeEventListener('pointerup', listeners.up)
+        if (listeners.cancel) window.removeEventListener('pointercancel', listeners.cancel)
+        if (listeners.key) window.removeEventListener('keydown', listeners.key)
+      }
+      dialListenersRef.current = null
+      dialSessionRef.current = null
+      try { document.body.classList.remove('desktop-window-moving') } catch {}
+    }
+  }, [])
 
 
   useEffect(()=>{
@@ -835,26 +1257,62 @@ export default function Desktop(){
   // Listen for requests to auto-open an app
   useEffect(()=>{
     function onMessage(e: MessageEvent){
-      const d: any = (e as any).data
-      if (!d) return
-      if (d.type === 'FYOS_AGENT_RUN_STARTED' || d.type === 'FYOS_AGENT_RUN_ENDED') {
+      const payload = e.data
+      if (isContextPointerMessage(payload)) {
+        if (payload.phase === 'down') {
+          const candidateAppId = typeof payload.appId === 'string' ? payload.appId : null
+          if (moveSessionRef.current) {
+            endMoveSession()
+          }
+          startDialSession({
+            pointerId: payload.pointerId,
+            clientX: payload.clientX,
+            clientY: payload.clientY,
+            source: 'iframe',
+            targetAppId: candidateAppId,
+          })
+        } else {
+          const session = dialSessionRef.current
+          if (!session || session.source !== 'iframe' || session.pointerId !== payload.pointerId) return
+          if (payload.phase === 'move') {
+            updateDialVisuals(payload.clientX, payload.clientY)
+          } else if (payload.phase === 'up') {
+            const result = updateDialVisuals(payload.clientX, payload.clientY)
+            endDial()
+            if (result?.option) {
+              executeDialSelection(result.option, session.targetAppId, payload.clientX, payload.clientY)
+            }
+          } else if (payload.phase === 'cancel') {
+            endDial()
+          }
+        }
+        return
+      }
+      if (!payload || typeof payload !== 'object') return
+      const record = payload as { [key: string]: unknown }
+      const typeValue = typeof record.type === 'string' ? record.type : ''
+      if (typeValue === 'FYOS_AGENT_RUN_STARTED' || typeValue === 'FYOS_AGENT_RUN_ENDED') {
         try {
           const frames = Array.from(document.querySelectorAll('iframe')) as HTMLIFrameElement[]
           frames.forEach(f => {
-            try { f.contentWindow?.postMessage(d, '*') } catch {}
+            try { f.contentWindow?.postMessage(payload, '*') } catch {}
           })
         } catch {}
         return
       }
-      if (d.type === EVT_USER_MODE) {
-        try { const mode = d?.payload?.mode; if (mode === 'auth' || mode === 'anon') setUserMode(mode) } catch {}
+      if (typeValue === EVT_USER_MODE) {
+        const raw = (record.payload as { mode?: unknown } | undefined)?.mode
+        if (raw === 'auth' || raw === 'anon') setUserMode(raw)
         return
       }
-      if (d.type === EVT_SET_THEME) {
-        try { const t = d?.payload; if (t && (t.mode === 'image' || t.mode === 'gradient') && typeof t.value === 'string') setTheme(t) } catch {}
+      if (typeValue === EVT_SET_THEME) {
+        const themePayload = record.payload as { mode?: unknown; value?: unknown } | undefined
+        if (themePayload && (themePayload.mode === 'image' || themePayload.mode === 'gradient') && typeof themePayload.value === 'string') {
+          setTheme({ mode: themePayload.mode, value: themePayload.value })
+        }
         return
       }
-      if (d.type === 'FYOS_REQUEST_DESKTOP_STATE') {
+      if (typeValue === 'FYOS_REQUEST_DESKTOP_STATE') {
         try {
           const payload = (userMode === 'auth')
             ? { iconPositions: loadIconPositions(), windowGeometries: loadWindowGeometries(), windowTabs: loadWindowTabs(), appOrder: loadAppOrder() }
@@ -863,8 +1321,9 @@ export default function Desktop(){
         } catch {}
         return
       }
-      if (d.type !== EVT_OPEN_APP) return
-      const app: App | null = (d.app && typeof d.app === 'object') ? d.app as App : null
+      if (typeValue !== EVT_OPEN_APP) return
+      const rawApp = record.app
+      const app: App | null = (rawApp && typeof rawApp === 'object') ? rawApp as App : null
       if (!app || !app.id) return
       // If app exists in registry, prefer that canonical entry
       const existing = appsByIdRef.current[app.id]
@@ -892,7 +1351,12 @@ export default function Desktop(){
     : { backgroundImage: `url(${theme?.value || '/2.webp'})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }
 
   return (
-    <div className="desktop" style={{ background: 'transparent', color: 'inherit' }}>
+    <div
+      className="desktop"
+      style={{ background: 'transparent', color: 'inherit' }}
+      onPointerDown={handleDesktopPointerDown}
+      onContextMenu={(e)=>{ e.preventDefault() }}
+    >
       <div className="wallpaper" style={wallpaperStyle} />
       <div className="wallpaper-glass" />
       {/* MenuBar removed */}
@@ -928,6 +1392,7 @@ export default function Desktop(){
               className={`desktop-icon`}
               style={{ left: p.left, top: p.top }}
               onMouseDown={(e)=>{
+                if (e.button !== 0) return
                 e.preventDefault()
                 const cur = iconPositions[id] || { left: 16, top: 52 }
                 dragIconRef.current = { id, startX: e.clientX, startY: e.clientY, startLeft: cur.left, startTop: cur.top, dragging: false }
@@ -943,6 +1408,50 @@ export default function Desktop(){
           )
         })}
       </div>
+
+      {dialState && (
+        <div className="context-dial-overlay" style={{ left: dialState.x, top: dialState.y }}>
+          <div className="context-dial">
+            <svg className="dial-svg" viewBox={`0 0 ${DIAL_VIEWBOX} ${DIAL_VIEWBOX}`} aria-hidden>
+              <circle className="dial-ring" cx={DIAL_CENTER} cy={DIAL_CENTER} r={DIAL_OUTER_RADIUS + 6} />
+              {DIAL_OPTIONS.map(option => {
+                const meta = DIAL_OPTION_META[option]
+                const active = dialState.active === option
+                const disabled = !dialState.available[option]
+                const classes = ['dial-slice']
+                if (active) classes.push('active')
+                if (disabled) classes.push('disabled')
+                return (
+                  <path
+                    key={option}
+                    className={classes.join(' ')}
+                    d={buildDialPath(meta.angle)}
+                  />
+                )
+              })}
+              <circle className="dial-inner" cx={DIAL_CENTER} cy={DIAL_CENTER} r={DIAL_INNER_RADIUS - 8} />
+            </svg>
+            {DIAL_OPTIONS.map(option => {
+              const meta = DIAL_OPTION_META[option]
+              const active = dialState.active === option
+              const disabled = !dialState.available[option]
+              const pos = computeLabelPosition(meta.angle)
+              const classes = ['dial-label-node']
+              if (active) classes.push('active')
+              if (disabled) classes.push('disabled')
+              return (
+                <div key={option} className={classes.join(' ')} style={{ left: `${pos.x}px`, top: `${pos.y}px` }}>
+                  <span className="dial-ico" aria-hidden>{meta.icon}</span>
+                  <span className="dial-label-text">{meta.label}</span>
+                </div>
+              )
+            })}
+            <div className={`dial-center${dialState.distance < DIAL_THRESHOLD ? ' active' : ''}`}>
+              <span className="dial-center-label">Cancel</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {open.map((app, idx) => {
         const tabsState = windowTabs[app.id] || { activeTabId: '', tabs: [] };
@@ -963,6 +1472,7 @@ export default function Desktop(){
             onNewTab={()=>addTab(app.id)}
             onOpenAppInTab={(tabId, a)=>openAppIntoTab(app.id, tabId, a)}
             availableApps={apps}
+            isBeingMoved={movingWindowId === app.id}
           />
         );
       })}

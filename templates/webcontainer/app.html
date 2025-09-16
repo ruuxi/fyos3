@@ -137,6 +137,62 @@
         } catch {}
       };
 
+
+      let contextPointerActive = false;
+      let contextPointerId = null;
+
+      const sendContextPointer = (phase, evt) => {
+        try {
+          const frame = window.frameElement;
+          if (!frame) return;
+          const rect = frame.getBoundingClientRect();
+          const appId = frame.getAttribute('data-app-id') || null;
+          window.parent?.postMessage({
+            type: 'FYOS_DESKTOP_CONTEXT_POINTER',
+            phase,
+            pointerId: evt.pointerId,
+            clientX: rect.left + evt.clientX,
+            clientY: rect.top + evt.clientY,
+            button: evt.button,
+            buttons: evt.buttons,
+            pointerType: evt.pointerType,
+            appId,
+          }, '*');
+        } catch {}
+      };
+
+      window.addEventListener('contextmenu', (evt) => {
+        evt.preventDefault();
+      });
+
+      window.addEventListener('pointerdown', (evt) => {
+        if (evt.button !== 2) return;
+        contextPointerActive = true;
+        contextPointerId = evt.pointerId;
+        try { evt.target?.setPointerCapture?.(evt.pointerId); } catch {}
+        evt.preventDefault();
+        evt.stopPropagation();
+        sendContextPointer('down', evt);
+      }, true);
+
+      window.addEventListener('pointermove', (evt) => {
+        if (!contextPointerActive || contextPointerId !== evt.pointerId) return;
+        evt.preventDefault();
+        sendContextPointer('move', evt);
+      }, true);
+
+      const finalizeContextPointer = (phase, evt) => {
+        if (!contextPointerActive || contextPointerId !== evt.pointerId) return;
+        evt.preventDefault();
+        sendContextPointer(phase, evt);
+        try { evt.target?.releasePointerCapture?.(evt.pointerId); } catch {}
+        contextPointerActive = false;
+        contextPointerId = null;
+      };
+
+      window.addEventListener('pointerup', (evt) => finalizeContextPointer('up', evt), true);
+      window.addEventListener('pointercancel', (evt) => finalizeContextPointer('cancel', evt), true);
+
       
       import { createRoot } from '/src/iframe-root.js';
       // Hint Vite/Tailwind to include all app entry modules in the module graph

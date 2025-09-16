@@ -314,6 +314,19 @@ export default function AIAgentBar() {
   useEffect(() => { prevOpenRef.current = isOpen; }, [isOpen]);
   const barAreaRef = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const payload = event?.data;
+      if (!payload || typeof payload !== 'object') return;
+      const type = (payload as { type?: unknown }).type;
+      if (type === 'FYOS_OPEN_CHAT') {
+        setMode('chat');
+      }
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
   // One-time welcome animation flag
   useEffect(() => {
     const t = setTimeout(() => setDidAnimateWelcome(true), 500);
