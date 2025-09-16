@@ -126,15 +126,6 @@ export default function AIAgentBar() {
     getStatus: () => statusRef.current,
   });
 
-  // Magical words indicator state and helpers
-  const MAGIC_WORDS = useMemo(() => [
-    'gooping', 'gooning', 'magicking', 'imagining', 'sparkling', 'whirring', 'glitching', 'morphing', 'weaving', 'hatching',
-    'summoning', 'scribbling', 'cooking', 'zapping', 'whispering', 'bubbling', 'tinkering', 'tickling', 'twinkling', 'drifting',
-    'juggling', 'riffing', 'blooming', 'shimmering', 'swooshing', 'dreaming', 'warping', 'stitching', 'burbling', 'glooping',
-    'sparkplugging', 'spellweaving', 'sketchcasting', 'zapcrafting', 'fluxing', 'glowcoding', 'mindgardening', 'vibesmithing', 'fogweaving', 'glyphing',
-    'beamsurfing', 'notioning', 'musecalling', 'dayforging', 'pulsewriting', 'echoforming', 'holojamming', 'hyperknitting', 'ghostpainting', 'skylarking'
-  ], []);
-  const [magicWord, setMagicWord] = useState<string>('');
   const agentActiveRef = useRef<boolean>(false);
 
   const { messages, sendMessage: sendMessageRaw, status, stop } = useAgentChat({
@@ -152,9 +143,7 @@ export default function AIAgentBar() {
       agentActiveRef.current = true;
     },
     onToolProgress: (toolName: string) => {
-      // Rotate the magical word when a tool starts
-      const idx = Math.floor(Math.random() * MAGIC_WORDS.length);
-      setMagicWord(MAGIC_WORDS[idx]);
+      // Tool progress callback
     },
   });
 
@@ -210,8 +199,6 @@ export default function AIAgentBar() {
     if (finished && hmrGateActiveRef.current) {
       try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
       hmrGateActiveRef.current = false;
-      // Reset magic word at run end
-      setMagicWord('');
       agentActiveRef.current = false;
     }
     if (finished && fsChangedRef.current && instanceRef.current) {
@@ -446,14 +433,7 @@ export default function AIAgentBar() {
               onStop={() => stop()}
               onFocus={() => setMode('chat')}
               uploadBusy={busyFlags.uploadBusy}
-              placeholderWord={magicWord}
-              showAnimatedPlaceholder={agentActiveRef.current}
-              placeholderTheme={(() => {
-                const palette = ['blue','red','orange','green'] as const;
-                const idx = Math.floor(Math.random() * palette.length);
-                return palette[idx];
-              })()}
-              magicWord={magicWord}
+
             />
           )}
           {leftPane === 'friend' && (
@@ -475,15 +455,6 @@ export default function AIAgentBar() {
     </div>
   );
 
-  // Smoothly pulse the placeholder when status is streaming/submitted
-  useEffect(() => {
-    if (status === 'submitted' || status === 'streaming') return;
-    // If idle without a magic word, pick a playful default to entice typing
-    if (!magicWord) {
-      const idx = Math.floor(Math.random() * MAGIC_WORDS.length);
-      setMagicWord(MAGIC_WORDS[idx]);
-    }
-  }, [status, MAGIC_WORDS, magicWord]);
 
 
   return (
