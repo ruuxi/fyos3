@@ -23,7 +23,7 @@ export default function AgentBarShell(props: AgentBarShellProps) {
         aria-hidden="true"
       />
       <div className="flex justify-center">
-        <div className="w-full max-w-4xl mx-4 relative z-50" ref={barAreaRef}>
+        <div className="w-full max-w-5xl mx-4 relative z-50" ref={barAreaRef}>
           <div className={`rounded-none text-white ${isOpen ? 'glass-secondary' : 'glass-primary'} transition-shadow overflow-hidden`}>
             <div className="flex flex-col-reverse">
               {/* Bottom bar (fixed) */}
@@ -44,5 +44,4 @@ export default function AgentBarShell(props: AgentBarShellProps) {
     </>
   );
 }
-
 

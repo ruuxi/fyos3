@@ -159,15 +159,15 @@ export default function MessagesPane(props: MessagesPaneProps) {
   return (
     <div
       ref={messagesContainerRef}
-      className="overflow-auto pt-2 pb-1 modern-scrollbar pr-3"
+      className="overflow-auto pt-0 pb-1 modern-scrollbar pr-0"
       style={{
         height: containerHeight > 0 ? `${containerHeight}px` : undefined,
         maxHeight: '60vh',
         transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
         willChange: 'height',
         scrollBehavior: 'auto',
-        paddingLeft: '12px',
-        paddingRight: '22px',
+        paddingLeft: '0px',
+        paddingRight: '0px',
       }}
     >
       <div ref={messagesInnerRef} className="space-y-3 px-1">

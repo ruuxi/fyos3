@@ -573,111 +573,128 @@ export default function AIAgentBar() {
     >
       <div className="bg-transparent text-white">
         {(mode === 'chat' || mode === 'friends') && (
-          <div className={`${leftPane === 'friend' ? 'relative' : 'px-4 pt-3 relative'}`}>
-            <div className="grid grid-cols-[220px_1fr] gap-3">
-              {/* Left switcher: Agent vs Friends */}
-              <div className="border border-white/15 bg-white/5 p-2">
-                <div className="text-xs text-white/70 mb-1">Chats</div>
-                <div className="flex flex-col gap-1">
-                  <button
-                    className={`text-left text-sm px-2 py-1 rounded ${leftPane==='agent' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                    onClick={()=>{ setLeftPane('agent'); setMode('chat'); }}
-                  >
-                    Agent
-                  </button>
-                  <button
-                    className={`text-left text-sm px-2 py-1 rounded ${leftPane==='friend' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                    onClick={()=>{ setLeftPane('friend'); setMode('friends'); }}
-                  >
-                    Friends
-                  </button>
+          <div className="relative pb-3">
+            <div className="border border-white/15 bg-white/5 overflow-hidden">
+              <div className="grid grid-cols-[220px_minmax(0,1fr)]">
+                {/* Left switcher: Agent vs Friends */}
+                <div className="min-h-[420px] border-r border-white/15">
+                  <div className="px-3 pt-3 pb-3 flex flex-col gap-2">
+                    <div className="text-xs text-white/70 mb-1">Chats</div>
+                    <div className="flex flex-col gap-1">
+                      <button
+                        className={`text-left text-sm px-2 py-1 rounded ${leftPane==='agent' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
+                        onClick={()=>{ setLeftPane('agent'); setMode('chat'); }}
+                      >
+                        Agent
+                      </button>
+                      <button
+                        className={`text-left text-sm px-2 py-1 rounded ${leftPane==='friend' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
+                        onClick={()=>{ setLeftPane('friend'); setMode('friends'); }}
+                      >
+                        Friends
+                      </button>
+                    </div>
+
+                    {leftPane==='friend' && (
+                      <div className="mt-2 flex flex-col gap-2">
+                        {friendsLoading && (<div className="text-xs text-white/60">Loading…</div>)}
+                        {friendsError && (<div className="text-xs text-red-300">{friendsError}</div>)}
+                        {(friends.length > 0) && (
+                          <div className="text-xs text-white/70">Friends</div>
+                        )}
+                        <div className="flex flex-col gap-1 max-h-[240px] overflow-auto">
+                          {friends.map((f)=> (
+                            <button key={f.ownerId}
+                              className={`text-left text-xs px-2 py-1 rounded ${activePeerId===f.ownerId ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
+                              onClick={()=> setActivePeerId(f.ownerId)}
+                              title={f.email || f.ownerId}
+                            >
+                              {f.nickname || f.email || f.ownerId.slice(0,8)}
+                            </button>
+                          ))}
+                          {friends.length===0 && !friendsLoading && !friendsError && (
+                            <div className="text-xs text-white/60">No friends yet</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {leftPane==='friend' && (
-                  <div className="mt-1">
-                    <div className="text-xs text-white/70 mb-1">Me</div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="text"
-                        className="rounded-none text-black px-2 py-1 text-xs flex-1"
-                        placeholder="Nickname"
-                        defaultValue={me?.nickname || ''}
-                        onBlur={(e)=>{ const v = e.target.value.trim(); if (v && v !== (me?.nickname||'')) void setNickname(v); }}
-                        disabled={!isAuthed}
-                      />
-                    </div>
-                    <div className="text-xs text-white/70 mt-2 mb-1">Friends</div>
-                    {friendsLoading && (<div className="text-xs text-white/60">Loading…</div>)}
-                    {friendsError && (<div className="text-xs text-red-300">{friendsError}</div>)}
-                    <div className="flex flex-col gap-1 max-h-[240px] overflow-auto">
-                      {friends.map((f)=> (
-                        <button key={f.ownerId}
-                          className={`text-left text-xs px-2 py-1 rounded ${activePeerId===f.ownerId ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                          onClick={()=> setActivePeerId(f.ownerId)}
-                          title={f.email || f.ownerId}
-                        >
-                          {f.nickname || f.email || f.ownerId.slice(0,8)}
-                        </button>
-                      ))}
-                      {friends.length===0 && (<div className="text-xs text-white/60">No friends yet</div>)}
-                    </div>
+                <div className="min-h-[420px] flex flex-col">
+                  <div className="flex flex-col gap-3 h-full px-3 pt-3 pb-3">
+                    {leftPane==='agent' && (
+                      <>
+                        <ChatTabs
+                          openThreads={openThreads}
+                          historyThreads={historyThreads}
+                          threadsLoading={threadsLoading}
+                          threadsError={threadsError}
+                          activeThreadId={activeThreadId}
+                          setActiveThreadId={setActiveThreadId}
+                          showHistory={showThreadHistory}
+                          setShowHistory={setShowThreadHistory}
+                          onRefresh={() => { void refreshThreads(); }}
+                          onNewConversation={() => { activeThreadIdImmediateRef.current = null; startBlankThread(); }}
+                          onClose={(id) => {
+                            if (activeThreadIdImmediateRef.current === id) {
+                              activeThreadIdImmediateRef.current = null;
+                            }
+                            closeThread(id);
+                          }}
+                          onOpenFromHistory={(id) => {
+                            activeThreadIdImmediateRef.current = id;
+                            setActiveThreadId(id);
+                          }}
+                        />
+                        <div className="flex-1 min-h-0">
+                          <MessagesPane
+                            messages={messages}
+                            optimisticMessages={optimisticMessages}
+                            status={status}
+                            messagesContainerRef={messagesContainerRef}
+                            messagesInnerRef={messagesInnerRef}
+                            containerHeight={containerHeight}
+                            didAnimateWelcome={didAnimateWelcome}
+                            bubbleAnimatingIds={bubbleAnimatingIds}
+                            lastSentAttachments={lastSentAttachments || undefined}
+                            activeThreadId={activeThreadId || undefined}
+                          />
+                        </div>
+                      </>
+                    )}
+                    {leftPane==='friend' && (
+                      <div className="flex flex-col gap-3 flex-1 min-h-0">
+                        <div className="flex flex-col gap-2">
+                          <div className="text-xs text-white/70">Me</div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              className="rounded-none text-black px-2 py-1 text-xs flex-1"
+                              placeholder="Nickname"
+                              defaultValue={me?.nickname || ''}
+                              onBlur={(e)=>{ const v = e.target.value.trim(); if (v && v !== (me?.nickname||'')) void setNickname(v); }}
+                              disabled={!isAuthed}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-white/70 mb-1">Add friend</div>
+                          <AddFriendForm onAdd={(nickname)=> addFriend(nickname)} disabled={!isAuthed} />
+                        </div>
+                        <div className="flex-1 min-h-0">
+                          <FriendMessagesPane
+                            messages={dmMessages || []}
+                            activePeerId={activePeerId}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-
-              <div className={`${leftPane==='friend' ? 'min-h-[420px] p-3' : ''}`}>
-                {leftPane==='agent' && (
-                  <>
-                    <ChatTabs
-                      openThreads={openThreads}
-                      historyThreads={historyThreads}
-                      threadsLoading={threadsLoading}
-                      threadsError={threadsError}
-                      activeThreadId={activeThreadId}
-                      setActiveThreadId={setActiveThreadId}
-                      showHistory={showThreadHistory}
-                      setShowHistory={setShowThreadHistory}
-                      onRefresh={() => { void refreshThreads(); }}
-                      onNewConversation={() => { activeThreadIdImmediateRef.current = null; startBlankThread(); }}
-                      onClose={(id) => {
-                        if (activeThreadIdImmediateRef.current === id) {
-                          activeThreadIdImmediateRef.current = null;
-                        }
-                        closeThread(id);
-                      }}
-                      onOpenFromHistory={(id) => {
-                        activeThreadIdImmediateRef.current = id;
-                        setActiveThreadId(id);
-                      }}
-                    />
-                    <MessagesPane
-                      messages={messages}
-                      optimisticMessages={optimisticMessages}
-                      status={status}
-                      messagesContainerRef={messagesContainerRef}
-                      messagesInnerRef={messagesInnerRef}
-                      containerHeight={containerHeight}
-                      didAnimateWelcome={didAnimateWelcome}
-                      bubbleAnimatingIds={bubbleAnimatingIds}
-                      lastSentAttachments={lastSentAttachments || undefined}
-                      activeThreadId={activeThreadId || undefined}
-                    />
-                  </>
-                )}
-                {leftPane==='friend' && (
-                  <>
-                    <div className="mb-3">
-                      <div className="text-xs text-white/70 mb-1">Add friend</div>
-                      <AddFriendForm onAdd={(nickname)=> addFriend(nickname)} disabled={!isAuthed} />
-                    </div>
-                    <FriendMessagesPane
-                      messages={dmMessages || []}
-                      activePeerId={activePeerId}
-                    />
-                  </>
-                )}
+                </div>
               </div>
             </div>
+
             {status === 'ready' && undoDepth > 1 && (
               <button
                 onClick={handleUndo}
@@ -688,6 +705,7 @@ export default function AIAgentBar() {
                 <span className="text-sm">undo</span>
               </button>
             )}
+
             <style jsx>{`
               .ios-pop { animation: iosPop 420ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: bottom left; }
               @keyframes iosPop {
