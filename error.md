@@ -41,8 +41,14 @@ Total errors: 0
 - src/components/WebContainer.tsx — removed unused JSON parsing and silent catch arg
 - src/components/WebContainerProvider.tsx — cleaned unused types and catch param
 - test-auto-ingest-simple.js — marked unused fetch options parameter
-- src/components/BootScreen.tsx — removed unused theme selector memo
-- src/components/ScreenCarousel.tsx — removed unused drag start state
+- src/components/BootScreen.tsx — stabilized theme selection hooks
+- src/components/ScreenCarousel.tsx — kept drag maths typed and dependency-safe
+- src/components/WebContainer.tsx — guarded desktop bootstrap with stable refs
+- src/app/logs/page.tsx — memoized fetchLogs for useEffect
+- src/apps/media/index.tsx — memoized load handler for dependency checks
+- templates/webcontainer/src/desktop/Desktop.tsx — stabilized message bridge effect
+- templates/webcontainer/postcss.config.js — exported named config constant
+- templates/webcontainer/tailwind.config.js — exported named config constant
 
 ## Active warnings
-- None (next focus: hook deps, config exports, `<img>` usage)
+- src/apps/media/index.tsx — replace `<img>` with `next/image` for Next.js lint
