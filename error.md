@@ -1,6 +1,6 @@
 # ESLint Errors
 
-Total errors: 86
+Total errors: 41
 
 ## Resolved
 - src/components/ScreenCarousel.tsx — cleared 2 `any` violations
@@ -24,60 +24,12 @@ Total errors: 86
 - src/utils/app-packaging.ts — cleared 4 lint offenses
 - src/utils/desktop-snapshot.ts — cleared 1 lint offense
 - src/utils/vfs-persistence.ts — cleared 1 lint offense
+- templates/webcontainer/src/ai/index.ts — cleared 45 lint offenses
 
 ## /home/rn/projects/7/fyos/src/lib/code-edit/recastEdit.ts
 
 
 
-## /home/rn/projects/7/fyos/templates/webcontainer/src/ai/index.ts
-- Line 8, Col 77: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 8, Col 91: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 13, Col 18: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 13, Col 30: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 15, Col 60: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 19, Col 60: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 23, Col 53: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 37, Col 58: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 43, Col 64: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 49, Col 53: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 49, Col 67: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 53, Col 46: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 53, Col 60: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 58, Col 45: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 58, Col 59: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 63, Col 60: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 63, Col 79: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 69, Col 21: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 75, Col 73: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 76, Col 16: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 78, Col 27: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 78, Col 79: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 79, Col 20: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 79, Col 78: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 80, Col 27: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 80, Col 95: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 81, Col 27: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 81, Col 92: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 82, Col 27: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 82, Col 77: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 108, Col 16: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 108, Col 28: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 110, Col 58: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 114, Col 53: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 119, Col 58: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 123, Col 64: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 134, Col 16: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 134, Col 28: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 136, Col 58: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 140, Col 53: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 145, Col 58: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 149, Col 64: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 183, Col 67: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 183, Col 86: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 188, Col 80: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 188, Col 99: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 193, Col 83: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
-- Line 193, Col 102: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
 - Line 198, Col 85: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
 - Line 198, Col 104: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
 - Line 204, Col 93: Unexpected any. Specify a different type (`@typescript-eslint/no-explicit-any`)
