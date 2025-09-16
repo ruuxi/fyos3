@@ -512,7 +512,9 @@ export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
   const appsByIdRef = useRef<Record<string, App>>({})
   const [appOrder, setAppOrder] = useState<string[]>([])
+  const appOrderRef = useRef(appOrder)
   const [userMode, setUserMode] = useState<'auth'|'anon'>('auth')
+  const userModeRef = useRef(userMode)
   const [theme, setTheme] = useState<{ mode: 'image'|'gradient'; value: string } | null>(null)
   // const [bootscreen, setBootscreen] = useState<boolean>(false)
   // const [gradientKey, setGradientKey] = useState<string>('1')
@@ -535,6 +537,8 @@ export default function Desktop(){
       } catch {}
     })();
   }, [userMode])
+  useEffect(() => { appOrderRef.current = appOrder }, [appOrder])
+  useEffect(() => { userModeRef.current = userMode }, [userMode])
   // Announce readiness to host so it can flush any pending open-app messages
   useEffect(()=>{
     try { window.parent?.postMessage({ type: EVT_DESKTOP_READY }, '*') } catch {}
@@ -606,6 +610,8 @@ export default function Desktop(){
   const openWindowsRef = useRef<App[]>([])
   useEffect(() => { openWindowsRef.current = open }, [open])
   const [windowTabs, setWindowTabs] = useState<Record<string, WindowTabsState>>({})
+  const windowTabsRef = useRef(windowTabs)
+  useEffect(() => { windowTabsRef.current = windowTabs }, [windowTabs])
 
   const [dialState, setDialState] = useState<{
     x: number;
@@ -642,6 +648,11 @@ export default function Desktop(){
   const [movingWindowId, setMovingWindowId] = useState<string | null>(null)
   const isMountedRef = useRef(true)
   const skipGeometryPersistenceRef = useRef(false)
+  const endMoveSessionRef = useRef<(persist?: boolean) => void>(() => {})
+  const startDialSessionRef = useRef<(params: { pointerId: number; clientX: number; clientY: number; source: 'native' | 'iframe'; targetAppId?: string | null }) => void>(() => {})
+  const updateDialVisualsRef = useRef<((clientX: number, clientY: number) => { option: DialOption | null; distance: number; hasWindow: boolean } | null) | null>(null)
+  const executeDialSelectionRef = useRef<((option: DialOption, appId: string | null, pointerX: number, pointerY: number) => void) | null>(null)
+  const launchRef = useRef<(app: App) => void>(() => {})
 
   useEffect(() => { if (userMode === 'auth') setWindowTabs(loadWindowTabs()); }, [userMode]);
 
@@ -697,6 +708,9 @@ export default function Desktop(){
 
   const [iconPositions, setIconPositions] = useState<Record<string,{left:number;top:number}>>({})
   const [windowGeometries, setWindowGeometries] = useState<Record<string,{left:number;top:number;width:number;height:number}>>({})
+  const windowGeometriesRef = useRef(windowGeometries)
+  useEffect(() => { windowGeometriesRef.current = windowGeometries }, [windowGeometries])
+  const windowGeometriesRef = useRef(windowGeometries)
   const dragIconRef = useRef<{
     id: string | null
     startX: number
@@ -877,6 +891,7 @@ export default function Desktop(){
       return [...prev, created]
     })
   }
+  launchRef.current = launch
 
   function close(appId: string){
     // Animate close before removing
@@ -1005,6 +1020,7 @@ export default function Desktop(){
     window.addEventListener('keydown', keyListener)
     dialListenersRef.current = listeners
   }
+  startDialSessionRef.current = startDialSession
 
   const endDial = () => {
     const listeners = dialListenersRef.current
@@ -1031,6 +1047,7 @@ export default function Desktop(){
     setDialState(prev => prev ? { ...prev, active: option, distance, available: availability } : prev)
     return { option, distance, hasWindow }
   }
+  updateDialVisualsRef.current = updateDialVisuals
 
   function executeDialSelection(option: DialOption, appId: string | null, pointerX: number, pointerY: number) {
     if (option === 'chat') {
@@ -1062,6 +1079,7 @@ export default function Desktop(){
       startMoveSession(appId, pointerX, pointerY)
     }
   }
+  executeDialSelectionRef.current = executeDialSelection
 
   const applyMoveSessionPosition = (session: NonNullable<typeof moveSessionRef.current>, clientX: number, clientY: number) => {
     const rawLeft = clientX - session.offsetX
@@ -1106,6 +1124,7 @@ export default function Desktop(){
     }
     if (isMountedRef.current) setMovingWindowId(null)
   }
+  endMoveSessionRef.current = endMoveSession
 
   const onMoveSessionPointerMove = (evt: PointerEvent) => {
     const session = moveSessionRef.current
@@ -1198,7 +1217,7 @@ export default function Desktop(){
   useEffect(() => {
     return () => {
       isMountedRef.current = false
-      endMoveSession(false)
+      endMoveSessionRef.current?.(false)
       const listeners = dialListenersRef.current
       if (listeners) {
         if (listeners.move) window.removeEventListener('pointermove', listeners.move)
@@ -1236,7 +1255,7 @@ export default function Desktop(){
       if (d.id){
         // persist positions
         setTimeout(()=>{
-          try{ if (userMode === 'auth') localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(iconPositionsRef.current)) } catch{}
+          try{ if (userModeRef.current === 'auth') localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(iconPositionsRef.current)) } catch{}
         }, 0)
       }
       dragIconRef.current = { id: null, startX: 0, startY: 0, startLeft: 0, startTop: 0, dragging: false }
@@ -1275,9 +1294,9 @@ export default function Desktop(){
         if (payload.phase === 'down') {
           const candidateAppId = typeof payload.appId === 'string' ? payload.appId : null
           if (moveSessionRef.current) {
-            endMoveSession()
+            endMoveSessionRef.current?.()
           }
-          startDialSession({
+          startDialSessionRef.current?.({
             pointerId: payload.pointerId,
             clientX: payload.clientX,
             clientY: payload.clientY,
@@ -1288,12 +1307,12 @@ export default function Desktop(){
           const session = dialSessionRef.current
           if (!session || session.source !== 'iframe' || session.pointerId !== payload.pointerId) return
           if (payload.phase === 'move') {
-            updateDialVisuals(payload.clientX, payload.clientY)
+            updateDialVisualsRef.current?.(payload.clientX, payload.clientY)
           } else if (payload.phase === 'up') {
-            const result = updateDialVisuals(payload.clientX, payload.clientY)
+            const result = updateDialVisualsRef.current?.(payload.clientX, payload.clientY)
             endDial()
-            if (result?.option) {
-              executeDialSelection(result.option, session.targetAppId, payload.clientX, payload.clientY)
+            if (result?.option && executeDialSelectionRef.current) {
+              executeDialSelectionRef.current(result.option, session.targetAppId, payload.clientX, payload.clientY)
             }
           } else if (payload.phase === 'cancel') {
             endDial()
@@ -1327,9 +1346,9 @@ export default function Desktop(){
       }
       if (typeValue === 'FYOS_REQUEST_DESKTOP_STATE') {
         try {
-          const payload = (userMode === 'auth')
+          const payload = (userModeRef.current === 'auth')
             ? { iconPositions: loadIconPositions(), windowGeometries: loadWindowGeometries(), windowTabs: loadWindowTabs(), appOrder: loadAppOrder() }
-            : { iconPositions, windowGeometries, windowTabs, appOrder }
+            : { iconPositions: iconPositionsRef.current, windowGeometries: windowGeometriesRef.current, windowTabs: windowTabsRef.current, appOrder: appOrderRef.current }
           window.parent?.postMessage({ type: 'FYOS_DESKTOP_STATE', payload }, '*')
         } catch {}
         return
@@ -1345,13 +1364,13 @@ export default function Desktop(){
       if (!toLaunch.path) return
       // visually bounce icon if present
       bounceIcon(setLaunchingIconId, toLaunch.id)
-      launch(toLaunch)
+      launchRef.current?.(toLaunch)
       // If icon position missing, assign one and persist
       setIconPositions(prev => {
         if (prev[toLaunch.id]) return prev
         const nextPos = findNextIconPosition(prev, appsRef.current || [])
         const next = { ...prev, [toLaunch.id]: nextPos }
-        if (userMode === 'auth') saveIconPositions(next)
+        if (userModeRef.current === 'auth') saveIconPositions(next)
         return next
       })
     }

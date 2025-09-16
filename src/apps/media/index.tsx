@@ -27,7 +27,7 @@ export default function App(){
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
-  async function load() {
+  const load = React.useCallback(async () => {
     setLoading(true); setError(null)
     try {
       // Only attempt to load media if user is authenticated
@@ -47,13 +47,13 @@ export default function App(){
     } finally {
       setLoading(false)
     }
-  }
+  }, [isSignedIn, type])
 
   React.useEffect(()=>{ 
     if (isLoaded) {
       void load() 
     }
-  }, [type, isSignedIn, isLoaded])
+  }, [isLoaded, load])
 
   return (
     <div className="h-full overflow-auto">
@@ -107,4 +107,3 @@ export default function App(){
     </div>
   )
 }
-

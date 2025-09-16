@@ -20,25 +20,26 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
 
   type Theme = { mode: 'image'|'gradient'; value: string };
   type ThemeOption = { key: string; mode: 'image'|'gradient'; value: string };
-  const options: ThemeOption[] = [
+  const themeOptions = useMemo<ThemeOption[]>(() => ([
     { key: 'img-2', mode: 'image', value: '/2.webp' },
     { key: 'img-3', mode: 'image', value: '/3.webp' },
     { key: 'grad-1', mode: 'gradient', value: 'linear-gradient(180deg,#6EC1FF 0%,#60E6F7 50%,#77F2C9 100%)' },
     { key: 'grad-2', mode: 'gradient', value: 'linear-gradient(180deg,#FF6BA6 0%,#FF9D6C 50%,#FFD36E 100%)' },
     { key: 'grad-3', mode: 'gradient', value: 'linear-gradient(180deg,#A78BFA 0%,#60A5FA 50%,#22D3EE 100%)' },
-  ];
+  ]), []);
   // Initialize synchronously to prevent flicker: read localStorage on first render
-  const initialKey = (() => {
-    if (typeof window === 'undefined') return options[0].key;
+  const [selectedKey, setSelectedKey] = useState<string>(() => {
+    if (typeof window === 'undefined') return themeOptions[0].key;
     try {
       const raw = window.localStorage.getItem(THEME_KEY);
-      if (!raw) return options[0].key;
+      if (!raw) return themeOptions[0].key;
       const t: Theme = JSON.parse(raw);
-      const match = options.find(o => o.mode === t.mode && o.value === t.value);
-      return match ? match.key : options[0].key;
-    } catch { return options[0].key; }
-  })();
-  const [selectedKey, setSelectedKey] = useState<string>(initialKey);
+      const match = themeOptions.find(o => o.mode === t.mode && o.value === t.value);
+      return match ? match.key : themeOptions[0].key;
+    } catch {
+      return themeOptions[0].key;
+    }
+  });
 
   useEffect(() => {
     if (complete && canProceed && !exiting) {
@@ -52,19 +53,19 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
 
   // Persist on selection
   useEffect(() => {
-    const o = options.find(x => x.key === selectedKey) || options[0];
+    const o = themeOptions.find(x => x.key === selectedKey) || themeOptions[0];
     const next: Theme = { mode: o.mode, value: o.value };
     try { window.localStorage.setItem(THEME_KEY, JSON.stringify(next)); } catch {}
     try { window.postMessage({ type: 'FYOS_SET_THEME', payload: next }, '*'); } catch {}
-  }, [selectedKey]);
+  }, [selectedKey, themeOptions]);
 
   const widthStyle = useMemo(() => ({ width: `${clamped}%` }), [clamped]);
   const wallpaperStyle = useMemo<React.CSSProperties>(() => {
-    const o = options.find(x => x.key === selectedKey) || options[0];
+    const o = themeOptions.find(x => x.key === selectedKey) || themeOptions[0];
     return o.mode === 'gradient'
       ? { background: o.value }
       : { backgroundImage: `url(${o.value})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' };
-  }, [selectedKey]);
+  }, [selectedKey, themeOptions]);
 
   const glassStyle: React.CSSProperties = {
     background: 'rgba(255,255,255,0.04)',
@@ -87,7 +88,7 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
 
         <div className="mx-auto w-[280px] md:w-[520px]">
           <div className="mb-4 flex items-center justify-center gap-3">
-            {options.map((opt) => (
+            {themeOptions.map((opt) => (
               <button
                 key={opt.key}
                 onClick={() => setSelectedKey(opt.key)}

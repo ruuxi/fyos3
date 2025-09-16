@@ -152,6 +152,8 @@ export default function WebContainer() {
   const { openSignIn } = useClerk();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [webcontainerInstance, setWebcontainerInstance] = useState<WebContainerAPI | null>(null);
+  const webcontainerInstanceRef = useRef<WebContainerAPI | null>(null);
+  useEffect(() => { webcontainerInstanceRef.current = webcontainerInstance; }, [webcontainerInstance]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStage, setLoadingStage] = useState<string>('Initializing…');
   const [displayProgress, setDisplayProgress] = useState<number>(2);
@@ -162,6 +164,8 @@ export default function WebContainer() {
   const [serverReady, setServerReady] = useState(false);
   const [shouldExitBoot, setShouldExitBoot] = useState(false);
   const { setInstance } = useWebContainer();
+  const setInstanceRef = useRef(setInstance);
+  useEffect(() => { setInstanceRef.current = setInstance; }, [setInstance]);
   const devProcRef = useRef<WebContainerProcess | null>(null);
   const devUrlRef = useRef<string | null>(null);
   const pendingOpenAppsRef = useRef<OpenAppPayload[]>([]);
@@ -169,7 +173,13 @@ export default function WebContainer() {
   const lastRemoteSaveRef = useRef<number>(0);
   const remoteSaveInFlightRef = useRef<boolean>(false);
   const { client: convexClient, ready: convexReady } = useConvexClient();
+  const convexClientRef = useRef(convexClient);
+  useEffect(() => { convexClientRef.current = convexClient; }, [convexClient]);
+  const convexReadyRef = useRef(convexReady);
+  useEffect(() => { convexReadyRef.current = convexReady; }, [convexReady]);
   const [userMode, setUserMode] = useState<'auth'|'anon'>('auth');
+  const userModeRef = useRef(userMode);
+  useEffect(() => { userModeRef.current = userMode; }, [userMode]);
   const canProceed = isSignedIn || userMode === 'anon';
 
   useEffect(() => {
@@ -327,14 +337,15 @@ export default function WebContainer() {
         // Try restoring a private desktop snapshot from server, then local IndexedDB, else default snapshot
         let restored = false;
         try {
-          if (userMode === 'auth' && convexReady && convexClient) {
+          const convexClientCurrent = convexClientRef.current;
+          if (userModeRef.current === 'auth' && convexReadyRef.current && convexClientCurrent) {
             setLoadingStage('Checking cloud snapshot…');
             setTargetProgress((p) => Math.max(p, 30));
-            const record = await convexClient.query(convexApi.desktops_private.getLatestDesktop, {});
+            const record = await convexClientCurrent.query(convexApi.desktops_private.getLatestDesktop, {});
             if (record && record._id) {
               setLoadingStage('Restoring from cloud…');
               setTargetProgress((p) => Math.max(p, 34));
-              const url = await convexClient.query(convexApi.desktops_private.getDesktopSnapshotUrl, { id: record._id });
+              const url = await convexClientCurrent.query(convexApi.desktops_private.getDesktopSnapshotUrl, { id: record._id });
               const snapRes = await fetch(url, { cache: 'no-store' });
               if (snapRes.ok) {
                 const buf = new Uint8Array(await snapRes.arrayBuffer());
@@ -353,7 +364,7 @@ export default function WebContainer() {
           console.warn('[WebContainer] Could not check latest private snapshot:', e);
         }
 
-        if (!restored && userMode === 'auth') {
+        if (!restored && userModeRef.current === 'auth') {
           try {
             const hasSaved = await hasPersistedVfs();
             if (hasSaved) {
@@ -483,7 +494,7 @@ export default function Document() {
         }
 
         // Expose the instance to tools only after dependencies are installed
-        setInstance(instance);
+        setInstanceRef.current?.(instance);
 
         // Removed periodic autosave; persist on visibility/unload only
 
@@ -524,7 +535,7 @@ export default function Document() {
               }
             };
 
-            if (userMode === 'auth') {
+            if (userModeRef.current === 'auth') {
               const state = await fetchDesktopState().catch(() => null);
               if (state) {
                 try {
@@ -543,10 +554,11 @@ export default function Document() {
                 } catch {}
               }
             }
-            if (userMode === 'auth' && convexReady && convexClient) {
+            const convexClientCurrent = convexClientRef.current;
+            if (userModeRef.current === 'auth' && convexReadyRef.current && convexClientCurrent) {
               const { buildDesktopSnapshot } = await import('@/utils/desktop-snapshot');
               const snap = await buildDesktopSnapshot(instance);
-              const start = await convexClient.mutation(convexApi.desktops_private.saveDesktopStart, {
+              const start = await convexClientCurrent.mutation(convexApi.desktops_private.saveDesktopStart, {
                 desktopId: 'default',
                 title: 'My Desktop',
                 size: snap.size,
@@ -555,7 +567,7 @@ export default function Document() {
               });
               if (start?.url && start?.r2KeySnapshot) {
                 await fetch(start.url, { method: 'PUT', body: new Uint8Array(snap.gz), headers: { 'Content-Type': 'application/octet-stream' } }).catch(() => {});
-                await convexClient.mutation(convexApi.desktops_private.saveDesktopFinalize, {
+                await convexClientCurrent.mutation(convexApi.desktops_private.saveDesktopFinalize, {
                   desktopId: 'default',
                   title: 'My Desktop',
                   r2KeySnapshot: start.r2KeySnapshot,
@@ -575,14 +587,14 @@ export default function Document() {
 
         const handleVisibility = () => {
           if (document.visibilityState === 'hidden') {
-            if (userMode === 'auth') {
+            if (userModeRef.current === 'auth') {
               void persistNow(instance);
               void savePrivateSnapshot();
             }
           }
         };
         const handleBeforeUnload = () => {
-          if (userMode === 'auth') {
+          if (userModeRef.current === 'auth') {
             void persistNow(instance);
             void savePrivateSnapshot();
           }
@@ -680,7 +692,7 @@ export default function Document() {
               try { srcWin.postMessage(resp, event.origin); } catch {}
             };
             try {
-              if (userMode === 'anon') {
+              if (userModeRef.current === 'anon') {
                 // In anon mode, skip persistence; return original payload
                 const originalPayload = typeof payload === 'object' && payload !== null ? payload : {};
                 reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: true, result: { ...originalPayload, persisted: false } });
@@ -779,7 +791,7 @@ export default function Document() {
             desktopReadyRef.current = true;
             const target = iframeRef.current?.contentWindow;
             // Announce user mode to the desktop iframe
-            try { target?.postMessage({ type: 'FYOS_USER_MODE', payload: { mode: userMode } }, '*') } catch {}
+            try { target?.postMessage({ type: 'FYOS_USER_MODE', payload: { mode: userModeRef.current } }, '*') } catch {}
             // Send current theme as soon as desktop is ready
             try {
               const raw = window.localStorage.getItem('fyos.desktop.theme');
@@ -840,13 +852,14 @@ export default function Document() {
 
     return () => {
       mounted = false;
-      setInstance(null);
+      setInstanceRef.current?.(null);
       if (cleanupMessageListener) cleanupMessageListener();
       if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
       if (beforeUnloadHandler) window.removeEventListener('beforeunload', beforeUnloadHandler);
       try {
-        if (webcontainerInstance) {
-          void persistNow(webcontainerInstance);
+        const existingInstance = webcontainerInstanceRef.current;
+        if (existingInstance) {
+          void persistNow(existingInstance);
         }
       } catch {}
     };

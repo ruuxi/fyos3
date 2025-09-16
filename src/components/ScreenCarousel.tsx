@@ -177,7 +177,7 @@ export function ScreenCarousel({ children }: ScreenCarouselProps) {
       container.removeEventListener('pointercancel', handlePointerCancel);
       document.body.style.overflow = '';
     };
-  }, [isDragging, hasHorizontalIntent, isTransitioning, activeIndex, children.length, goTo]);
+  }, [isDragging, hasHorizontalIntent, isTransitioning, activeIndex, children.length, goTo, prefersReduced]);
 
   // Keyboard shortcuts
   useEffect(() => {

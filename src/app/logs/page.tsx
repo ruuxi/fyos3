@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,7 @@ export default function LogsPage() {
   const [limit, setLimit] = useState(100);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/agent/logs?limit=${limit}`);
@@ -37,11 +37,11 @@ export default function LogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit]);
 
   useEffect(() => {
-    fetchLogs();
-  }, [limit]);
+    void fetchLogs();
+  }, [fetchLogs]);
 
   const formatTimestamp = (timestamp: string) => {
     return new Date(timestamp).toLocaleString();
