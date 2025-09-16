@@ -1442,7 +1442,6 @@ export default function Desktop(){
               return (
                 <div key={option} className={classes.join(' ')} style={{ left: `${pos.x}px`, top: `${pos.y}px` }}>
                   <span className="dial-ico" aria-hidden>{meta.icon}</span>
-                  <span className="dial-label-text">{meta.label}</span>
                 </div>
               )
             })}
