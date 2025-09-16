@@ -28,9 +28,9 @@ export default function AppStore() {
         const data = await fetchJSON<{ apps: AppRecord[] }>(`/api/store/apps`)
         if (!mounted) return
         setApps(data.apps || [])
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!mounted) return
-        setError(e?.message || 'Failed to load')
+        setError(e instanceof Error ? e.message : 'Failed to load')
       } finally {
         if (mounted) setLoading(false)
       }
@@ -84,5 +84,4 @@ export default function AppStore() {
     </div>
   )
 }
-
 

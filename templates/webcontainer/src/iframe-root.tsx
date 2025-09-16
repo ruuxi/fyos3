@@ -1,9 +1,9 @@
-import React, { StrictMode, Component, ReactNode } from 'react'
+import React, { StrictMode, Component, ComponentType, ErrorInfo, ReactNode } from 'react'
 import { createRoot as createReactRoot } from 'react-dom/client'
 
 interface ErrorBoundaryProps {
   name?: string;
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 interface ErrorBoundaryState {
@@ -18,7 +18,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   static getDerivedStateFromError(error: Error): ErrorBoundaryState{
     return { error }
   }
-  componentDidCatch(error: Error, info: any){
+  componentDidCatch(error: Error, info: ErrorInfo){
     try{ console.error('[App iframe] render error:', error, info) } catch{}
   }
   render(){
@@ -40,7 +40,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-export function createRoot(mountEl: HTMLElement, Comp: any, name?: string){
+export function createRoot(mountEl: HTMLElement, Comp: ComponentType | null | undefined, name?: string){
   const root = createReactRoot(mountEl)
   function Wrapper(){
     if (!Comp) return React.createElement('div', null, `Missing component: ${name || 'App'}`)
@@ -55,5 +55,4 @@ export function createRoot(mountEl: HTMLElement, Comp: any, name?: string){
   )
   return root
 }
-
 

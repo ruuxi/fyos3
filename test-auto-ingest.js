@@ -20,10 +20,16 @@ global.fetch = async (url, options) => {
   throw new Error('Unexpected fetch call');
 };
 
-// Import our auto-ingest function
-const { autoIngestInputs } = require('./src/utils/auto-ingest.ts');
+const loadAutoIngestInputs = async () => {
+  const mod = await import('./src/utils/auto-ingest.ts');
+  if (typeof mod.autoIngestInputs !== 'function') {
+    throw new Error('autoIngestInputs export is missing');
+  }
+  return mod.autoIngestInputs;
+};
 
 async function testAutoIngest() {
+  const autoIngestInputs = await loadAutoIngestInputs();
   console.log('🧪 Testing Auto-Ingest Logic\n');
 
   // Test 1: External URL detection and ingestion

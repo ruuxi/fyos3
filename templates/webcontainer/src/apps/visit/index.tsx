@@ -26,9 +26,9 @@ export default function Visit() {
         const data = await fetchJSON<{ desktops: DesktopRecord[] }>(`/api/visit/desktops`)
         if (!mounted) return
         setDesktops(data.desktops || [])
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!mounted) return
-        setError(e?.message || 'Failed to load')
+        setError(e instanceof Error ? e.message : 'Failed to load')
       } finally {
         if (mounted) setLoading(false)
       }
@@ -75,5 +75,4 @@ export default function Visit() {
     </div>
   )
 }
-
 

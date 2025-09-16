@@ -4,6 +4,12 @@ import Desktop from './desktop/Desktop'
 import './desktop/styles.css'
 import './tailwind.css'
 
+type ViteHotEvent = 'vite:beforeUpdate' | 'vite:afterUpdate' | 'full-reload'
+
+type ViteHot = {
+  on(event: ViteHotEvent, callback: () => void): void
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Desktop />
@@ -11,7 +17,8 @@ createRoot(document.getElementById('root')!).render(
 )
 
 // Lightweight HMR anti-flash mask
-if (import.meta && (import.meta as any).hot) {
+const hot = (import.meta as ImportMeta & { hot?: ViteHot }).hot
+if (hot) {
   try {
     const maskId = 'vite-hmr-mask'
     let mask = document.getElementById(maskId)
@@ -27,14 +34,14 @@ if (import.meta && (import.meta as any).hot) {
     const show = () => { ensureMask().classList.add('active') }
     const hideSoon = () => { setTimeout(() => ensureMask().classList.remove('active'), 120) }
 
-    ;(import.meta as any).hot.on('vite:beforeUpdate', () => {
+    hot.on('vite:beforeUpdate', () => {
       // HMR update incoming; briefly mask
       show()
     })
-    ;(import.meta as any).hot.on('vite:afterUpdate', () => {
+    hot.on('vite:afterUpdate', () => {
       hideSoon()
     })
-    ;(import.meta as any).hot.on('full-reload', () => {
+    hot.on('full-reload', () => {
       // Mask until the new page paints; keep active, browser reload will clear
       show()
     })

@@ -5,7 +5,8 @@ import type { Change } from 'diff';
 import * as t from '@babel/types';
 import type { TCodeEditAstInput } from '@/lib/agentTools';
 
-const { builders: b, namedTypes: n } = recast.types;
+const { namedTypes: n } = recast.types;
+const { builders: b } = recast.types;
 
 const PARSER_PLUGINS: parser.ParserPlugin[] = [
   'typescript',
@@ -329,18 +330,18 @@ function replaceJsxAttributes(ast: t.File, input: AstEditInput): boolean {
       if (n.JSXIdentifier.check(name) && name.name === jsxTag) {
         // Create new attributes
         const newAttributes = Object.entries(jsxAttributes).map(([key, value]) => {
-          let attrValue: (typeof b.jsxAttribute.arguments)[1];
+          let attrValue;
           if (typeof value === 'string') {
-            attrValue = b.literal(value) as unknown as typeof attrValue;
+            attrValue = b.stringLiteral(value);
           } else if (typeof value === 'boolean') {
-            attrValue = value ? null : b.jsxExpressionContainer(b.literal(false));
+            attrValue = value ? null : b.jsxExpressionContainer(b.booleanLiteral(false));
           } else if (typeof value === 'number') {
-            attrValue = b.jsxExpressionContainer(b.literal(value));
+            attrValue = b.jsxExpressionContainer(b.numericLiteral(value));
           } else {
-            attrValue = b.literal(String(value)) as unknown as typeof attrValue;
+            attrValue = b.stringLiteral(String(value));
           }
 
-          return b.jsxAttribute(b.jsxIdentifier(key), attrValue as any);
+          return b.jsxAttribute(b.jsxIdentifier(key), attrValue);
         });
 
         // Replace all attributes

@@ -109,6 +109,22 @@ function resolveAppGeometry(app: App): Geometry{
 
 // (removed unused resolveInitialGeometry)
 
+function setBodyUserSelect(value: string){
+  if (typeof document === 'undefined') return
+  const { body } = document
+  if (!body) return
+  try {
+    body.style.userSelect = value
+    if (value){
+      body.style.setProperty('-webkit-user-select', value)
+    } else {
+      body.style.removeProperty('-webkit-user-select')
+    }
+  } catch {
+    // ignore style failures
+  }
+}
+
 function determineDialOption(dx: number, dy: number, distance: number, hasWindow: boolean): DialOption | null {
   if (distance < DIAL_THRESHOLD) return null
   const angle = Math.atan2(dy, dx)
@@ -363,8 +379,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
         clearSelectionEverywhere()
         try{ rootRef.current?.classList.remove('resizing') } catch {}
         try{ document.body.classList.remove('desktop-resizing') } catch {}
-        try{ document.body.style.userSelect = '' } catch {}
-        try{ (document.body.style as any).webkitUserSelect = '' } catch {}
+        setBodyUserSelect('')
         try{ document.body.style.cursor = '' } catch {}
       }
       draggingRef.current.active = false; draggingRef.current.type = null
@@ -394,8 +409,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
     }
     try{ rootRef.current?.classList.add('resizing') } catch {}
     try{ document.body.classList.add('desktop-resizing') } catch {}
-    try{ document.body.style.userSelect = 'none' } catch {}
-    try{ (document.body.style as any).webkitUserSelect = 'none' } catch {}
+    setBodyUserSelect('none')
     try{ document.body.style.cursor = 'grabbing' } catch {}
     // Avoid costly selection updates during drag; clear once at start
     clearSelectionEverywhere()
@@ -421,8 +435,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
       }
       try{ rootRef.current?.classList.add('resizing') } catch {}
       try{ document.body.classList.add('desktop-resizing') } catch {}
-      try{ document.body.style.userSelect = 'none' } catch {}
-      try{ (document.body.style as any).webkitUserSelect = 'none' } catch {}
+      setBodyUserSelect('none')
       try{
         const map: Record<string,string> = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' }
         document.body.style.cursor = map[handle] || 'nwse-resize'
