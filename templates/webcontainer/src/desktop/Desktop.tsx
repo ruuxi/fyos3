@@ -34,10 +34,10 @@ const DIAL_THRESHOLD = 36
 type DialMeta = { label: string; angle: number; icon: string }
 
 const DIAL_OPTION_META: Record<DialOption, DialMeta> = {
-  expand: { label: 'Expand', angle: -90, icon: '⤢' },
-  move: { label: 'Move', angle: 0, icon: '🪟' },
-  close: { label: 'Close', angle: 90, icon: '✕' },
-  chat: { label: 'Open Chat', angle: 180, icon: '💬' },
+  expand: { label: 'Expand', angle: -45, icon: '⤢' },
+  move: { label: 'Move', angle: 45, icon: '🪟' },
+  close: { label: 'Close', angle: 135, icon: '✕' },
+  chat: { label: 'Open Chat', angle: -135, icon: '💬' },
 }
 
 const DIAL_OPTIONS: DialOption[] = ['expand', 'move', 'close', 'chat']
@@ -128,7 +128,8 @@ function setBodyUserSelect(value: string){
 function determineDialOption(dx: number, dy: number, distance: number, hasWindow: boolean): DialOption | null {
   if (distance < DIAL_THRESHOLD) return null
   const angle = Math.atan2(dy, dx)
-  const deg = (angle * 180 / Math.PI + 360) % 360
+  const normalizedDeg = (angle * 180 / Math.PI + 360) % 360
+  const deg = (normalizedDeg - 45 + 360) % 360
   if (deg >= 315 || deg < 45) return hasWindow ? 'move' : null
   if (deg >= 45 && deg < 135) return hasWindow ? 'close' : null
   if (deg >= 135 && deg < 225) return 'chat'
