@@ -127,6 +127,7 @@ export default defineSchema({
     ownerId: v.string(),
     role: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
+    mode: v.optional(v.union(v.literal("agent"), v.literal("persona"))),
     createdAt: v.number(),
   })
     .index("by_thread", ["threadId"]) 
@@ -164,4 +165,3 @@ export default defineSchema({
     .index("by_owner_peer_createdAt", ["ownerId", "peerId", "createdAt"]) 
     .index("by_owner_createdAt", ["ownerId", "createdAt"]),
 });
-

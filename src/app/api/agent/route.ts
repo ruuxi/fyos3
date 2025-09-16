@@ -109,22 +109,6 @@ export async function POST(req: Request) {
   // Generate session ID for this conversation
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   
-  // Log the incoming user message
-  const lastMessage = messagesWithHints[messagesWithHints.length - 1];
-  if (lastMessage && lastMessage.role === 'user') {
-    const content = lastMessage.parts?.map(p => p.type === 'text' ? p.text : '').join('') || '';
-    await agentLogger.logMessage(sessionId, lastMessage.id, 'user', content);
-    // Persist user message to Convex if threadId and auth are present
-    if (threadId) {
-      try {
-        const client = await getConvexClientOptional();
-        if (client) {
-          await client.mutation(convexApi.chat.appendMessage as any, { threadId: threadId as any, role: 'user', content } as any);
-        }
-      } catch {}
-    }
-  }
-
   // Sanitize/dedupe messages to avoid downstream gateway duplicate-id issues
   const seenHashes = new Set<string>();
   const sanitizedMessages: UIMessage[] = [] as any;
@@ -151,6 +135,27 @@ export async function POST(req: Request) {
       toolCalls: 'toolCalls' in m && Array.isArray((m as any).toolCalls) ? (m as any).toolCalls.length : 0,
     };
   }));
+
+  const appendMessageToThread = async (
+    role: 'user' | 'assistant',
+    content: string,
+    mode: 'agent' | 'persona'
+  ) => {
+    if (!threadId) return;
+    try {
+      const client = await getConvexClientOptional();
+      if (client) {
+        await client.mutation(convexApi.chat.appendMessage as any, {
+          threadId: threadId as any,
+          role,
+          content,
+          mode,
+        } as any);
+      }
+    } catch (error) {
+      console.warn('⚠️ [AGENT] Failed to append message to thread', error);
+    }
+  };
 
 
   // Persona-only mode: returns a parallel, personality-driven stream that does not use tools
@@ -179,6 +184,13 @@ export async function POST(req: Request) {
       // On classifier error, default to agent mode
     }
   }
+
+  const lastMessage = messagesWithHints[messagesWithHints.length - 1];
+  if (lastMessage && lastMessage.role === 'user') {
+    const content = lastMessage.parts?.map(p => p.type === 'text' ? p.text : '').join('') || '';
+    await agentLogger.logMessage(sessionId, lastMessage.id, 'user', content);
+    await appendMessageToThread('user', content, personaMode ? 'persona' : 'agent');
+  }
   if (personaMode) {
     const personaSystem = PERSONA_PROMPT;
 
@@ -191,12 +203,16 @@ export async function POST(req: Request) {
       model: 'google/gemini-2.0-flash',
       messages: convertToModelMessages(personaMessages),
       system: personaSystem,
-      onFinish: ({ usage, finishReason, text }: any) => {
+      onFinish: async ({ usage, finishReason, text }: any) => {
         console.log('🎭 [PERSONA] Response finished:', {
           finishReason,
           textLength: text?.length || 0,
           messagesCount: personaMessages.length,
         });
+        if (text) {
+          await agentLogger.logMessage(sessionId, `assistant_${Date.now()}`, 'assistant', text);
+          await appendMessageToThread('assistant', text, 'persona');
+        }
         
         if (usage) {
           console.log('📊 [USAGE-PERSONA] Token consumption:', {
@@ -379,15 +395,7 @@ export async function POST(req: Request) {
       // Log the complete assistant response including tool calls
       if (event.text) {
         await agentLogger.logMessage(sessionId, `assistant_${Date.now()}`, 'assistant', event.text);
-        // Persist assistant message to Convex if threadId and auth are present
-        if (threadId) {
-          try {
-            const client = await getConvexClientOptional();
-            if (client) {
-              await client.mutation(convexApi.chat.appendMessage as any, { threadId: threadId as any, role: 'assistant', content: event.text } as any);
-            }
-          } catch {}
-        }
+        await appendMessageToThread('assistant', event.text, 'agent');
       }
 
       // Tool calls are now logged in onStepFinish with proper timing and results

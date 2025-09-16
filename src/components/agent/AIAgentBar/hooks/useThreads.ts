@@ -1,29 +1,64 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useConvexAuth, useMutation, useQuery } from 'convex/react';
 import type { ChatThread } from '@/lib/agent/agentTypes';
-// Note: convex generated API is at repo root under convex/_generated
 import { api as convexApi } from '../../../../../convex/_generated/api';
 
+type ChatMode = 'agent' | 'persona';
+
 type UseThreadsState = {
-  threads: ChatThread[];
+  openThreads: ChatThread[];
+  historyThreads: ChatThread[];
   threadsLoading: boolean;
   threadsError: string | null;
   activeThreadId: string | null;
-  setActiveThreadId: (id: string | null) => void;
+  setActiveThreadId: (id: string | null, opts?: { ensureOpen?: boolean }) => void;
   initialChatMessages: any[] | undefined;
   chatSessionKey: string;
-  refreshThreads: (selectFirstIfAny?: boolean) => Promise<void>;
-  createNewThread: (title?: string) => Promise<void>;
+  refreshThreads: () => Promise<void>;
+  startBlankThread: () => void;
+  ensureActiveThread: (opts?: { titleHint?: string }) => Promise<string | null>;
+  closeThread: (id: string) => void;
   deleteThread: (id: string) => Promise<void>;
-  loadMessagesForThread: (id: string) => Promise<void>;
+  isAuthenticated: boolean;
 };
+
+const OPEN_THREADS_STORAGE_KEY = 'FYOS_AGENT_OPEN_THREADS_V1';
+
+function normalizeTitle(title?: string) {
+  if (!title) return 'New Chat';
+  const trimmed = title.replace(/\s+/g, ' ').trim();
+  if (!trimmed) return 'New Chat';
+  return trimmed.length > 80 ? `${trimmed.slice(0, 77)}…` : trimmed;
+}
+
+function mapThread(doc: any): ChatThread {
+  return {
+    _id: String(doc._id ?? doc.id),
+    title: doc.title ?? 'Chat',
+    updatedAt: doc.updatedAt ?? doc.lastMessageAt ?? 0,
+    lastMessageAt: doc.lastMessageAt,
+  };
+}
+
+function mapMessage(doc: any) {
+  const parts = [{ type: 'text', text: String(doc.content ?? '') }];
+  const mode: ChatMode | undefined = doc.mode === 'persona' ? 'persona' : (doc.mode === 'agent' ? 'agent' : undefined);
+  return {
+    id: String(doc._id ?? doc.id ?? Math.random().toString(36).slice(2)),
+    role: doc.role === 'assistant' ? 'assistant' : 'user',
+    metadata: mode ? { mode } : undefined,
+    parts,
+  };
+}
 
 export function useThreads(): UseThreadsState {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [threadsError, setThreadsError] = useState<string | null>(null);
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [activeThreadIdState, setActiveThreadIdState] = useState<string | null>(null);
   const [initialChatMessages, setInitialChatMessages] = useState<any[] | undefined>(undefined);
   const [chatSessionKey, setChatSessionKey] = useState<string>('agent-chat');
+  const [openThreadIds, setOpenThreadIds] = useState<string[]>([]);
+  const openIdsLoadedRef = useRef(false);
 
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const createThreadMutation = useMutation(convexApi.chat.createThread as any);
@@ -32,166 +67,213 @@ export function useThreads(): UseThreadsState {
   const threadsData = useQuery(
     convexApi.chat.listThreads as any,
     isAuthenticated ? ({ limit: 100 } as any) : 'skip'
-  ) as any[] | undefined;
+  ) as any[] | 'skip' | undefined;
 
   const messagesData = useQuery(
     convexApi.chat.listMessages as any,
-    isAuthenticated && activeThreadId ? ({ threadId: activeThreadId as any, limit: 200 } as any) : 'skip'
-  ) as any[] | undefined;
+    isAuthenticated && activeThreadIdState ? ({ threadId: activeThreadIdState as any, limit: 200 } as any) : 'skip'
+  ) as any[] | 'skip' | undefined;
 
-  const defaultCreatedRef = useRef(false);
-
-  async function refreshThreads(selectFirstIfAny = true) {
-    try {
-      setThreadsError(null);
-      if (!isAuthenticated) {
-        setThreads([]);
-        if (selectFirstIfAny) setActiveThreadId(null);
-        return;
-      }
-      const list = threadsData || [];
-      setThreads(list as ChatThread[]);
-      if (selectFirstIfAny) {
-        if (list.length > 0) {
-          setActiveThreadId(String((list[0] as any)._id));
-        } else {
-          if (!defaultCreatedRef.current) {
-            defaultCreatedRef.current = true;
-            await createNewThread('Default');
-          }
-          return;
-        }
-      }
-    } catch (e: any) {
-      setThreadsError(e?.message || 'Failed to load threads');
-    }
-  }
-
-  async function loadMessagesForThread(tid: string) {
-    try {
-      setInitialChatMessages(undefined);
-      if (!isAuthenticated) { setInitialChatMessages([]); setChatSessionKey(`ephemeral:${Date.now()}`); return; }
-      // For react hooks, set active thread and let the messagesData effect seed initial messages
-      setActiveThreadId(tid);
-    } catch {
-      setInitialChatMessages(undefined);
-    }
-  }
-
-  async function createNewThread(title = 'New Chat') {
-    try {
-      if (!isAuthenticated) {
-        setActiveThreadId(null);
-        setInitialChatMessages([]);
-        setChatSessionKey(`ephemeral:${Date.now()}`);
-        return;
-      }
-      const tid = await createThreadMutation({ title } as any);
-      setActiveThreadId(String(tid));
-      // messages seeding handled by effects
-    } catch (e) {
-      console.error('Failed to create thread', e);
-    }
-  }
-
-  async function deleteThread(id: string) {
-    try {
-      if (isAuthenticated) {
-        await deleteThreadMutation({ threadId: id as any } as any);
-      }
-      // Pick a new active thread locally for snappy UX
-      const remaining = (threads || []).filter(t => String((t as any)._id) !== id);
-      if (activeThreadId === id) {
-        const idx = threads.findIndex(th => String((th as any)._id) === id);
-        const candidate = remaining[Math.min(idx, Math.max(remaining.length - 1, 0))] || remaining[idx - 1] || remaining[0];
-        setActiveThreadId(candidate ? String((candidate as any)._id) : null);
-        if (candidate) await loadMessagesForThread(String((candidate as any)._id));
-      }
-    } catch (e) {
-      console.error('Delete thread failed', e);
-    }
-  }
-
-  // Keep local threads list in sync with query data
+  // Load open thread ids from localStorage once per auth session
   useEffect(() => {
-    if (threadsData !== undefined) {
-      setThreads((threadsData as ChatThread[]) || []);
+    if (!isAuthenticated) {
+      openIdsLoadedRef.current = false;
+      setOpenThreadIds([]);
+      return;
     }
-  }, [threadsData]);
+    if (openIdsLoadedRef.current) return;
+    if (typeof window === 'undefined') return;
+    openIdsLoadedRef.current = true;
+    try {
+      const raw = window.localStorage.getItem(OPEN_THREADS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter((id) => typeof id === 'string');
+        if (filtered.length) setOpenThreadIds(filtered);
+      }
+    } catch (error) {
+      console.warn('[threads] Failed to load open thread ids', error);
+    }
+  }, [isAuthenticated]);
 
-  // Initial selection and default thread creation when authenticated
+  // Persist open thread ids whenever they change
   useEffect(() => {
     if (!isAuthenticated) return;
-    if (threadsData === undefined) return; // loading
-    if (activeThreadId) return;
-    const list = threadsData as any[];
-    if (list.length > 0) {
-      setActiveThreadId(String((list[0] as any)._id));
-    } else if (!defaultCreatedRef.current) {
-      defaultCreatedRef.current = true;
-      void createNewThread('Default');
+    if (!openIdsLoadedRef.current) return;
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(OPEN_THREADS_STORAGE_KEY, JSON.stringify(openThreadIds));
+    } catch (error) {
+      console.warn('[threads] Failed to persist open thread ids', error);
     }
-  }, [isAuthenticated, threadsData, activeThreadId]);
+  }, [openThreadIds, isAuthenticated]);
 
-  // Handle unauthenticated mode: ephemeral
+  // React to server thread updates
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (threadsData === undefined) return; // Loading
+    if (threadsData === 'skip') return;
+    if (!Array.isArray(threadsData)) return;
+
+    const converted = (threadsData as any[]).map(mapThread);
+    setThreads(converted);
+
+    const availableIds = new Set(converted.map((t) => t._id));
+    const filteredOpen = openThreadIds.filter((id) => availableIds.has(id));
+    const openChanged = filteredOpen.length !== openThreadIds.length || filteredOpen.some((id, idx) => id !== openThreadIds[idx]);
+    if (openChanged) {
+      setOpenThreadIds(filteredOpen);
+    }
+
+    if (activeThreadIdState && !availableIds.has(activeThreadIdState)) {
+      const fallback = filteredOpen[0] ?? (converted[0]?. _id ?? null);
+      setActiveThreadIdState(fallback ?? null);
+    }
+  }, [isAuthenticated, threadsData, openThreadIds, activeThreadIdState]);
+
+  // Seed initial messages when the active thread changes
+  useEffect(() => {
+    if (activeThreadIdState) {
+      setInitialChatMessages(undefined);
+      setChatSessionKey(`${activeThreadIdState}:${Date.now()}`);
+    } else {
+      setInitialChatMessages([]);
+      setChatSessionKey(`ephemeral:${Date.now()}`);
+    }
+  }, [activeThreadIdState]);
+
+  // Populate messages for the active thread
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (!activeThreadIdState) return;
+    if (messagesData === undefined || messagesData === 'skip') return;
+    if (!Array.isArray(messagesData)) return;
+    try {
+      const converted = (messagesData as any[]).map(mapMessage);
+      setInitialChatMessages(converted);
+    } catch (error) {
+      console.warn('[threads] Failed to map messages', error);
+    }
+  }, [isAuthenticated, activeThreadIdState, messagesData]);
+
+  // Handle unauthenticated mode
   useEffect(() => {
     if (!isAuthenticated && !authLoading) {
       setThreads([]);
-      setActiveThreadId(null);
+      setActiveThreadIdState(null);
       setInitialChatMessages([]);
       setChatSessionKey(`ephemeral:${Date.now()}`);
     }
   }, [isAuthenticated, authLoading]);
 
-  // When active thread changes, reset seeding state and chat session key
-  useEffect(() => {
-    if (activeThreadId) {
-      setInitialChatMessages(undefined);
-      setChatSessionKey(`${activeThreadId}:${Date.now()}`);
-    }
-  }, [activeThreadId]);
+  const threadsLoading = Boolean(isAuthenticated && threadsData === undefined);
 
-  // Seed initial messages from reactive query for the active thread
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    if (!activeThreadId) return;
-    if (!messagesData) return; // loading or skipped
+  const openThreads = useMemo(() => {
+    if (openThreadIds.length === 0) return [];
+    const byId = new Map(threads.map((t) => [t._id, t]));
+    return openThreadIds.map((id) => byId.get(id)).filter(Boolean) as ChatThread[];
+  }, [openThreadIds, threads]);
+
+  const historyThreads = useMemo(() => {
+    return [...threads].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  }, [threads]);
+
+  const setActiveThreadId = useCallback((id: string | null, opts?: { ensureOpen?: boolean }) => {
+    setActiveThreadIdState(id);
+    if (id) {
+      const ensureOpen = opts?.ensureOpen !== false;
+      if (ensureOpen) {
+        setOpenThreadIds((prev) => {
+          const filtered = prev.filter((tid) => tid !== id);
+          return [id, ...filtered];
+        });
+      }
+    }
+  }, []);
+
+  const startBlankThread = useCallback(() => {
+    setActiveThreadIdState(null);
+    setInitialChatMessages([]);
+    setChatSessionKey(`ephemeral:${Date.now()}`);
+  }, []);
+
+  const ensureActiveThread = useCallback(async ({ titleHint }: { titleHint?: string } = {}) => {
+    if (!isAuthenticated) return null;
+    if (activeThreadIdState) return activeThreadIdState;
     try {
-      const converted = (messagesData as any[]).map((m: any) => ({
-        id: String(m._id || m.id || Math.random().toString(36).slice(2)),
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        parts: [{ type: 'text', text: String(m.content || '') }],
-      }));
-      setInitialChatMessages(converted);
-    } catch {
-      // ignore
+      const title = normalizeTitle(titleHint);
+      const now = Date.now();
+      const tid = await createThreadMutation({ title } as any);
+      const id = String(tid);
+      const optimistic: ChatThread = { _id: id, title, updatedAt: now, lastMessageAt: now };
+      setThreads((prev) => {
+        if (prev.some((t) => t._id === id)) return prev;
+        return [optimistic, ...prev];
+      });
+      setOpenThreadIds((prev) => [id, ...prev.filter((existing) => existing !== id)]);
+      setActiveThreadIdState(id);
+      return id;
+    } catch (error) {
+      console.error('Failed to create thread', error);
+      setThreadsError((error as Error)?.message ?? 'Failed to create thread');
+      return null;
     }
-  }, [isAuthenticated, activeThreadId, messagesData]);
+  }, [isAuthenticated, activeThreadIdState, createThreadMutation]);
 
-  // When active thread changes, load its messages
-  useEffect(() => { if (activeThreadId) { void loadMessagesForThread(activeThreadId); } }, [activeThreadId]);
+  const closeThread = useCallback((id: string) => {
+    setOpenThreadIds((prev) => {
+      if (!prev.includes(id)) return prev;
+      const filtered = prev.filter((tid) => tid !== id);
+      if (activeThreadIdState === id) {
+        const fallback = filtered[0] ?? null;
+        setActiveThreadIdState(fallback);
+      }
+      return filtered;
+    });
+  }, [activeThreadIdState]);
 
-  // Refresh threads when window gains focus
-  useEffect(() => {
-    const threadsLoadingComputed = Boolean(isAuthenticated && threadsData === undefined);
-    const onFocus = () => { if (!threadsLoadingComputed) { void refreshThreads(false); } };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+  const deleteThread = useCallback(async (id: string) => {
+    if (!isAuthenticated) return;
+    try {
+      await deleteThreadMutation({ threadId: id as any } as any);
+      closeThread(id);
+      setThreads((prev) => prev.filter((t) => t._id !== id));
+    } catch (error) {
+      console.error('Delete thread failed', error);
+      setThreadsError((error as Error)?.message ?? 'Failed to delete thread');
+    }
+  }, [closeThread, deleteThreadMutation, isAuthenticated]);
+
+  const refreshThreads = useCallback(async () => {
+    try {
+      setThreadsError(null);
+      if (!isAuthenticated) {
+        setThreads([]);
+        return;
+      }
+      if (Array.isArray(threadsData)) {
+        setThreads((threadsData as any[]).map(mapThread));
+      }
+    } catch (error) {
+      setThreadsError((error as Error)?.message ?? 'Failed to refresh threads');
+    }
   }, [isAuthenticated, threadsData]);
 
   return {
-    threads,
-    threadsLoading: Boolean(isAuthenticated && threadsData === undefined),
+    openThreads,
+    historyThreads,
+    threadsLoading,
     threadsError,
-    activeThreadId,
+    activeThreadId: activeThreadIdState,
     setActiveThreadId,
     initialChatMessages,
     chatSessionKey,
     refreshThreads,
-    createNewThread,
+    startBlankThread,
+    ensureActiveThread,
+    closeThread,
     deleteThread,
-    loadMessagesForThread,
+    isAuthenticated,
   };
 }
-
-

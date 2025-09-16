@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useChat } from '@ai-sdk/react';
 import { agentLogger } from '@/lib/agentLogger';
@@ -18,7 +19,7 @@ type UseAgentChatOptions = {
   id: string;
   initialMessages?: any[];
   activeThreadId: string | null;
-  threadsCount: number;
+  getActiveThreadId?: () => string | null;
   wc: { instanceRef: React.MutableRefObject<any>; fnsRef: React.MutableRefObject<WebContainerFns> };
   media: {
     loadMedia: () => Promise<void>;
@@ -30,18 +31,24 @@ type UseAgentChatOptions = {
 };
 
 export function useAgentChat(opts: UseAgentChatOptions) {
-  const { id, initialMessages, activeThreadId, threadsCount, wc, media, runValidation, attachmentsProvider } = opts;
+  const { id, initialMessages, activeThreadId, wc, media, runValidation, attachmentsProvider } = opts;
   const firstToolCalledRef = (typeof window !== 'undefined') ? (window as any).__FYOS_FIRST_TOOL_CALLED_REF || { current: false } : { current: false };
   try { (window as any).__FYOS_FIRST_TOOL_CALLED_REF = firstToolCalledRef } catch {}
 
-  const { messages, sendMessage, status, stop, addToolResult } = useChat({
+  const activeThreadIdRef = useRef<string | null>(activeThreadId);
+  useEffect(() => { activeThreadIdRef.current = activeThreadId; }, [activeThreadId]);
+
+  const { messages, sendMessage, status, stop, addToolResult, setMessages } = useChat({
     id,
     messages: initialMessages,
     transport: new DefaultChatTransport({
       api: '/api/agent',
       prepareSendMessagesRequest({ messages, id }) {
         const body: any = { id, messages };
-        if (activeThreadId && threadsCount > 0) body.threadId = activeThreadId;
+        const threadForRequest = typeof opts.getActiveThreadId === 'function'
+          ? opts.getActiveThreadId()
+          : activeThreadIdRef.current;
+        if (threadForRequest) body.threadId = threadForRequest;
         // Include attachment hints so server-side classifier can detect media ops
         try {
           if (typeof opts.attachmentsProvider === 'function') {
@@ -404,7 +411,22 @@ export function useAgentChat(opts: UseAgentChatOptions) {
     },
   });
 
+  const initialMessagesSignatureRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!Array.isArray(initialMessages)) return;
+    const signature = JSON.stringify(
+      initialMessages.map(m => ({
+        id: m?.id,
+        role: m?.role,
+        text: Array.isArray(m?.parts)
+          ? m.parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join('')
+          : '',
+      }))
+    );
+    if (signature === initialMessagesSignatureRef.current) return;
+    initialMessagesSignatureRef.current = signature;
+    setMessages(initialMessages as any);
+  }, [initialMessages, setMessages]);
+
   return { messages, sendMessage, status, stop, addToolResult } as const;
 }
-
-

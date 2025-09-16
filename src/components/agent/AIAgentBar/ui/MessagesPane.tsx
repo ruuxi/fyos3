@@ -13,7 +13,6 @@ export type MessagesPaneProps = {
   bubbleAnimatingIds: Set<string>;
   lastSentAttachments?: Array<{ name: string; publicUrl: string; contentType: string }>;
   activeThreadId?: string;
-  suppressAssistant?: boolean;
 };
 
 type AttachmentPreview = { name: string; publicUrl: string; contentType: string };
@@ -136,8 +135,18 @@ function renderAttachments(items: AttachmentPreview[]) {
   );
 }
 
+type ChatMode = 'agent' | 'persona';
+
+function resolveMode(message: any): ChatMode | undefined {
+  const meta = message?.metadata?.mode;
+  if (meta === 'persona' || meta === 'agent') return meta;
+  const fallback = message?.mode;
+  if (fallback === 'persona' || fallback === 'agent') return fallback;
+  return undefined;
+}
+
 export default function MessagesPane(props: MessagesPaneProps) {
-  const { messages, status, messagesContainerRef, messagesInnerRef, containerHeight, didAnimateWelcome, bubbleAnimatingIds, lastSentAttachments, activeThreadId, suppressAssistant } = props;
+  const { messages, status, messagesContainerRef, messagesInnerRef, containerHeight, didAnimateWelcome, bubbleAnimatingIds, lastSentAttachments, activeThreadId } = props;
   const { isAuthenticated } = useConvexAuth();
   const liveMedia = useQuery(
     convexApi.media.listMedia as any,
@@ -170,7 +179,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
             </div>
           </div>
         )}
-        {(suppressAssistant ? messages.filter(m => m.role !== 'assistant') : messages).map((m, idx) => {
+        {messages.map((m, idx) => {
           // Build content and collect any attachments referenced in text
           const textNodes: any[] = [];
           let collectedFromText: AttachmentPreview[] = [];
@@ -193,14 +202,23 @@ export default function MessagesPane(props: MessagesPaneProps) {
           // Determine if this is the last assistant message to attach live media below
           const isAssistant = m.role === 'assistant';
           const isLastAssistant = isAssistant && messages.slice(idx + 1).every(mm => mm.role !== 'assistant');
+          const mode = resolveMode(m);
+          const personaLabel = 'Sim';
+          const authorLabel = m.role === 'assistant' ? (mode === 'persona' ? personaLabel : 'AI Agent') : 'You';
+          const assistantBubble = mode === 'persona'
+            ? 'inline-block max-w-[80%] bg-white/10 border border-white/20 text-white'
+            : 'inline-block max-w-[80%] bg-white/10 border border-white/15 text-white';
+          const bubbleClass = m.role === 'user'
+            ? 'bg-sky-500 text-white max-w-full'
+            : assistantBubble;
 
           return (
             <div key={m.id} className={`text-sm flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`${m.role === 'user' ? 'flex flex-col items-end max-w-[80%]' : 'max-w-full flex-1'}`}>
                 <div className={`text-xs mb-1 ${m.role === 'user' ? 'text-white/60 pr-1' : 'text-white/60 pl-1'}`}>
-                  {m.role === 'user' ? 'You' : 'AI Agent'}
+                  {authorLabel}
                 </div>
-                <div className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${m.role === 'user' ? 'bg-sky-500 text-white max-w-full' : 'inline-block max-w-[80%] bg-white/10 border border-white/15 text-white'} ${bubbleAnimatingIds.has(m.id) ? 'ios-pop' : ''}`}>
+                <div className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${bubbleClass} ${bubbleAnimatingIds.has(m.id) ? 'ios-pop' : ''}`}>
                   {/* Render cleaned text parts first */}
                   {textNodes}
                   {/* Render tool results and media blocks */}
@@ -299,5 +317,3 @@ export default function MessagesPane(props: MessagesPaneProps) {
     </div>
   );
 }
-
-

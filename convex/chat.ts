@@ -28,6 +28,7 @@ export const appendMessage = mutation({
     threadId: v.id("chat_threads"),
     role: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
+    mode: v.optional(v.union(v.literal("agent"), v.literal("persona"))),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -43,6 +44,7 @@ export const appendMessage = mutation({
       ownerId,
       role: args.role,
       content: args.content,
+      mode: args.mode,
       createdAt: now,
     });
 
@@ -143,4 +145,3 @@ export const deleteThread = mutation({
     return true;
   },
 });
-

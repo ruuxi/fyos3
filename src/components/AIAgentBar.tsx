@@ -48,7 +48,8 @@ export default function AIAgentBar() {
 
   // Phase 2 hooks
   const {
-    threads,
+    openThreads,
+    historyThreads,
     threadsLoading,
     threadsError,
     activeThreadId,
@@ -56,9 +57,14 @@ export default function AIAgentBar() {
     initialChatMessages,
     chatSessionKey,
     refreshThreads,
-    createNewThread,
-    deleteThread,
+    startBlankThread,
+    ensureActiveThread,
+    closeThread,
+    isAuthenticated: isChatAuthenticated,
   } = useThreads();
+
+  const activeThreadIdImmediateRef = useRef<string | null>(activeThreadId);
+  useEffect(() => { activeThreadIdImmediateRef.current = activeThreadId; }, [activeThreadId]);
 
   const {
     mediaItems,
@@ -132,7 +138,7 @@ export default function AIAgentBar() {
     id: chatSessionKey,
     initialMessages: initialChatMessages,
     activeThreadId,
-    threadsCount: threads.length,
+    getActiveThreadId: () => activeThreadIdImmediateRef.current,
     wc: { instanceRef, fnsRef },
     media: { loadMedia },
     runValidation,
@@ -342,9 +348,17 @@ export default function AIAgentBar() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    const trimmedInput = input.trim();
+    if (!trimmedInput) return;
     forceFollow();
-    let userText = input;
+    let userText = trimmedInput;
+    if (!activeThreadIdImmediateRef.current && isChatAuthenticated) {
+      const ensured = await ensureActiveThread({ titleHint: trimmedInput });
+      if (ensured) {
+        activeThreadIdImmediateRef.current = ensured;
+        await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+      }
+    }
     // Ensure we pick up durable URLs if ingestion just finished
     const waitForDurable = async (timeoutMs = 6000, intervalMs = 80) => {
       const started = Date.now();
@@ -525,16 +539,26 @@ export default function AIAgentBar() {
                 {leftPane==='agent' && (
                   <>
                     <ChatTabs
-                      threads={threads}
+                      openThreads={openThreads}
+                      historyThreads={historyThreads}
                       threadsLoading={threadsLoading}
                       threadsError={threadsError}
                       activeThreadId={activeThreadId}
                       setActiveThreadId={setActiveThreadId}
                       showHistory={showThreadHistory}
                       setShowHistory={setShowThreadHistory}
-                      onRefresh={() => refreshThreads(false)}
-                      onCreate={() => createNewThread('New Chat')}
-                      onDelete={deleteThread}
+                      onRefresh={() => { void refreshThreads(); }}
+                      onNewConversation={() => { activeThreadIdImmediateRef.current = null; startBlankThread(); }}
+                      onClose={(id) => {
+                        if (activeThreadIdImmediateRef.current === id) {
+                          activeThreadIdImmediateRef.current = null;
+                        }
+                        closeThread(id);
+                      }}
+                      onOpenFromHistory={(id) => {
+                        activeThreadIdImmediateRef.current = id;
+                        setActiveThreadId(id);
+                      }}
                     />
                     <MessagesPane
                       messages={messages}
@@ -546,7 +570,6 @@ export default function AIAgentBar() {
                       bubbleAnimatingIds={bubbleAnimatingIds}
                       lastSentAttachments={lastSentAttachments || undefined}
                       activeThreadId={activeThreadId || undefined}
-                      suppressAssistant={true}
                     />
                   </>
                 )}
@@ -641,4 +664,3 @@ export default function AIAgentBar() {
     </AgentBarShell>
   );
 }
-
