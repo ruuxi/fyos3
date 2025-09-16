@@ -2,6 +2,7 @@
 // This is separate from the WebContainer binary snapshot used for the initial template mount.
 
 import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
+import type { Unzipped } from 'fflate';
 
 // Exclusions mirror src/utils/vfs-persistence.ts
 const EXCLUDED_DIRS = new Set([
@@ -73,8 +74,7 @@ export async function buildDesktopSnapshot(instance: WebContainerAPI): Promise<{
   const tree: Record<string, Uint8Array> = {};
   for (const rel of files) {
     try {
-      const data = await fs.readFile(rel);
-      const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as any);
+      const bytes = await fs.readFile(rel);
       tree[toAbsolute(rel).slice(1)] = bytes; // zip entries shouldn't start with '/'
     } catch {
       // ignore unreadable files
@@ -90,7 +90,7 @@ export async function buildDesktopSnapshot(instance: WebContainerAPI): Promise<{
 export async function restoreDesktopSnapshot(instance: WebContainerAPI, gzBytes: Uint8Array): Promise<void> {
   const fflate = await import('fflate');
   const unz = fflate.gunzipSync(gzBytes);
-  const files = fflate.unzipSync(unz);
+  const files: Unzipped = fflate.unzipSync(unz);
 
   // Pre-compute directory set
   const dirSet = new Set<string>();
@@ -121,4 +121,3 @@ export async function restoreDesktopSnapshot(instance: WebContainerAPI, gzBytes:
     }
   }
 }
-

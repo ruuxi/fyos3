@@ -1,5 +1,5 @@
 import { tool } from 'ai';
-import Exa from 'exa-js';
+import Exa, { type ExaSearchOptions, type ExaSearchResult } from 'exa-js';
 import { agentLogger } from '@/lib/agentLogger';
 import { TOOL_NAMES, WebSearchInput } from '@/lib/agentTools';
 
@@ -19,8 +19,15 @@ export function buildServerTools(sessionId: string) {
             return error;
           }
           const exa = new Exa(apiKey);
-          const { results } = await exa.searchAndContents(query, { livecrawl: 'always', numResults: 3 } as any);
-          const output = (results || []).map((r: any) => ({ title: r.title, url: r.url, content: typeof r.text === 'string' ? r.text.slice(0, 1000) : undefined, publishedDate: r.publishedDate }));
+          const options: ExaSearchOptions = { livecrawl: 'always', numResults: 3 };
+          const { results } = await exa.searchAndContents(query, options);
+          const entries: ExaSearchResult[] = Array.isArray(results) ? results : [];
+          const output = entries.map((r) => ({
+            title: typeof r.title === 'string' ? r.title : undefined,
+            url: typeof r.url === 'string' ? r.url : undefined,
+            content: typeof r.text === 'string' ? r.text.slice(0, 1000) : undefined,
+            publishedDate: typeof r.publishedDate === 'string' ? r.publishedDate : undefined,
+          }));
           await agentLogger.logToolCall(sessionId, TOOL_NAMES.web_search, toolCallId, { query }, { results: output.length, data: output }, Date.now() - startTime);
           return output;
         } catch (err: unknown) {
@@ -32,5 +39,4 @@ export function buildServerTools(sessionId: string) {
     }),
   };
 }
-
 

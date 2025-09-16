@@ -40,7 +40,7 @@ class AgentLogger {
     };
 
     // Log to console for development
-    console.log(`[AgentLog] ${entry.type}:`, entry.data);
+    console.log(`[AgentLog] ${logEntry.type}:`, logEntry.data);
   }
   
   async logMessage(sessionId: string, messageId: string, role: 'user' | 'assistant', content: string) {

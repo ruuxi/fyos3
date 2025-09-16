@@ -3,7 +3,9 @@ import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
 type FS = WebContainerAPI['fs'];
 
 async function ensureDir(fs: FS, dir: string) {
-  try { await fs.mkdir(dir, { recursive: true } as any); } catch {}
+  try {
+    await fs.mkdir(dir, { recursive: true });
+  } catch {}
 }
 
 async function writeFile(fs: FS, path: string, data: Uint8Array | string) {
@@ -16,9 +18,8 @@ async function writeFile(fs: FS, path: string, data: Uint8Array | string) {
 
 async function readJSON<T>(fs: FS, path: string): Promise<T | null> {
   try {
-    const raw = await fs.readFile(path, 'utf8' as any);
-    const s = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as any);
-    return JSON.parse(s) as T;
+    const raw = await fs.readFile(path, 'utf8');
+    return JSON.parse(raw) as T;
   } catch {
     return null;
   }
@@ -70,8 +71,8 @@ export async function installAppFromBundle(instance: WebContainerAPI, bundleByte
       fullPath = `/${name}`;
     }
     const dir = fullPath.split('/').slice(0, -1).join('/');
-    await ensureDir(fs, dir);
-    await writeFile(fs, fullPath, content as Uint8Array);
+  await ensureDir(fs, dir);
+    await writeFile(fs, fullPath, content);
   }
 
   // Update registry
@@ -80,8 +81,11 @@ export async function installAppFromBundle(instance: WebContainerAPI, bundleByte
   await writeFile(fs, registryPath, JSON.stringify(nextReg, null, 2));
 
   // Compute delta dependencies and install missing
-  const pkgRaw = await fs.readFile('/package.json', 'utf8' as any);
-  const pkg = JSON.parse(typeof pkgRaw === 'string' ? pkgRaw : new TextDecoder().decode(pkgRaw as any));
+  const pkgRaw = await fs.readFile('/package.json', 'utf8');
+  const pkg = JSON.parse(pkgRaw) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
   const have: Record<string,string> = { ...(pkg.dependencies||{}), ...(pkg.devDependencies||{}) };
   const need = manifest.dependencies || {};
   const missing: string[] = [];
@@ -100,5 +104,4 @@ export async function installAppFromBundle(instance: WebContainerAPI, bundleByte
 
   return { id: targetId, entry };
 }
-
 

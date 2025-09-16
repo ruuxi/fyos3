@@ -61,7 +61,7 @@ async function idbSet<T>(key: IDBValidKey, value: T): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    const req = store.put(value as any, key);
+    const req = store.put(value, key);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error ?? new Error('IndexedDB put error'));
   });
@@ -110,7 +110,11 @@ function toBase64(buffer: Uint8Array): string {
   const chunkSize = 0x8000;
   for (let i = 0; i < buffer.length; i += chunkSize) {
     const chunk = buffer.subarray(i, i + chunkSize);
-    binary += String.fromCharCode.apply(null, Array.from(chunk) as unknown as number[]);
+    let chunkStr = '';
+    for (let j = 0; j < chunk.length; j++) {
+      chunkStr += String.fromCharCode(chunk[j]);
+    }
+    binary += chunkStr;
   }
   return btoa(binary);
 }
@@ -160,7 +164,7 @@ export async function exportVfs(instance: WebContainerAPI, opts?: { maxDepth?: n
   for (const p of limited) {
     try {
       const buf = await instance.fs.readFile(p);
-      files.push({ path: p, base64: toBase64(buf as unknown as Uint8Array) });
+      files.push({ path: p, base64: toBase64(buf) });
     } catch {
       // ignore
     }
@@ -173,23 +177,21 @@ export async function persistNow(instance: WebContainerAPI): Promise<void> {
   await idbSet(STORE_KEY, data);
 }
 
-let debounceTimer: number | null = null;
-let lastQueuedAt = 0;
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 const DEBOUNCE_MS = 1000;
 
 export function enqueuePersist(instance: WebContainerAPI) {
-  lastQueuedAt = Date.now();
   if (debounceTimer !== null) {
     clearTimeout(debounceTimer);
   }
-  debounceTimer = (setTimeout(async () => {
+  debounceTimer = setTimeout(async () => {
     try {
       await persistNow(instance);
     } catch {
       // ignore
     }
     debounceTimer = null;
-  }, DEBOUNCE_MS) as unknown) as number;
+  }, DEBOUNCE_MS);
 }
 
 export async function restoreFromPersistence(instance: WebContainerAPI): Promise<boolean> {
@@ -220,7 +222,7 @@ export async function restoreFromPersistence(instance: WebContainerAPI): Promise
     for (const f of data.files) {
       try {
         const content = fromBase64(f.base64);
-        await instance.fs.writeFile(f.path, content as unknown as Uint8Array);
+        await instance.fs.writeFile(f.path, content);
       } catch {
         // ignore
       }
@@ -230,5 +232,3 @@ export async function restoreFromPersistence(instance: WebContainerAPI): Promise
     return false;
   }
 }
-
-

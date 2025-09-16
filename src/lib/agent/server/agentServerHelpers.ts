@@ -13,12 +13,13 @@ export async function getInstalledAppNames(): Promise<string[]> {
   try {
     const regPath = path.join(process.cwd(), 'public', 'apps', 'registry.json');
     const buf = await fs.readFile(regPath, 'utf-8');
-    const data = JSON.parse(buf);
+    const data = JSON.parse(buf) as unknown;
     if (Array.isArray(data)) {
       return data.map(parseAppName).filter((name: string | undefined): name is string => Boolean(name));
     }
-    if (Array.isArray(data?.apps)) {
-      return data.apps.map(parseAppName).filter((name: string | undefined): name is string => Boolean(name));
+    if (typeof data === 'object' && data !== null && Array.isArray((data as { apps?: unknown }).apps)) {
+      const apps = (data as { apps: unknown[] }).apps;
+      return apps.map(parseAppName).filter((name: string | undefined): name is string => Boolean(name));
     }
   } catch {}
   try {
@@ -29,7 +30,8 @@ export async function getInstalledAppNames(): Promise<string[]> {
       if (entry.isDirectory()) {
         const id = entry.name;
         try {
-          const meta = JSON.parse(await fs.readFile(path.join(appsDir, id, 'metadata.json'), 'utf-8'));
+          const metaRaw = await fs.readFile(path.join(appsDir, id, 'metadata.json'), 'utf-8');
+          const meta = JSON.parse(metaRaw) as unknown;
           names.push(parseAppName(meta) ?? id);
         } catch {
           names.push(id);

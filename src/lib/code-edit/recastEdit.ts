@@ -1,7 +1,53 @@
 import * as recast from 'recast';
 import * as parser from '@babel/parser';
 import { diffLines } from 'diff';
+import type { Change } from 'diff';
+import * as t from '@babel/types';
 import type { TCodeEditAstInput } from '@/lib/agentTools';
+
+const { builders: b, namedTypes: n } = recast.types;
+
+const PARSER_PLUGINS: parser.ParserPlugin[] = [
+  'typescript',
+  'jsx',
+  'decorators-legacy',
+  'classProperties',
+  'objectRestSpread',
+  'asyncGenerators',
+  'functionBind',
+  'exportDefaultFrom',
+  'exportNamespaceFrom',
+  'dynamicImport',
+  'nullishCoalescingOperator',
+  'optionalChaining',
+];
+
+function parseFile(source: string): t.File {
+  return recast.parse(source, {
+    parser: {
+      parse(code: string) {
+        return parser.parse(code, {
+          sourceType: 'module',
+          allowImportExportEverywhere: true,
+          plugins: PARSER_PLUGINS,
+        });
+      },
+    },
+  }) as unknown as t.File;
+}
+
+function parseExpression(source: string): t.Expression {
+  const file = parseFile(`const __temp = (${source});`);
+  const declaration = file.program.body[0];
+  if (!declaration || declaration.type !== 'VariableDeclaration') {
+    throw new Error('Failed to parse JSX replacement expression');
+  }
+  const declarator = declaration.declarations[0];
+  if (!declarator || declarator.type !== 'VariableDeclarator' || !declarator.init) {
+    throw new Error('Failed to resolve parsed expression');
+  }
+  return declarator.init;
+}
 
 interface EditResult {
   applied: boolean;
@@ -28,30 +74,7 @@ export async function applyAstEdit(input: AstEditInput): Promise<EditResult> {
     }
 
     // Parse the source code using Babel parser with TypeScript and JSX support
-    const ast = recast.parse(input.content, {
-      parser: {
-        parse(source: string) {
-          return parser.parse(source, {
-            sourceType: 'module',
-            allowImportExportEverywhere: true,
-            plugins: [
-              'typescript',
-              'jsx',
-              'decorators-legacy',
-              'classProperties',
-              'objectRestSpread',
-              'asyncGenerators',
-              'functionBind',
-              'exportDefaultFrom',
-              'exportNamespaceFrom',
-              'dynamicImport',
-              'nullishCoalescingOperator',
-              'optionalChaining',
-            ],
-          });
-        },
-      },
-    });
+    const ast = parseFile(input.content);
 
     let applied = false;
 
@@ -109,7 +132,7 @@ export async function applyAstEdit(input: AstEditInput): Promise<EditResult> {
 /**
  * Upsert an import statement - add missing specifiers or create new import
  */
-function upsertImport(ast: any, input: AstEditInput): boolean {
+function upsertImport(ast: t.File, input: AstEditInput): boolean {
   if (!input.payload?.import) {
     throw new Error('upsertImport requires payload.import with module and specifiers');
   }
@@ -118,7 +141,7 @@ function upsertImport(ast: any, input: AstEditInput): boolean {
   const body = ast.program.body;
 
   // Find existing import for this module
-  let existingImport: any = null;
+  let existingImport: t.ImportDeclaration | null = null;
   for (const node of body) {
     if (node.type === 'ImportDeclaration' && node.source.value === module) {
       existingImport = node;
@@ -130,18 +153,19 @@ function upsertImport(ast: any, input: AstEditInput): boolean {
     // Add missing specifiers to existing import
     const existingSpecifiers = new Set(
       existingImport.specifiers
-        .filter((spec: any) => spec.type === 'ImportSpecifier')
-        .map((spec: any) => spec.imported.name)
+        .filter(
+          (spec): spec is t.ImportSpecifier & { imported: t.Identifier } =>
+            spec.type === 'ImportSpecifier' && spec.imported.type === 'Identifier'
+        )
+        .map((spec) => spec.imported.name)
     );
 
     let added = false;
     for (const specifier of specifiers) {
       if (!existingSpecifiers.has(specifier)) {
-        const newSpecifier = {
-          type: 'ImportSpecifier',
-          imported: { type: 'Identifier', name: specifier },
-          local: { type: 'Identifier', name: specifier },
-        };
+        const localId = t.identifier(specifier);
+        const importedId = t.identifier(specifier);
+        const newSpecifier = t.importSpecifier(localId, importedId);
         existingImport.specifiers.push(newSpecifier);
         added = true;
       }
@@ -149,8 +173,9 @@ function upsertImport(ast: any, input: AstEditInput): boolean {
 
     // Sort specifiers alphabetically
     if (added) {
-      existingImport.specifiers.sort((a: any, b: any) => {
+      existingImport.specifiers.sort((a, b) => {
         if (a.type !== 'ImportSpecifier' || b.type !== 'ImportSpecifier') return 0;
+        if (a.imported.type !== 'Identifier' || b.imported.type !== 'Identifier') return 0;
         return a.imported.name.localeCompare(b.imported.name);
       });
     }
@@ -158,17 +183,11 @@ function upsertImport(ast: any, input: AstEditInput): boolean {
     return added;
   } else {
     // Create new import declaration
-    const importSpecifiers = specifiers.map((spec) => ({
-      type: 'ImportSpecifier',
-      imported: { type: 'Identifier', name: spec },
-      local: { type: 'Identifier', name: spec },
-    }));
+    const importSpecifiers = specifiers.map((spec) =>
+      t.importSpecifier(t.identifier(spec), t.identifier(spec))
+    );
 
-    const newImport = {
-      type: 'ImportDeclaration',
-      specifiers: importSpecifiers,
-      source: { type: 'StringLiteral', value: module },
-    };
+    const newImport = t.importDeclaration(importSpecifiers, t.stringLiteral(module));
 
     // Insert after other imports or at the beginning
     let insertIndex = 0;
@@ -188,7 +207,7 @@ function upsertImport(ast: any, input: AstEditInput): boolean {
 /**
  * Update the body of a function (declaration or arrow function in variable)
  */
-function updateFunctionBody(ast: any, input: AstEditInput): boolean {
+function updateFunctionBody(ast: t.File, input: AstEditInput): boolean {
   if (!input.selector?.functionName || !input.payload?.functionBody) {
     throw new Error('updateFunctionBody requires selector.functionName and payload.functionBody');
   }
@@ -201,19 +220,12 @@ function updateFunctionBody(ast: any, input: AstEditInput): boolean {
   for (const node of body) {
     if (node.type === 'FunctionDeclaration' && node.id?.name === functionName) {
       // Parse the new function body
-      const bodyAst = recast.parse(`function temp() { ${functionBody} }`, {
-        parser: {
-          parse(source: string) {
-            return parser.parse(source, {
-              sourceType: 'module',
-              plugins: ['typescript', 'jsx'],
-            });
-          },
-        },
-      });
-
-      const tempFunc = bodyAst.program.body[0] as any;
-      node.body = tempFunc.body;
+      const bodyAst = parseFile(`function temp() { ${functionBody} }`);
+      const tempNode = bodyAst.program.body[0];
+      if (!tempNode || tempNode.type !== 'FunctionDeclaration') {
+        throw new Error('Failed to parse new function body');
+      }
+      node.body = tempNode.body;
       return true;
     }
 
@@ -225,19 +237,16 @@ function updateFunctionBody(ast: any, input: AstEditInput): boolean {
           declarator.id.name === functionName &&
           declarator.init?.type === 'ArrowFunctionExpression'
         ) {
-          const bodyAst = recast.parse(`() => { ${functionBody} }`, {
-            parser: {
-              parse(source: string) {
-                return parser.parse(source, {
-                  sourceType: 'module',
-                  plugins: ['typescript', 'jsx'],
-                });
-              },
-            },
-          });
-
-          const tempArrow = bodyAst.program.body[0] as any;
-          declarator.init.body = tempArrow.expression.body;
+          const bodyAst = parseFile(`const temp = () => { ${functionBody} };`);
+          const tempDecl = bodyAst.program.body[0];
+          if (!tempDecl || tempDecl.type !== 'VariableDeclaration') {
+            throw new Error('Failed to parse arrow function body');
+          }
+          const tempVar = tempDecl.declarations[0];
+          if (!tempVar || tempVar.type !== 'VariableDeclarator' || !tempVar.init || tempVar.init.type !== 'ArrowFunctionExpression') {
+            throw new Error('Parsed arrow function has unexpected shape');
+          }
+          declarator.init.body = tempVar.init.body;
           return true;
         }
       }
@@ -249,19 +258,12 @@ function updateFunctionBody(ast: any, input: AstEditInput): boolean {
       node.declaration?.type === 'FunctionDeclaration' &&
       node.declaration.id?.name === functionName
     ) {
-      const bodyAst = recast.parse(`function temp() { ${functionBody} }`, {
-        parser: {
-          parse(source: string) {
-            return parser.parse(source, {
-              sourceType: 'module',
-              plugins: ['typescript', 'jsx'],
-            });
-          },
-        },
-      });
-
-      const tempFunc = bodyAst.program.body[0] as any;
-      node.declaration.body = tempFunc.body;
+      const bodyAst = parseFile(`function temp() { ${functionBody} }`);
+      const tempNode = bodyAst.program.body[0];
+      if (!tempNode || tempNode.type !== 'FunctionDeclaration') {
+        throw new Error('Failed to parse export default function body');
+      }
+      node.declaration.body = tempNode.body;
       return true;
     }
   }
@@ -272,7 +274,7 @@ function updateFunctionBody(ast: any, input: AstEditInput): boolean {
 /**
  * Replace a JSX element with new JSX content
  */
-function replaceJsxElement(ast: any, input: AstEditInput): boolean {
+function replaceJsxElement(ast: t.File, input: AstEditInput): boolean {
   if (!input.selector?.jsxTag || !input.payload?.jsxReplaceWith) {
     throw new Error('replaceJsxElement requires selector.jsxTag and payload.jsxReplaceWith');
   }
@@ -281,25 +283,21 @@ function replaceJsxElement(ast: any, input: AstEditInput): boolean {
   const { jsxReplaceWith } = input.payload;
 
   // Parse the replacement JSX
-  const replacementAst = recast.parse(`const temp = ${jsxReplaceWith};`, {
-    parser: {
-      parse(source: string) {
-        return parser.parse(source, {
-          sourceType: 'module',
-          plugins: ['typescript', 'jsx'],
-        });
-      },
-    },
-  });
-
-  const replacementElement = (replacementAst.program.body[0] as any).declarations[0].init;
+  const replacementExpression = parseExpression(jsxReplaceWith);
+  if (replacementExpression.type !== 'JSXElement' && replacementExpression.type !== 'JSXFragment') {
+    throw new Error('Replacement JSX must evaluate to a JSX element or fragment');
+  }
 
   // Find and replace the first matching JSX element
   let found = false;
   recast.visit(ast, {
-    visitJSXElement(path: any) {
-      if (!found && path.node.openingElement.name.name === jsxTag) {
-        path.replace(replacementElement);
+    visitJSXElement(path) {
+      if (found) {
+        return false;
+      }
+      const opening = path.node.openingElement;
+      if (n.JSXIdentifier.check(opening.name) && opening.name.name === jsxTag) {
+        path.replace(replacementExpression);
         found = true;
         return false; // Stop traversing
       }
@@ -313,7 +311,7 @@ function replaceJsxElement(ast: any, input: AstEditInput): boolean {
 /**
  * Replace JSX attributes on a matching element
  */
-function replaceJsxAttributes(ast: any, input: AstEditInput): boolean {
+function replaceJsxAttributes(ast: t.File, input: AstEditInput): boolean {
   if (!input.selector?.jsxTag || !input.payload?.jsxAttributes) {
     throw new Error('replaceJsxAttributes requires selector.jsxTag and payload.jsxAttributes');
   }
@@ -323,26 +321,26 @@ function replaceJsxAttributes(ast: any, input: AstEditInput): boolean {
 
   let found = false;
   recast.visit(ast, {
-    visitJSXOpeningElement(path: any) {
-      if (!found && path.node.name.name === jsxTag) {
+    visitJSXOpeningElement(path) {
+      if (found) {
+        return false;
+      }
+      const name = path.node.name;
+      if (n.JSXIdentifier.check(name) && name.name === jsxTag) {
         // Create new attributes
         const newAttributes = Object.entries(jsxAttributes).map(([key, value]) => {
-          let attrValue;
+          let attrValue: (typeof b.jsxAttribute.arguments)[1];
           if (typeof value === 'string') {
-            attrValue = { type: 'StringLiteral', value };
+            attrValue = b.literal(value) as unknown as typeof attrValue;
           } else if (typeof value === 'boolean') {
-            attrValue = value ? null : { type: 'BooleanLiteral', value: false };
+            attrValue = value ? null : b.jsxExpressionContainer(b.literal(false));
           } else if (typeof value === 'number') {
-            attrValue = { type: 'JSXExpressionContainer', expression: { type: 'NumericLiteral', value } };
+            attrValue = b.jsxExpressionContainer(b.literal(value));
           } else {
-            attrValue = { type: 'StringLiteral', value: String(value) };
+            attrValue = b.literal(String(value)) as unknown as typeof attrValue;
           }
 
-          return {
-            type: 'JSXAttribute',
-            name: { type: 'JSXIdentifier', name: key },
-            value: attrValue,
-          };
+          return b.jsxAttribute(b.jsxIdentifier(key), attrValue as any);
         });
 
         // Replace all attributes
@@ -360,7 +358,7 @@ function replaceJsxAttributes(ast: any, input: AstEditInput): boolean {
 /**
  * Insert text after the last import statement
  */
-function insertAfterLastImport(ast: any, input: AstEditInput): boolean {
+function insertAfterLastImport(ast: t.File, input: AstEditInput): boolean {
   if (!input.payload?.insertText) {
     throw new Error('insertAfterLastImport requires payload.insertText');
   }
@@ -377,19 +375,10 @@ function insertAfterLastImport(ast: any, input: AstEditInput): boolean {
   }
 
   // Parse the text to insert
-  const insertAst = recast.parse(insertText, {
-    parser: {
-      parse(source: string) {
-        return parser.parse(source, {
-          sourceType: 'module',
-          plugins: ['typescript', 'jsx'],
-        });
-      },
-    },
-  });
+  const insertAst = parseFile(insertText);
 
   const insertIndex = lastImportIndex >= 0 ? lastImportIndex + 1 : 0;
-  body.splice(insertIndex, 0, ...insertAst.program.body);
+  body.splice(insertIndex, 0, ...(insertAst.program.body as t.Statement[]));
   
   return true;
 }
@@ -397,7 +386,7 @@ function insertAfterLastImport(ast: any, input: AstEditInput): boolean {
 /**
  * Insert text at the top of the file
  */
-function insertAtTop(ast: any, input: AstEditInput): boolean {
+function insertAtTop(ast: t.File, input: AstEditInput): boolean {
   if (!input.payload?.insertText) {
     throw new Error('insertAtTop requires payload.insertText');
   }
@@ -406,25 +395,16 @@ function insertAtTop(ast: any, input: AstEditInput): boolean {
   const body = ast.program.body;
 
   // Parse the text to insert
-  const insertAst = recast.parse(insertText, {
-    parser: {
-      parse(source: string) {
-        return parser.parse(source, {
-          sourceType: 'module',
-          plugins: ['typescript', 'jsx'],
-        });
-      },
-    },
-  });
+  const insertAst = parseFile(insertText);
 
-  body.splice(0, 0, ...insertAst.program.body);
+  body.splice(0, 0, ...(insertAst.program.body as t.Statement[]));
   return true;
 }
 
 /**
  * Calculate edit ranges from diff
  */
-function calculateEdits(diff: any[]): Array<{ start: number; end: number }> {
+function calculateEdits(diff: Change[]): Array<{ start: number; end: number }> {
   const edits: Array<{ start: number; end: number }> = [];
   let lineNumber = 0;
   let editStart = -1;
@@ -454,7 +434,7 @@ function calculateEdits(diff: any[]): Array<{ start: number; end: number }> {
 /**
  * Generate a preview diff string (capped at ~400 lines)
  */
-function generatePreviewDiff(diff: any[]): string {
+function generatePreviewDiff(diff: Change[]): string {
   const lines: string[] = [];
   let lineCount = 0;
   const maxLines = 400;

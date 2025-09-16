@@ -1,22 +1,126 @@
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { useConvexAuth, useQuery } from 'convex/react';
 import { api as convexApi } from '../../../../../convex/_generated/api';
 import { formatBytes, guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
+import type { Doc } from '../../../../../convex/_generated/dataModel';
+
+type ChatMode = 'agent' | 'persona';
+
+type AttachmentPreview = { name: string; publicUrl: string; contentType: string };
+
+type OptimisticMessage = {
+  id: string;
+  role: 'user';
+  parts: Array<{ type: 'text'; text: string }>;
+  metadata?: { optimistic: true; optimisticAttachments?: AttachmentPreview[] };
+};
+
+type AgentMessageMetadata = {
+  mode?: ChatMode;
+  optimistic?: true;
+  optimisticAttachments?: AttachmentPreview[];
+  [key: string]: unknown;
+};
+
+type AgentMessage = {
+  id: string;
+  role: 'assistant' | 'user' | 'system';
+  metadata?: unknown;
+  parts?: unknown[];
+  mode?: ChatMode;
+};
+
+type DisplayMessage = AgentMessage | OptimisticMessage;
+
+type ToolResultPayload = {
+  ephemeralAssets?: MediaAsset[];
+  persistedAssets?: MediaAsset[];
+  publicUrl?: string;
+  contentType?: string;
+  size?: number;
+  [key: string]: unknown;
+};
+
+type MediaAsset = {
+  publicUrl?: string;
+  contentType?: string;
+  size?: number;
+};
+
+type ToolResultPart = {
+  type: 'tool-result';
+  result?: unknown;
+  output?: unknown;
+};
+
+type TextPart = {
+  type: 'text';
+  text?: string;
+};
+
+const isTextPart = (part: unknown): part is TextPart => {
+  return Boolean(
+    part &&
+    typeof part === 'object' &&
+    (part as { type?: unknown }).type === 'text' &&
+    typeof (part as { text?: unknown }).text === 'string'
+  );
+};
+
+const isToolResultPart = (part: unknown): part is ToolResultPart => {
+  return Boolean(part && typeof part === 'object' && (part as { type?: unknown }).type === 'tool-result');
+};
+
+const isToolResultPayload = (value: unknown): value is ToolResultPayload => {
+  return Boolean(value && typeof value === 'object');
+};
+
+const isMediaAsset = (value: unknown): value is MediaAsset => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as MediaAsset;
+  const validPublicUrl = candidate.publicUrl === undefined || typeof candidate.publicUrl === 'string';
+  const validContentType = candidate.contentType === undefined || typeof candidate.contentType === 'string';
+  const validSize = candidate.size === undefined || typeof candidate.size === 'number';
+  return validPublicUrl && validContentType && validSize;
+};
+
+const toMediaAssetArray = (value: unknown): MediaAsset[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isMediaAsset);
+};
+
+const getToolResultPayload = (part: ToolResultPart): ToolResultPayload | null => {
+  const payload = part.result ?? part.output ?? null;
+  if (!isToolResultPayload(payload)) return null;
+  return payload as ToolResultPayload;
+};
+
+const getOptimisticAttachments = (metadata: unknown | undefined): AttachmentPreview[] | null => {
+  if (!metadata || typeof metadata !== 'object') return null;
+  const attachments = (metadata as AgentMessageMetadata).optimisticAttachments;
+  if (!Array.isArray(attachments)) return null;
+  const valid = attachments.filter(att =>
+    typeof att?.name === 'string' && typeof att?.publicUrl === 'string' && typeof att?.contentType === 'string'
+  );
+  return valid.length > 0 ? valid : null;
+};
+
+const hasOptimisticFlag = (metadata: unknown | undefined): boolean => {
+  return Boolean(metadata && typeof metadata === 'object' && (metadata as AgentMessageMetadata).optimistic === true);
+};
 
 export type MessagesPaneProps = {
-  messages: Array<any>;
-  optimisticMessages?: Array<{ id: string; role: 'user'; parts: Array<{ type: 'text'; text: string }>; metadata?: Record<string, unknown> }>;
+  messages: AgentMessage[];
+  optimisticMessages?: OptimisticMessage[];
   status: string;
   messagesContainerRef: RefObject<HTMLDivElement | null>;
   messagesInnerRef: RefObject<HTMLDivElement | null>;
   containerHeight: number;
   didAnimateWelcome: boolean;
   bubbleAnimatingIds: Set<string>;
-  lastSentAttachments?: Array<{ name: string; publicUrl: string; contentType: string }>;
+  lastSentAttachments?: AttachmentPreview[];
   activeThreadId?: string;
 };
-
-type AttachmentPreview = { name: string; publicUrl: string; contentType: string };
 
 function extractAttachmentsFromText(text: string): { cleanedText: string; items: AttachmentPreview[] } {
   try {
@@ -67,8 +171,8 @@ function extractAttachmentsFromText(text: string): { cleanedText: string; items:
 
     // Bare media URLs in free text
     const urlRegex = /https?:\/\/[^\s<>()'"`]+/gi;
-    const rawUrls = (text.match(urlRegex) || []) as string[];
-    for (let raw of rawUrls) {
+    const rawUrls = text.match(urlRegex) || [];
+    for (const raw of rawUrls) {
       // Trim common trailing punctuation
       const trimmed = raw.replace(/[),.;!?\]\}"']+$/g, '');
       if (!/^https?:\/\//i.test(trimmed)) continue;
@@ -136,24 +240,23 @@ function renderAttachments(items: AttachmentPreview[]) {
   );
 }
 
-type ChatMode = 'agent' | 'persona';
-
-function resolveMode(message: any): ChatMode | undefined {
-  const meta = message?.metadata?.mode;
+function resolveMode(message: DisplayMessage): ChatMode | undefined {
+  const meta = (message as { metadata?: AgentMessageMetadata })?.metadata?.mode;
   if (meta === 'persona' || meta === 'agent') return meta;
-  const fallback = message?.mode;
+  const fallback = (message as { mode?: ChatMode })?.mode;
   if (fallback === 'persona' || fallback === 'agent') return fallback;
   return undefined;
 }
 
 export default function MessagesPane(props: MessagesPaneProps) {
-  const { messages, optimisticMessages = [], status, messagesContainerRef, messagesInnerRef, containerHeight, didAnimateWelcome, bubbleAnimatingIds, lastSentAttachments, activeThreadId } = props;
-  const displayMessages = optimisticMessages.length > 0 ? [...messages, ...optimisticMessages] : messages;
+  const { messages, optimisticMessages = [], status: _status, messagesContainerRef, messagesInnerRef, containerHeight, didAnimateWelcome, bubbleAnimatingIds, lastSentAttachments, activeThreadId } = props;
+  const displayMessages: DisplayMessage[] = optimisticMessages.length > 0 ? [...messages, ...optimisticMessages] : messages;
   const { isAuthenticated } = useConvexAuth();
   const liveMedia = useQuery(
-    convexApi.media.listMedia as any,
-    isAuthenticated && activeThreadId ? ({ threadId: activeThreadId as any, limit: 50 } as any) : 'skip'
-  ) as Array<{ publicUrl?: string; contentType: string; size?: number; createdAt: number; r2Key: string }> | undefined;
+    convexApi.media.listMedia,
+    isAuthenticated && activeThreadId ? { threadId: activeThreadId, limit: 50 } : 'skip'
+  );
+  const liveMediaList: Doc<'media_public'>[] = Array.isArray(liveMedia) ? liveMedia : [];
   const lastUserMessage = [...displayMessages].reverse().find(m => m.role === 'user');
   const lastUserMessageId = lastUserMessage?.id;
   return (
@@ -183,10 +286,10 @@ export default function MessagesPane(props: MessagesPaneProps) {
         )}
         {displayMessages.map((m, idx) => {
           // Build content and collect any attachments referenced in text
-          const textNodes: any[] = [];
+          const textNodes: ReactNode[] = [];
           let collectedFromText: AttachmentPreview[] = [];
-          (m.parts || []).forEach((part: any, index: number) => {
-            if (part.type === 'text') {
+          (m.parts || []).forEach((part, index: number) => {
+            if (isTextPart(part)) {
               const { cleanedText, items } = extractAttachmentsFromText(part.text || '');
               if (cleanedText) {
                 textNodes.push(<span key={`t-${index}`}>{cleanedText}</span>);
@@ -196,13 +299,12 @@ export default function MessagesPane(props: MessagesPaneProps) {
               }
             }
           });
+          const metadata = 'metadata' in m ? (m.metadata as AgentMessageMetadata | undefined) : undefined;
           const isLastUser = m.role === 'user' && m.id === lastUserMessageId;
-          const optimisticAttachmentOverride = Array.isArray((m?.metadata as any)?.optimisticAttachments)
-            ? ((m.metadata as any).optimisticAttachments as AttachmentPreview[])
-            : null;
+          const optimisticAttachmentOverride = getOptimisticAttachments(metadata);
           const previewItems = collectedFromText.length > 0
             ? collectedFromText
-            : (optimisticAttachmentOverride ?? (isLastUser && (lastSentAttachments?.length || 0) > 0 ? (lastSentAttachments as AttachmentPreview[]) : []));
+            : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
 
           // Determine if this is the last assistant message to attach live media below
           const isAssistant = m.role === 'assistant';
@@ -213,7 +315,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
           const assistantBubble = mode === 'persona'
             ? 'inline-block max-w-[80%] bg-white/10 border border-white/20 text-white'
             : 'inline-block max-w-[80%] bg-white/10 border border-white/15 text-white';
-          const isOptimistic = Boolean((m?.metadata as any)?.optimistic);
+          const isOptimistic = hasOptimisticFlag(metadata);
           const bubbleBase = m.role === 'user'
             ? 'bg-sky-500 text-white max-w-full'
             : assistantBubble;
@@ -229,14 +331,15 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   {/* Render cleaned text parts first */}
                   {textNodes}
                   {/* Render tool results and media blocks */}
-                  {(m.parts || []).map((part: any, index: number) => {
-                    if (part.type !== 'tool-result') return null;
-                    const payload = part.result ?? part.output ?? null;
+                  {(m.parts || []).map((part, index: number) => {
+                    if (!isToolResultPart(part)) return null;
+                    const payload = getToolResultPayload(part);
                     // Ephemeral assets from provider (surface immediately)
-                    if (payload?.ephemeralAssets?.length) {
+                    if (payload && payload.ephemeralAssets && payload.ephemeralAssets.length > 0) {
+                      const assets = toMediaAssetArray(payload.ephemeralAssets);
                       return (
                         <div key={`ep-${index}`} className="mt-2 space-y-2">
-                          {payload.ephemeralAssets.map((asset: any, assetIndex: number) => {
+                          {assets.map((asset, assetIndex) => {
                             const { publicUrl, contentType } = asset || {};
                             if (!publicUrl) return null;
                             const isImage = (contentType || '').startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(publicUrl);
@@ -244,7 +347,10 @@ export default function MessagesPane(props: MessagesPaneProps) {
                             const isVideo = (contentType || '').startsWith('video/') || /\.(mp4|webm|mov|m4v|mkv)$/i.test(publicUrl);
                             return (
                               <div key={assetIndex} className="w-full">
-                                {isImage && (<img src={publicUrl} alt="Generated content" className="w-full rounded max-w-sm" />)}
+                                {isImage && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={publicUrl} alt="Generated content" className="w-full rounded max-w-sm" />
+                                )}
                                 {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
                                 {isVideo && (<video controls src={publicUrl} className="w-full rounded max-w-sm" />)}
                               </div>
@@ -253,10 +359,11 @@ export default function MessagesPane(props: MessagesPaneProps) {
                         </div>
                       );
                     }
-                    if (payload?.persistedAssets?.length) {
+                    if (payload && payload.persistedAssets && payload.persistedAssets.length > 0) {
+                      const assets = toMediaAssetArray(payload.persistedAssets);
                       return (
                         <div key={`tr-${index}`} className="mt-2 space-y-2">
-                          {payload.persistedAssets.map((asset: any, assetIndex: number) => {
+                          {assets.map((asset, assetIndex) => {
                             const { publicUrl, contentType, size } = asset;
                             if (!publicUrl) return null;
                             const isImage = contentType?.startsWith('image/');
@@ -264,7 +371,10 @@ export default function MessagesPane(props: MessagesPaneProps) {
                             const isVideo = contentType?.startsWith('video/');
                             return (
                               <div key={assetIndex} className="w-full">
-                                {isImage && (<img src={publicUrl} alt="Generated content" className="w-full rounded max-w-sm" />)}
+                                {isImage && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={publicUrl} alt="Generated content" className="w-full rounded max-w-sm" />
+                                )}
                                 {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
                                 {isVideo && (<video controls src={publicUrl} className="w-full rounded max-w-sm" />)}
                                 {contentType && size && (<div className="text-xs text-white/60 mt-1">{contentType} • {formatBytes(size)}</div>)}
@@ -281,14 +391,21 @@ export default function MessagesPane(props: MessagesPaneProps) {
                       const isVideo = contentType.startsWith('video/');
                       return (
                         <div key={`tr-${index}`} className="mt-2">
-                          {isImage && (<img src={publicUrl} alt="Uploaded content" className="w-full rounded max-w-sm" />)}
+                          {isImage && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={publicUrl} alt="Uploaded content" className="w-full rounded max-w-sm" />
+                          )}
                           {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
                           {isVideo && (<video controls src={publicUrl} className="w-full rounded max-w-sm" />)}
                           {size && (<div className="text-xs text-white/60 mt-1">{contentType} • {formatBytes(size)}</div>)}
                         </div>
                       );
                     }
-                    return (<pre key={`tr-${index}`} className="text-xs bg-black/20 rounded p-2 mt-2 overflow-auto">{JSON.stringify(payload, null, 2)}</pre>);
+                    return (
+                      <pre key={`tr-${index}`} className="text-xs bg-black/20 rounded p-2 mt-2 overflow-auto">
+                        {JSON.stringify(part.result ?? part.output ?? null, null, 2)}
+                      </pre>
+                    );
                   })}
                   {/* Render attachments parsed from text or last-sent preview */}
                   {previewItems && previewItems.length > 0 && (
@@ -296,9 +413,9 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   )}
 
                   {/* Reactive media: if authenticated and thread-bound media exists, show new thumbnails below last assistant message */}
-                  {isLastAssistant && Array.isArray(liveMedia) && liveMedia.length > 0 && (
+                  {isLastAssistant && liveMediaList.length > 0 && (
                     <div className="mt-2 space-y-2">
-                      {liveMedia.map((asset, assetIndex) => {
+                      {liveMediaList.map((asset, assetIndex) => {
                         const publicUrl = asset.publicUrl || '';
                         if (!publicUrl) return null;
                         const contentType = asset.contentType || '';
@@ -307,7 +424,10 @@ export default function MessagesPane(props: MessagesPaneProps) {
                         const isVideo = contentType.startsWith('video/');
                         return (
                           <div key={`live-${assetIndex}`} className="w-full">
-                            {isImage && (<img src={publicUrl} alt="Generated content" className="w-full rounded max-w-sm" />)}
+                            {isImage && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={publicUrl} alt="Generated content" className="w-full rounded max-w-sm" />
+                            )}
                             {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
                             {isVideo && (<video controls src={publicUrl} className="w-full rounded max-w-sm" />)}
                           </div>

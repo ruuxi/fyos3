@@ -2,17 +2,16 @@
 // This will be used to publish apps to R2 via signed uploads.
 
 import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
+import type { Zippable } from 'fflate';
 
 type FS = WebContainerAPI['fs'];
 
 async function readFileAsUint8Array(fs: FS, path: string): Promise<Uint8Array> {
-  const buf = await fs.readFile(path);
-  return buf instanceof Uint8Array ? buf : new Uint8Array(buf as any);
+  return fs.readFile(path);
 }
 
 async function readText(fs: FS, path: string): Promise<string> {
-  const data = await fs.readFile(path, 'utf8' as any);
-  return typeof data === 'string' ? data : new TextDecoder().decode(data as any);
+  return fs.readFile(path, 'utf8');
 }
 
 async function listFilesRecursive(fs: FS, root: string): Promise<string[]> {
@@ -60,7 +59,8 @@ export type PackageResult = {
 };
 
 function sha256Hex(bytes: Uint8Array): Promise<string> {
-  return crypto.subtle.digest('SHA-256', bytes).then((buf) =>
+  const input = bytes.slice().buffer; // ensure ArrayBuffer, not ArrayBufferLike
+  return crypto.subtle.digest('SHA-256', input).then((buf) =>
     Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('')
   );
 }
@@ -73,7 +73,7 @@ export async function buildAppTarGz(instance: WebContainerAPI, appId: string, ma
 
   // Prepare zip tree: use fflate on demand via dynamic import
   const fflate = await import('fflate');
-  const tree: Record<string, any> = {};
+  const tree: Zippable = {};
 
   // Include app files
   for (const filePath of files) {
@@ -132,5 +132,3 @@ export async function buildAppTarGz(instance: WebContainerAPI, appId: string, ma
 
   return { tarGz: gz, manifest, size, manifestHash, depsHash };
 }
-
-

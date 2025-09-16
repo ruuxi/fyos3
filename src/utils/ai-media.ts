@@ -12,13 +12,15 @@ export type PersistedAsset = {
   path: string; // JSON path to where replacement occurred
 };
 
+type JsonParent = Record<string, unknown> | unknown[];
+
 type Candidate = {
   id: string; // dedupe key (url or base64 prefix+len)
   kind: PersistedAsset['kind'];
   source: PersistedAsset['source'];
   original: string; // url or base64
   // Where to modify result once ingested
-  parent: any;
+  parent: JsonParent;
   key: string | number; // key in parent to replace
   // For audioBase64 transformation we also record that we should convert base64->audioUrl
   isAudioBase64Field?: boolean;
@@ -56,6 +58,30 @@ function guessKindFromContentType(ct?: string): PersistedAsset['kind'] {
 function makeJsonPath(parentPath: string, key: string | number): string {
   if (typeof key === 'number') return `${parentPath}[${key}]`;
   return parentPath ? `${parentPath}.${key}` : String(key);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getFromParent(parent: JsonParent, key: string | number): unknown {
+  return Array.isArray(parent) ? parent[key as number] : parent[key as string];
+}
+
+function setOnParent(parent: JsonParent, key: string | number, value: unknown): void {
+  if (Array.isArray(parent)) {
+    parent[key as number] = value;
+  } else {
+    parent[key as string] = value;
+  }
+}
+
+function deleteFromParent(parent: JsonParent, key: string | number): void {
+  if (Array.isArray(parent)) {
+    parent[key as number] = undefined;
+  } else {
+    delete parent[key as string];
+  }
 }
 
 async function ingestUrl(url: string, scope?: MediaScope): Promise<PersistedAsset | null> {
@@ -108,17 +134,21 @@ async function ingestBase64(base64: string, contentType?: string, scope?: MediaS
   }
 }
 
-export async function persistAssetsFromAIResult<T = any>(inputResult: T, scope?: MediaScope): Promise<{ result: T; persistedAssets: PersistedAsset[] }>{
+export async function persistAssetsFromAIResult<T = unknown>(inputResult: T, scope?: MediaScope): Promise<{ result: T; persistedAssets: PersistedAsset[] }>{
   // Work on a shallow clone to avoid mutating caller's reference unexpectedly
-  const result: any = Array.isArray(inputResult) ? [...(inputResult as any)] : (typeof inputResult === 'object' && inputResult !== null) ? { ...(inputResult as any) } : inputResult;
+  const clonedResult: unknown = Array.isArray(inputResult)
+    ? [...(inputResult as unknown[])]
+    : isPlainObject(inputResult)
+      ? { ...(inputResult as Record<string, unknown>) }
+      : inputResult;
+  const result = clonedResult as T;
   const candidates: Candidate[] = [];
   const seen = new Set<string>();
 
-  function visit(node: any, parent: any, key: string | number, path: string) {
+  function visit(node: unknown, parent: JsonParent | null, key: string | number | null, path: string) {
     if (node == null) return;
-    const t = typeof node;
-    if (t === 'string') {
-      if (key != null && isHttpUrl(node) && (URL_KEYS.has(String(key)) || MEDIA_KEYS.has(String(key)))) {
+    if (typeof node === 'string') {
+      if (key != null && parent && isHttpUrl(node) && (URL_KEYS.has(String(key)) || MEDIA_KEYS.has(String(key)))) {
         const id = `url:${node}`;
         if (!seen.has(id)) {
           seen.add(id);
@@ -137,26 +167,28 @@ export async function persistAssetsFromAIResult<T = any>(inputResult: T, scope?:
             seen.add(id);
             candidates.push({ id, kind: guessKindFromKey(String(key)), source: 'url', original: child, parent: node, key: i, path: childPath });
           }
-        } else if (typeof child === 'object' && child) {
+        } else if (typeof child === 'object' && child !== null) {
           visit(child, node, i, childPath);
         }
       }
       return;
     }
-    if (t === 'object') {
+    if (isPlainObject(node)) {
       // ElevenLabs audio: { contentType, audioBase64 }
-      if (typeof (node as any).audioBase64 === 'string' && (node as any).audioBase64.length > 0) {
-        const raw = (node as any).audioBase64 as string;
+      const audioBase64 = node['audioBase64'];
+      if (typeof audioBase64 === 'string' && audioBase64.length > 0) {
+        const raw = audioBase64;
         const id = `b64:${raw.slice(0, 48)}:${raw.length}`;
         if (!seen.has(id)) {
           seen.add(id);
-          candidates.push({ id, kind: 'audio', source: 'base64', original: raw, parent: node, key: 'audioBase64', isAudioBase64Field: true, contentTypeHint: (node as any).contentType, path: makeJsonPath(path, 'audioBase64') });
+          const contentTypeHint = typeof node['contentType'] === 'string' ? node['contentType'] : undefined;
+          candidates.push({ id, kind: 'audio', source: 'base64', original: raw, parent: node, key: 'audioBase64', isAudioBase64Field: true, contentTypeHint, path: makeJsonPath(path, 'audioBase64') });
         }
       }
 
       // Traverse object properties
       for (const k of Object.keys(node)) {
-        const v = (node as any)[k];
+        const v = node[k];
         const childPath = makeJsonPath(path, k);
         if (typeof v === 'string') {
           if (isHttpUrl(v) && (URL_KEYS.has(k) || MEDIA_KEYS.has(k))) {
@@ -168,10 +200,11 @@ export async function persistAssetsFromAIResult<T = any>(inputResult: T, scope?:
           }
         } else if (Array.isArray(v)) {
           visit(v, node, k, childPath);
-        } else if (typeof v === 'object' && v !== null) {
+        } else if (isPlainObject(v)) {
           // Common pattern: { url: '...' }
-          if (typeof (v as any).url === 'string' && isHttpUrl((v as any).url)) {
-            const u = (v as any).url as string;
+          const urlValue = v['url'];
+          if (typeof urlValue === 'string' && isHttpUrl(urlValue)) {
+            const u = urlValue;
             const id = `url:${u}`;
             if (!seen.has(id)) {
               seen.add(id);
@@ -184,8 +217,10 @@ export async function persistAssetsFromAIResult<T = any>(inputResult: T, scope?:
     }
   }
 
-  if (typeof result === 'object' && result !== null) {
-    visit(result, { root: true, value: result }, 'value', '');
+  if (Array.isArray(result)) {
+    visit(result, result, null, '');
+  } else if (isPlainObject(result)) {
+    visit(result, result, null, '');
   }
 
   const persistedAssets: PersistedAsset[] = [];
@@ -207,21 +242,23 @@ export async function persistAssetsFromAIResult<T = any>(inputResult: T, scope?:
     const persisted = cache.get(cand.id);
     if (!persisted || !persisted.publicUrl) continue;
     try {
-      if (cand.isAudioBase64Field && cand.parent && typeof cand.parent === 'object') {
+      if (cand.isAudioBase64Field && !Array.isArray(cand.parent)) {
         // Replace audioBase64 -> audioUrl
-        delete cand.parent[cand.key as any];
-        (cand.parent as any).audioUrl = persisted.publicUrl;
-        (cand.parent as any).contentType = persisted.contentType || (cand.parent as any).contentType;
+        deleteFromParent(cand.parent, cand.key);
+        cand.parent['audioUrl'] = persisted.publicUrl;
+        if (persisted.contentType) {
+          cand.parent['contentType'] = persisted.contentType;
+        }
       } else {
         // Replace url string or { url }
-        const current = cand.parent[cand.key as any];
+        const current = getFromParent(cand.parent, cand.key);
         if (typeof current === 'string') {
-          cand.parent[cand.key as any] = persisted.publicUrl;
-        } else if (typeof current === 'object' && current && typeof current.url === 'string') {
-          (current as any).url = persisted.publicUrl;
+          setOnParent(cand.parent, cand.key, persisted.publicUrl);
+        } else if (isPlainObject(current) && typeof current['url'] === 'string') {
+          current['url'] = persisted.publicUrl;
         } else {
           // Fallback: set to object with url
-          cand.parent[cand.key as any] = { url: persisted.publicUrl };
+          setOnParent(cand.parent, cand.key, { url: persisted.publicUrl });
         }
       }
       const asset: PersistedAsset = { ...persisted, path: cand.path, source: cand.source, kind: cand.kind, original: cand.original };
@@ -232,8 +269,8 @@ export async function persistAssetsFromAIResult<T = any>(inputResult: T, scope?:
   }
 
   try {
-    if (typeof result === 'object' && result) {
-      (result as any).persistedAssets = persistedAssets;
+    if (isPlainObject(result) || Array.isArray(result)) {
+      (result as unknown as Record<string, unknown>)['persistedAssets'] = persistedAssets;
     }
   } catch {}
 
@@ -242,7 +279,7 @@ export async function persistAssetsFromAIResult<T = any>(inputResult: T, scope?:
 
 
 // Extract provider-returned media URLs before ingestion for immediate rendering
-export function extractOriginalMediaUrlsFromResult(inputResult: any): Array<{ url: string; contentType?: string }>{
+export function extractOriginalMediaUrlsFromResult(inputResult: unknown): Array<{ url: string; contentType?: string }>{
   const urls: Array<{ url: string; contentType?: string }> = [];
   const seen = new Set<string>();
 
@@ -253,7 +290,7 @@ export function extractOriginalMediaUrlsFromResult(inputResult: any): Array<{ ur
     urls.push({ url: u, contentType: ct });
   };
 
-  function visit(node: any, parentKey: string | number | null) {
+  function visit(node: unknown, parentKey: string | number | null) {
     if (node == null) return;
     const t = typeof node;
     if (t === 'string') return;
@@ -270,19 +307,21 @@ export function extractOriginalMediaUrlsFromResult(inputResult: any): Array<{ ur
       }
       return;
     }
-    if (t === 'object') {
+    if (isPlainObject(node)) {
       for (const k of Object.keys(node)) {
-        const v = (node as any)[k];
+        const v = node[k];
         if (typeof v === 'string') {
           if (isHttpUrl(v) && (URL_KEYS.has(k) || MEDIA_KEYS.has(k))) {
             push(v);
           }
         } else if (Array.isArray(v)) {
           visit(v, k);
-        } else if (typeof v === 'object' && v !== null) {
+        } else if (isPlainObject(v)) {
           // Common pattern: { url: '...' }
-          if (typeof (v as any).url === 'string' && isHttpUrl((v as any).url)) {
-            push((v as any).url);
+          const urlValue = v['url'];
+          if (typeof urlValue === 'string' && isHttpUrl(urlValue)) {
+            const contentType = typeof v['contentType'] === 'string' ? v['contentType'] : undefined;
+            push(urlValue, contentType);
           }
           visit(v, k);
         }
@@ -291,11 +330,8 @@ export function extractOriginalMediaUrlsFromResult(inputResult: any): Array<{ ur
   }
 
   try {
-    if (typeof inputResult === 'object' && inputResult !== null) {
-      visit(inputResult, null);
-    }
+    visit(inputResult, null);
   } catch {}
 
   return urls;
 }
-
