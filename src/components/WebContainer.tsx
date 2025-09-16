@@ -388,12 +388,10 @@ body{background:transparent}
         
         // Inject normalization CSS into HTML files
         try {
-          const packageJsonContent = await instance.fs.readFile('/package.json', 'utf8');
-          const packageJson = JSON.parse(packageJsonContent);
-          
+          await instance.fs.readFile('/package.json', 'utf8');
+
           // Check if it's a React/Next.js app and inject into public/index.html or pages/_document.tsx
           const publicIndexPath = '/public/index.html';
-          const appIndexPath = '/app/layout.tsx';
           const srcIndexPath = '/src/index.html';
           
           let injected = false;
@@ -568,7 +566,7 @@ export default function Document() {
               }
             }
             lastRemoteSaveRef.current = now;
-          } catch (e) {
+          } catch {
             // ignore network or build errors
           } finally {
             remoteSaveInFlightRef.current = false;

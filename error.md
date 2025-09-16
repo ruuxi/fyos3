@@ -31,3 +31,18 @@ Total errors: 0
 - templates/webcontainer/src/iframe-root.tsx — cleared 2 lint offenses
 - templates/webcontainer/src/main.tsx — cleared 4 lint offenses
 - test-auto-ingest.js — cleared 1 lint offense
+- convex/auth.config.ts — cleared anonymous default export warning
+- scripts/extract-webcontainer-lockfile.mjs — removed unused imports
+- scripts/verify-webcontainer.mjs — reported ESLint errors with context
+- src/app/api/agent/route.ts — removed unused imports and silent catch param
+- src/app/api/webcontainer-snapshot/route.ts — trimmed unused NextRequest arg
+- src/app/page.tsx — removed unused convex hooks
+- src/components/AIAgentBar.tsx — trimmed unused UI imports and arg
+- src/components/WebContainer.tsx — removed unused JSON parsing and silent catch arg
+- src/components/WebContainerProvider.tsx — cleaned unused types and catch param
+- test-auto-ingest-simple.js — marked unused fetch options parameter
+- src/components/BootScreen.tsx — removed unused theme selector memo
+- src/components/ScreenCarousel.tsx — removed unused drag start state
+
+## Active warnings
+- None (next focus: hook deps, config exports, `<img>` usage)

@@ -6,9 +6,8 @@ import { WebContainerProvider } from '@/components/WebContainerProvider';
 import { ScreensProvider } from '@/components/ScreensProvider';
 import { ScreenCarousel } from '@/components/ScreenCarousel';
 import { AppStoreScreen } from '@/components/AppStoreScreen';
-import { Authenticated, Unauthenticated, useQuery } from 'convex/react';
+import { Authenticated, Unauthenticated } from 'convex/react';
 import { SignInButton, UserButton } from '@clerk/nextjs';
-import { api } from '../../convex/_generated/api';
 
 export default function Home() {
   return (

@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const snapshotPath = path.join(process.cwd(), 'src', 'data', 'webcontainer-snapshot.bin');
     const snapshot = readFileSync(snapshotPath);

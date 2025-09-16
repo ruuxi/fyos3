@@ -21,8 +21,6 @@ import MediaPane from '@/components/agent/AIAgentBar/ui/MediaPane';
 import AddFriendForm from '@/components/agent/AIAgentBar/ui/AddFriendForm';
 import FriendMessagesPane from '@/components/agent/AIAgentBar/ui/FriendMessagesPane';
 import { buildDesktopSnapshot, restoreDesktopSnapshot } from '@/utils/desktop-snapshot';
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { UIMessage } from 'ai';
 import type { Doc } from '../../convex/_generated/dataModel';
 
@@ -184,7 +182,7 @@ export default function AIAgentBar() {
       try { window.postMessage({ type: 'FYOS_AGENT_RUN_STARTED' }, '*'); } catch {}
       agentActiveRef.current = true;
     },
-    onToolProgress: (toolName: string) => {
+    onToolProgress: (_toolName: string) => {
       // Tool progress callback
     },
   });

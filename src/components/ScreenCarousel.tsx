@@ -11,7 +11,6 @@ export function ScreenCarousel({ children }: ScreenCarouselProps) {
   const { activeIndex, goTo, isTransitioning, animDurationMs } = useScreens();
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragOffset, setDragOffset] = useState(0);
   const [hasHorizontalIntent, setHasHorizontalIntent] = useState(false);
   const [prefersReduced, setPrefersReduced] = useState(false);
@@ -64,7 +63,6 @@ export function ScreenCarousel({ children }: ScreenCarouselProps) {
       startY = e.clientY;
       currentX = e.clientX;
       startTime = Date.now();
-      setDragStart({ x: startX, y: startY });
       setIsDragging(true);
       setHasHorizontalIntent(false);
       setDragOffset(0);

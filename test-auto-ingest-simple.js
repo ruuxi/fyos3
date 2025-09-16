@@ -3,7 +3,7 @@
  */
 
 // Mock fetch
-global.fetch = async (url, options) => {
+global.fetch = async (url, _options) => {
   if (url === '/api/media/ingest') {
     return {
       ok: true,

@@ -84,8 +84,8 @@ async function main() {
   try {
     await run('pnpm', ['exec', 'eslint', OUT_FS, '--ext', '.js,.jsx,.ts,.tsx']);
     console.log('ESLint completed with no errors.');
-  } catch (err) {
-    console.error('ESLint reported issues. Review the output above.');
+  } catch (error) {
+    console.error('ESLint reported issues. Review the output above.', error);
     process.exitCode = 1;
   }
 }
@@ -94,4 +94,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

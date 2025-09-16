@@ -9,7 +9,6 @@ import {
   WebExecInput,
   AppManageInput,
   ValidateProjectInput,
-  WebSearchInput,
   AiGenerateInput,
   MediaListInput,
   CodeEditAstInput,
@@ -21,8 +20,6 @@ import {
   PERSONA_PROMPT,
   CLASSIFIER_PROMPT
 } from '@/lib/prompts';
-import { promises as fs } from 'fs';
-import path from 'path';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { api as convexApi } from '../../../../convex/_generated/api';
 import { getInstalledAppNames, sanitizeToolInput, getConvexClientOptional } from '@/lib/agent/server/agentServerHelpers';
@@ -258,7 +255,7 @@ export async function POST(req: Request) {
         else if (raw === '1') personaMode = false;
         // If unexpected output, default to agent (personaMode=false)
       }
-    } catch (e) {
+    } catch {
       // On classifier error, default to agent mode
     }
   }

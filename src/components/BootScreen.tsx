@@ -39,7 +39,6 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
     } catch { return options[0].key; }
   })();
   const [selectedKey, setSelectedKey] = useState<string>(initialKey);
-  const selected = useMemo(() => options.find(o => o.key === selectedKey) || options[0], [selectedKey]);
 
   useEffect(() => {
     if (complete && canProceed && !exiting) {
@@ -153,4 +152,3 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
     </div>
   );
 }
-

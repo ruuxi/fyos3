@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import type { WebContainer as WebContainerAPI, FileSystemTree } from '@webcontainer/api';
+import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
 
 type SpawnResult = {
   exitCode: number;
@@ -183,7 +183,7 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
               output += decoder.decode(value as Uint8Array, { stream: true });
             }
           }
-        } catch (e) {
+        } catch {
           // Ignore read cancellation/errors; we still return what we have
         }
       })();

@@ -2,18 +2,11 @@
 // Extract pnpm-lock.yaml from running Next.js dev server's WebContainer
 // This script calls the /api/extract-lockfile endpoint
 
-import fs from 'node:fs';
-import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, '..');
-
-const TEMPLATES_DIR = path.join(repoRoot, 'templates', 'webcontainer');
-const LOCKFILE_PATH = path.join(TEMPLATES_DIR, 'pnpm-lock.yaml');
-
 async function extractLockfile() {
   console.log('📡 Instructions for extracting lockfile from WebContainer:');
   console.log('');
