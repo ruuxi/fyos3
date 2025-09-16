@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { agentLogger } from '@/lib/agentLogger';
+import { agentLogger, type AgentLogEntry } from '@/lib/agentLogger';
 
 export async function GET(request: Request) {
   try {
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     }
 
     // Return empty logs since we don't persist them to files
-    const logs: any[] = [];
+    const logs: AgentLogEntry[] = [];
 
     return NextResponse.json({
       logs,
@@ -62,7 +62,5 @@ export async function DELETE(request: Request) {
     );
   }
 }
-
-
 
 

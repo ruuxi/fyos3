@@ -4,29 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-
-interface LogEntry {
-  timestamp: string;
-  sessionId: string;
-  type: 'message' | 'tool_call' | 'token_usage' | 'error';
-  data: {
-    messageId?: string;
-    role?: 'user' | 'assistant';
-    content?: string;
-    toolName?: string;
-    toolCallId?: string;
-    toolInput?: any;
-    toolOutput?: any;
-    toolDuration?: number;
-    promptTokens?: number;
-    completionTokens?: number;
-    totalTokens?: number;
-    estimatedCost?: number;
-    model?: string;
-    error?: string;
-    stack?: string;
-  };
-}
+import type { AgentLogEntry } from '@/lib/agentLogger';
 
 interface LogSummary {
   totalSessions: number;
@@ -38,7 +16,7 @@ interface LogSummary {
 }
 
 export default function LogsPage() {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logs, setLogs] = useState<AgentLogEntry[]>([]);
   const [summary, setSummary] = useState<LogSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,9 +29,9 @@ export default function LogsPage() {
       const response = await fetch(`/api/agent/logs?limit=${limit}`);
       if (!response.ok) throw new Error('Failed to fetch logs');
       
-      const data = await response.json();
-      setLogs(data.logs || []);
-      setSummary(data.summary || null);
+      const data = (await response.json()) as { logs?: AgentLogEntry[]; summary?: LogSummary };
+      setLogs(data.logs ?? []);
+      setSummary(data.summary ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch logs');
     } finally {
@@ -260,4 +238,3 @@ export default function LogsPage() {
     </div>
   );
 }
-

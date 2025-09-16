@@ -3,28 +3,34 @@ import path from 'path';
 import { ConvexHttpClient } from 'convex/browser';
 import { auth } from '@clerk/nextjs/server';
 
+const parseAppName = (candidate: unknown): string | undefined => {
+  if (!candidate || typeof candidate !== 'object') return undefined;
+  const value = (candidate as { name?: unknown }).name;
+  return typeof value === 'string' ? value : undefined;
+};
+
 export async function getInstalledAppNames(): Promise<string[]> {
   try {
     const regPath = path.join(process.cwd(), 'public', 'apps', 'registry.json');
     const buf = await fs.readFile(regPath, 'utf-8');
     const data = JSON.parse(buf);
     if (Array.isArray(data)) {
-      return data.map((x: any) => (typeof x?.name === 'string' ? x.name : undefined)).filter(Boolean);
+      return data.map(parseAppName).filter((name: string | undefined): name is string => Boolean(name));
     }
     if (Array.isArray(data?.apps)) {
-      return data.apps.map((x: any) => (typeof x?.name === 'string' ? x.name : undefined)).filter(Boolean);
+      return data.apps.map(parseAppName).filter((name: string | undefined): name is string => Boolean(name));
     }
   } catch {}
   try {
     const appsDir = path.join(process.cwd(), 'src', 'apps');
-    const entries = (await fs.readdir(appsDir, { withFileTypes: true } as any)) as unknown as Array<{ isDirectory: () => boolean; name: string }>;
+    const entries = await fs.readdir(appsDir, { withFileTypes: true });
     const names: string[] = [];
-    for (const e of entries) {
-      if (e.isDirectory && e.isDirectory()) {
-        const id = e.name;
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const id = entry.name;
         try {
           const meta = JSON.parse(await fs.readFile(path.join(appsDir, id, 'metadata.json'), 'utf-8'));
-          names.push(typeof meta?.name === 'string' ? meta.name : id);
+          names.push(parseAppName(meta) ?? id);
         } catch {
           names.push(id);
         }
@@ -35,24 +41,30 @@ export async function getInstalledAppNames(): Promise<string[]> {
   return [];
 }
 
-export function sanitizeToolInput(toolName: string, input: any): any {
+export function sanitizeToolInput(toolName: string, input: Record<string, unknown> | undefined): Record<string, unknown> {
   try {
-    if (toolName === 'web_fs_write' && input?.content) {
-      const contentBytes = typeof input.content === 'string' ? new TextEncoder().encode(input.content).length : 0;
+    if (toolName === 'web_fs_write' && input) {
+      const contentRaw = input['content'];
+      const contentString = typeof contentRaw === 'string' ? contentRaw : '';
+      const contentBytes = new TextEncoder().encode(contentString).length;
       return {
-        path: input.path,
-        createDirs: input.createDirs,
+        path: typeof input['path'] === 'string' ? (input['path'] as string) : undefined,
+        createDirs: typeof input['createDirs'] === 'boolean' ? (input['createDirs'] as boolean) : undefined,
         contentSize: contentBytes,
         contentSizeKB: Number((contentBytes / 1024).toFixed(1)),
-        contentPreview: typeof input.content === 'string' ? input.content.slice(0, 100) + (input.content.length > 100 ? '...' : '') : undefined,
+        contentPreview: contentString ? `${contentString.slice(0, 100)}${contentString.length > 100 ? '...' : ''}` : undefined,
       };
     }
     if (toolName === 'web_fs_read') {
-      return { path: input?.path, encoding: input?.encoding };
+      return {
+        path: typeof input?.['path'] === 'string' ? (input['path'] as string) : undefined,
+        encoding: typeof input?.['encoding'] === 'string' ? (input['encoding'] as string) : undefined,
+      } as Record<string, unknown>;
     }
-    return input;
+    return input ?? {};
   } catch {
-    return { sanitizationError: true, originalKeys: Object.keys(input || {}) };
+    const keys = input ? Object.keys(input) : [];
+    return { sanitizationError: true, originalKeys: keys };
   }
 }
 
@@ -70,5 +82,3 @@ export async function getConvexClientOptional() {
     return null;
   }
 }
-
-

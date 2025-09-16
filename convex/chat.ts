@@ -1,7 +1,8 @@
 import { query, mutation } from "./_generated/server";
+import type { UserIdentity } from "convex/server";
 import { v } from "convex/values";
 
-function getOwnerId(identity: any): string {
+function getOwnerId(identity: UserIdentity): string {
   return identity.subject ?? identity.tokenIdentifier ?? identity.email ?? "unknown";
 }
 
@@ -106,7 +107,7 @@ export const listMessagesPage = query({
       .query("chat_messages")
       .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
       .order("asc")
-      .paginate({ cursor: (args.cursor ?? null) as any, numItems: pageSize });
+      .paginate({ cursor: args.cursor ?? null, numItems: pageSize });
     return { page: page.page, isDone: page.isDone, continueCursor: page.continueCursor };
   },
 });

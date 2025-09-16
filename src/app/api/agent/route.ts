@@ -1,4 +1,4 @@
-import { convertToModelMessages, streamText, UIMessage, stepCountIs, tool, generateText } from 'ai';
+import { convertToModelMessages, streamText, UIMessage, stepCountIs, generateText } from 'ai';
 // z is used in tool schemas but not directly here
 import {
   TOOL_NAMES,
@@ -23,6 +23,7 @@ import {
 } from '@/lib/prompts';
 import { promises as fs } from 'fs';
 import path from 'path';
+import type { Id } from '../../../../convex/_generated/dataModel';
 import { api as convexApi } from '../../../../convex/_generated/api';
 import { getInstalledAppNames, sanitizeToolInput, getConvexClientOptional } from '@/lib/agent/server/agentServerHelpers';
 import { buildServerTools } from '@/lib/agent/server/agentServerTools';
@@ -30,28 +31,118 @@ import { buildServerTools } from '@/lib/agent/server/agentServerTools';
 // Some tool actions (like package installs) may take longer than 30s
 export const maxDuration = 300;
 
-export async function POST(req: Request) {
-  const body = await req.json();
-  const { messages, threadId, attachmentHints }: { messages: UIMessage[]; threadId?: string; attachmentHints?: Array<{ contentType: string; url: string }> } = body as any;
+type AttachmentHint = { contentType?: string | null; url: string };
+type AgentPostPayload = {
+  messages: UIMessage[];
+  threadId?: string;
+  attachmentHints?: AttachmentHint[];
+};
+type SanitizedMessage = Omit<UIMessage, 'id'>;
+type MessageEnvelope = (UIMessage | SanitizedMessage) & { content?: string; toolCalls?: unknown[] };
+type TextUIPart = { type: 'text'; text: string };
 
-  // If the client provided attachment hints, append them to the last user message
-  const hints: Array<{ contentType: string; url: string }> = Array.isArray(attachmentHints) ? attachmentHints : [];
-  const messagesWithHints: UIMessage[] = Array.isArray(messages) ? [...messages] : [];
-  console.log('🧩 [AGENT] attachmentHints received:', Array.isArray(hints) ? hints : 'none');
+interface TokenUsageSummary {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+  cachedInputTokens?: number;
+}
+
+interface ToolCallSummary {
+  toolCallId?: string;
+  toolName?: string;
+  input?: unknown;
+  args?: unknown;
+}
+
+interface ToolResultSummary extends ToolCallSummary {
+  result?: unknown;
+  state?: unknown;
+  isError?: boolean;
+  errorMessage?: string;
+}
+
+interface StepEventSummary {
+  text?: string;
+  toolCalls?: ToolCallSummary[];
+  toolResults?: ToolResultSummary[];
+  finishReason?: string;
+  usage?: TokenUsageSummary;
+}
+
+type StreamFinishEvent = StepEventSummary & { steps?: StepEventSummary[] };
+
+const isAttachmentHint = (value: AttachmentHint | unknown): value is AttachmentHint => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<AttachmentHint>;
+  return typeof candidate.url === 'string';
+};
+
+const isTextPart = (part: unknown): part is TextUIPart => {
+  return Boolean(
+    part &&
+    typeof part === 'object' &&
+    'type' in (part as { type?: unknown }) &&
+    (part as { type?: unknown }).type === 'text' &&
+    'text' in (part as { text?: unknown }) &&
+    typeof (part as { text?: unknown }).text === 'string'
+  );
+};
+
+const extractTextFromMessage = (message: MessageEnvelope): string => {
+  const fromParts = Array.isArray(message.parts)
+    ? (message.parts as unknown[]).filter(isTextPart).map((part) => (part as TextUIPart).text).join('')
+    : '';
+  if (fromParts) return fromParts;
+  return typeof message.content === 'string' ? message.content : '';
+};
+
+const appendHintText = (message: MessageEnvelope, text: string) => {
+  if (Array.isArray(message.parts)) {
+    const textPart: TextUIPart = { type: 'text', text };
+    message.parts = [...message.parts, textPart];
+  } else if (typeof message.content === 'string') {
+    message.content = message.content + text;
+  } else {
+    message.content = text.trimStart();
+  }
+};
+
+const countToolCalls = (message: MessageEnvelope): number => {
+  const toolCalls = (message as { toolCalls?: unknown[] }).toolCalls;
+  return Array.isArray(toolCalls) ? toolCalls.length : 0;
+};
+
+const hasErrorField = (value: unknown): value is { error: unknown } => {
+  return typeof value === 'object' && value !== null && 'error' in value;
+};
+
+export async function POST(req: Request) {
+  const body: unknown = await req.json();
+  const payload = body as Partial<AgentPostPayload>;
+  const messages: UIMessage[] = Array.isArray(payload.messages) ? payload.messages : [];
+  const threadIdRaw = typeof payload.threadId === 'string' ? payload.threadId : undefined;
+  const attachmentHintsRaw = Array.isArray(payload.attachmentHints) ? payload.attachmentHints : [];
+  const hints = attachmentHintsRaw.filter(isAttachmentHint);
+  const messagesWithHints: MessageEnvelope[] = [...messages];
+
+  console.log('🧩 [AGENT] attachmentHints received:', hints.length > 0 ? hints : 'none');
   // Also detect client-side appended hint user message
   try {
-    const last = messagesWithHints[messagesWithHints.length - 1] as any;
-    if (last?.role === 'user' && Array.isArray(last.parts)) {
-      const txt = last.parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join('');
-      if (/^Attached\s+/i.test((txt || '').trim())) {
+    const last = messagesWithHints[messagesWithHints.length - 1];
+    if (last?.role === 'user') {
+      const txt = extractTextFromMessage(last);
+      if (/^Attached\s+/i.test(txt.trim())) {
         console.log('🧩 [AGENT] client-appended hints present in last message');
       }
     }
   } catch {}
+
   if (messagesWithHints.length > 0) {
     const lastUserIdx = (() => {
       for (let i = messagesWithHints.length - 1; i >= 0; i--) {
-        if ((messagesWithHints[i] as any)?.role === 'user') return i;
+        if (messagesWithHints[i]?.role === 'user') return i;
       }
       return -1;
     })();
@@ -59,80 +150,65 @@ export async function POST(req: Request) {
       let appended = false;
       if (hints.length > 0) {
         const lines = hints
-          .filter(h => typeof h?.url === 'string' && /^https?:\/\//i.test(h.url))
-          .map(h => `Attached ${h.contentType || 'file'}: ${h.url}`);
+          .filter(hint => /^https?:\/\//i.test(hint.url))
+          .map(hint => `Attached ${hint.contentType || 'file'}: ${hint.url}`);
         if (lines.length > 0) {
           const hintText = `\n${lines.join('\n')}`;
-          const target: any = messagesWithHints[lastUserIdx];
-          if (Array.isArray(target.parts)) {
-            target.parts = [...target.parts, { type: 'text', text: hintText }];
-          } else if (typeof target.content === 'string') {
-            target.content = (target.content || '') + hintText;
-          } else {
-            target.content = hintText.trimStart();
-          }
+          const target = messagesWithHints[lastUserIdx];
+          appendHintText(target, hintText);
           appended = true;
         }
       }
       // Fallback: parse legacy Attachments block in the last user message and synthesize lines
       if (!appended) {
-        const target: any = messagesWithHints[lastUserIdx];
-        const text = Array.isArray(target.parts)
-          ? target.parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join('')
-          : (typeof target.content === 'string' ? target.content : '');
-        const m = text && text.match(/Attachments:\s*\n([\s\S]*)$/i);
-        if (m) {
-          const section = (m[1] || '').split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);
+        const target = messagesWithHints[lastUserIdx];
+        const text = extractTextFromMessage(target);
+        const match = text && text.match(/Attachments:\s*\n([\s\S]*)$/i);
+        if (match) {
+          const section = (match[1] || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
           const urls: string[] = [];
           for (const line of section) {
-            const mm = line.match(/^[-•]\s*(.+?):\s*(\S+)\s*$/);
-            if (!mm) continue;
-            const url = mm[2].trim();
+            const urlMatch = line.match(/^[-•]\s*(.+?):\s*(\S+)\s*$/);
+            if (!urlMatch) continue;
+            const url = urlMatch[2].trim();
             if (/^https?:\/\//i.test(url)) urls.push(url);
           }
           if (urls.length > 0) {
             const lines = urls.map(u => `Attached file: ${u}`).join('\n');
             const hintText = `\n${lines}`;
-            if (Array.isArray(target.parts)) {
-              target.parts = [...target.parts, { type: 'text', text: hintText }];
-            } else if (typeof target.content === 'string') {
-              target.content = (target.content || '') + hintText;
-            } else {
-              target.content = hintText.trimStart();
-            }
+            appendHintText(target, hintText);
           }
         }
       }
     }
   }
-  
+
   // Generate session ID for this conversation
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  
+
   // Sanitize/dedupe messages to avoid downstream gateway duplicate-id issues
   const seenHashes = new Set<string>();
-  const sanitizedMessages: UIMessage[] = [] as any;
-  for (const m of messagesWithHints) {
-    const text = (m as any).parts?.map((p: any) => (p.type === 'text' ? p.text : '')).join('') || (m as any).content || '';
-    const key = `${m.role}|${text}`;
+  const sanitizedMessages: SanitizedMessage[] = [];
+  for (const message of messagesWithHints) {
+    const text = extractTextFromMessage(message);
+    const key = `${message.role}|${text}`;
     if (seenHashes.has(key)) continue;
     seenHashes.add(key);
-    const { id: _omit, ...rest } = m as any;
-    sanitizedMessages.push(rest);
+    if ('id' in message) {
+      const { id: _omit, ...rest } = message;
+      sanitizedMessages.push(rest);
+    } else {
+      sanitizedMessages.push(message);
+    }
   }
 
-  console.log('🔵 [AGENT] Incoming request with messages:', sanitizedMessages.map(m => {
-    const raw = (m as any);
-    const text = typeof raw.content === 'string' && raw.content
-      ? raw.content
-      : Array.isArray(raw.parts)
-        ? raw.parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join('')
-        : '';
-    const preview = text ? (text.length > 160 ? text.slice(0, 160) + '…' : text) : '[non-text content]';
+  console.log('🔵 [AGENT] Incoming request with messages:', sanitizedMessages.map(message => {
+    const text = extractTextFromMessage(message);
+    const preview = text ? (text.length > 160 ? `${text.slice(0, 160)}…` : text) : '[non-text content]';
     return {
-      role: m.role,
+      role: message.role,
       textPreview: preview,
-      toolCalls: 'toolCalls' in m && Array.isArray((m as any).toolCalls) ? (m as any).toolCalls.length : 0,
+      toolCalls: countToolCalls(message),
     };
   }));
 
@@ -141,16 +217,16 @@ export async function POST(req: Request) {
     content: string,
     mode: 'agent' | 'persona'
   ) => {
-    if (!threadId) return;
+    if (!threadIdRaw) return;
     try {
       const client = await getConvexClientOptional();
       if (client) {
-        await client.mutation(convexApi.chat.appendMessage as any, {
-          threadId: threadId as any,
+        await client.mutation(convexApi.chat.appendMessage, {
+          threadId: threadIdRaw as Id<'chat_threads'>,
           role,
           content,
           mode,
-        } as any);
+        });
       }
     } catch (error) {
       console.warn('⚠️ [AGENT] Failed to append message to thread', error);
@@ -165,9 +241,11 @@ export async function POST(req: Request) {
   // If not explicitly forced, auto-classify last user message using CLASSIFIER_PROMPT (0=persona, 1=agent)
   if (!personaMode) {
     try {
-      const lastUser = sanitizedMessages.slice().reverse().find(m => (m as any).role === 'user') as any;
-      const lastText = lastUser?.parts?.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join('') || lastUser?.content || '';
-      const attachmentsMentioned = (Array.isArray(attachmentHints) && attachmentHints.length > 0) ? `\nAttachments:\n${attachmentHints.map(h => `- ${h.contentType || 'file'}: ${h.url}`).join('\n')}` : '';
+      const lastUser = [...sanitizedMessages].reverse().find(m => m.role === 'user');
+      const lastText = lastUser ? extractTextFromMessage(lastUser) : '';
+      const attachmentsMentioned = hints.length > 0
+        ? `\nAttachments:\n${hints.map(h => `- ${h.contentType || 'file'}: ${h.url}`).join('\n')}`
+        : '';
       const classifyInput = (lastText || '') + attachmentsMentioned;
       if (classifyInput) {
         const classification = await generateText({
@@ -187,8 +265,11 @@ export async function POST(req: Request) {
 
   const lastMessage = messagesWithHints[messagesWithHints.length - 1];
   if (lastMessage && lastMessage.role === 'user') {
-    const content = lastMessage.parts?.map(p => p.type === 'text' ? p.text : '').join('') || '';
-    await agentLogger.logMessage(sessionId, lastMessage.id, 'user', content);
+    const content = extractTextFromMessage(lastMessage);
+    const messageId = 'id' in lastMessage && typeof lastMessage.id === 'string'
+      ? lastMessage.id
+      : `user_${Date.now()}`;
+    await agentLogger.logMessage(sessionId, messageId, 'user', content);
     await appendMessageToThread('user', content, personaMode ? 'persona' : 'agent');
   }
   if (personaMode) {
@@ -203,7 +284,7 @@ export async function POST(req: Request) {
       model: 'google/gemini-2.0-flash',
       messages: convertToModelMessages(personaMessages),
       system: personaSystem,
-      onFinish: async ({ usage, finishReason, text }: any) => {
+      onFinish: async ({ usage, finishReason, text }: { usage?: TokenUsageSummary; finishReason?: string; text?: string }) => {
         console.log('🎭 [PERSONA] Response finished:', {
           finishReason,
           textLength: text?.length || 0,
@@ -324,9 +405,9 @@ export async function POST(req: Request) {
         reasoningEffort: 'high',
       },
     },
-    messages: convertToModelMessages(sanitizedMessages as any),
+    messages: convertToModelMessages(sanitizedMessages),
     stopWhen: stepCountIs(15),
-    onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }: any) => {
+    onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }: StepEventSummary) => {
       console.log('📊 [USAGE-STEP] Step finished:', {
         finishReason,
         textLength: text?.length || 0,
@@ -343,46 +424,50 @@ export async function POST(req: Request) {
       
       // Track start times for tool calls (for timing)
       if (toolCalls?.length) {
-        console.log('🔧 [USAGE-STEP] Tool calls:', toolCalls.map((tc: any) => ({
+        console.log('🔧 [USAGE-STEP] Tool calls:', toolCalls.map((tc) => ({
           name: tc.toolName,
-          id: tc.toolCallId?.substring(0, 8),
+          id: tc.toolCallId ? tc.toolCallId.slice(0, 8) : 'unknown',
         })));
 
         // Record start times for duration tracking
         for (const tc of toolCalls) {
-          toolCallTimings.set(tc.toolCallId, Date.now());
+          if (tc.toolCallId) {
+            toolCallTimings.set(tc.toolCallId, Date.now());
+          }
         }
       }
 
       // Log completed tool calls with results and timing
       if (toolResults?.length) {
         for (const result of toolResults) {
-          const startTime = toolCallTimings.get(result.toolCallId) || Date.now();
+          const toolCallId = result.toolCallId ?? `tool_${Date.now()}`;
+          const startTime = toolCallTimings.get(toolCallId) ?? Date.now();
           const duration = Date.now() - startTime;
           
           // Sanitize large content from tool inputs before logging
-          const sanitizedInput = sanitizeToolInput(result.toolName || 'unknown', (result as any).args || (result as any).input || {});
-          
+          const rawInput = (result.args ?? result.input ?? {}) as Record<string, unknown>;
+          const sanitizedInput = sanitizeToolInput(result.toolName || 'unknown', rawInput);
+
           await agentLogger.logToolCall(
             sessionId,
             result.toolName || 'unknown',
-            result.toolCallId,
+            toolCallId,
             sanitizedInput,
             {
-              result: (result as any).result,
-              state: (result as any).state,
-              isError: (result as any).isError || false,
-              errorMessage: (result as any).errorMessage
+              result: result.result,
+              state: result.state,
+              isError: result.isError ?? false,
+              errorMessage: result.errorMessage,
             },
             duration
           );
           
           // Clean up timing tracking
-          toolCallTimings.delete(result.toolCallId);
+          toolCallTimings.delete(toolCallId);
         }
       }
     },
-    onFinish: async (event) => {
+    onFinish: async (event: StreamFinishEvent) => {
       // Enhanced usage logging
       console.log('🎯 [AI] Response finished:', {
         finishReason: event.finishReason,
@@ -435,25 +520,25 @@ export async function POST(req: Request) {
       // Log step-by-step breakdown if multiple steps
       if (event.steps && event.steps.length > 1) {
         console.log('📈 [USAGE-STEPS] Step breakdown:');
-        event.steps.forEach((step: any, index: number) => {
+        event.steps.forEach((step, index) => {
           console.log(`  Step ${index}: ${step.text?.length || 0} chars, ${step.toolCalls?.length || 0} tools`);
         });
       }
 
       // Console logging for development (tool calls already logged in onStepFinish)
       if (event.toolCalls?.length) {
-        console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc: any) => ({
+        console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc) => ({
           name: tc.toolName,
           input: tc.input ?? tc.args,
-          id: tc.toolCallId?.substring(0, 8)
+          id: tc.toolCallId ? tc.toolCallId.slice(0, 8) : 'unknown',
         })));
       }
 
       if (event.toolResults?.length) {
-        console.log('📋 [AI] Tool results received:', event.toolResults.map((tr: any) => ({
+        console.log('📋 [AI] Tool results received:', event.toolResults.map((tr) => ({
           name: tr.toolName,
-          success: !tr.result?.error,
-          id: tr.toolCallId?.substring(0, 8)
+          success: !hasErrorField(tr.result),
+          id: tr.toolCallId ? tr.toolCallId.slice(0, 8) : 'unknown',
         })));
       }
     },

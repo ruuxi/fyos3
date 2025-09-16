@@ -33,18 +33,18 @@ export async function GET(req: NextRequest) {
 
     const client = await getClient();
     const apps = await client.query(api.apps.listApps, {
-      limit,
+      limit: Number.isFinite(limit) ? limit : undefined,
       search,
       ownerId,
       visibility,
     });
     return NextResponse.json({ apps });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to list apps";
     return NextResponse.json(
-      { error: err?.message ?? "Failed to list apps" },
+      { error: message },
       { status: 500 }
     );
   }
 }
-
 

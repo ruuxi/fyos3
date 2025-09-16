@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { JSONSafe, stableHash, trimForChat } from '@/lib/agent/agentUtils';
 
 type SpawnFn = (command: string, args?: string[], opts?: { cwd?: string }) => Promise<{ exitCode: number; output: string }>;
@@ -14,7 +14,7 @@ export function useValidationDiagnostics({ spawn, sendMessage, getStatus }: Opti
   const lastErrorHashRef = useRef<string | null>(null);
   const autoPostBusyRef = useRef(false);
 
-  async function autoPostDiagnostic(content: string) {
+  const autoPostDiagnostic = useCallback(async (content: string) => {
     if (autoPostBusyRef.current) return;
     autoPostBusyRef.current = true;
     try {
@@ -29,7 +29,7 @@ export function useValidationDiagnostics({ spawn, sendMessage, getStatus }: Opti
       };
       release();
     }
-  }
+  }, [getStatus, sendMessage]);
 
   function extractBreakingESLint(jsonOutput: string): string | null {
     try {
@@ -129,10 +129,18 @@ export function useValidationDiagnostics({ spawn, sendMessage, getStatus }: Opti
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const ce = e as CustomEvent;
-      if (ce?.detail?.source === 'preview') {
-        const detail = ce.detail as any;
-        const payload = detail?.content || detail?.description || '';
+      const previewEvent = e as CustomEvent<
+        | { source: 'preview'; content?: unknown; description?: unknown }
+        | { source?: unknown; content?: unknown; description?: unknown }
+        | undefined
+      >;
+      if (previewEvent?.detail?.source === 'preview') {
+        const { content, description } = previewEvent.detail;
+        const payload = typeof content === 'string'
+          ? content
+          : typeof description === 'string'
+            ? description
+            : '';
         if (payload) {
           const hash = stableHash(String(payload));
           if (hash !== lastErrorHashRef.current) {
@@ -146,9 +154,7 @@ export function useValidationDiagnostics({ spawn, sendMessage, getStatus }: Opti
     };
     window.addEventListener('wc-preview-error', handler as EventListener);
     return () => window.removeEventListener('wc-preview-error', handler as EventListener);
-  }, []);
+  }, [autoPostDiagnostic]);
 
   return { runValidation } as const;
 }
-
-

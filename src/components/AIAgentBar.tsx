@@ -23,6 +23,8 @@ import FriendMessagesPane from '@/components/agent/AIAgentBar/ui/FriendMessagesP
 import { buildDesktopSnapshot, restoreDesktopSnapshot } from '@/utils/desktop-snapshot';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { UIMessage } from 'ai';
+import type { Doc } from '../../convex/_generated/dataModel';
 
 type OptimisticChatMessage = {
   id: string;
@@ -36,6 +38,16 @@ type AppRegistryEntry = {
   name: string;
   icon?: string;
   path: string;
+};
+
+type MutableWindow = Window & {
+  __FYOS_FIRST_TOOL_CALLED_REF?: { current: boolean };
+  __FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL?: number;
+};
+
+const getMutableWindow = (): MutableWindow | null => {
+  if (typeof window === 'undefined') return null;
+  return window as MutableWindow;
 };
 
 export default function AIAgentBar() {
@@ -179,19 +191,36 @@ export default function AIAgentBar() {
 
   useEffect(() => {
     if (optimisticMessages.length === 0) return;
-    const extractText = (message: any) => {
+
+    const isTextPart = (part: unknown): part is { type: 'text'; text?: string } => {
+      return Boolean(
+        part &&
+        typeof part === 'object' &&
+        'type' in (part as { type?: unknown }) &&
+        (part as { type?: unknown }).type === 'text'
+      );
+    };
+
+    const extractText = (message: UIMessage | OptimisticChatMessage | undefined): string => {
       if (!message) return '';
-      if (Array.isArray(message.parts)) {
-        return message.parts
-          .filter((part: any) => part?.type === 'text')
-          .map((part: any) => part?.text ?? '')
+      if ('parts' in message && Array.isArray((message as { parts?: unknown[] }).parts)) {
+        const parts = (message as { parts?: unknown[] }).parts ?? [];
+        return parts
+          .filter(isTextPart)
+          .map((part) => (part.text ?? ''))
           .join('');
       }
-      if (typeof message.content === 'string') return message.content;
+      if ('content' in message && typeof message.content === 'string') {
+        return message.content;
+      }
       return '';
     };
 
-    const realUserMessages = (messages || []).filter((msg: any) => msg?.role === 'user' && !(msg?.metadata as any)?.optimistic);
+    const metadataHasOptimistic = (metadata: unknown): boolean => {
+      return Boolean(metadata && typeof metadata === 'object' && (metadata as { optimistic?: unknown }).optimistic === true);
+    };
+
+    const realUserMessages = (messages ?? []).filter((msg) => msg.role === 'user' && !metadataHasOptimistic(msg.metadata));
     if (realUserMessages.length === 0) return;
     const latestReal = realUserMessages[realUserMessages.length - 1];
     const latestText = extractText(latestReal).trim();
@@ -199,7 +228,7 @@ export default function AIAgentBar() {
 
     setOptimisticMessages((prev) => {
       const filtered = prev.filter((opt) => {
-        const targetText = (opt?.parts?.[0]?.text ?? '').trim();
+        const targetText = (opt.parts?.[0]?.text ?? '').trim();
         if (!targetText) return false;
         return !latestText.startsWith(targetText);
       });
@@ -229,10 +258,11 @@ export default function AIAgentBar() {
   // Capture initial snapshot once the WebContainer is ready
   useEffect(() => {
     (async () => {
-      if (!instanceRef.current) return;
+      const inst = instanceRef.current;
+      if (!inst) return;
       if (undoStackRef.current.length > 0) return;
       try {
-        const { gz } = await buildDesktopSnapshot(instanceRef.current as any);
+        const { gz } = await buildDesktopSnapshot(inst);
         undoStackRef.current.push(gz);
         setUndoDepth(undoStackRef.current.length);
         console.log('📸 [UNDO] Initial snapshot captured');
@@ -253,11 +283,17 @@ export default function AIAgentBar() {
         const raw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) return [];
+        const isRegistryEntry = (entry: unknown): entry is AppRegistryEntry => {
+          return Boolean(
+            entry &&
+            typeof entry === 'object' &&
+            typeof (entry as { id?: unknown }).id === 'string' &&
+            typeof (entry as { path?: unknown }).path === 'string'
+          );
+        };
         return parsed
-          .filter((entry: any): entry is AppRegistryEntry => (
-            entry && typeof entry.id === 'string' && typeof entry.path === 'string'
-          ))
-          .map((entry: AppRegistryEntry) => ({
+          .filter(isRegistryEntry)
+          .map((entry) => ({
             id: entry.id,
             name: typeof entry.name === 'string' ? entry.name : entry.id,
             icon: typeof entry.icon === 'string' ? entry.icon : undefined,
@@ -271,8 +307,10 @@ export default function AIAgentBar() {
     // Reset first-tool-call gate at run start so subsequent runs can pause HMR again
     if (started) {
       try {
-        const ref: any = (window as any).__FYOS_FIRST_TOOL_CALLED_REF;
-        if (ref && typeof ref === 'object') ref.current = false;
+        const globalWin = getMutableWindow();
+        if (globalWin?.__FYOS_FIRST_TOOL_CALLED_REF) {
+          globalWin.__FYOS_FIRST_TOOL_CALLED_REF.current = false;
+        }
       } catch {}
       registryBeforeRunRef.current = null;
       (async () => {
@@ -292,7 +330,9 @@ export default function AIAgentBar() {
     if (finished && fsChangedRef.current && instanceRef.current) {
       (async () => {
         try {
-          const { gz } = await buildDesktopSnapshot(instanceRef.current as any);
+          const inst = instanceRef.current;
+          if (!inst) return;
+          const { gz } = await buildDesktopSnapshot(inst);
           undoStackRef.current.push(gz);
           setUndoDepth(undoStackRef.current.length);
           fsChangedRef.current = false;
@@ -335,18 +375,26 @@ export default function AIAgentBar() {
       if (stack.length < 2) return;
       try {
         // Temporarily suppress preview errors during restore to avoid false alarms
-        try { (window as any).__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL = Date.now() + 1500; } catch {}
+        const globalWin = getMutableWindow();
+        if (globalWin) {
+          try { globalWin.__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL = Date.now() + 1500; } catch {}
+        }
         // Drop the current snapshot and restore the previous
         stack.pop();
         const prev = stack[stack.length - 1];
-        await restoreDesktopSnapshot(inst as any, prev);
+        await restoreDesktopSnapshot(inst, prev);
         setUndoDepth(stack.length);
         console.log('↩️ [UNDO] Restored previous snapshot. Depth:', stack.length);
       } catch (e) {
         console.error('[UNDO] Restore failed', e);
       } finally {
         // Clear suppression shortly after
-        setTimeout(() => { try { (window as any).__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL = 0; } catch {} }, 1600);
+        setTimeout(() => {
+          const win = getMutableWindow();
+          if (win) {
+            try { win.__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL = 0; } catch {}
+          }
+        }, 1600);
       }
     };
   }, []);
@@ -420,12 +468,38 @@ export default function AIAgentBar() {
   // Visit desktops fetcher
   useEffect(() => {
     if (mode !== 'visit') return;
-    setDesktopsLoading(true); setDesktopsError(null);
-    fetch('/api/visit/desktops')
-      .then(r => r.json())
-      .then(j => setDesktopsListing((j?.desktops || []).map((d: any) => ({ _id: String(d._id), title: d.title, description: d.description, icon: d.icon }))))
-      .catch(e => setDesktopsError(e?.message || 'Failed'))
-      .finally(() => setDesktopsLoading(false));
+    let cancelled = false;
+
+    const loadDesktops = async () => {
+      setDesktopsLoading(true);
+      setDesktopsError(null);
+      try {
+        const response = await fetch('/api/visit/desktops');
+        const data = (await response.json()) as { desktops?: Doc<'desktops_public'>[] };
+        if (cancelled) return;
+        const list = (data.desktops ?? []).map((desktop) => ({
+          _id: String(desktop._id),
+          title: desktop.title ?? 'Untitled desktop',
+          description: desktop.description,
+          icon: desktop.icon,
+        }));
+        setDesktopsListing(list);
+      } catch (error) {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : 'Failed to load desktops';
+          setDesktopsError(message);
+        }
+      } finally {
+        if (!cancelled) {
+          setDesktopsLoading(false);
+        }
+      }
+    };
+
+    void loadDesktops();
+    return () => {
+      cancelled = true;
+    };
   }, [mode]);
 
   // Keyboard shortcuts: Cmd/Ctrl+K to open chat, Esc to close overlay

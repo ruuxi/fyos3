@@ -1,15 +1,151 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { WebContainer as WebContainerAPI } from '@webcontainer/api';
+import { WebContainer as WebContainerAPI, type WebContainerProcess } from '@webcontainer/api';
 // Binary snapshot approach for faster mounting
 import { useWebContainer } from './WebContainerProvider';
 import BootScreen from './BootScreen';
 import { hasPersistedVfs, restoreFromPersistence, persistNow } from '@/utils/vfs-persistence';
-import { persistAssetsFromAIResult } from '@/utils/ai-media';
+import { persistAssetsFromAIResult, type MediaScope } from '@/utils/ai-media';
 import { useConvexClient } from '@/lib/useConvexClient';
 import { api as convexApi } from '../../convex/_generated/api';
 import { useAuth, useClerk } from '@clerk/nextjs';
+
+declare global {
+  interface Window {
+    webcontainerInstance?: WebContainerAPI;
+    __FYOS_HMR_PAUSED?: boolean;
+    __FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL?: number;
+  }
+}
+
+type AgentMessageBase = { type: string } & Record<string, unknown>;
+
+type OpenAppPayload = AgentMessageBase & {
+  type: 'FYOS_OPEN_APP';
+  app?: { id?: string } & Record<string, unknown>;
+  delayMs?: number | string;
+};
+
+type AIRequestMessage = AgentMessageBase & {
+  type: 'AI_REQUEST';
+  id: string;
+  provider: string;
+  model?: string;
+  input?: unknown;
+  scope?: MediaScope;
+};
+
+type AIResponseMessage =
+  | { type: 'AI_RESPONSE'; id: string; ok: true; result: unknown; persistedAssets?: unknown }
+  | { type: 'AI_RESPONSE'; id: string; ok: false; error: unknown };
+
+type MediaIngestMessage = AgentMessageBase & {
+  type: 'MEDIA_INGEST';
+  id: string;
+  payload?: Record<string, unknown> | null;
+  scope?: unknown;
+};
+
+type MediaIngestResponse =
+  | { type: 'MEDIA_INGEST_RESPONSE'; id: string; ok: true; result: unknown }
+  | { type: 'MEDIA_INGEST_RESPONSE'; id: string; ok: false; error: unknown };
+
+type DesktopReadyMessage = AgentMessageBase & { type: 'FYOS_DESKTOP_READY' };
+type DesktopStateMessage = AgentMessageBase & { type: 'FYOS_DESKTOP_STATE'; payload?: Record<string, unknown> | null };
+type AppRuntimeErrorMessage = AgentMessageBase & {
+  type: 'APP_RUNTIME_ERROR';
+  message?: string;
+  pathname?: string;
+  search?: string;
+  hash?: string;
+  stack?: string;
+};
+
+type AppConsoleMessage = AgentMessageBase & {
+  type: 'APP_CONSOLE';
+  level?: string;
+  args?: unknown;
+  pathname?: string;
+  search?: string;
+  hash?: string;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+const isAIRequestMessage = (value: unknown): value is AIRequestMessage => {
+  return (
+    isRecord(value) &&
+    value.type === 'AI_REQUEST' &&
+    typeof value.id === 'string' &&
+    typeof value.provider === 'string'
+  );
+};
+
+const isMediaIngestMessage = (value: unknown): value is MediaIngestMessage => {
+  return isRecord(value) && value.type === 'MEDIA_INGEST' && typeof value.id === 'string';
+};
+
+const isOpenAppMessage = (value: unknown): value is OpenAppPayload => {
+  return isRecord(value) && value.type === 'FYOS_OPEN_APP';
+};
+
+const isDesktopReadyMessage = (value: unknown): value is DesktopReadyMessage => {
+  return isRecord(value) && value.type === 'FYOS_DESKTOP_READY';
+};
+
+const isDesktopStateMessage = (value: unknown): value is DesktopStateMessage => {
+  return isRecord(value) && value.type === 'FYOS_DESKTOP_STATE';
+};
+
+const isAppRuntimeErrorMessage = (value: unknown): value is AppRuntimeErrorMessage => {
+  return isRecord(value) && value.type === 'APP_RUNTIME_ERROR';
+};
+
+const isAppConsoleMessage = (value: unknown): value is AppConsoleMessage => {
+  return isRecord(value) && value.type === 'APP_CONSOLE';
+};
+
+const getSourceWindow = (source: MessageEventSource | null): Window | null => {
+  if (typeof Window === 'undefined' || !source) {
+    return null;
+  }
+  return source instanceof Window ? source : null;
+};
+
+const DEFAULT_OPEN_APP_DELAY_MS = 2000;
+
+const parseDelayMs = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return DEFAULT_OPEN_APP_DELAY_MS;
+};
+
+const formatPreviewMessageArgs = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        try {
+          return JSON.stringify(item);
+        } catch {
+          return '[unserializable]';
+        }
+      })
+      .join(' ');
+  }
+  if (value == null) {
+    return '';
+  }
+  return typeof value === 'string' ? value : String(value);
+};
 
 export default function WebContainer() {
   const { isSignedIn } = useAuth();
@@ -26,9 +162,9 @@ export default function WebContainer() {
   const [serverReady, setServerReady] = useState(false);
   const [shouldExitBoot, setShouldExitBoot] = useState(false);
   const { setInstance } = useWebContainer();
-  const devProcRef = useRef<any>(null);
+  const devProcRef = useRef<WebContainerProcess | null>(null);
   const devUrlRef = useRef<string | null>(null);
-  const pendingOpenAppsRef = useRef<any[]>([]);
+  const pendingOpenAppsRef = useRef<OpenAppPayload[]>([]);
   const desktopReadyRef = useRef<boolean>(false);
   const lastRemoteSaveRef = useRef<number>(0);
   const remoteSaveInFlightRef = useRef<boolean>(false);
@@ -39,7 +175,6 @@ export default function WebContainer() {
   useEffect(() => {
     let mounted = true;
     let cleanupMessageListener: (() => void) | null = null;
-    let autosaveIntervalId: ReturnType<typeof setInterval> | null = null;
     let visibilityHandler: (() => void) | null = null;
     let beforeUnloadHandler: (() => void) | null = null;
 
@@ -51,13 +186,14 @@ export default function WebContainer() {
         setTargetProgress((p) => Math.max(p, 8));
 
         // Boot WebContainer
-        const instance = await WebContainerAPI.boot({
+        const bootOptions: Parameters<typeof WebContainerAPI.boot>[0] & { forwardPreviewErrors?: boolean } = {
           coep: 'credentialless',
           workdirName: 'project',
           // Forward uncaught exceptions/unhandled rejections from preview iframes
           // so we can surface them in the chat and ask the AI to fix
-          forwardPreviewErrors: true as any,
-        } as any);
+          forwardPreviewErrors: true,
+        };
+        const instance = await WebContainerAPI.boot(bootOptions);
         
         if (!mounted) return;
         setWebcontainerInstance(instance);
@@ -65,12 +201,29 @@ export default function WebContainer() {
 
         // Store instance globally for API access
         if (typeof window !== 'undefined') {
-          (global as any).webcontainerInstance = instance;
+          window.webcontainerInstance = instance;
         }
 
         // Listen for preview errors (uncaught exceptions / unhandled promise rejections)
+        type PreviewMessage = {
+          type?: string;
+          message?: string;
+          pathname?: string;
+          search?: string;
+          hash?: string;
+          port?: number;
+          stack?: string;
+        };
+
+        type PreviewCapableContainer = WebContainerAPI & {
+          on?(event: 'preview-message', handler: (message: PreviewMessage) => void): void;
+          setPreviewScript?(script: string): Promise<void>;
+        };
+
+        const previewContainer = instance as PreviewCapableContainer;
+
         try {
-          (instance as any).on?.('preview-message', (message: any) => {
+          previewContainer.on?.('preview-message', (message: PreviewMessage) => {
             try {
               if (
                 message?.type === 'PREVIEW_UNCAUGHT_EXCEPTION' ||
@@ -106,7 +259,14 @@ export default function WebContainer() {
                 try { origErr.apply(console, args); } catch {}
                 try {
                   const safe = args.map(a => {
-                    try { if (typeof a === 'string') return a; if (a && typeof a === 'object') return a.message || JSON.stringify(a).slice(0,800); return String(a); } catch { return '[unserializable]'; }
+                    try {
+                      if (typeof a === 'string') return a;
+                      if (a && typeof a === 'object') {
+                        const obj = a as { message?: string };
+                        return obj.message || JSON.stringify(a).slice(0, 800);
+                      }
+                      return String(a);
+                    } catch { return '[unserializable]'; }
                   });
                   window.top?.postMessage({ type: 'APP_CONSOLE', level: 'error', args: safe, pathname: location.pathname, search: location.search, hash: location.hash }, '*');
                 } catch {}
@@ -154,7 +314,7 @@ export default function WebContainer() {
               } catch {}
             } catch {}
           })();`;
-          try { await (instance as any).setPreviewScript?.(script); } catch {}
+          try { await previewContainer.setPreviewScript?.(script); } catch {}
         } catch {}
         setLoadingStage('Preparing workspace…');
         setTargetProgress((p) => Math.max(p, 26));
@@ -165,11 +325,11 @@ export default function WebContainer() {
           if (userMode === 'auth' && convexReady && convexClient) {
             setLoadingStage('Checking cloud snapshot…');
             setTargetProgress((p) => Math.max(p, 30));
-            const record = await convexClient.query(convexApi.desktops_private.getLatestDesktop as any, {} as any) as any;
+            const record = await convexClient.query(convexApi.desktops_private.getLatestDesktop, {});
             if (record && record._id) {
               setLoadingStage('Restoring from cloud…');
               setTargetProgress((p) => Math.max(p, 34));
-              const url = await convexClient.query(convexApi.desktops_private.getDesktopSnapshotUrl as any, { id: record._id } as any) as string;
+              const url = await convexClient.query(convexApi.desktops_private.getDesktopSnapshotUrl, { id: record._id });
               const snapRes = await fetch(url, { cache: 'no-store' });
               if (snapRes.ok) {
                 const buf = new Uint8Array(await snapRes.arrayBuffer());
@@ -332,24 +492,28 @@ export default function Document() {
             if (now - lastRemoteSaveRef.current < 60000) return; // throttle 60s
             remoteSaveInFlightRef.current = true;
             // Ask desktop iframe for current UI state and persist to FS before building snapshot
-            const fetchDesktopState = async (timeoutMs = 1500): Promise<any | null> => {
+            const fetchDesktopState = async (timeoutMs = 1500): Promise<Record<string, unknown> | null> => {
               try {
                 const cw = iframeRef.current?.contentWindow;
                 if (!cw) return null;
                 return await new Promise((resolve) => {
                   let done = false;
-                  const timer = window.setTimeout(() => { if (!done) { done = true; try { window.removeEventListener('message', onMsg as any); } catch {}; resolve(null); } }, timeoutMs);
+                  const timer = window.setTimeout(() => {
+                    if (!done) {
+                      done = true;
+                      window.removeEventListener('message', onMsg);
+                      resolve(null);
+                    }
+                  }, timeoutMs);
                   const onMsg = (event: MessageEvent) => {
                     if (event.source !== cw) return;
-                    const data: any = (event as any).data;
-                    if (data && data.type === 'FYOS_DESKTOP_STATE') {
-                      try { window.clearTimeout(timer); } catch {}
-                      done = true;
-                      try { window.removeEventListener('message', onMsg as any); } catch {}
-                      resolve(data.payload || null);
-                    }
+                    if (!isDesktopStateMessage(event.data)) return;
+                    window.clearTimeout(timer);
+                    done = true;
+                    window.removeEventListener('message', onMsg);
+                    resolve(event.data.payload ?? null);
                   };
-                  window.addEventListener('message', onMsg as any);
+                  window.addEventListener('message', onMsg);
                   try { cw.postMessage({ type: 'FYOS_REQUEST_DESKTOP_STATE' }, '*'); } catch {}
                 });
               } catch {
@@ -361,37 +525,41 @@ export default function Document() {
               const state = await fetchDesktopState().catch(() => null);
               if (state) {
                 try {
-                  await instance.fs.mkdir('/public/_fyos', { recursive: true } as any);
+                  await instance.fs.mkdir('/public/_fyos', { recursive: true });
                 } catch {}
                 try {
                   // Attach theme selection from localStorage
-                  let theme: any = null;
-                  try { const raw = window.localStorage.getItem('fyos.desktop.theme'); if (raw) theme = JSON.parse(raw); } catch {}
-                  const toWrite = { ...(state || {}), theme };
-                  await instance.fs.writeFile('/public/_fyos/desktop-state.json', new TextEncoder().encode(JSON.stringify(toWrite, null, 2)) as any);
+                  let theme: unknown = null;
+                  try {
+                    const raw = window.localStorage.getItem('fyos.desktop.theme');
+                    if (raw) theme = JSON.parse(raw);
+                  } catch {}
+                  const toWrite = { ...state, theme };
+                  const encoded = new TextEncoder().encode(JSON.stringify(toWrite, null, 2));
+                  await instance.fs.writeFile('/public/_fyos/desktop-state.json', encoded);
                 } catch {}
               }
             }
             if (userMode === 'auth' && convexReady && convexClient) {
               const { buildDesktopSnapshot } = await import('@/utils/desktop-snapshot');
               const snap = await buildDesktopSnapshot(instance);
-              const start = await convexClient.mutation(convexApi.desktops_private.saveDesktopStart as any, {
+              const start = await convexClient.mutation(convexApi.desktops_private.saveDesktopStart, {
                 desktopId: 'default',
                 title: 'My Desktop',
                 size: snap.size,
                 fileCount: snap.fileCount,
                 contentSha256: snap.contentSha256,
-              } as any) as any;
+              });
               if (start?.url && start?.r2KeySnapshot) {
                 await fetch(start.url, { method: 'PUT', body: new Uint8Array(snap.gz), headers: { 'Content-Type': 'application/octet-stream' } }).catch(() => {});
-                await convexClient.mutation(convexApi.desktops_private.saveDesktopFinalize as any, {
+                await convexClient.mutation(convexApi.desktops_private.saveDesktopFinalize, {
                   desktopId: 'default',
                   title: 'My Desktop',
                   r2KeySnapshot: start.r2KeySnapshot,
                   size: snap.size,
                   fileCount: snap.fileCount,
                   contentSha256: snap.contentSha256,
-                } as any).catch(() => {});
+                }).catch(() => {});
               }
             }
             lastRemoteSaveRef.current = now;
@@ -447,16 +615,27 @@ export default function Document() {
         });
 
         // Message bridge for AI requests, auto-open app, and desktop readiness from preview iframes
-        const onMessage = async (event: MessageEvent) => {
-          
-          if (event.data && event.data.type === 'AI_REQUEST') {
-            const { id, provider, model, input, scope } = event.data as any;
-            const srcWin = (event.source as Window | null);
-            const reply = (payload: any) => { try { srcWin?.postMessage(payload, event.origin); } catch {} };
+        const onMessage = async (event: MessageEvent<unknown>) => {
+          const data = event.data;
+
+          if (isAIRequestMessage(data)) {
+            const { id, provider, model, input, scope } = data;
+            const srcWin = getSourceWindow(event.source);
+            const reply = (payload: AIResponseMessage) => {
+              if (!srcWin) return;
+              try { srcWin.postMessage(payload, event.origin); } catch {}
+            };
             try {
               if (provider === 'fal') {
-                const res = await fetch('/api/ai/fal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, input }) });
-                if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
+                const res = await fetch('/api/ai/fal', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ model, input }),
+                });
+                if (!res.ok) {
+                  reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() });
+                  return;
+                }
                 const raw = await res.json();
                 try {
                   const { result: updated, persistedAssets } = await persistAssetsFromAIResult(raw, scope);
@@ -465,8 +644,15 @@ export default function Document() {
                   reply({ type: 'AI_RESPONSE', id, ok: true, result: raw });
                 }
               } else if (provider === 'eleven') {
-                const res = await fetch('/api/ai/eleven', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input || {}) });
-                if (!res.ok) { reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() }); return; }
+                const res = await fetch('/api/ai/eleven', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(input ?? {}),
+                });
+                if (!res.ok) {
+                  reply({ type: 'AI_RESPONSE', id, ok: false, error: await res.text() });
+                  return;
+                }
                 const raw = await res.json();
                 try {
                   const { result: updated, persistedAssets } = await persistAssetsFromAIResult(raw, scope);
@@ -475,24 +661,29 @@ export default function Document() {
                   reply({ type: 'AI_RESPONSE', id, ok: true, result: raw });
                 }
               }
-            } catch (e: any) {
-              reply({ type: 'AI_RESPONSE', id, ok: false, error: e?.message || 'Request failed' });
+            } catch (rawError: unknown) {
+              const errorMessage = rawError instanceof Error ? rawError.message : 'Request failed';
+              reply({ type: 'AI_RESPONSE', id, ok: false, error: errorMessage });
             }
             return;
           }
 
           // Media ingest bridge: apps can request host to ingest base64 or sourceUrl to R2
-          if (event.data && event.data.type === 'MEDIA_INGEST') {
-            const { id, payload, scope } = event.data as any;
-            const srcWin = (event.source as Window | null);
-            const reply = (resp: any) => { try { srcWin?.postMessage(resp, event.origin); } catch {} };
+          if (isMediaIngestMessage(data)) {
+            const { id, payload, scope } = data;
+            const srcWin = getSourceWindow(event.source);
+            const reply = (resp: MediaIngestResponse) => {
+              if (!srcWin) return;
+              try { srcWin.postMessage(resp, event.origin); } catch {}
+            };
             try {
               if (userMode === 'anon') {
                 // In anon mode, skip persistence; return original payload
-                reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: true, result: { ...payload, persisted: false } });
+                const originalPayload = typeof payload === 'object' && payload !== null ? payload : {};
+                reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: true, result: { ...originalPayload, persisted: false } });
                 return;
               }
-              const body = { ...(payload || {}), scope };
+              const body = { ...(payload ?? {}), scope };
               const res = await fetch('/api/media/ingest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -505,25 +696,25 @@ export default function Document() {
               }
               const json = await res.json();
               reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: true, result: json });
-            } catch (e: any) {
-              reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: false, error: e?.message || 'Ingest failed' });
+            } catch (rawError: unknown) {
+              const errorMessage = rawError instanceof Error ? rawError.message : 'Ingest failed';
+              reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: false, error: errorMessage });
             }
             return;
           }
 
           // Forward app runtime errors from app iframes to the host diagnostic bus
-          if (event.data && event.data.type === 'APP_RUNTIME_ERROR') {
+          if (isAppRuntimeErrorMessage(data)) {
             try {
-              const suppressUntil = (window as any).__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL as number | undefined;
+              const suppressUntil = window.__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL;
               if (typeof suppressUntil === 'number' && Date.now() < suppressUntil) {
                 // Suppress transient preview errors during controlled operations (e.g., undo restore)
                 return;
               }
-              const d = event.data as any;
               const title = 'App Runtime Error';
-              const description = d?.message || 'Unknown app error';
-              const loc = `${d?.pathname || ''}${d?.search || ''}${d?.hash || ''}`;
-              const stack = d?.stack || '';
+              const description = data.message ?? 'Unknown app error';
+              const loc = `${data.pathname ?? ''}${data.search ?? ''}${data.hash ?? ''}`;
+              const stack = data.stack ?? '';
               const detail = { source: 'preview' as const, title, description, content: `Error at ${loc}\n\nStack trace:\n${stack}` };
               window.dispatchEvent(new CustomEvent('wc-preview-error', { detail }));
             } catch {}
@@ -531,17 +722,16 @@ export default function Document() {
           }
 
           // Optionally surface app console errors as diagnostics (warnings ignored)
-          if (event.data && event.data.type === 'APP_CONSOLE') {
+          if (isAppConsoleMessage(data)) {
             try {
-              const suppressUntil = (window as any).__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL as number | undefined;
+              const suppressUntil = window.__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL;
               if (typeof suppressUntil === 'number' && Date.now() < suppressUntil) {
                 // Suppress transient preview console errors during controlled operations (e.g., undo restore)
                 return;
               }
-              const d = event.data as any;
-              if (d?.level === 'error') {
-                const loc = `${d?.pathname || ''}${d?.search || ''}${d?.hash || ''}`;
-                const msg = Array.isArray(d?.args) ? d.args.join(' ') : String(d?.args || '');
+              if (data.level === 'error') {
+                const loc = `${data.pathname ?? ''}${data.search ?? ''}${data.hash ?? ''}`;
+                const msg = formatPreviewMessageArgs(data.args);
                 const detail = { source: 'preview' as const, title: 'App Console Error', description: msg, content: `Console error at ${loc}\n\n${msg}` };
                 window.dispatchEvent(new CustomEvent('wc-preview-error', { detail }));
               }
@@ -550,7 +740,10 @@ export default function Document() {
           }
 
           // Forward agent run gating to preview iframe (Desktop) so it can propagate to apps
-          if (event.data && (event.data.type === 'FYOS_AGENT_RUN_STARTED' || event.data.type === 'FYOS_AGENT_RUN_ENDED')) {
+          if (
+            isRecord(data) &&
+            (data.type === 'FYOS_AGENT_RUN_STARTED' || data.type === 'FYOS_AGENT_RUN_ENDED')
+          ) {
             try {
               const target = iframeRef.current?.contentWindow;
               if (target) { target.postMessage(event.data, '*'); }
@@ -559,9 +752,9 @@ export default function Document() {
           }
 
           // Install App from App Store (bundle download + install inside WebContainer)
-          if (event.data && event.data.type === 'FYOS_INSTALL_APP') {
+          if (isRecord(data) && data.type === 'FYOS_INSTALL_APP') {
             try {
-              const appId = event.data.appId as string;
+              const appId = typeof data.appId === 'string' ? data.appId : null;
               if (!appId) return;
               const bundleUrl = `/api/store/apps/${appId}/bundle`;
               const res = await fetch(bundleUrl);
@@ -572,14 +765,14 @@ export default function Document() {
               const buf = new Uint8Array(await res.arrayBuffer());
               const { installAppFromBundle } = await import('@/utils/app-install');
               await installAppFromBundle(instance, buf);
-            } catch (e) {
-              console.error('[WebContainer] Install failed', e);
+            } catch (installError: unknown) {
+              console.error('[WebContainer] Install failed', installError);
             }
             return;
           }
 
           // Desktop iframe announced readiness; mark ready and flush any queued opens
-          if (event.data && event.data.type === 'FYOS_DESKTOP_READY') {
+          if (isDesktopReadyMessage(data)) {
             desktopReadyRef.current = true;
             const target = iframeRef.current?.contentWindow;
             // Announce user mode to the desktop iframe
@@ -594,15 +787,14 @@ export default function Document() {
             } catch {}
             if (target && pendingOpenAppsRef.current.length > 0) {
               try {
-                pendingOpenAppsRef.current.forEach(payload => {
-                  try {
-                    const delay = Number((payload as any)?.delayMs) || 2000;
-                    window.setTimeout(() => {
-                      try { target.postMessage(payload, '*'); } catch {}
-                    }, delay);
-                  } catch {}
-                });
+                const queued = [...pendingOpenAppsRef.current];
                 pendingOpenAppsRef.current = [];
+                queued.forEach((payload) => {
+                  const delay = parseDelayMs(payload.delayMs);
+                  window.setTimeout(() => {
+                    try { target.postMessage(payload, '*'); } catch {}
+                  }, delay);
+                });
               } catch {}
             }
             return;
@@ -610,24 +802,20 @@ export default function Document() {
 
           // Handle auto-open app signals. If desktop not ready yet, queue for later.
           // If desktop is ready, send immediately without queueing.
-          if (event.data && event.data.type === 'FYOS_OPEN_APP') {
-            const payload = event.data;
+          if (isOpenAppMessage(data)) {
+            const normalizedPayload: OpenAppPayload = { ...data, delayMs: parseDelayMs(data.delayMs) };
             if (!desktopReadyRef.current) {
-              try {
-                const delay = Number((payload as any)?.delayMs) || 2000;
-                (payload as any).delayMs = delay;
-                const idx = pendingOpenAppsRef.current.findIndex(p => p?.app?.id === payload?.app?.id);
-                if (idx === -1) pendingOpenAppsRef.current.push(payload);
-              } catch { pendingOpenAppsRef.current.push(payload); }
+              const idx = pendingOpenAppsRef.current.findIndex(
+                (queued) => queued?.app?.id === normalizedPayload?.app?.id,
+              );
+              if (idx === -1) pendingOpenAppsRef.current.push(normalizedPayload);
             } else {
               const target = iframeRef.current?.contentWindow;
               if (target) {
-                const delay = Number((payload as any)?.delayMs) || 2000;
-                try {
-                  window.setTimeout(() => {
-                    try { target.postMessage(payload, '*'); } catch {}
-                  }, delay);
-                } catch {}
+                const delay = parseDelayMs(normalizedPayload.delayMs);
+                window.setTimeout(() => {
+                  try { target.postMessage(normalizedPayload, '*'); } catch {}
+                }, delay);
               }
             }
             return;

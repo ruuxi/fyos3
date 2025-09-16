@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { auth } from '@clerk/nextjs/server';
 import { api as convexApi } from '../../../../../convex/_generated/api';
-const api: any = convexApi as any;
 
 async function getClient() {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
@@ -31,11 +30,19 @@ export async function GET(req: NextRequest) {
     const limit = limitStr ? Number(limitStr) : undefined;
 
     const client = await getClient();
-    const items = await client.query(api.media.listMedia, { type, appId, desktopId, threadId, from, to, limit } as any);
+    const items = await client.query(convexApi.media.listMedia, {
+      type,
+      appId,
+      desktopId,
+      threadId,
+      from: Number.isFinite(from) ? from : undefined,
+      to: Number.isFinite(to) ? to : undefined,
+      limit: Number.isFinite(limit) ? limit : undefined,
+    });
     return NextResponse.json({ items });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Failed to list media' }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to list media';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
 

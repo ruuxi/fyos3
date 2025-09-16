@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { api as convexApi } from '../../../../../convex/_generated/api';
+import type { Doc } from '../../../../../convex/_generated/dataModel';
 
 export type FriendProfile = { ownerId: string; nickname?: string; email?: string };
 
+type DmMessage = Doc<'dm_messages'>;
+
 type UseFriendsState = {
   isAuthenticated: boolean;
-  me: { ownerId: string; nickname?: string; email?: string } | null | undefined;
+  me: FriendProfile | null | undefined;
   setNickname: (nickname: string) => Promise<void>;
   friends: FriendProfile[];
   friendsLoading: boolean;
@@ -14,7 +17,7 @@ type UseFriendsState = {
   addFriend: (nickname: string) => Promise<void>;
   activePeerId: string | null;
   setActivePeerId: (id: string | null) => void;
-  dmMessages: Array<{ _id?: string; id?: string; ownerId: string; peerId: string; senderId: string; content: string; createdAt: number }> | undefined;
+  dmMessages: DmMessage[] | undefined;
   sendDm: (content: string) => Promise<void>;
 };
 
@@ -23,30 +26,30 @@ export function useFriends(): UseFriendsState {
   const [activePeerId, setActivePeerId] = useState<string | null>(null);
 
   const myProfile = useQuery(
-    (convexApi as any).friends.getMyProfile,
-    isAuthenticated ? ({} as any) : 'skip'
-  ) as any | undefined;
+    convexApi.friends.getMyProfile,
+    isAuthenticated ? {} : 'skip',
+  );
   const friendsList = useQuery(
-    (convexApi as any).friends.listFriends,
-    isAuthenticated ? ({} as any) : 'skip'
-  ) as FriendProfile[] | undefined;
+    convexApi.friends.listFriends,
+    isAuthenticated ? {} : 'skip',
+  );
   const dmMessages = useQuery(
-    (convexApi as any).friends.listDmMessages,
-    isAuthenticated && activePeerId ? ({ peerId: activePeerId } as any) : 'skip'
-  ) as Array<{ _id: string; ownerId: string; peerId: string; senderId: string; content: string; createdAt: number }> | undefined;
+    convexApi.friends.listDmMessages,
+    isAuthenticated && activePeerId ? { peerId: activePeerId } : 'skip',
+  );
 
-  const upsertMyProfile = useMutation((convexApi as any).friends.upsertMyProfile);
-  const addFriendMutation = useMutation((convexApi as any).friends.addFriend);
-  const sendDmMutation = useMutation((convexApi as any).friends.sendDm);
+  const upsertMyProfile = useMutation(convexApi.friends.upsertMyProfile);
+  const addFriendMutation = useMutation(convexApi.friends.addFriend);
+  const sendDmMutation = useMutation(convexApi.friends.sendDm);
 
   const me = useMemo(() => {
     if (!isAuthenticated) return null;
     if (authLoading) return undefined; // loading sentinel
     if (!myProfile) return null;
     return {
-      ownerId: (myProfile as any).ownerId,
-      nickname: (myProfile as any).nickname,
-      email: (myProfile as any).email,
+      ownerId: myProfile.ownerId,
+      nickname: myProfile.nickname ?? undefined,
+      email: myProfile.email ?? undefined,
     } as const;
   }, [isAuthenticated, authLoading, myProfile]);
 
@@ -63,21 +66,21 @@ export function useFriends(): UseFriendsState {
     if (!isAuthenticated) return;
     const v = (nickname || '').trim();
     if (!v) return;
-    await addFriendMutation({ nickname: v } as any);
+    await addFriendMutation({ nickname: v });
   }
 
   async function sendDm(content: string) {
     if (!isAuthenticated || !activePeerId) return;
     const text = (content || '').trim();
     if (!text) return;
-    await sendDmMutation({ peerId: activePeerId, content: text } as any);
+    await sendDmMutation({ peerId: activePeerId, content: text });
   }
 
   return {
     isAuthenticated,
     me,
     setNickname,
-    friends: friendsList || [],
+    friends: friendsList ?? [],
     friendsLoading: Boolean(isAuthenticated && friendsList === undefined),
     friendsError: null,
     addFriend,
@@ -87,5 +90,4 @@ export function useFriends(): UseFriendsState {
     sendDm,
   } as const;
 }
-
 

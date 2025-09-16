@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { auth } from '@clerk/nextjs/server';
 import { api as convexApi } from '../../../../../convex/_generated/api';
-const api: any = convexApi as any;
 
 type IngestBody = {
   sourceUrl?: string;
@@ -127,19 +126,19 @@ export async function POST(req: NextRequest) {
     const client = await getConvexClient();
 
     // Dedup check
-    const existing = await client.query(api.media.getMediaByHash, { sha256 } as any);
+    const existing = await client.query(convexApi.media.getMediaByHash, { sha256 });
     if (existing) {
       return NextResponse.json({ ok: true, deduped: true, publicUrl: existing.publicUrl, r2Key: existing.r2Key, sha256: existing.sha256, size: existing.size, contentType: existing.contentType });
     }
 
     // Request signed URL
-    const { url, r2Key } = await client.mutation(api.media.startIngest, {
+    const { url, r2Key } = await client.mutation(convexApi.media.startIngest, {
       sha256,
       size,
       contentType: detected,
       desktopId: body.scope?.desktopId,
       appId: body.scope?.appId,
-    } as any);
+    });
 
     // Upload to signed URL
     const uploadRes = await fetch(url, { method: 'PUT', body: bytes, headers: { 'Content-Type': detected } });
@@ -152,14 +151,14 @@ export async function POST(req: NextRequest) {
     if (!publicUrl) {
       try {
         // Fallback via Convex query (avoids importing server r2 client here)
-        publicUrl = await client.query(api.media.getUrlForKey, { r2Key, expiresIn: 86400 } as any);
+        publicUrl = await client.query(convexApi.media.getUrlForKey, { r2Key, expiresIn: 86400 });
       } catch {
         publicUrl = undefined;
       }
     }
 
     // Finalize record
-    const id = await client.mutation(api.media.finalizeIngest, {
+    const id = await client.mutation(convexApi.media.finalizeIngest, {
       desktopId: body.scope?.desktopId,
       appId: body.scope?.appId,
       threadId: body.scope?.threadId,
@@ -170,12 +169,11 @@ export async function POST(req: NextRequest) {
       r2Key,
       publicUrl,
       metadata: body.metadata,
-    } as any);
+    });
 
     return NextResponse.json({ ok: true, id, publicUrl, r2Key, sha256, size, contentType: detected });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Ingest failed' }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Ingest failed';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
-

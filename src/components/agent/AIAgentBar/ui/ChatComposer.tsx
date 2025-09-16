@@ -78,7 +78,9 @@ export default function ChatComposer(props: ChatComposerProps) {
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (input.trim() && status === 'ready' && !uploadBusy) onSubmit(e as any);
+                if (input.trim() && status === 'ready' && !uploadBusy) {
+                  e.currentTarget.form?.requestSubmit();
+                }
               }
             }}
           />
@@ -135,5 +137,4 @@ export default function ChatComposer(props: ChatComposerProps) {
     </form>
   );
 }
-
 

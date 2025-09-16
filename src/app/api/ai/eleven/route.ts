@@ -1,7 +1,19 @@
 import type { NextRequest } from 'next/server';
 
+interface ElevenLabsRequestBody {
+  prompt?: string;
+  composition_plan?: unknown;
+  music_length_ms?: number;
+  output_format?: string;
+  model?: string;
+}
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
 // POST /api/ai/eleven
-// Body: { prompt?: string, composition_plan?: any, music_length_ms?: number, output_format?: string, model?: string }
+// Body: { prompt?: string, composition_plan?: object, music_length_ms?: number, output_format?: string, model?: string }
 export async function POST(req: NextRequest) {
   try {
     const apiKey = process.env.ELEVENLABS_API_KEY || process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY;
@@ -9,11 +21,11 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: 'ELEVENLABS_API_KEY not configured' }), { status: 500 });
     }
 
-    const { prompt, composition_plan, music_length_ms, output_format, model } = await req.json();
+    const { prompt, composition_plan, music_length_ms, output_format, model } = (await req.json()) as ElevenLabsRequestBody;
 
-    const payload: Record<string, any> = {};
+    const payload: Record<string, unknown> = {};
     if (typeof prompt === 'string' && prompt.trim().length > 0) payload.prompt = prompt.trim();
-    if (composition_plan && typeof composition_plan === 'object') payload.composition_plan = composition_plan;
+    if (isPlainObject(composition_plan)) payload.composition_plan = composition_plan;
     if (typeof music_length_ms === 'number') payload.music_length_ms = music_length_ms;
     if (typeof output_format === 'string') payload.output_format = output_format;
     if (typeof model === 'string' && model.trim()) payload.model_id = model.trim();
@@ -46,5 +58,4 @@ export async function POST(req: NextRequest) {
     return new Response('Internal Server Error', { status: 500 });
   }
 }
-
 

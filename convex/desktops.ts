@@ -17,8 +17,7 @@ export const publishDesktopStart = mutation({
     const ownerId = identity.subject ?? identity.tokenIdentifier ?? identity.email ?? "unknown";
 
     const r2KeySnapshot = `desktops/${ownerId}/${args.desktopId}/${args.version}/snapshot.bin`;
-    const signed = await r2.generateUploadUrl(r2KeySnapshot) as any;
-    const url: string = typeof signed === 'string' ? signed : signed?.url;
+    const { url } = await r2.generateUploadUrl(r2KeySnapshot);
     return { url, r2KeySnapshot };
   },
 });
@@ -78,7 +77,9 @@ export const publishDesktopFinalize = mutation({
       createdAt: now,
       updatedAt: now,
     });
-    try { await ctx.runMutation(internal.metrics.increment, { name: 'publish_desktops', by: 1 } as any); } catch {}
+    try {
+      await ctx.runMutation(internal.metrics.increment, { name: 'publish_desktops', by: 1 });
+    } catch {}
     return id;
   },
 });
@@ -129,5 +130,4 @@ export const getDesktopSnapshotUrl = query({
     return await r2.getUrl(desktop.r2KeySnapshot, { expiresIn: ttl });
   },
 });
-
 

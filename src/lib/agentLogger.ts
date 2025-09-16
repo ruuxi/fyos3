@@ -11,8 +11,8 @@ export interface AgentLogEntry {
     // Tool call data
     toolName?: string;
     toolCallId?: string;
-    toolInput?: any;
-    toolOutput?: any;
+    toolInput?: unknown;
+    toolOutput?: unknown;
     toolDuration?: number;
 
     // Token usage data
@@ -56,11 +56,11 @@ class AgentLogger {
   }
   
   async logToolCall(
-    sessionId: string, 
-    toolName: string, 
-    toolCallId: string, 
-    input: any, 
-    output: any, 
+    sessionId: string,
+    toolName: string,
+    toolCallId: string,
+    input: unknown,
+    output: unknown,
     duration: number
   ) {
     await this.logEntry({
@@ -100,14 +100,14 @@ class AgentLogger {
     });
   }
   
-  async logError(sessionId: string, error: Error | string, context?: any) {
+  async logError(sessionId: string, error: Error | string, context?: unknown) {
     await this.logEntry({
       sessionId,
       type: 'error',
       data: {
         error: error instanceof Error ? error.message : error,
         stack: error instanceof Error ? error.stack : undefined,
-        ...context,
+        ...(typeof context === 'object' && context !== null ? context : {}),
       },
     });
   }

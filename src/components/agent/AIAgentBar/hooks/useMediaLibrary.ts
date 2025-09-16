@@ -65,8 +65,9 @@ export function useMediaLibrary(): UseMediaLibraryState {
       if (!res.ok) throw new Error(`Failed (${res.status})`);
       const json = await res.json();
       setMediaItems(Array.isArray(json?.items) ? json.items : []);
-    } catch (e: any) {
-      setMediaError(e?.message || 'Failed to load');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to load';
+      setMediaError(message);
     } finally {
       setMediaLoading(false);
     }
@@ -105,7 +106,7 @@ export function useMediaLibrary(): UseMediaLibraryState {
             reader.onerror = () => reject(new Error('Read failed'));
             reader.readAsDataURL(file);
           });
-          const body: any = { base64, contentType: file.type || undefined, metadata: { filename: file.name } };
+          const body = { base64, contentType: file.type || undefined, metadata: { filename: file.name } };
           const res = await fetch('/api/media/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           if (!res.ok) {
             const text = await res.text().catch(() => '');
@@ -143,8 +144,9 @@ export function useMediaLibrary(): UseMediaLibraryState {
         }
       }
       await loadMedia();
-    } catch (e: any) {
-      setUploadError(e?.message || 'Upload failed');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Upload failed';
+      setUploadError(message);
     } finally {
       setUploadBusy(false);
     }
@@ -181,9 +183,10 @@ export function useMediaLibrary(): UseMediaLibraryState {
         const text = await res.text().catch(() => '');
         setUploadError(text || `Ingest failed (${res.status})`);
       }
-    } catch (e: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Ingest failed';
       // Leave the original URL; just record the error
-      setUploadError(e?.message || 'Ingest failed');
+      setUploadError(message);
     } finally {
       setUploadBusy(false);
     }
@@ -205,5 +208,4 @@ export function useMediaLibrary(): UseMediaLibraryState {
     projectAttachmentsToDurable,
   };
 }
-
 

@@ -33,18 +33,18 @@ export async function GET(req: NextRequest) {
 
     const client = await getClient();
     const desktops = await client.query(api.desktops.listDesktops, {
-      limit,
+      limit: Number.isFinite(limit) ? limit : undefined,
       search,
       ownerId,
       visibility,
     });
     return NextResponse.json({ desktops });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to list desktops";
     return NextResponse.json(
-      { error: err?.message ?? "Failed to list desktops" },
+      { error: message },
       { status: 500 }
     );
   }
 }
-
 

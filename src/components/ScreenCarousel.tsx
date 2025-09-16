@@ -212,10 +212,18 @@ export function ScreenCarousel({ children }: ScreenCarouselProps) {
   // Respect reduced motion
   useEffect(() => {
     const m = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const apply = () => setPrefersReduced(m.matches);
+    const apply = (event?: MediaQueryListEvent) => {
+      setPrefersReduced(event?.matches ?? m.matches);
+    };
     apply();
-    try { m.addEventListener('change', apply); } catch { m.addListener(apply as any); }
-    return () => { try { m.removeEventListener('change', apply); } catch { m.removeListener(apply as any); } };
+    try {
+      m.addEventListener('change', apply);
+      return () => m.removeEventListener('change', apply);
+    } catch {
+      const legacyListener = (event: MediaQueryListEvent) => apply(event);
+      m.addListener(legacyListener);
+      return () => m.removeListener(legacyListener);
+    }
   }, []);
 
   return (

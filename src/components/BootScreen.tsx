@@ -67,11 +67,17 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
       : { backgroundImage: `url(${o.value})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' };
   }, [selectedKey]);
 
+  const glassStyle: React.CSSProperties = {
+    background: 'rgba(255,255,255,0.04)',
+    backdropFilter: 'saturate(160%) blur(24px)',
+    WebkitBackdropFilter: 'saturate(160%) blur(24px)',
+  };
+
   return (
     <div className={`boot-overlay absolute inset-0 z-20 flex items-center justify-center text-white ${exiting ? 'boot-overlay--exit' : ''}`} aria-busy={!exiting}>
       {/* Wallpaper + glass */}
       <div className="absolute inset-0 -z-10" style={wallpaperStyle} />
-      <div className="absolute inset-0 -z-10 pointer-events-none" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'saturate(160%) blur(24px)' as any, WebkitBackdropFilter: 'saturate(160%) blur(24px)' as any }} />
+      <div className="absolute inset-0 -z-10 pointer-events-none" style={glassStyle} />
 
       <div className="relative text-center px-6">
         <div className="mb-7">
@@ -147,5 +153,4 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
     </div>
   );
 }
-
 

@@ -11,44 +11,44 @@ export function useGlobalDrop({ onFiles, onUrl, onTextAsFile, setIsDraggingOver 
   const dragCounterRef = useRef(0);
 
   useEffect(() => {
-    const hasDroppableData = (e: any) => {
-      const dt = e?.dataTransfer;
+    const hasDroppableData = (event: DragEvent) => {
+      const dt = event.dataTransfer;
       if (!dt) return false;
-      const types = Array.from(dt.types || []);
+      const types = Array.from(dt.types ?? []);
       return types.includes('Files') || types.includes('text/uri-list') || types.includes('text/plain');
     };
 
-    const onDragEnter = (e: any) => {
-      if (!hasDroppableData(e)) return;
-      e.preventDefault();
+    const onDragEnter = (event: DragEvent) => {
+      if (!hasDroppableData(event)) return;
+      event.preventDefault();
       dragCounterRef.current++;
       setIsDraggingOver?.(true);
     };
-    const onDragOver = (e: any) => {
-      if (!hasDroppableData(e)) return;
-      e.preventDefault();
+    const onDragOver = (event: DragEvent) => {
+      if (!hasDroppableData(event)) return;
+      event.preventDefault();
     };
-    const onDragLeave = (e: any) => {
-      if (!hasDroppableData(e)) return;
+    const onDragLeave = (event: DragEvent) => {
+      if (!hasDroppableData(event)) return;
       dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
       if (dragCounterRef.current === 0) setIsDraggingOver?.(false);
     };
-    const onDrop = async (e: any) => {
-      if (!hasDroppableData(e)) return;
-      e.preventDefault();
+    const onDrop = async (event: DragEvent) => {
+      if (!hasDroppableData(event)) return;
+      event.preventDefault();
       dragCounterRef.current = 0;
       setIsDraggingOver?.(false);
 
-      const dt: DataTransfer = e.dataTransfer;
+      const dt = event.dataTransfer;
       try {
-        if (dt.files && dt.files.length > 0) {
+        if (dt?.files && dt.files.length > 0) {
           await onFiles(dt.files);
           return;
         }
-        const uriList = dt.getData('text/uri-list');
+        const uriList = dt?.getData('text/uri-list');
         let url = (uriList || '').split('\n')[0].trim();
         if (!url) {
-          const text = dt.getData('text/plain');
+          const text = dt?.getData('text/plain');
           const maybe = (text || '').trim();
           if (/^https?:\/\//i.test(maybe)) {
             url = maybe;
@@ -70,18 +70,19 @@ export function useGlobalDrop({ onFiles, onUrl, onTextAsFile, setIsDraggingOver 
     };
 
     // Use capture-phase listeners so drops work even when other layers intercept events.
-    window.addEventListener('dragenter', onDragEnter as EventListener, { capture: true });
+    const captureOptions: AddEventListenerOptions = { capture: true };
+    const dragOverOptions: AddEventListenerOptions = { capture: true, passive: false };
+
+    window.addEventListener('dragenter', onDragEnter, captureOptions);
     // Explicitly non-passive so preventDefault is honored for dragover
-    window.addEventListener('dragover', onDragOver as EventListener, { capture: true, passive: false });
-    window.addEventListener('dragleave', onDragLeave as EventListener, { capture: true });
-    window.addEventListener('drop', onDrop as EventListener, { capture: true });
+    window.addEventListener('dragover', onDragOver, dragOverOptions);
+    window.addEventListener('dragleave', onDragLeave, captureOptions);
+    window.addEventListener('drop', onDrop, captureOptions);
     return () => {
-      window.removeEventListener('dragenter', onDragEnter as EventListener, { capture: true });
-      window.removeEventListener('dragover', onDragOver as EventListener, { capture: true });
-      window.removeEventListener('dragleave', onDragLeave as EventListener, { capture: true });
-      window.removeEventListener('drop', onDrop as EventListener, { capture: true });
+      window.removeEventListener('dragenter', onDragEnter, captureOptions);
+      window.removeEventListener('dragover', onDragOver, captureOptions);
+      window.removeEventListener('dragleave', onDragLeave, captureOptions);
+      window.removeEventListener('drop', onDrop, captureOptions);
     };
   }, [onFiles, onUrl, onTextAsFile, setIsDraggingOver]);
 }
-
-

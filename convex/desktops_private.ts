@@ -18,8 +18,7 @@ export const saveDesktopStart = mutation({
 
     // Stable key for latest private snapshot per (owner, desktopId)
     const r2KeySnapshot = `desktops/private/${ownerId}/${args.desktopId}/snapshot.gz`;
-    const signed = (await r2.generateUploadUrl(r2KeySnapshot)) as any;
-    const url: string = typeof signed === "string" ? signed : signed?.url;
+    const { url } = await r2.generateUploadUrl(r2KeySnapshot);
     return { url, r2KeySnapshot };
   },
 });
@@ -136,4 +135,3 @@ export const listMyDesktops = query({
     return args.limit ? sorted.slice(0, args.limit) : sorted;
   },
 });
-

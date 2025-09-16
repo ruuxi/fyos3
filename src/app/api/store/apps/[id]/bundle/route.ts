@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { auth } from "@clerk/nextjs/server";
 import { api } from "../../../../../../../convex/_generated/api";
+import type { Id } from "../../../../../../../convex/_generated/dataModel";
 
 async function getClient() {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
@@ -28,7 +29,7 @@ export async function GET(
 ) {
   try {
     const client = await getClient();
-    const id = params.id as any; // will be validated by Convex as v.id("apps_public")
+    const id = params.id as Id<'apps_public'>; // Validated by Convex schema
     const signedUrl = await client.query(api.apps.getAppBundleUrl, { id });
     const resp = await fetch(signedUrl, { cache: 'no-store' });
     if (!resp.ok || !resp.body) {
@@ -42,12 +43,12 @@ export async function GET(
     };
     if (etag) headers['ETag'] = etag;
     return new Response(resp.body, { headers });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to proxy bundle";
     return NextResponse.json(
-      { error: err?.message ?? "Failed to proxy bundle" },
+      { error: message },
       { status: 500 }
     );
   }
 }
-
 

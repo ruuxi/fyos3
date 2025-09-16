@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useConvexAuth, useMutation, useQuery } from 'convex/react';
+import type { UIMessage } from 'ai';
 import type { ChatThread } from '@/lib/agent/agentTypes';
 import { api as convexApi } from '../../../../../convex/_generated/api';
+import type { Doc, Id } from '../../../../../convex/_generated/dataModel';
 
 type ChatMode = 'agent' | 'persona';
 
@@ -12,7 +14,7 @@ type UseThreadsState = {
   threadsError: string | null;
   activeThreadId: string | null;
   setActiveThreadId: (id: string | null, opts?: { ensureOpen?: boolean }) => void;
-  initialChatMessages: any[] | undefined;
+  initialChatMessages: UIMessage[] | undefined;
   chatSessionKey: string;
   refreshThreads: () => Promise<void>;
   startBlankThread: () => void;
@@ -33,18 +35,22 @@ function normalizeTitle(title?: string) {
   return trimmed.length > 80 ? `${trimmed.slice(0, 77)}…` : trimmed;
 }
 
-function mapThread(doc: any): ChatThread {
+type ThreadDoc = Pick<Doc<'chat_threads'>, '_id' | 'title' | 'updatedAt' | 'lastMessageAt' | 'createdAt'> & { id?: string };
+
+type MessageDoc = Pick<Doc<'chat_messages'>, '_id' | 'role' | 'content' | 'mode' | 'createdAt'> & { id?: string };
+
+function mapThread(doc: ThreadDoc): ChatThread {
   return {
-    _id: String(doc._id ?? doc.id),
+    _id: String(doc._id ?? doc.id ?? ''),
     title: doc.title ?? 'Chat',
-    updatedAt: doc.updatedAt ?? doc.lastMessageAt ?? 0,
+    updatedAt: doc.updatedAt ?? doc.lastMessageAt ?? doc.createdAt ?? 0,
     lastMessageAt: doc.lastMessageAt,
   };
 }
 
-function mapMessage(doc: any) {
-  const parts = [{ type: 'text', text: String(doc.content ?? '') }];
-  const mode: ChatMode | undefined = doc.mode === 'persona' ? 'persona' : (doc.mode === 'agent' ? 'agent' : undefined);
+function mapMessage(doc: MessageDoc): UIMessage {
+  const parts: UIMessage['parts'] = [{ type: 'text', text: String(doc.content ?? '') }];
+  const mode: ChatMode | undefined = doc.mode === 'persona' ? 'persona' : doc.mode === 'agent' ? 'agent' : undefined;
   return {
     id: String(doc._id ?? doc.id ?? Math.random().toString(36).slice(2)),
     role: doc.role === 'assistant' ? 'assistant' : 'user',
@@ -57,27 +63,30 @@ export function useThreads(): UseThreadsState {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [threadsError, setThreadsError] = useState<string | null>(null);
   const [activeThreadIdState, setActiveThreadIdState] = useState<string | null>(null);
-  const [initialChatMessages, setInitialChatMessages] = useState<any[] | undefined>(undefined);
+  const [initialChatMessages, setInitialChatMessages] = useState<UIMessage[] | undefined>(undefined);
   const [chatSessionKey, setChatSessionKey] = useState<string>('agent-chat');
   const [openThreadIds, setOpenThreadIds] = useState<string[]>([]);
   const openIdsLoadedRef = useRef(false);
   const activeThreadIdRef = useRef<string | null>(null);
+  const threadIdMapRef = useRef<Map<string, Id<'chat_threads'>>>(new Map());
 
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
-  const createThreadMutation = useMutation(convexApi.chat.createThread as any);
-  const deleteThreadMutation = useMutation(convexApi.chat.deleteThread as any);
-  const appendMessageMutation = useMutation(convexApi.chat.appendMessage as any);
+  const createThreadMutation = useMutation(convexApi.chat.createThread);
+  const deleteThreadMutation = useMutation(convexApi.chat.deleteThread);
+  const appendMessageMutation = useMutation(convexApi.chat.appendMessage);
   const pendingThreadPromiseRef = useRef<Promise<string | null> | null>(null);
 
   const threadsData = useQuery(
-    convexApi.chat.listThreads as any,
-    isAuthenticated ? ({ limit: 100 } as any) : 'skip'
-  ) as any[] | 'skip' | undefined;
+    convexApi.chat.listThreads,
+    isAuthenticated ? { limit: 100 } : 'skip'
+  );
+
+  const activeThreadIdForQuery = activeThreadIdState ? threadIdMapRef.current.get(activeThreadIdState) : undefined;
 
   const messagesData = useQuery(
-    convexApi.chat.listMessages as any,
-    isAuthenticated && activeThreadIdState ? ({ threadId: activeThreadIdState as any, limit: 200 } as any) : 'skip'
-  ) as any[] | 'skip' | undefined;
+    convexApi.chat.listMessages,
+    isAuthenticated && activeThreadIdForQuery ? { threadId: activeThreadIdForQuery, limit: 200 } : 'skip'
+  );
 
   // Load open thread ids from localStorage once per auth session
   useEffect(() => {
@@ -118,10 +127,15 @@ export function useThreads(): UseThreadsState {
   useEffect(() => {
     if (!isAuthenticated) return;
     if (threadsData === undefined) return; // Loading
-    if (threadsData === 'skip') return;
     if (!Array.isArray(threadsData)) return;
 
-    const converted = (threadsData as any[]).map(mapThread);
+    const nextMap = new Map<string, Id<'chat_threads'>>();
+    const converted = threadsData.map((doc) => {
+      const mapped = mapThread(doc);
+      nextMap.set(mapped._id, doc._id);
+      return mapped;
+    });
+    threadIdMapRef.current = nextMap;
     setThreads(converted);
 
     const availableIds = new Set(converted.map((t) => t._id));
@@ -132,7 +146,7 @@ export function useThreads(): UseThreadsState {
     }
 
     if (activeThreadIdState && !availableIds.has(activeThreadIdState)) {
-      const fallback = filteredOpen[0] ?? (converted[0]?. _id ?? null);
+      const fallback = filteredOpen[0] ?? converted[0]?._id ?? null;
       setActiveThreadIdState(fallback ?? null);
     }
   }, [isAuthenticated, threadsData, openThreadIds, activeThreadIdState]);
@@ -152,10 +166,10 @@ export function useThreads(): UseThreadsState {
   useEffect(() => {
     if (!isAuthenticated) return;
     if (!activeThreadIdState) return;
-    if (messagesData === undefined || messagesData === 'skip') return;
+    if (messagesData === undefined) return;
     if (!Array.isArray(messagesData)) return;
     try {
-      const converted = (messagesData as any[]).map(mapMessage);
+      const converted = messagesData.map(mapMessage);
       setInitialChatMessages(converted);
     } catch (error) {
       console.warn('[threads] Failed to map messages', error);
@@ -177,7 +191,9 @@ export function useThreads(): UseThreadsState {
   const openThreads = useMemo(() => {
     if (openThreadIds.length === 0) return [];
     const byId = new Map(threads.map((t) => [t._id, t]));
-    return openThreadIds.map((id) => byId.get(id)).filter(Boolean) as ChatThread[];
+    return openThreadIds
+      .map((id) => byId.get(id))
+      .filter((thread): thread is ChatThread => Boolean(thread));
   }, [openThreadIds, threads]);
 
   const historyThreads = useMemo(() => {
@@ -207,8 +223,9 @@ export function useThreads(): UseThreadsState {
       try {
         const title = normalizeTitle(titleHint ?? DEFAULT_THREAD_TITLE);
         const now = Date.now();
-        const tid = await createThreadMutation({ title } as any);
+        const tid = await createThreadMutation({ title });
         const id = String(tid);
+        threadIdMapRef.current.set(id, tid);
         const optimistic: ChatThread = { _id: id, title, updatedAt: now, lastMessageAt: now };
         setThreads((prev) => (prev.some((t) => t._id === id) ? prev : [...prev, optimistic]));
         setOpenThreadIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -216,7 +233,7 @@ export function useThreads(): UseThreadsState {
         setActiveThreadIdState(id);
 
         if (bootstrap) {
-          const welcomeMessage = {
+          const welcomeMessage: UIMessage = {
             id: `welcome_${id}`,
             role: 'assistant' as const,
             parts: [{ type: 'text', text: DEFAULT_WELCOME_MESSAGE }],
@@ -225,11 +242,11 @@ export function useThreads(): UseThreadsState {
           setInitialChatMessages([welcomeMessage]);
           try {
             await appendMessageMutation({
-              threadId: id as any,
+              threadId: tid,
               role: 'assistant',
               content: DEFAULT_WELCOME_MESSAGE,
               mode: 'persona',
-            } as any);
+            });
           } catch (error) {
             console.warn('[threads] Failed to store welcome message', error);
           }
@@ -296,10 +313,13 @@ export function useThreads(): UseThreadsState {
 
   const deleteThread = useCallback(async (id: string) => {
     if (!isAuthenticated) return;
+    const threadId = threadIdMapRef.current.get(id);
+    if (!threadId) return;
     try {
-      await deleteThreadMutation({ threadId: id as any } as any);
+      await deleteThreadMutation({ threadId });
       closeThread(id);
       setThreads((prev) => prev.filter((t) => t._id !== id));
+      threadIdMapRef.current.delete(id);
     } catch (error) {
       console.error('Delete thread failed', error);
       setThreadsError((error as Error)?.message ?? 'Failed to delete thread');
@@ -314,7 +334,14 @@ export function useThreads(): UseThreadsState {
         return;
       }
       if (Array.isArray(threadsData)) {
-        setThreads((threadsData as any[]).map(mapThread));
+        const nextMap = new Map<string, Id<'chat_threads'>>();
+        const mapped = threadsData.map((doc) => {
+          const converted = mapThread(doc);
+          nextMap.set(converted._id, doc._id);
+          return converted;
+        });
+        threadIdMapRef.current = nextMap;
+        setThreads(mapped);
       }
     } catch (error) {
       setThreadsError((error as Error)?.message ?? 'Failed to refresh threads');

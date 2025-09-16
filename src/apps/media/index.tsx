@@ -42,8 +42,8 @@ export default function App(){
       const res = await fetch(`/api/media/list?${params.toString()}`)
       const json = await res.json()
       setItems(json.items || [])
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load')
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to load')
     } finally {
       setLoading(false)
     }
@@ -107,5 +107,4 @@ export default function App(){
     </div>
   )
 }
-
 

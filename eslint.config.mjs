@@ -18,7 +18,17 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "convex/_generated/**",
+      ".tmp/**",
     ],
+  },
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }
+      ],
+    },
   },
 ];
 

@@ -1,7 +1,8 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import type { UserIdentity } from "convex/server";
 
-function getOwnerId(identity: any): string {
+function getOwnerId(identity: UserIdentity): string {
   return identity.subject ?? identity.tokenIdentifier ?? identity.email ?? "unknown";
 }
 
@@ -141,5 +142,4 @@ export const listDmMessages = query({
     return page;
   },
 });
-
 

@@ -57,9 +57,9 @@ export function useScrollSizing(mode: 'compact' | 'chat' | 'visit' | 'media') {
     const onScroll = () => {
       isNearBottomRef.current = isUserNearBottom(el, 56);
     };
-    el.addEventListener('scroll', onScroll, { passive: true } as any);
+    el.addEventListener('scroll', onScroll, { passive: true });
     isNearBottomRef.current = isUserNearBottom(el, 56);
-    return () => el.removeEventListener('scroll', onScroll as any);
+    return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
   useEffect(() => {
@@ -115,5 +115,4 @@ export function useScrollSizing(mode: 'compact' | 'chat' | 'visit' | 'media') {
     forceFollow: () => { forceFollowRef.current = true; },
   } as const;
 }
-
 

@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type TextUIPart, type UIMessage } from 'ai';
 import { useChat } from '@ai-sdk/react';
+import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
 import { agentLogger } from '@/lib/agentLogger';
-import { persistAssetsFromAIResult, extractOriginalMediaUrlsFromResult } from '@/utils/ai-media';
+import { persistAssetsFromAIResult, extractOriginalMediaUrlsFromResult, type MediaScope } from '@/utils/ai-media';
 import { autoIngestInputs } from '@/utils/auto-ingest';
 import { guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
+import type { TCodeEditAstInput } from '@/lib/agentTools';
 
 type WebContainerFns = {
   mkdir: (path: string, recursive?: boolean) => Promise<void>;
@@ -17,10 +19,13 @@ type WebContainerFns = {
 
 type UseAgentChatOptions = {
   id: string;
-  initialMessages?: any[];
+  initialMessages?: UIMessage[];
   activeThreadId: string | null;
   getActiveThreadId?: () => string | null;
-  wc: { instanceRef: React.MutableRefObject<any>; fnsRef: React.MutableRefObject<WebContainerFns> };
+  wc: {
+    instanceRef: React.MutableRefObject<WebContainerAPI | null>;
+    fnsRef: React.MutableRefObject<WebContainerFns>;
+  };
   media: {
     loadMedia: () => Promise<void>;
   };
@@ -30,29 +35,77 @@ type UseAgentChatOptions = {
   onToolProgress?: (toolName: string) => void;
 };
 
+type WebFsFindInput = {
+  root?: string;
+  maxDepth?: number;
+  glob?: string;
+  prefix?: string;
+  limit?: number;
+  offset?: number;
+};
+
+type WebExecInput = {
+  command: string;
+  args?: string[];
+  cwd?: string;
+};
+
+type AiGenerateInput = {
+  provider: 'fal' | 'eleven';
+  task?: 'image' | 'video' | 'music' | 'audio' | '3d';
+  input: Record<string, unknown>;
+  scope?: MediaScope;
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+// Use shared tool input type to ensure selector/payload are correctly typed
+type CodeEditAstInput = TCodeEditAstInput;
+
+const isTextPart = (part: UIMessage['parts'][number]): part is TextUIPart => part.type === 'text';
+
+type MutableWindow = Window & {
+  __FYOS_FIRST_TOOL_CALLED_REF?: { current: boolean };
+};
+
+const getMutableWindow = (): MutableWindow | null => {
+  if (typeof window === 'undefined') return null;
+  return window as MutableWindow;
+};
+
 export function useAgentChat(opts: UseAgentChatOptions) {
-  const { id, initialMessages, activeThreadId, wc, media, runValidation, attachmentsProvider } = opts;
-  const firstToolCalledRef = (typeof window !== 'undefined') ? (window as any).__FYOS_FIRST_TOOL_CALLED_REF || { current: false } : { current: false };
-  try { (window as any).__FYOS_FIRST_TOOL_CALLED_REF = firstToolCalledRef } catch {}
+  const { id, initialMessages, activeThreadId, wc, runValidation, attachmentsProvider } = opts;
+  const mutableWindow = getMutableWindow();
+  const firstToolCalledRef = mutableWindow?.__FYOS_FIRST_TOOL_CALLED_REF ?? { current: false };
+  if (mutableWindow) {
+    mutableWindow.__FYOS_FIRST_TOOL_CALLED_REF = firstToolCalledRef;
+  }
 
   const activeThreadIdRef = useRef<string | null>(activeThreadId);
   useEffect(() => { activeThreadIdRef.current = activeThreadId; }, [activeThreadId]);
 
-  const { messages, sendMessage, status, stop, addToolResult, setMessages } = useChat({
+  const { messages, sendMessage, status, stop, addToolResult, setMessages } = useChat<UIMessage>({
     id,
     messages: initialMessages,
     transport: new DefaultChatTransport({
       api: '/api/agent',
       prepareSendMessagesRequest({ messages, id }) {
-        const body: any = { id, messages };
+        const body: {
+          id: string;
+          messages: UIMessage[];
+          threadId?: string;
+          attachmentHints?: Array<{ contentType: string; url: string }>;
+        } = { id, messages };
         const threadForRequest = typeof opts.getActiveThreadId === 'function'
           ? opts.getActiveThreadId()
           : activeThreadIdRef.current;
         if (threadForRequest) body.threadId = threadForRequest;
         // Include attachment hints so server-side classifier can detect media ops
         try {
-          if (typeof opts.attachmentsProvider === 'function') {
-            const hints = opts.attachmentsProvider()?.map(a => ({ contentType: a.contentType, url: a.publicUrl })) || [];
+          if (typeof attachmentsProvider === 'function') {
+            const hints = attachmentsProvider()?.map((attachment) => ({ contentType: attachment.contentType, url: attachment.publicUrl })) || [];
             if (hints.length > 0) body.attachmentHints = hints;
           }
         } catch {}
@@ -76,34 +129,33 @@ export function useAgentChat(opts: UseAgentChatOptions) {
       // Notify UI on each tool call to update progress indicator word
       try {
         if (typeof opts.onToolProgress === 'function') {
-          const name = (toolCall as any).toolName as string;
-          opts.onToolProgress(name);
+          opts.onToolProgress(toolCall.toolName);
         }
       } catch {}
 
-      async function waitForInstance(timeoutMs = 6000, intervalMs = 120) {
+      const waitForInstance = async (timeoutMs = 6000, intervalMs = 120): Promise<WebContainerAPI | null> => {
         const start = Date.now();
         while (!instanceRef.current && Date.now() - start < timeoutMs) {
           await new Promise(r => setTimeout(r, intervalMs));
         }
         return instanceRef.current;
-      }
+      };
 
       if (!instanceRef.current) {
         await waitForInstance();
       }
       if (!instanceRef.current) {
-        addToolResult({ tool: toolCall.toolName as string, toolCallId: toolCall.toolCallId, output: { error: 'WebContainer is not ready yet. Still initializing, try again in a moment.' } });
+        addToolResult({ tool: toolCall.toolName, toolCallId: toolCall.toolCallId, output: { error: 'WebContainer is not ready yet. Still initializing, try again in a moment.' } });
         return;
       }
 
-      type ToolCall = { toolName: string; toolCallId: string; input: unknown };
-      const tc = toolCall as ToolCall;
+      type AgentToolCall = { toolName: string; toolCallId: string; input: unknown };
+      const tc: AgentToolCall = toolCall;
 
       const startTime = Date.now();
-      const logAndAddResult = async (output: any) => {
+      const logAndAddResult = async (output: unknown) => {
         const duration = Date.now() - startTime;
-        addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output });
+        addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output });
         try {
           await agentLogger.logToolCall('client', tc.toolName, tc.toolCallId, tc.input, output, duration);
         } catch {}
@@ -112,7 +164,8 @@ export function useAgentChat(opts: UseAgentChatOptions) {
       try {
         switch (tc.toolName) {
           case 'web_fs_find': {
-            const { root = '.', maxDepth = 10, glob, prefix, limit = 200, offset = 0 } = (tc.input as any) ?? {};
+            const findInput = isPlainObject(tc.input) ? (tc.input as Partial<WebFsFindInput>) : {};
+            const { root = '.', maxDepth = 10, glob, prefix, limit = 200, offset = 0 } = findInput;
             const results = await fnsRef.current.readdirRecursive(root, maxDepth);
             const paths = results.map(r => r.path);
             const filterByPrefix = (p: string) => (prefix ? p.startsWith(prefix) : true);
@@ -194,7 +247,9 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             break;
           }
           case 'web_exec': {
-            let { command, args = [], cwd } = tc.input as { command: string; args?: string[]; cwd?: string };
+            const execInput = (isPlainObject(tc.input) ? tc.input : {}) as Partial<WebExecInput>;
+            let { command = '', args = [] } = execInput;
+            const { cwd } = execInput;
             const splitCommandLine = (line: string): string[] => {
               const out: string[] = []; let cur = ''; let quote: '"' | "'" | null = null;
               for (let i = 0; i < line.length; i++) {
@@ -247,7 +302,8 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             break;
           }
           case 'ai_generate': {
-            const { provider, task, input, scope } = tc.input as { provider: 'fal'|'eleven'; task?: 'image'|'video'|'music'|'audio'|'3d'; input: Record<string, any>; scope?: { desktopId?: string; appId?: string; appName?: string } };
+            const generateInput = tc.input as AiGenerateInput;
+            const { provider, task, input, scope } = generateInput;
             try {
               const { processedInput, ingestedCount } = await autoIngestInputs(input, scope);
               if (provider === 'fal') {
@@ -268,7 +324,11 @@ export function useAgentChat(opts: UseAgentChatOptions) {
                   }
                 } catch {}
                 // Enrich scope with threadId/requestId for ingestion tracking
-                const enrichedScope = { ...scope, threadId: activeThreadId || undefined, appId: scope?.appId, desktopId: scope?.desktopId, requestId } as any;
+                const enrichedScope: MediaScope & { threadId?: string; requestId: string } = {
+                  ...(scope ?? {}),
+                  threadId: activeThreadId ?? undefined,
+                  requestId,
+                };
                 const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, enrichedScope);
                 addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, result: updated, persistedAssets, autoIngestedCount: ingestedCount } });
               } else if (provider === 'eleven') {
@@ -321,7 +381,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             break;
           }
           case 'code_edit_ast': {
-            const input = tc.input as { path: string; action: 'upsertImport' | 'updateFunctionBody' | 'replaceJsxElement' | 'replaceJsxAttributes' | 'insertAfterLastImport' | 'insertAtTop'; selector?: any; payload?: any };
+            const input = tc.input as CodeEditAstInput;
             try {
               const content = await fnsRef.current.readFile(input.path, 'utf-8');
               const { applyAstEdit } = await import('@/lib/code-edit/recastEdit');
@@ -332,7 +392,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
               addToolResult({ tool: 'code_edit_ast', toolCallId: tc.toolCallId, output: { ok: true, applied: result.applied, edits: result.edits, previewDiff: result.previewDiff, path: input.path, elapsedMs: result.elapsedMs, bytesChanged: result.applied ? Math.abs(result.code.length - content.length) : 0 } });
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : String(err);
-              addToolResult({ tool: 'code_edit_ast', toolCallId: tc.toolCallId, output: { ok: false, error: message, path: (tc.input as any).path } });
+              addToolResult({ tool: 'code_edit_ast', toolCallId: tc.toolCallId, output: { ok: false, error: message, path: input.path } });
             }
             break;
           }
@@ -419,13 +479,13 @@ export function useAgentChat(opts: UseAgentChatOptions) {
         id: m?.id,
         role: m?.role,
         text: Array.isArray(m?.parts)
-          ? m.parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join('')
+          ? m.parts.filter(isTextPart).map((part) => part.text).join('')
           : '',
       }))
     );
     if (signature === initialMessagesSignatureRef.current) return;
     initialMessagesSignatureRef.current = signature;
-    setMessages(initialMessages as any);
+    setMessages(initialMessages);
   }, [initialMessages, setMessages]);
 
   return { messages, sendMessage, status, stop, addToolResult } as const;

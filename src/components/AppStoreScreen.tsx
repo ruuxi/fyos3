@@ -40,9 +40,10 @@ export function AppStoreScreen() {
         const data = await fetchJSON<{ apps: AppRecord[] }>('/api/store/apps');
         if (!mounted) return;
         setApps(data.apps || []);
-      } catch (e: any) {
+      } catch (error) {
         if (!mounted) return;
-        setError(e?.message || 'Failed to load apps');
+        const message = error instanceof Error ? error.message : 'Failed to load apps';
+        setError(message);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -235,7 +236,7 @@ export function AppStoreScreen() {
                 <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 p-8 text-white">
                   <div className="relative z-10">
                     <Badge className="mb-4 bg-white/20 text-white border-white/30">
-                      Editor's Choice
+                      Editor&apos;s Choice
                     </Badge>
                     <h2 className="text-4xl font-bold mb-2">{featuredApps[0].name}</h2>
                     <p className="text-lg opacity-90 mb-6 max-w-md">
@@ -402,7 +403,7 @@ export function AppStoreScreen() {
                       Create apps using the AI agent first, then come back here to publish them.
                     </p>
                     <p className="text-white/50 text-sm">
-                      Try saying: "Create a calculator app" or "Build a todo list app"
+                      Try saying: &quot;Create a calculator app&quot; or &quot;Build a todo list app&quot;
                     </p>
                   </CardContent>
                 </Card>

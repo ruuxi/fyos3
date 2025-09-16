@@ -55,8 +55,7 @@ export const startIngest = mutation({
     const now = new Date();
 
     const r2Key = buildR2Key({ ownerId, desktopId: args.desktopId ?? undefined, appId: args.appId ?? undefined, sha256: args.sha256, contentType: args.contentType, now });
-    const signed = await r2.generateUploadUrl(r2Key) as any;
-    const url: string = typeof signed === 'string' ? signed : signed?.url;
+    const { url } = await r2.generateUploadUrl(r2Key);
     return { url, r2Key };
   },
 });
@@ -202,7 +201,7 @@ export const listMediaPage = query({
 
     const page = await q
       .order("desc")
-      .paginate({ cursor: (args.cursor ?? null) as any, numItems: pageSize });
+      .paginate({ cursor: args.cursor ?? null, numItems: pageSize });
 
     const pageFiltered = page.page.filter((m) => (typePrefix ? m.contentType.startsWith(typePrefix) : true));
     return { page: pageFiltered, isDone: page.isDone, continueCursor: page.continueCursor };
@@ -216,5 +215,4 @@ export const getUrlForKey = query({
     return await r2.getUrl(args.r2Key, { expiresIn: ttl });
   },
 });
-
 

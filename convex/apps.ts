@@ -17,8 +17,7 @@ export const publishAppStart = mutation({
     const ownerId = identity.subject ?? identity.tokenIdentifier ?? identity.email ?? "unknown";
 
     const r2KeyTar = `apps/${ownerId}/${args.appId}/${args.version}/app.tar.gz`;
-    const signed = await r2.generateUploadUrl(r2KeyTar) as any;
-    const url: string = typeof signed === 'string' ? signed : signed?.url;
+    const { url } = await r2.generateUploadUrl(r2KeyTar);
     return { url, r2KeyTar };
   },
 });
@@ -84,7 +83,9 @@ export const publishAppFinalize = mutation({
       updatedAt: now,
     });
     // metrics
-    try { await ctx.runMutation(internal.metrics.increment, { name: 'publish_apps', by: 1 } as any); } catch {}
+    try {
+      await ctx.runMutation(internal.metrics.increment, { name: 'publish_apps', by: 1 });
+    } catch {}
     return id;
   },
 });
@@ -137,5 +138,4 @@ export const getAppBundleUrl = query({
     return await r2.getUrl(app.r2KeyTar, { expiresIn: ttl });
   },
 });
-
 
