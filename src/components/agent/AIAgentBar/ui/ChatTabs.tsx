@@ -31,19 +31,26 @@ export default function ChatTabs(props: ChatTabsProps) {
           <HistoryIcon className="w-4 h-4" />
         </button>
         <div className="flex-1 overflow-x-auto">
-          <div className="flex items-center gap-1 min-h-[32px]">
+          <div className="flex items-center gap-1 min-h-[36px]">
             {threadsLoading && (<div className="text-xs text-white/60 px-2">Loading…</div>)}
             {threadsError && (<div className="text-xs text-red-300 px-2">{threadsError}</div>)}
             {openThreads.length === 0 && !threadsLoading && (
               <div className="text-xs text-white/60 px-3">No chats open.</div>
             )}
             {openThreads.map((t) => (
-              <div key={t._id} className={`group flex items-center max-w-[220px] pl-3 pr-1 h-8 rounded-t bg-white/10 border border-white/20 border-b-0 ${activeThreadId === t._id ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15'}`}>
-                <button className="flex-1 truncate text-xs text-left" onClick={() => setActiveThreadId(t._id)} title={t.title || 'Chat'}>
+              <div
+                key={t._id}
+                className={`group flex-none flex items-center h-9 w-32 rounded-t border border-white/20 border-b-0 bg-white/10 transition-colors ${activeThreadId === t._id ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15'}`}
+              >
+                <button
+                  className="flex-1 px-3 text-xs text-left truncate"
+                  onClick={() => setActiveThreadId(t._id)}
+                  title={t.title || 'Chat'}
+                >
                   {t.title || 'Chat'}
                 </button>
                 <button
-                  className="ml-1 inline-flex items-center justify-center h-5 w-5 rounded hover:bg-white/20"
+                  className="mr-1 inline-flex items-center justify-center h-5 w-5 rounded hover:bg-white/20"
                   title="Close"
                   onClick={() => onClose(t._id)}
                 >
@@ -85,4 +92,3 @@ export default function ChatTabs(props: ChatTabsProps) {
     </div>
   );
 }
-

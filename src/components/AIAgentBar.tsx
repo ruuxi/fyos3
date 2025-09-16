@@ -24,6 +24,13 @@ import { buildDesktopSnapshot, restoreDesktopSnapshot } from '@/utils/desktop-sn
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+type OptimisticChatMessage = {
+  id: string;
+  role: 'user';
+  parts: Array<{ type: 'text'; text: string }>;
+  metadata?: { optimistic: true; optimisticAttachments?: Attachment[] };
+};
+
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'compact' | 'chat' | 'visit' | 'media' | 'friends'>('chat');
@@ -34,6 +41,8 @@ export default function AIAgentBar() {
   const [didAnimateWelcome, setDidAnimateWelcome] = useState(false);
   const [bubbleAnimatingIds, setBubbleAnimatingIds] = useState<Set<string>>(new Set());
   const [lastSentAttachments, setLastSentAttachments] = useState<Attachment[] | null>(null);
+  const [optimisticMessages, setOptimisticMessages] = useState<OptimisticChatMessage[]>([]);
+  const skipOptimisticClearRef = useRef(false);
   // Undo stack depth for UI invalidation
   const [undoDepth, setUndoDepth] = useState<number>(0);
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
@@ -65,6 +74,13 @@ export default function AIAgentBar() {
 
   const activeThreadIdImmediateRef = useRef<string | null>(activeThreadId);
   useEffect(() => { activeThreadIdImmediateRef.current = activeThreadId; }, [activeThreadId]);
+  useEffect(() => {
+    if (skipOptimisticClearRef.current) {
+      skipOptimisticClearRef.current = false;
+      return;
+    }
+    setOptimisticMessages([]);
+  }, [activeThreadId]);
 
   const {
     mediaItems,
@@ -152,6 +168,36 @@ export default function AIAgentBar() {
       // Tool progress callback
     },
   });
+
+  useEffect(() => {
+    if (optimisticMessages.length === 0) return;
+    const extractText = (message: any) => {
+      if (!message) return '';
+      if (Array.isArray(message.parts)) {
+        return message.parts
+          .filter((part: any) => part?.type === 'text')
+          .map((part: any) => part?.text ?? '')
+          .join('');
+      }
+      if (typeof message.content === 'string') return message.content;
+      return '';
+    };
+
+    const realUserMessages = (messages || []).filter((msg: any) => msg?.role === 'user' && !(msg?.metadata as any)?.optimistic);
+    if (realUserMessages.length === 0) return;
+    const latestReal = realUserMessages[realUserMessages.length - 1];
+    const latestText = extractText(latestReal).trim();
+    if (!latestText) return;
+
+    setOptimisticMessages((prev) => {
+      const filtered = prev.filter((opt) => {
+        const targetText = (opt?.parts?.[0]?.text ?? '').trim();
+        if (!targetText) return false;
+        return !latestText.startsWith(targetText);
+      });
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [messages, optimisticMessages.length]);
 
   // Friends hook
   const {
@@ -350,16 +396,24 @@ export default function AIAgentBar() {
     e.preventDefault();
     const trimmedInput = input.trim();
     if (!trimmedInput) return;
+
+    const attachmentsForDisplay = (attachmentsRef.current || attachments).map((a) => ({ ...a }));
+    const optimisticId = `optimistic_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const optimisticEntry: OptimisticChatMessage = {
+      id: optimisticId,
+      role: 'user',
+      parts: [{ type: 'text', text: trimmedInput }],
+      metadata: { optimistic: true, optimisticAttachments: attachmentsForDisplay },
+    };
+    setOptimisticMessages((prev) => [...prev, optimisticEntry]);
     forceFollow();
+
+    const removeOptimistic = () => {
+      setOptimisticMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+    };
+
     let userText = trimmedInput;
-    if (!activeThreadIdImmediateRef.current && isChatAuthenticated) {
-      const ensured = await ensureActiveThread({ titleHint: trimmedInput });
-      if (ensured) {
-        activeThreadIdImmediateRef.current = ensured;
-        await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
-      }
-    }
-    // Ensure we pick up durable URLs if ingestion just finished
+
     const waitForDurable = async (timeoutMs = 6000, intervalMs = 80) => {
       const started = Date.now();
       while (Date.now() - started < timeoutMs) {
@@ -371,31 +425,67 @@ export default function AIAgentBar() {
         await new Promise(r => setTimeout(r, intervalMs));
       }
     };
-    await waitForDurable();
-    // Project any blob: attachments to known durable URLs just in case state hasn't flushed
-    const snapshot = projectAttachmentsToDurable((attachmentsRef.current || attachments).slice());
-    
-    if (snapshot.length > 0) {
-      // Only include durable, fetchable URLs for the LLM (avoid blob:)
-      const durable = snapshot.filter(a => /^https?:\/\//i.test(a.publicUrl));
-      if (durable.length > 0) {
-        // Append concise attachment hints per request into the user's message only
-        const lines = durable.map(a => `Attached ${a.contentType || 'file'}: ${a.publicUrl}`);
-        userText += '\n' + lines.join('\n');
+
+    try {
+      if (!activeThreadIdImmediateRef.current && isChatAuthenticated) {
+        skipOptimisticClearRef.current = true;
+        const ensured = await ensureActiveThread({ titleHint: trimmedInput });
+        if (ensured) {
+          activeThreadIdImmediateRef.current = ensured;
+          await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+        } else {
+          skipOptimisticClearRef.current = false;
+        }
       }
+
+      await waitForDurable();
+      const snapshot = projectAttachmentsToDurable((attachmentsRef.current || attachments).map((a) => ({ ...a })));
+
+      if (snapshot.length > 0) {
+        const durable = snapshot.filter(a => /^https?:\/\//i.test(a.publicUrl));
+        if (durable.length > 0) {
+          const lines = durable.map(a => `Attached ${a.contentType || 'file'}: ${a.publicUrl}`);
+          userText += '\n' + lines.join('\n');
+        }
+      }
+
+      console.log('📤 [CHAT] Sending with attachments snapshot:', snapshot);
+
+      pendingAttachmentsRef.current = snapshot;
+      setLastSentAttachments(snapshot);
+
+      let sendPromise: Promise<void> | void;
+      try {
+        sendPromise = sendMessage({ text: userText });
+      } catch (error) {
+        pendingAttachmentsRef.current = null;
+        removeOptimistic();
+        throw error;
+      }
+
+      setInput('');
+      setAttachments([]);
+      const finalize = () => {
+        removeOptimistic();
+        setTimeout(() => { pendingAttachmentsRef.current = null; }, 1500);
+      };
+
+      if (sendPromise && typeof sendPromise.then === 'function') {
+        sendPromise
+          .then(() => finalize())
+          .catch((error) => {
+            console.error('[CHAT] sendMessage failed', error);
+            finalize();
+          });
+      } else {
+        finalize();
+      }
+    } catch (error) {
+      console.error('[CHAT] Failed to prepare message', error);
+      removeOptimistic();
+      pendingAttachmentsRef.current = null;
+      skipOptimisticClearRef.current = false;
     }
-    
-    // Debug log the snapshot before sending
-    console.log('📤 [CHAT] Sending with attachments snapshot:', snapshot);
-    
-    // Ensure server receives a stable view even if UI clears attachments immediately
-    pendingAttachmentsRef.current = snapshot;
-    setLastSentAttachments(snapshot);
-    void sendMessage({ text: userText });
-    // Clear the pending ref shortly after dispatch
-    setTimeout(() => { pendingAttachmentsRef.current = null; }, 1500);
-    setInput('');
-    setAttachments([]);
   };
 
   // Drag overlay
@@ -562,6 +652,7 @@ export default function AIAgentBar() {
                     />
                     <MessagesPane
                       messages={messages}
+                      optimisticMessages={optimisticMessages}
                       status={status}
                       messagesContainerRef={messagesContainerRef}
                       messagesInnerRef={messagesInnerRef}

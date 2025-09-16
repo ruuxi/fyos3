@@ -5,6 +5,7 @@ import { formatBytes, guessContentTypeFromFilename } from '@/lib/agent/agentUtil
 
 export type MessagesPaneProps = {
   messages: Array<any>;
+  optimisticMessages?: Array<{ id: string; role: 'user'; parts: Array<{ type: 'text'; text: string }>; metadata?: Record<string, unknown> }>;
   status: string;
   messagesContainerRef: RefObject<HTMLDivElement | null>;
   messagesInnerRef: RefObject<HTMLDivElement | null>;
@@ -146,13 +147,14 @@ function resolveMode(message: any): ChatMode | undefined {
 }
 
 export default function MessagesPane(props: MessagesPaneProps) {
-  const { messages, status, messagesContainerRef, messagesInnerRef, containerHeight, didAnimateWelcome, bubbleAnimatingIds, lastSentAttachments, activeThreadId } = props;
+  const { messages, optimisticMessages = [], status, messagesContainerRef, messagesInnerRef, containerHeight, didAnimateWelcome, bubbleAnimatingIds, lastSentAttachments, activeThreadId } = props;
+  const displayMessages = optimisticMessages.length > 0 ? [...messages, ...optimisticMessages] : messages;
   const { isAuthenticated } = useConvexAuth();
   const liveMedia = useQuery(
     convexApi.media.listMedia as any,
     isAuthenticated && activeThreadId ? ({ threadId: activeThreadId as any, limit: 50 } as any) : 'skip'
   ) as Array<{ publicUrl?: string; contentType: string; size?: number; createdAt: number; r2Key: string }> | undefined;
-  const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+  const lastUserMessage = [...displayMessages].reverse().find(m => m.role === 'user');
   const lastUserMessageId = lastUserMessage?.id;
   return (
     <div
@@ -169,7 +171,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
       }}
     >
       <div ref={messagesInnerRef} className="space-y-3 px-1">
-        {messages.length === 0 && (
+        {displayMessages.length === 0 && (
           <div className="text-sm flex justify-start" aria-label="Welcome message">
             <div className="max-w-full flex-1">
               <div className="text-xs mb-1 text-white/60 pl-1">AI Agent</div>
@@ -179,7 +181,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
             </div>
           </div>
         )}
-        {messages.map((m, idx) => {
+        {displayMessages.map((m, idx) => {
           // Build content and collect any attachments referenced in text
           const textNodes: any[] = [];
           let collectedFromText: AttachmentPreview[] = [];
@@ -195,25 +197,30 @@ export default function MessagesPane(props: MessagesPaneProps) {
             }
           });
           const isLastUser = m.role === 'user' && m.id === lastUserMessageId;
+          const optimisticAttachmentOverride = Array.isArray((m?.metadata as any)?.optimisticAttachments)
+            ? ((m.metadata as any).optimisticAttachments as AttachmentPreview[])
+            : null;
           const previewItems = collectedFromText.length > 0
             ? collectedFromText
-            : (isLastUser && (lastSentAttachments?.length || 0) > 0 ? (lastSentAttachments as AttachmentPreview[]) : []);
+            : (optimisticAttachmentOverride ?? (isLastUser && (lastSentAttachments?.length || 0) > 0 ? (lastSentAttachments as AttachmentPreview[]) : []));
 
           // Determine if this is the last assistant message to attach live media below
           const isAssistant = m.role === 'assistant';
-          const isLastAssistant = isAssistant && messages.slice(idx + 1).every(mm => mm.role !== 'assistant');
+          const isLastAssistant = isAssistant && displayMessages.slice(idx + 1).every(mm => mm.role !== 'assistant');
           const mode = resolveMode(m);
           const personaLabel = 'Sim';
           const authorLabel = m.role === 'assistant' ? (mode === 'persona' ? personaLabel : 'AI Agent') : 'You';
           const assistantBubble = mode === 'persona'
             ? 'inline-block max-w-[80%] bg-white/10 border border-white/20 text-white'
             : 'inline-block max-w-[80%] bg-white/10 border border-white/15 text-white';
-          const bubbleClass = m.role === 'user'
+          const isOptimistic = Boolean((m?.metadata as any)?.optimistic);
+          const bubbleBase = m.role === 'user'
             ? 'bg-sky-500 text-white max-w-full'
             : assistantBubble;
+          const bubbleClass = isOptimistic ? `${bubbleBase} opacity-80` : bubbleBase;
 
           return (
-            <div key={m.id} className={`text-sm flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div key={m.id} className={`text-sm flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} ${isOptimistic ? 'opacity-80' : ''}`}>
               <div className={`${m.role === 'user' ? 'flex flex-col items-end max-w-[80%]' : 'max-w-full flex-1'}`}>
                 <div className={`text-xs mb-1 ${m.role === 'user' ? 'text-white/60 pr-1' : 'text-white/60 pl-1'}`}>
                   {authorLabel}

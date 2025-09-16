@@ -16,18 +16,20 @@ type UseThreadsState = {
   chatSessionKey: string;
   refreshThreads: () => Promise<void>;
   startBlankThread: () => void;
-  ensureActiveThread: (opts?: { titleHint?: string }) => Promise<string | null>;
+  ensureActiveThread: (opts?: { titleHint?: string; bootstrap?: boolean }) => Promise<string | null>;
   closeThread: (id: string) => void;
   deleteThread: (id: string) => Promise<void>;
   isAuthenticated: boolean;
 };
 
 const OPEN_THREADS_STORAGE_KEY = 'FYOS_AGENT_OPEN_THREADS_V1';
+const DEFAULT_THREAD_TITLE = 'New Chat';
+const DEFAULT_WELCOME_MESSAGE = "Hello! I'm your AI assistant. I can help you create apps, modify files, and manage your WebContainer workspace.";
 
 function normalizeTitle(title?: string) {
-  if (!title) return 'New Chat';
+  if (!title) return DEFAULT_THREAD_TITLE;
   const trimmed = title.replace(/\s+/g, ' ').trim();
-  if (!trimmed) return 'New Chat';
+  if (!trimmed) return DEFAULT_THREAD_TITLE;
   return trimmed.length > 80 ? `${trimmed.slice(0, 77)}…` : trimmed;
 }
 
@@ -59,10 +61,13 @@ export function useThreads(): UseThreadsState {
   const [chatSessionKey, setChatSessionKey] = useState<string>('agent-chat');
   const [openThreadIds, setOpenThreadIds] = useState<string[]>([]);
   const openIdsLoadedRef = useRef(false);
+  const activeThreadIdRef = useRef<string | null>(null);
 
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const createThreadMutation = useMutation(convexApi.chat.createThread as any);
   const deleteThreadMutation = useMutation(convexApi.chat.deleteThread as any);
+  const appendMessageMutation = useMutation(convexApi.chat.appendMessage as any);
+  const pendingThreadPromiseRef = useRef<Promise<string | null> | null>(null);
 
   const threadsData = useQuery(
     convexApi.chat.listThreads as any,
@@ -180,58 +185,114 @@ export function useThreads(): UseThreadsState {
   }, [threads]);
 
   const setActiveThreadId = useCallback((id: string | null, opts?: { ensureOpen?: boolean }) => {
+    activeThreadIdRef.current = id;
     setActiveThreadIdState(id);
-    if (id) {
-      const ensureOpen = opts?.ensureOpen !== false;
-      if (ensureOpen) {
-        setOpenThreadIds((prev) => {
-          const filtered = prev.filter((tid) => tid !== id);
-          return [id, ...filtered];
-        });
-      }
+    if (id && opts?.ensureOpen !== false) {
+      setOpenThreadIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
     }
   }, []);
+
+  useEffect(() => {
+    activeThreadIdRef.current = activeThreadIdState;
+  }, [activeThreadIdState]);
+
+  const ensureActiveThread = useCallback(async ({ titleHint, bootstrap }: { titleHint?: string; bootstrap?: boolean } = {}) => {
+    if (!isAuthenticated) return null;
+    if (activeThreadIdRef.current) return activeThreadIdRef.current;
+    if (pendingThreadPromiseRef.current) {
+      return pendingThreadPromiseRef.current;
+    }
+
+    const promise = (async () => {
+      try {
+        const title = normalizeTitle(titleHint ?? DEFAULT_THREAD_TITLE);
+        const now = Date.now();
+        const tid = await createThreadMutation({ title } as any);
+        const id = String(tid);
+        const optimistic: ChatThread = { _id: id, title, updatedAt: now, lastMessageAt: now };
+        setThreads((prev) => (prev.some((t) => t._id === id) ? prev : [...prev, optimistic]));
+        setOpenThreadIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+        activeThreadIdRef.current = id;
+        setActiveThreadIdState(id);
+
+        if (bootstrap) {
+          const welcomeMessage = {
+            id: `welcome_${id}`,
+            role: 'assistant' as const,
+            parts: [{ type: 'text', text: DEFAULT_WELCOME_MESSAGE }],
+            metadata: { mode: 'persona' as const },
+          };
+          setInitialChatMessages([welcomeMessage]);
+          try {
+            await appendMessageMutation({
+              threadId: id as any,
+              role: 'assistant',
+              content: DEFAULT_WELCOME_MESSAGE,
+              mode: 'persona',
+            } as any);
+          } catch (error) {
+            console.warn('[threads] Failed to store welcome message', error);
+          }
+        }
+
+        return id;
+      } catch (error) {
+        console.error('Failed to create thread', error);
+        setThreadsError((error as Error)?.message ?? 'Failed to create thread');
+        return null;
+      } finally {
+        pendingThreadPromiseRef.current = null;
+      }
+    })();
+
+    pendingThreadPromiseRef.current = promise;
+    return promise;
+  }, [appendMessageMutation, createThreadMutation, isAuthenticated]);
 
   const startBlankThread = useCallback(() => {
+    if (!isAuthenticated) {
+      activeThreadIdRef.current = null;
+      setActiveThreadIdState(null);
+      setInitialChatMessages([]);
+      setChatSessionKey(`ephemeral:${Date.now()}`);
+      return;
+    }
+
+    activeThreadIdRef.current = null;
     setActiveThreadIdState(null);
     setInitialChatMessages([]);
-    setChatSessionKey(`ephemeral:${Date.now()}`);
-  }, []);
+    setChatSessionKey(`draft:${Date.now()}`);
+    void ensureActiveThread({ bootstrap: true });
+  }, [ensureActiveThread, isAuthenticated]);
 
-  const ensureActiveThread = useCallback(async ({ titleHint }: { titleHint?: string } = {}) => {
-    if (!isAuthenticated) return null;
-    if (activeThreadIdState) return activeThreadIdState;
-    try {
-      const title = normalizeTitle(titleHint);
-      const now = Date.now();
-      const tid = await createThreadMutation({ title } as any);
-      const id = String(tid);
-      const optimistic: ChatThread = { _id: id, title, updatedAt: now, lastMessageAt: now };
-      setThreads((prev) => {
-        if (prev.some((t) => t._id === id)) return prev;
-        return [optimistic, ...prev];
-      });
-      setOpenThreadIds((prev) => [id, ...prev.filter((existing) => existing !== id)]);
-      setActiveThreadIdState(id);
-      return id;
-    } catch (error) {
-      console.error('Failed to create thread', error);
-      setThreadsError((error as Error)?.message ?? 'Failed to create thread');
-      return null;
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) return;
+    if (threadsLoading) return;
+
+    if (threads.length === 0 && !activeThreadIdState) {
+      void ensureActiveThread({ bootstrap: true });
+      return;
     }
-  }, [isAuthenticated, activeThreadIdState, createThreadMutation]);
+
+    if (!activeThreadIdRef.current && openThreadIds.length > 0) {
+      const fallback = openThreadIds[0];
+      activeThreadIdRef.current = fallback;
+      setActiveThreadIdState(fallback);
+    }
+  }, [isAuthenticated, authLoading, threadsLoading, threads, openThreadIds, activeThreadIdState, ensureActiveThread]);
 
   const closeThread = useCallback((id: string) => {
     setOpenThreadIds((prev) => {
       if (!prev.includes(id)) return prev;
       const filtered = prev.filter((tid) => tid !== id);
-      if (activeThreadIdState === id) {
+      if (activeThreadIdRef.current === id) {
         const fallback = filtered[0] ?? null;
+        activeThreadIdRef.current = fallback;
         setActiveThreadIdState(fallback);
       }
       return filtered;
     });
-  }, [activeThreadIdState]);
+  }, []);
 
   const deleteThread = useCallback(async (id: string) => {
     if (!isAuthenticated) return;
