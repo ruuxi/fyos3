@@ -262,8 +262,13 @@ export default function WebContainer() {
                     try {
                       if (typeof a === 'string') return a;
                       if (a && typeof a === 'object') {
-                        const obj = a as { message?: string };
-                        return obj.message || JSON.stringify(a).slice(0, 800);
+                        try {
+                          if ('message' in a && typeof a.message === 'string') {
+                            return a.message;
+                          }
+                        } catch {}
+                        try { return JSON.stringify(a).slice(0, 800); } catch {}
+                        return '[unserializable]';
                       }
                       return String(a);
                     } catch { return '[unserializable]'; }

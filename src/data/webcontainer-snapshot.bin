@@ -2637,90 +2637,162 @@ n
 
 .read-the-docs {
   color: #888;
-}¢aiÅ°dÅ®index.tsÅ°fÅ°c≈(—// AI helpers for FYOS apps (client-side, runs inside Vite iframe)
+}¢aiÅ°dÅ®index.tsÅ°fÅ°c≈1// AI helpers for FYOS apps (client-side, runs inside Vite iframe)
 export type AIProvider = 'fal' | 'eleven';
+
+type Scope = { appId?: string; appName?: string };
+
+type AIRequestPayload<TInput> = {
+  type: 'AI_REQUEST';
+  id: string;
+  provider: AIProvider;
+  model: string;
+  input: TInput;
+  scope?: Scope;
+};
+
+type AIResponsePayload = {
+  type: 'AI_RESPONSE';
+  id: string;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+};
+
+type MediaIngestPayload = {
+  base64?: string;
+  sourceUrl?: string;
+  contentType?: string;
+};
+
+type MediaIngestRequest = {
+  type: 'MEDIA_INGEST';
+  id: string;
+  payload: MediaIngestPayload;
+  scope?: Scope;
+};
+
+type MediaIngestResponse = {
+  type: 'MEDIA_INGEST_RESPONSE';
+  id: string;
+  ok: boolean;
+  result?: MediaIngestResult;
+  error?: string;
+};
+
+type PlainObject = Record<string, unknown>;
+
+function isPlainObject(value: unknown): value is PlainObject {
+  return typeof value === 'object' && value !== null;
+}
+
+function deriveScope(): Scope | undefined {
+  try {
+    const sp = new URLSearchParams(window.location.search || '');
+    const appId = sp.get('id') || undefined;
+    const appName = sp.get('name') || undefined;
+    return { appId, appName };
+  } catch {
+    return undefined;
+  }
+}
+
+function isMatchingAIResponse(data: unknown, expectedId: string): data is AIResponsePayload {
+  if (!isPlainObject(data)) return false;
+  if (data.type !== 'AI_RESPONSE') return false;
+  if (data.id !== expectedId) return false;
+  if (typeof data.ok !== 'boolean') return false;
+  if ('error' in data && data.error !== undefined && typeof data.error !== 'string') return false;
+  return true;
+}
+
+function isMatchingMediaResponse(data: unknown, expectedId: string): data is MediaIngestResponse {
+  if (!isPlainObject(data)) return false;
+  if (data.type !== 'MEDIA_INGEST_RESPONSE') return false;
+  if (data.id !== expectedId) return false;
+  if (typeof data.ok !== 'boolean') return false;
+  if ('error' in data && data.error !== undefined && typeof data.error !== 'string') return false;
+  if ('result' in data && data.result !== undefined && !isPlainObject(data.result)) return false;
+  return true;
+}
 
 function generateRequestId(): string {
   return 'ai_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
 }
 
-export async function aiRequest(provider: AIProvider, model: string, input: any): Promise<any> {
+export async function aiRequest<TInput = unknown, TResult = unknown>(provider: AIProvider, model: string, input: TInput): Promise<TResult> {
   const id = generateRequestId();
   return new Promise((resolve, reject) => {
-    const onMessage = (e: MessageEvent) => {
+    const onMessage = (event: MessageEvent<unknown>) => {
       try {
-        const d: any = (e as any).data;
-        if (!d || d.type !== 'AI_RESPONSE' || d.id !== id) return;
-        window.removeEventListener('message', onMessage as any);
-        if (d.ok) resolve(d.result);
-        else reject(new Error(d.error || 'AI request failed'));
+        const data = event.data;
+        if (!isMatchingAIResponse(data, id)) return;
+        window.removeEventListener('message', onMessage);
+        if (data.ok) {
+          resolve(data.result as TResult);
+        } else {
+          reject(new Error(data.error || 'AI request failed'));
+        }
       } catch (err) {
-        window.removeEventListener('message', onMessage as any);
+        window.removeEventListener('message', onMessage);
         reject(err);
       }
     };
-    window.addEventListener('message', onMessage as any);
+    window.addEventListener('message', onMessage);
     try {
       // Derive app scope from iframe query params (?id=...&name=...)
-      let scope: { appId?: string; appName?: string } | undefined = undefined;
-      try {
-        const sp = new URLSearchParams(window.location.search || '');
-        const appId = sp.get('id') || undefined;
-        const appName = sp.get('name') || undefined;
-        scope = { appId, appName };
-      } catch {}
-      const payload = { type: 'AI_REQUEST', id, provider, model, input, scope } as const;
+      const scope = deriveScope();
+      const payload: AIRequestPayload<TInput> = { type: 'AI_REQUEST', id, provider, model, input, scope };
       // Post directly to the top-level Next.js host to avoid needing a desktop relay
       window.top?.postMessage(payload, '*');
     } catch (err) {
-      window.removeEventListener('message', onMessage as any);
+      window.removeEventListener('message', onMessage);
       reject(err);
       return;
     }
     // Timeout after 60s
     setTimeout(() => {
-      try { window.removeEventListener('message', onMessage as any); } catch {}
+      try { window.removeEventListener('message', onMessage); } catch {}
       reject(new Error('AI request timeout'));
     }, 60000);
   });
 }
 
-export async function callFal(model: string, input: any): Promise<any> {
-  return aiRequest('fal', model, input);
+export async function callFal<TInput = unknown, TResult = unknown>(model: string, input: TInput): Promise<TResult> {
+  return aiRequest<TInput, TResult>('fal', model, input);
 }
 
-export async function callFluxSchnell(input: any): Promise<any> {
-  return aiRequest('fal', 'fal-ai/nano-banana', input);
+export async function callFluxSchnell<TInput = unknown, TResult = unknown>(input: TInput): Promise<TResult> {
+  return callFal<TInput, TResult>('fal-ai/nano-banana', input);
 }
 
 // New Nano Banana text-to-image helper (replaces FLUX Schnell)
-export async function callNanaBanana(input: any): Promise<any> {
-  return aiRequest('fal', 'fal-ai/nano-banana', input);
+export async function callNanaBanana<TInput = unknown, TResult = unknown>(input: TInput): Promise<TResult> {
+  return callFal<TInput, TResult>('fal-ai/nano-banana', input);
 }
 
 // Text-to-image using Nano Banana
-export async function textToImage(prompt: string, options: any = {}): Promise<any> {
+export async function textToImage(prompt: string, options: PlainObject = {}): Promise<unknown> {
   return callFal('fal-ai/nano-banana', { prompt, ...options });
 }
 
 export interface ComposeMusicParams {
   prompt?: string;
-  compositionPlan?: any;
+  compositionPlan?: unknown;
   musicLengthMs?: number;
   outputFormat?: string;
   model?: string;
 }
 
-export async function composeMusic(params: ComposeMusicParams): Promise<any> {
-  const input: any = {};
-  if (params && typeof params === 'object') {
-    if (typeof (params as any).prompt === 'string') input.prompt = (params as any).prompt;
-    if ((params as any).compositionPlan) input.composition_plan = (params as any).compositionPlan;
-    if (typeof (params as any).musicLengthMs === 'number') input.music_length_ms = (params as any).musicLengthMs;
-    if (typeof (params as any).outputFormat === 'string') input.output_format = (params as any).outputFormat;
-    if (typeof (params as any).model === 'string') input.model = (params as any).model;
-  }
-  return aiRequest('eleven', input.model || '', input);
+export async function composeMusic(params: ComposeMusicParams): Promise<unknown> {
+  const input: PlainObject = {};
+  if (typeof params.prompt === 'string') input.prompt = params.prompt;
+  if (params.compositionPlan !== undefined) input.composition_plan = params.compositionPlan;
+  if (typeof params.musicLengthMs === 'number') input.music_length_ms = params.musicLengthMs;
+  if (typeof params.outputFormat === 'string') input.output_format = params.outputFormat;
+  if (typeof params.model === 'string') input.model = params.model;
+  const model = typeof params.model === 'string' ? params.model : '';
+  return aiRequest('eleven', model, input);
 }
 
 // Media ingest helpers for inputs that require a public URL
@@ -2743,23 +2815,31 @@ export async function ingestToPublicUrlFromBase64(base64: string, contentType?: 
   const id = generateMediaRequestId();
   const scope = deriveScope();
   return new Promise((resolve, reject) => {
-    const onMessage = (e: MessageEvent) => {
-      const d: any = (e as any).data;
-      if (!d || d.type !== 'MEDIA_INGEST_RESPONSE' || d.id !== id) return;
-      window.removeEventListener('message', onMessage as any);
-      if (d.ok && d.result?.publicUrl) resolve(d.result.publicUrl);
-      else reject(new Error(d.error || 'Ingest failed'));
+    const onMessage = (event: MessageEvent<unknown>) => {
+      const data = event.data;
+      if (!isMatchingMediaResponse(data, id)) return;
+      window.removeEventListener('message', onMessage);
+      if (data.ok && data.result?.publicUrl) {
+        resolve(data.result.publicUrl);
+      } else {
+        reject(new Error(data.error || 'Ingest failed'));
+      }
     };
-    window.addEventListener('message', onMessage as any);
+    window.addEventListener('message', onMessage);
     try {
-      const payload = { base64, contentType };
-      window.top?.postMessage({ type: 'MEDIA_INGEST', id, payload, scope }, '*');
+      const request: MediaIngestRequest = {
+        type: 'MEDIA_INGEST',
+        id,
+        payload: { base64, contentType },
+        scope,
+      };
+      window.top?.postMessage(request, '*');
     } catch (err) {
-      window.removeEventListener('message', onMessage as any);
+      window.removeEventListener('message', onMessage);
       reject(err);
     }
     setTimeout(() => {
-      try { window.removeEventListener('message', onMessage as any); } catch {}
+      try { window.removeEventListener('message', onMessage); } catch {}
       reject(new Error('Ingest timeout'));
     }, 60000);
   });
@@ -2769,43 +2849,47 @@ export async function ingestToPublicUrlFromSourceUrl(sourceUrl: string, contentT
   const id = generateMediaRequestId();
   const scope = deriveScope();
   return new Promise((resolve, reject) => {
-    const onMessage = (e: MessageEvent) => {
-      const d: any = (e as any).data;
-      if (!d || d.type !== 'MEDIA_INGEST_RESPONSE' || d.id !== id) return;
-      window.removeEventListener('message', onMessage as any);
-      if (d.ok && d.result?.publicUrl) resolve(d.result.publicUrl);
-      else reject(new Error(d.error || 'Ingest failed'));
+    const onMessage = (event: MessageEvent<unknown>) => {
+      const data = event.data;
+      if (!isMatchingMediaResponse(data, id)) return;
+      window.removeEventListener('message', onMessage);
+      if (data.ok && data.result?.publicUrl) {
+        resolve(data.result.publicUrl);
+      } else {
+        reject(new Error(data.error || 'Ingest failed'));
+      }
     };
-    window.addEventListener('message', onMessage as any);
+    window.addEventListener('message', onMessage);
     try {
-      const payload = { sourceUrl, contentType };
-      window.top?.postMessage({ type: 'MEDIA_INGEST', id, payload, scope }, '*');
+      const request: MediaIngestRequest = {
+        type: 'MEDIA_INGEST',
+        id,
+        payload: { sourceUrl, contentType },
+        scope,
+      };
+      window.top?.postMessage(request, '*');
     } catch (err) {
-      window.removeEventListener('message', onMessage as any);
+      window.removeEventListener('message', onMessage);
       reject(err);
     }
     setTimeout(() => {
-      try { window.removeEventListener('message', onMessage as any); } catch {}
+      try { window.removeEventListener('message', onMessage); } catch {}
       reject(new Error('Ingest timeout'));
     }, 60000);
   });
 }
 
-function deriveScope(): { appId?: string; appName?: string } | undefined {
-  try {
-    const sp = new URLSearchParams(window.location.search || '');
-    const appId = sp.get('id') || undefined;
-    const appName = sp.get('name') || undefined;
-    return { appId, appName };
-  } catch {
-    return undefined;
-  }
-}
-
 export async function uploadFileToPublicUrl(file: File): Promise<string> {
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === 'string') {
+        resolve(result);
+      } else {
+        reject(new Error('Unexpected file reader result type'));
+      }
+    };
     reader.onerror = () => reject(new Error('Read failed'));
     reader.readAsDataURL(file);
   });
@@ -2819,81 +2903,81 @@ export async function ensurePublicUrl(input: File | string): Promise<string> {
 }
 
 // Convenience wrappers for common FAL models (developers can still use callFal directly)
-export async function imageToVideo(image: File | string, options: any = {}): Promise<any> {
+export async function imageToVideo(image: File | string, options: PlainObject = {}): Promise<unknown> {
   const image_url = await ensurePublicUrl(image);
   return callFal('fal-ai/bytedance/seedance/v1/lite/image-to-video', { image_url, ...options });
 }
 
-export async function referenceToVideo(referenceImage: File | string, options: any = {}): Promise<any> {
+export async function referenceToVideo(referenceImage: File | string, options: PlainObject = {}): Promise<unknown> {
   const reference_image_url = await ensurePublicUrl(referenceImage);
   return callFal('fal-ai/bytedance/seedance/v1/lite/reference-to-video', { reference_image_url, ...options });
 }
 
-export async function imageToImage(image: File | string, prompt: string, options: any = {}): Promise<any> {
+export async function imageToImage(image: File | string, prompt: string, options: PlainObject = {}): Promise<unknown> {
   const image_urls = [await ensurePublicUrl(image)];
   return callFal('fal-ai/nano-banana/edit', { image_urls, prompt, ...options });
 }
 
-export async function imageEdit(image: File | string, instruction: string, options: any = {}): Promise<any> {
+export async function imageEdit(image: File | string, instruction: string, options: PlainObject = {}): Promise<unknown> {
   const image_urls = [await ensurePublicUrl(image)];
   return callFal('fal-ai/nano-banana/edit', { image_urls, prompt: instruction, ...options });
 }
 
 // Multiple image editing using Nano Banana
-export async function multiImageEdit(images: Array<File | string>, prompt: string, options: any = {}): Promise<any> {
+export async function multiImageEdit(images: Array<File | string>, prompt: string, options: PlainObject = {}): Promise<unknown> {
   const image_urls: string[] = [];
   for (const img of images) image_urls.push(await ensurePublicUrl(img));
   return callFal('fal-ai/nano-banana/edit', { image_urls, prompt, ...options });
 }
 
-export async function textToVideo(prompt: string, options: any = {}): Promise<any> {
+export async function textToVideo(prompt: string, options: PlainObject = {}): Promise<unknown> {
   return callFal('fal-ai/wan/v2.2-5b/text-to-video/fast-wan', { prompt, ...options });
 }
 
-export async function videoToVideo(video: File | string, options: any = {}): Promise<any> {
+export async function videoToVideo(video: File | string, options: PlainObject = {}): Promise<unknown> {
   const video_url = await ensurePublicUrl(video);
   return callFal('fal-ai/wan/v2.2-a14b/video-to-video', { video_url, ...options });
 }
 
-export async function audioToVideoAvatar(avatar: string, audio: File | string, options: any = {}): Promise<any> {
+export async function audioToVideoAvatar(avatar: string, audio: File | string, options: PlainObject = {}): Promise<unknown> {
   const url = await ensurePublicUrl(audio);
   return callFal('argil/avatars/audio-to-video', { avatar, audio_url: { url }, ...options });
 }
 
-export async function textToSpeechMultilingual(text: string, options: any = {}): Promise<any> {
+export async function textToSpeechMultilingual(text: string, options: PlainObject = {}): Promise<unknown> {
   return callFal('fal-ai/chatterbox/text-to-speech/multilingual', { text, ...options });
 }
 
-export async function speechToSpeech(audio: File | string, options: any = {}): Promise<any> {
+export async function speechToSpeech(audio: File | string, options: PlainObject = {}): Promise<unknown> {
   const source_audio_url = await ensurePublicUrl(audio);
   return callFal('fal-ai/chatterbox/speech-to-speech', { source_audio_url, ...options });
 }
 
-export async function soundEffects(prompt: string, options: any = {}): Promise<any> {
+export async function soundEffects(prompt: string, options: PlainObject = {}): Promise<unknown> {
   return callFal('fal-ai/elevenlabs/sound-effects/v2', { prompt, ...options });
 }
 
-export async function videoToAudio(video: File | string, options: any = {}): Promise<any> {
+export async function videoToAudio(video: File | string, options: PlainObject = {}): Promise<unknown> {
   const video_url = await ensurePublicUrl(video);
   return callFal('mirelo-ai/sfx-v1/video-to-audio', { video_url, ...options });
 }
 
-export async function videoFoley(video: File | string, options: any = {}): Promise<any> {
+export async function videoFoley(video: File | string, options: PlainObject = {}): Promise<unknown> {
   const video_url = await ensurePublicUrl(video);
   return callFal('fal-ai/hunyuan-video-foley', { video_url, ...options });
 }
 
-export async function imageTo3D(image: File | string, options: any = {}): Promise<any> {
+export async function imageTo3D(image: File | string, options: PlainObject = {}): Promise<unknown> {
   const image_url = await ensurePublicUrl(image);
   return callFal('tripo3d/tripo/v2.5/image-to-3d', { image_url, ...options });
 }
 
-export async function multiviewTo3D(images: Array<File | string>, options: any = {}): Promise<any> {
+export async function multiviewTo3D(images: Array<File | string>, options: PlainObject = {}): Promise<unknown> {
   const image_urls: string[] = [];
   for (const img of images) image_urls.push(await ensurePublicUrl(img));
   return callFal('tripo3d/tripo/v2.5/multiview-to-3d', { image_urls, ...options });
 }
-§appsÅ°dá©app-storeÅ°dÅ©index.tsxÅ°fÅ°c≈ìimport { useEffect, useMemo, useState } from 'react'
+§appsÅ°dá©app-storeÅ°dÅ©index.tsxÅ°fÅ°c≈©import { useEffect, useMemo, useState } from 'react'
 
 type AppRecord = {
   _id: string;
@@ -2923,9 +3007,9 @@ export default function AppStore() {
         const data = await fetchJSON<{ apps: AppRecord[] }>(`/api/store/apps`)
         if (!mounted) return
         setApps(data.apps || [])
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!mounted) return
-        setError(e?.message || 'Failed to load')
+        setError(e instanceof Error ? e.message : 'Failed to load')
       } finally {
         if (mounted) setLoading(false)
       }
@@ -2979,7 +3063,6 @@ export default function AppStore() {
     </div>
   )
 }
-
 
 ¶finderÅ°dÅ©index.tsxÅ°fÅ°c≈import React from 'react'
 export default function Finder(){
@@ -3079,7 +3162,7 @@ export default function Terminal(){
     </div>
   )
 }
-•visitÅ°dÅ©index.tsxÅ°fÅ°c≈üimport { useEffect, useMemo, useState } from 'react'
+•visitÅ°dÅ©index.tsxÅ°fÅ°c≈µimport { useEffect, useMemo, useState } from 'react'
 
 type DesktopRecord = {
   _id: string;
@@ -3107,9 +3190,9 @@ export default function Visit() {
         const data = await fetchJSON<{ desktops: DesktopRecord[] }>(`/api/visit/desktops`)
         if (!mounted) return
         setDesktops(data.desktops || [])
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!mounted) return
-        setError(e?.message || 'Failed to load')
+        setError(e instanceof Error ? e.message : 'Failed to load')
       } finally {
         if (mounted) setLoading(false)
       }
@@ -3156,7 +3239,6 @@ export default function Visit() {
     </div>
   )
 }
-
 
 ¶assetsÅ°dÅ©react.svgÅ°fÅ°c≈<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>™componentsÅ°dÅ¢uiÅ°dà©badge.tsxÅ°fÅ°c≈timport * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -3780,7 +3862,7 @@ const Textarea = React.forwardRef<
 Textarea.displayName = "Textarea"
 
 export { Textarea }
-ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈‡Äimport React, { useEffect, useRef, useState } from 'react'
+ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈‡ªimport React, { useEffect, useRef, useState } from 'react'
 
 // Shared constants
 const DEFAULT_WINDOW_POS = { left: 90, top: 90 }
@@ -3890,6 +3972,22 @@ function resolveAppGeometry(app: App): Geometry{
 }
 
 // (removed unused resolveInitialGeometry)
+
+function setBodyUserSelect(value: string){
+  if (typeof document === 'undefined') return
+  const { body } = document
+  if (!body) return
+  try {
+    body.style.userSelect = value
+    if (value){
+      body.style.setProperty('-webkit-user-select', value)
+    } else {
+      body.style.removeProperty('-webkit-user-select')
+    }
+  } catch {
+    // ignore style failures
+  }
+}
 
 function determineDialOption(dx: number, dy: number, distance: number, hasWindow: boolean): DialOption | null {
   if (distance < DIAL_THRESHOLD) return null
@@ -4145,8 +4243,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
         clearSelectionEverywhere()
         try{ rootRef.current?.classList.remove('resizing') } catch {}
         try{ document.body.classList.remove('desktop-resizing') } catch {}
-        try{ document.body.style.userSelect = '' } catch {}
-        try{ (document.body.style as any).webkitUserSelect = '' } catch {}
+        setBodyUserSelect('')
         try{ document.body.style.cursor = '' } catch {}
       }
       draggingRef.current.active = false; draggingRef.current.type = null
@@ -4176,8 +4273,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
     }
     try{ rootRef.current?.classList.add('resizing') } catch {}
     try{ document.body.classList.add('desktop-resizing') } catch {}
-    try{ document.body.style.userSelect = 'none' } catch {}
-    try{ (document.body.style as any).webkitUserSelect = 'none' } catch {}
+    setBodyUserSelect('none')
     try{ document.body.style.cursor = 'grabbing' } catch {}
     // Avoid costly selection updates during drag; clear once at start
     clearSelectionEverywhere()
@@ -4203,8 +4299,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
       }
       try{ rootRef.current?.classList.add('resizing') } catch {}
       try{ document.body.classList.add('desktop-resizing') } catch {}
-      try{ document.body.style.userSelect = 'none' } catch {}
-      try{ (document.body.style as any).webkitUserSelect = 'none' } catch {}
+      setBodyUserSelect('none')
       try{
         const map: Record<string,string> = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' }
         document.body.style.cursor = map[handle] || 'nwse-resize'
@@ -5481,12 +5576,12 @@ export function createRoot(mountEl, Comp, name){
 }
 
 
-Øiframe-root.tsxÅ°fÅ°c≈import React, { StrictMode, Component, ReactNode } from 'react'
+Øiframe-root.tsxÅ°fÅ°c≈Dimport React, { StrictMode, Component, ComponentType, ErrorInfo, ReactNode } from 'react'
 import { createRoot as createReactRoot } from 'react-dom/client'
 
 interface ErrorBoundaryProps {
   name?: string;
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 interface ErrorBoundaryState {
@@ -5501,7 +5596,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   static getDerivedStateFromError(error: Error): ErrorBoundaryState{
     return { error }
   }
-  componentDidCatch(error: Error, info: any){
+  componentDidCatch(error: Error, info: ErrorInfo){
     try{ console.error('[App iframe] render error:', error, info) } catch{}
   }
   render(){
@@ -5523,7 +5618,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-export function createRoot(mountEl: HTMLElement, Comp: any, name?: string){
+export function createRoot(mountEl: HTMLElement, Comp: ComponentType | null | undefined, name?: string){
   const root = createReactRoot(mountEl)
   function Wrapper(){
     if (!Comp) return React.createElement('div', null, `Missing component: ${name || 'App'}`)
@@ -5538,7 +5633,6 @@ export function createRoot(mountEl: HTMLElement, Comp: any, name?: string){
   )
   return root
 }
-
 
 ©index.cssÅ°fÅ°c≈ö:root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -5614,11 +5708,17 @@ import { twMerge } from "tailwind-merge"
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
-®main.tsxÅ°fÅ°c≈’import { StrictMode } from 'react'
+®main.tsxÅ°fÅ°c≈Gimport { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import Desktop from './desktop/Desktop'
 import './desktop/styles.css'
 import './tailwind.css'
+
+type ViteHotEvent = 'vite:beforeUpdate' | 'vite:afterUpdate' | 'full-reload'
+
+type ViteHot = {
+  on(event: ViteHotEvent, callback: () => void): void
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -5627,7 +5727,8 @@ createRoot(document.getElementById('root')!).render(
 )
 
 // Lightweight HMR anti-flash mask
-if (import.meta && (import.meta as any).hot) {
+const hot = (import.meta as ImportMeta & { hot?: ViteHot }).hot
+if (hot) {
   try {
     const maskId = 'vite-hmr-mask'
     let mask = document.getElementById(maskId)
@@ -5643,14 +5744,14 @@ if (import.meta && (import.meta as any).hot) {
     const show = () => { ensureMask().classList.add('active') }
     const hideSoon = () => { setTimeout(() => ensureMask().classList.remove('active'), 120) }
 
-    ;(import.meta as any).hot.on('vite:beforeUpdate', () => {
+    hot.on('vite:beforeUpdate', () => {
       // HMR update incoming; briefly mask
       show()
     })
-    ;(import.meta as any).hot.on('vite:afterUpdate', () => {
+    hot.on('vite:afterUpdate', () => {
       hideSoon()
     })
-    ;(import.meta as any).hot.on('full-reload', () => {
+    hot.on('full-reload', () => {
       // Mask until the new page paints; keep active, browser reload will clear
       show()
     })
