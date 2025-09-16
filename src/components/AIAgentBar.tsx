@@ -31,6 +31,13 @@ type OptimisticChatMessage = {
   metadata?: { optimistic: true; optimisticAttachments?: Attachment[] };
 };
 
+type AppRegistryEntry = {
+  id: string;
+  name: string;
+  icon?: string;
+  path: string;
+};
+
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'compact' | 'chat' | 'visit' | 'media' | 'friends'>('chat');
@@ -141,7 +148,8 @@ export default function AIAgentBar() {
   const undoStackRef = useRef<Uint8Array[]>([]);
   const prevStatusRef = useRef<string>('ready');
   const hmrGateActiveRef = useRef<boolean>(false);
-  
+  const registryBeforeRunRef = useRef<AppRegistryEntry[] | null>(null);
+
   const { runValidation } = useValidationDiagnostics({
     spawn: (cmd, args, opts) => fnsRef.current.spawn(cmd, args, opts),
     sendMessage: (content) => sendMessageRef.current(content),
@@ -240,15 +248,43 @@ export default function AIAgentBar() {
     const now = status;
     const started = (prev === 'ready') && (now === 'submitted' || now === 'streaming');
     const finished = (prev === 'submitted' || prev === 'streaming') && now === 'ready';
+    const readRegistry = async (): Promise<AppRegistryEntry[] | null> => {
+      try {
+        const raw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+          .filter((entry: any): entry is AppRegistryEntry => (
+            entry && typeof entry.id === 'string' && typeof entry.path === 'string'
+          ))
+          .map((entry: AppRegistryEntry) => ({
+            id: entry.id,
+            name: typeof entry.name === 'string' ? entry.name : entry.id,
+            icon: typeof entry.icon === 'string' ? entry.icon : undefined,
+            path: entry.path,
+          }));
+      } catch (error) {
+        console.warn('[AGENT] Failed to read app registry snapshot', error);
+        return null;
+      }
+    };
     // Reset first-tool-call gate at run start so subsequent runs can pause HMR again
     if (started) {
       try {
         const ref: any = (window as any).__FYOS_FIRST_TOOL_CALLED_REF;
         if (ref && typeof ref === 'object') ref.current = false;
       } catch {}
+      registryBeforeRunRef.current = null;
+      (async () => {
+        const snapshot = await readRegistry();
+        if (snapshot) {
+          registryBeforeRunRef.current = snapshot;
+        }
+      })();
     }
     // Signal run end only if we actually paused during this run
-    if (finished && hmrGateActiveRef.current) {
+    const runFinishedWithGate = finished && hmrGateActiveRef.current;
+    if (runFinishedWithGate) {
       try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
       hmrGateActiveRef.current = false;
       agentActiveRef.current = false;
@@ -265,6 +301,27 @@ export default function AIAgentBar() {
           console.warn('[UNDO] Snapshot after run failed', e);
         }
       })();
+    }
+    if (runFinishedWithGate) {
+      (async () => {
+        const previous = registryBeforeRunRef.current;
+        registryBeforeRunRef.current = null;
+        if (!previous) return;
+        const latest = await readRegistry();
+        if (!latest || latest.length === 0) return;
+        const previousIds = new Set(previous.map((entry) => entry.id));
+        const newEntries = latest.filter((entry) => !previousIds.has(entry.id));
+        if (newEntries.length === 0) return;
+        const targetApp = newEntries[newEntries.length - 1];
+        if (!targetApp || typeof targetApp.id !== 'string' || typeof targetApp.path !== 'string') return;
+        try {
+          window.postMessage({ type: 'FYOS_OPEN_APP', app: targetApp, source: 'agent-auto-open' }, '*');
+        } catch (error) {
+          console.warn('[AGENT] Failed to auto-open created app', error);
+        }
+      })();
+    } else if (finished) {
+      registryBeforeRunRef.current = null;
     }
     prevStatusRef.current = now;
   }, [status]);
