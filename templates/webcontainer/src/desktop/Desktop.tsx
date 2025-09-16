@@ -710,7 +710,6 @@ export default function Desktop(){
   const [windowGeometries, setWindowGeometries] = useState<Record<string,{left:number;top:number;width:number;height:number}>>({})
   const windowGeometriesRef = useRef(windowGeometries)
   useEffect(() => { windowGeometriesRef.current = windowGeometries }, [windowGeometries])
-  const windowGeometriesRef = useRef(windowGeometries)
   const dragIconRef = useRef<{
     id: string | null
     startX: number

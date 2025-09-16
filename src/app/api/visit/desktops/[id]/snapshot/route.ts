@@ -25,12 +25,13 @@ async function getClient() {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const client = await getClient();
-    const id = params.id as Id<'desktops_public'>; // Validated by Convex schema
-    const signedUrl = await client.query(api.desktops.getDesktopSnapshotUrl, { id });
+    const { id } = await params;
+    const typedId = id as Id<'desktops_public'>; // Validated by Convex schema
+    const signedUrl = await client.query(api.desktops.getDesktopSnapshotUrl, { id: typedId });
     const resp = await fetch(signedUrl, { cache: 'no-store' });
     if (!resp.ok || !resp.body) {
       return NextResponse.json({ error: "Upstream fetch failed" }, { status: 502 });
@@ -51,4 +52,3 @@ export async function GET(
     );
   }
 }
-

@@ -49,6 +49,13 @@ Total errors: 0
 - templates/webcontainer/src/desktop/Desktop.tsx — stabilized message bridge effect
 - templates/webcontainer/postcss.config.js — exported named config constant
 - templates/webcontainer/tailwind.config.js — exported named config constant
+- src/apps/media/index.tsx — upgraded to next/image for lint compliance
+- templates/webcontainer/src/components/ui/dropdown-menu.tsx — installed missing @radix-ui/react-dropdown-menu dependency
+- templates/webcontainer/src/components/ui/select.tsx — installed missing @radix-ui/react-select dependency after build failure
+- templates/webcontainer/src/desktop/Desktop.tsx — removed duplicate `windowGeometriesRef` declaration
 
 ## Active warnings
-- src/apps/media/index.tsx — replace `<img>` with `next/image` for Next.js lint
+- None 🎉
+
+## Outstanding build issues
+- None 🎯

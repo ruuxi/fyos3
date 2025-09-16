@@ -1,4 +1,5 @@
 import React from 'react'
+import Image from 'next/image'
 import { useAuth } from '@clerk/nextjs'
 
 type MediaItem = {
@@ -87,7 +88,15 @@ export default function App(){
               <div className="text-xs text-gray-500">{new Date(m.createdAt).toLocaleString()} • {formatBytes(m.size)}</div>
               <div className="mt-2">
                 {m.contentType.startsWith('image/') && (
-                  <img src={m.publicUrl || ''} alt={m.r2Key} className="w-full h-auto rounded" />
+                  <div className="relative w-full overflow-hidden rounded" style={{ aspectRatio: '4 / 3' }}>
+                    <Image
+                      src={m.publicUrl || ''}
+                      alt={m.r2Key}
+                      fill
+                      className="object-cover"
+                      sizes="(min-width: 768px) 33vw, 100vw"
+                    />
+                  </div>
                 )}
                 {m.contentType.startsWith('audio/') && (
                   <audio controls src={m.publicUrl || ''} className="w-full" />

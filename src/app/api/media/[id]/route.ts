@@ -16,9 +16,9 @@ async function getClient() {
   return client;
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = params.id;
+    const { id } = await params;
     const client = await getClient();
     const items = await client.query(convexApi.media.listMedia, { limit: 500 });
     const list = Array.isArray(items) ? items : [];
@@ -35,4 +35,3 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
