@@ -348,9 +348,6 @@ export default function MessagesPane(props: MessagesPaneProps) {
             if (mode !== 'agent') {
               return textNodes;
             }
-            if (agentActive) {
-              return <AgentVerbCarousel />;
-            }
             if (translatorMeta?.state === 'done' && Array.isArray(translatorMeta.outputs) && translatorMeta.outputs.length > 0) {
               return translatorMeta.outputs.map((text, index) => (
                 <span key={`translated-${index}`}>{text}</span>
@@ -362,6 +359,12 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   Translator glitched. Original reply stashed off-screen.
                 </span>
               );
+            }
+            if (translatorMeta?.state === 'done') {
+              return textNodes;
+            }
+            if (agentActive || translatorMeta?.state === 'translating') {
+              return <AgentVerbCarousel />;
             }
             return <AgentVerbCarousel />;
           })();
