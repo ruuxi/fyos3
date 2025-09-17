@@ -1,88 +1,32 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Search, Undo2 } from 'lucide-react';
 import { useWebContainer } from './WebContainerProvider';
 import { useScreens } from './ScreensProvider';
 import { formatBytes } from '@/lib/agent/agentUtils';
-import { useThreads } from '@/components/agent/AIAgentBar/hooks/useThreads';
-import { useMediaLibrary } from '@/components/agent/AIAgentBar/hooks/useMediaLibrary';
-import { useGlobalDrop } from '@/components/agent/AIAgentBar/hooks/useGlobalDrop';
 import { useScrollSizing } from '@/components/agent/AIAgentBar/hooks/useScrollSizing';
-import { useValidationDiagnostics } from '@/components/agent/AIAgentBar/hooks/useValidationDiagnostics';
-import { useFriends } from '@/components/agent/AIAgentBar/hooks/useFriends';
-import { useGroupChats } from '@/components/agent/AIAgentBar/hooks/useGroupChats';
-import { useAgentChat } from '@/components/agent/AIAgentBar/hooks/useAgentChat';
+import { useSocialPanelState } from '@/components/agent/AIAgentBar/hooks/useSocialPanelState';
+import { useDesktopUndo } from '@/components/agent/AIAgentBar/hooks/useDesktopUndo';
+import { useAgentController } from '@/components/agent/AIAgentBar/hooks/useAgentController';
+import { useMediaController } from '@/components/agent/AIAgentBar/hooks/useMediaController';
 import AgentBarShell from '@/components/agent/AIAgentBar/ui/AgentBarShell';
 import Toolbar from '@/components/agent/AIAgentBar/ui/Toolbar';
 import ChatTabs from '@/components/agent/AIAgentBar/ui/ChatTabs';
 import MessagesPane from '@/components/agent/AIAgentBar/ui/MessagesPane';
-import ChatComposer, { type Attachment } from '@/components/agent/AIAgentBar/ui/ChatComposer';
+import ChatComposer from '@/components/agent/AIAgentBar/ui/ChatComposer';
 import MediaPane from '@/components/agent/AIAgentBar/ui/MediaPane';
 import AddFriendForm from '@/components/agent/AIAgentBar/ui/AddFriendForm';
 import FriendMessagesPane from '@/components/agent/AIAgentBar/ui/FriendMessagesPane';
 import GroupMessagesPane from '@/components/agent/AIAgentBar/ui/GroupMessagesPane';
 import { buildDesktopSnapshot, restoreDesktopSnapshot } from '@/utils/desktop-snapshot';
-import type { UIMessage } from 'ai';
+import { getMutableWindow } from '@/components/agent/AIAgentBar/utils/window';
 import type { Doc } from '../../convex/_generated/dataModel';
-
-type OptimisticChatMessage = {
-  id: string;
-  role: 'user';
-  parts: Array<{ type: 'text'; text: string }>;
-  metadata?: { optimistic: true; optimisticAttachments?: Attachment[] };
-};
-
-type AppRegistryEntry = {
-  id: string;
-  name: string;
-  icon?: string;
-  path: string;
-};
-
-type MutableWindow = Window & {
-  __FYOS_FIRST_TOOL_CALLED_REF?: { current: boolean };
-  __FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL?: number;
-};
-
-type SocialView =
-  | { kind: 'settings' }
-  | { kind: 'dm'; peerId: string }
-  | { kind: 'group'; groupId: string }
-  | { kind: 'auto' };
-
-type ChatListItem = {
-  key: string;
-  kind: 'dm' | 'group' | 'auto';
-  label: string;
-  description?: string;
-  lastActivity: number;
-  peerId?: string;
-  groupId?: string;
-};
-
-const getMutableWindow = (): MutableWindow | null => {
-  if (typeof window === 'undefined') return null;
-  return window as MutableWindow;
-};
 
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'compact' | 'chat' | 'visit' | 'media' | 'friends'>('chat');
   const [leftPane, setLeftPane] = useState<'agent' | 'friend'>('agent');
-  const [socialView, setSocialView] = useState<SocialView>({ kind: 'settings' });
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const [ingestUrl, setIngestUrl] = useState('');
-  const [showThreadHistory, setShowThreadHistory] = useState<boolean>(false);
-  const [didAnimateWelcome, setDidAnimateWelcome] = useState(false);
-  const [bubbleAnimatingIds, setBubbleAnimatingIds] = useState<Set<string>>(new Set());
-  const [lastSentAttachments, setLastSentAttachments] = useState<Attachment[] | null>(null);
-  const [optimisticMessages, setOptimisticMessages] = useState<OptimisticChatMessage[]>([]);
-  const skipOptimisticClearRef = useRef(false);
-  // Undo stack depth for UI invalidation
-  const [undoDepth, setUndoDepth] = useState<number>(0);
-  const [agentActive, setAgentActive] = useState<boolean>(false);
-  const seenMessageIdsRef = useRef<Set<string>>(new Set());
   
   const { goTo, activeIndex } = useScreens();
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
@@ -91,33 +35,6 @@ export default function AIAgentBar() {
   const [desktopsListing, setDesktopsListing] = useState<Array<{ _id: string; title: string; description?: string; icon?: string }>>([]);
   const [desktopsLoading, setDesktopsLoading] = useState(false);
   const [desktopsError, setDesktopsError] = useState<string | null>(null);
-
-  // Phase 2 hooks
-  const {
-    openThreads,
-    historyThreads,
-    threadsLoading,
-    threadsError,
-    activeThreadId,
-    setActiveThreadId,
-    initialChatMessages,
-    chatSessionKey,
-    refreshThreads,
-    startBlankThread,
-    ensureActiveThread,
-    closeThread,
-    isAuthenticated: isChatAuthenticated,
-  } = useThreads();
-
-  const activeThreadIdImmediateRef = useRef<string | null>(activeThreadId);
-  useEffect(() => { activeThreadIdImmediateRef.current = activeThreadId; }, [activeThreadId]);
-  useEffect(() => {
-    if (skipOptimisticClearRef.current) {
-      skipOptimisticClearRef.current = false;
-      return;
-    }
-    setOptimisticMessages([]);
-  }, [activeThreadId]);
 
   const {
     mediaItems,
@@ -128,13 +45,61 @@ export default function AIAgentBar() {
     attachments,
     setAttachments,
     loadMedia,
-    uploadFiles,
-    ingestFromUrl,
     busyFlags,
     projectAttachmentsToDurable,
-  } = useMediaLibrary();
+    dragOverlay,
+    ingestUrl,
+    setIngestUrl,
+    handleUploadFiles,
+    handleIngestFromUrl,
+    removeAttachment,
+  } = useMediaController({ setMode });
 
   const { messagesContainerRef, messagesInnerRef, containerHeight, forceFollow } = useScrollSizing(mode === 'friends' ? 'chat' : mode);
+
+  const enterFriendsView = useCallback(() => {
+    setLeftPane('friend');
+    setMode('friends');
+  }, [setLeftPane, setMode]);
+
+  const clearSocialInput = useCallback(() => {
+    setInput('');
+  }, [setInput]);
+
+  const {
+    socialView,
+    chatItems,
+    activeChatKey,
+    socialComposerStatus,
+    openFriendsSettings,
+    openDmChat,
+    openGroupChat,
+    openAutoChat,
+    handleSocialSubmit,
+    handleJoinAutoRoom,
+    handleLeaveAutoRoom,
+    showCreateGroupForm,
+    setShowCreateGroupForm,
+    newGroupName,
+    setNewGroupName,
+    newGroupMemberIds,
+    toggleNewGroupMember,
+    resetGroupForm,
+    handleCreateGroup,
+    groupFormBusy,
+    friendsState,
+    groupState,
+    myUserId,
+    meDisplayName,
+    activePeerLabel,
+    activeGroupSummary,
+    autoRoomMembers,
+    autoRoomMessages,
+  } = useSocialPanelState({
+    input,
+    clearInput: clearSocialInput,
+    enterFriendsView,
+  });
 
   // Keep latest instance and fs helpers in refs so tool callbacks don't capture stale closures
   const instanceRef = useRef(instance);
@@ -143,521 +108,113 @@ export default function AIAgentBar() {
   useEffect(() => { instanceRef.current = instance; }, [instance]);
   useEffect(() => { baseFnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
 
-  // Track whether the agent mutated the filesystem during a run
-  const fsChangedRef = useRef<boolean>(false);
-  const markFsChanged = () => { fsChangedRef.current = true; };
+  const agent = useAgentController({
+    input,
+    setInput,
+    attachments,
+    setAttachments,
+    forceFollow,
+    projectAttachmentsToDurable,
+    busyUpload: !!busyFlags.uploadBusy,
+    loadMedia,
+    instanceRef,
+    fnsRef,
+  });
 
-  // Install tracked wrappers so agent tool calls can flip fsChangedRef when mutating
+  const {
+    openThreads,
+    historyThreads,
+    threadsLoading,
+    threadsError,
+    activeThreadId,
+    setActiveThreadId,
+    refreshThreads,
+    startBlankThread,
+    closeThread,
+    showThreadHistory,
+    setShowThreadHistory,
+    activeThreadIdImmediateRef,
+  } = agent.threads;
+
+  const {
+    messages: agentMessages,
+    optimisticMessages: agentOptimisticMessages,
+    status: agentStatus,
+    stop: stopAgent,
+    agentActive,
+    didAnimateWelcome,
+    setDidAnimateWelcome,
+    bubbleAnimatingIds,
+    lastSentAttachments,
+  } = agent.chat;
+
+  const {
+    undoDepth,
+    markFsChanged,
+    restorePreviousSnapshot,
+  } = useDesktopUndo({
+    instance,
+    instanceRef,
+    status: agent.chat.status,
+    buildSnapshot: buildDesktopSnapshot,
+    restoreSnapshot: restoreDesktopSnapshot,
+  });
+
   useEffect(() => {
     const base = baseFnsRef.current;
     const tracked = {
       mkdir: base.mkdir,
-      writeFile: async (path: string, content: string) => { markFsChanged(); return base.writeFile(path, content); },
+      writeFile: async (path: string, content: string) => {
+        markFsChanged();
+        return base.writeFile(path, content);
+      },
       readFile: base.readFile,
       readdirRecursive: base.readdirRecursive,
-      remove: async (path: string, opts?: { recursive?: boolean }) => { markFsChanged(); return base.remove(path, opts); },
+      remove: async (path: string, opts?: { recursive?: boolean }) => {
+        markFsChanged();
+        return base.remove(path, opts);
+      },
       spawn: async (command: string, args: string[] = [], opts?: { cwd?: string }) => {
         const cmdLower = (command || '').toLowerCase();
         const firstArg = (args[0] || '').toLowerCase();
         const isPkgMgr = /^(pnpm|npm|yarn|bun)$/.test(cmdLower);
         const isInstallLike = /^(add|install|update|remove|uninstall|i)$/i.test(firstArg);
-        if (isPkgMgr && isInstallLike) { markFsChanged(); }
+        if (isPkgMgr && isInstallLike) {
+          markFsChanged();
+        }
         return base.spawn(command, args, opts);
       },
     } as typeof fnsRef.current;
     fnsRef.current = tracked;
-  }, [undoDepth]);
+  }, [markFsChanged, mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
 
-  const statusRef = useRef<string>('ready');
-  const sendMessageRef = useRef<(content: string) => Promise<void>>(async () => {});
-  const attachmentsRef = useRef(attachments);
-  useEffect(() => { attachmentsRef.current = attachments; }, [attachments]);
-  const pendingAttachmentsRef = useRef<Attachment[] | null>(null);
-  const uploadBusyRef = useRef<boolean>(false);
-  useEffect(() => { uploadBusyRef.current = !!busyFlags.uploadBusy; }, [busyFlags.uploadBusy]);
-  const undoStackRef = useRef<Uint8Array[]>([]);
-  const prevStatusRef = useRef<string>('ready');
-  const hmrGateActiveRef = useRef<boolean>(false);
-  const registryBeforeRunRef = useRef<AppRegistryEntry[] | null>(null);
 
-  const { runValidation } = useValidationDiagnostics({
-    spawn: (cmd, args, opts) => fnsRef.current.spawn(cmd, args, opts),
-    sendMessage: (content) => sendMessageRef.current(content),
-    getStatus: () => statusRef.current,
-  });
-
-  const agentActiveRef = useRef<boolean>(false);
-
-  const { messages, sendMessage: sendMessageRaw, status, stop } = useAgentChat({
-    id: chatSessionKey,
-    initialMessages: initialChatMessages,
-    activeThreadId,
-    getActiveThreadId: () => activeThreadIdImmediateRef.current,
-    wc: { instanceRef, fnsRef },
-    media: { loadMedia },
-    runValidation,
-    attachmentsProvider: () => (pendingAttachmentsRef.current || attachmentsRef.current || []),
-    onFirstToolCall: () => {
-      hmrGateActiveRef.current = true;
-      try { window.postMessage({ type: 'FYOS_AGENT_RUN_STARTED' }, '*'); } catch {}
-      agentActiveRef.current = true;
-      setAgentActive(true);
-    },
-    onToolProgress: (_toolName: string) => {
-      // Tool progress callback
-    },
-  });
-
-  useEffect(() => {
-    if (optimisticMessages.length === 0) return;
-
-    const isTextPart = (part: unknown): part is { type: 'text'; text?: string } => {
-      return Boolean(
-        part &&
-        typeof part === 'object' &&
-        'type' in (part as { type?: unknown }) &&
-        (part as { type?: unknown }).type === 'text'
-      );
-    };
-
-    const extractText = (message: UIMessage | OptimisticChatMessage | undefined): string => {
-      if (!message) return '';
-      if ('parts' in message && Array.isArray((message as { parts?: unknown[] }).parts)) {
-        const parts = (message as { parts?: unknown[] }).parts ?? [];
-        return parts
-          .filter(isTextPart)
-          .map((part) => (part.text ?? ''))
-          .join('');
-      }
-      if ('content' in message && typeof message.content === 'string') {
-        return message.content;
-      }
-      return '';
-    };
-
-    const metadataHasOptimistic = (metadata: unknown): boolean => {
-      return Boolean(metadata && typeof metadata === 'object' && (metadata as { optimistic?: unknown }).optimistic === true);
-    };
-
-    const realUserMessages = (messages ?? []).filter((msg) => msg.role === 'user' && !metadataHasOptimistic(msg.metadata));
-    if (realUserMessages.length === 0) return;
-    const latestReal = realUserMessages[realUserMessages.length - 1];
-    const latestText = extractText(latestReal).trim();
-    if (!latestText) return;
-
-    setOptimisticMessages((prev) => {
-      const filtered = prev.filter((opt) => {
-        const targetText = (opt.parts?.[0]?.text ?? '').trim();
-        if (!targetText) return false;
-        return !latestText.startsWith(targetText);
-      });
-      return filtered.length === prev.length ? prev : filtered;
-    });
-  }, [messages, optimisticMessages.length]);
-
-  // Friends hook
-  const {
-    isAuthenticated: isAuthed,
-    me,
-    setNickname,
-    friends,
-    friendsLoading,
-    friendsError,
-    addFriend,
-    activePeerId: _activePeerId,
-    setActivePeerId,
-    dmMessages,
-    sendDmToPeer,
-    dmThreads,
-  } = useFriends();
-
-  const {
-    isAuthenticated: isGroupAuthed,
-    groups,
-    groupsLoading,
-    activeGroupId,
-    setActiveGroupId,
-    groupMembers,
-    groupMessages,
-    createGroup,
-    leaveGroup,
-    sendGroupMessage,
-    autoRoom,
-    claimAutoRoom,
-    leaveAutoRoom,
-    sendAutoMessage,
-  } = useGroupChats();
-
-  const [showCreateGroupForm, setShowCreateGroupForm] = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupMemberIds, setNewGroupMemberIds] = useState<string[]>([]);
-  const [groupFormBusy, setGroupFormBusy] = useState(false);
-
-  const activeGroupSummary = useMemo(() => {
-    if (!activeGroupId) return null;
-    return groups.find((g) => g.id === activeGroupId) ?? null;
-  }, [groups, activeGroupId]);
-
-  const autoRoomMembers = autoRoom?.members ?? [];
-  const autoRoomMessages = (autoRoom?.messages ?? []).map((message) => ({
-    ...message,
-    chatId: String(message.chatId),
-  }));
-
-  const friendsById = useMemo(() => {
-    const map = new Map<string, (typeof friends)[number]>();
-    friends.forEach((friend) => {
-      map.set(friend.ownerId, friend);
-    });
-    return map;
-  }, [friends]);
-
-  const dmThreadByPeer = useMemo(() => {
-    const map = new Map<string, (typeof dmThreads)[number]>();
-    dmThreads.forEach((thread) => { map.set(thread.peerId, thread); });
-    return map;
-  }, [dmThreads]);
-
-  const chatItems = useMemo<ChatListItem[]>(() => {
-    const items: ChatListItem[] = [];
-    for (const thread of dmThreads) {
-      const friendProfile = friendsById.get(thread.peerId);
-      const label = friendProfile?.nickname
-        || thread.peerNickname
-        || friendProfile?.email
-        || thread.peerEmail
-        || thread.peerId.slice(0, 8);
-      const snippet = thread.lastMessageContent ? thread.lastMessageContent.trim() : '';
-      items.push({
-        key: `dm-${thread.peerId}`,
-        kind: 'dm',
-        label,
-        description: snippet ? (snippet.length > 60 ? `${snippet.slice(0, 57)}…` : snippet) : undefined,
-        lastActivity: thread.lastMessageAt ?? 0,
-        peerId: thread.peerId,
-      });
-    }
-
-    for (const group of groups) {
-      items.push({
-        key: `group-${group.id}`,
-        kind: 'group',
-        label: group.name,
-        description: `${group.memberCount} members`,
-        lastActivity: group.updatedAt ?? group.createdAt ?? 0,
-        groupId: group.id,
-      });
-    }
-
-    if (autoRoom?.chat) {
-      const autoId = String(autoRoom.chat._id);
-      items.push({
-        key: `auto-${autoId}`,
-        kind: 'auto',
-        label: autoRoom.chat.name,
-        description: `${autoRoomMembers.length} people`,
-        lastActivity: autoRoom.chat.updatedAt ?? autoRoom.chat.createdAt ?? 0,
-      });
-    }
-
-    items.sort((a, b) => b.lastActivity - a.lastActivity);
-    return items;
-  }, [dmThreads, friendsById, groups, autoRoom, autoRoomMembers.length]);
-
-  const activeChatKey = useMemo(() => {
-    if (socialView.kind === 'dm') return `dm-${socialView.peerId}`;
-    if (socialView.kind === 'group') return `group-${socialView.groupId}`;
-    if (socialView.kind === 'auto' && autoRoom?.chat?._id) return `auto-${String(autoRoom.chat._id)}`;
-    return null;
-  }, [socialView, autoRoom?.chat?._id]);
-
-  const myUserId = me?.ownerId ?? null;
-  const meDisplayName = me?.nickname || (me ? 'Me' : 'You');
-
-  const activePeerProfile = socialView.kind === 'dm' ? friendsById.get(socialView.peerId) : undefined;
-  const activeDmThread = socialView.kind === 'dm' ? dmThreadByPeer.get(socialView.peerId) : undefined;
-  const activePeerLabel = socialView.kind === 'dm'
-    ? (activePeerProfile?.nickname
-      || activeDmThread?.peerNickname
-      || activePeerProfile?.email
-      || activeDmThread?.peerEmail
-      || socialView.peerId.slice(0, 8))
-    : undefined;
-
-  const panelCardClass = 'rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-lg shadow-[0_24px_60px_-32px_rgba(15,23,42,0.9)]';
-
-  function toggleNewGroupMember(memberId: string) {
-    setNewGroupMemberIds((prev) => {
-      if (prev.includes(memberId)) {
-        return prev.filter((id) => id !== memberId);
-      }
-      return [...prev, memberId];
-    });
-  }
-
-  async function handleCreateGroup(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newGroupName.trim()) return;
-    setGroupFormBusy(true);
+  const handleUndo = useCallback(async () => {
     try {
-      await createGroup({ name: newGroupName, memberIds: newGroupMemberIds });
-      setShowCreateGroupForm(false);
-      setNewGroupName('');
-      setNewGroupMemberIds([]);
-    } finally {
-      setGroupFormBusy(false);
-    }
-  }
-
-  function resetGroupForm() {
-    setNewGroupName('');
-    setNewGroupMemberIds([]);
-  }
-
-  function openFriendsSettings() {
-    setSocialView({ kind: 'settings' });
-    setActivePeerId(null);
-    setActiveGroupId(null);
-    setLeftPane('friend');
-    setMode('friends');
-  }
-
-  function openDmChat(peerId: string) {
-    setLeftPane('friend');
-    setMode('friends');
-    setActivePeerId(peerId);
-    setActiveGroupId(null);
-    setSocialView({ kind: 'dm', peerId });
-  }
-
-  function openGroupChat(groupId: string) {
-    setLeftPane('friend');
-    setMode('friends');
-    setActivePeerId(null);
-    setActiveGroupId(groupId);
-    setSocialView({ kind: 'group', groupId });
-  }
-
-  function openAutoChat() {
-    setLeftPane('friend');
-    setMode('friends');
-    setActivePeerId(null);
-    setActiveGroupId(null);
-    setSocialView({ kind: 'auto' });
-  }
-
-  async function handleJoinAutoRoom() {
-    const defaultName = me?.nickname ?? '';
-    const promptValue = window.prompt('Choose your name for the auto group chat', defaultName);
-    if (promptValue === null) return;
-    const nickname = (promptValue || defaultName || '').trim();
-    await claimAutoRoom({ nickname: nickname || undefined });
-    openAutoChat();
-  }
-
-  async function handleLeaveAutoRoom() {
-    await leaveAutoRoom();
-    openFriendsSettings();
-  }
-
-  const socialComposerStatus = socialView.kind === 'dm'
-    ? (socialView.peerId ? 'ready' : 'idle')
-    : socialView.kind === 'group'
-      ? (socialView.groupId ? 'ready' : 'idle')
-      : socialView.kind === 'auto'
-        ? (autoRoom?.chat ? 'ready' : 'idle')
-        : 'idle';
-
-  async function handleSocialSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text) return;
-    try {
-      if (socialView.kind === 'dm') {
-        setActivePeerId(socialView.peerId);
-        await sendDmToPeer(socialView.peerId, text);
-        setInput('');
-        return;
-      }
-      if (socialView.kind === 'group') {
-        setActiveGroupId(socialView.groupId);
-        await sendGroupMessage(socialView.groupId, text);
-        setInput('');
-        return;
-      }
-      if (socialView.kind === 'auto' && autoRoom?.chat) {
-        await sendAutoMessage(text);
-        setInput('');
+      const restored = await restorePreviousSnapshot({
+        onBeforeRestore: () => {
+          const globalWin = getMutableWindow();
+          if (globalWin) {
+            try { globalWin.__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL = Date.now() + 1500; } catch {}
+          }
+        },
+        onAfterRestore: () => {
+          setTimeout(() => {
+            const win = getMutableWindow();
+            if (win) {
+              try { win.__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL = 0; } catch {}
+            }
+          }, 1600);
+        },
+      });
+      if (!restored) {
+        const stackMessage = 'Nothing to undo — snapshot stack too shallow or WebContainer missing.';
+        console.debug?.('[UNDO] noop:', stackMessage);
       }
     } catch (error) {
-      console.warn('[friends] Failed to send message', error);
+      console.error('[UNDO] Restore failed', error);
     }
-  }
-
-  useEffect(() => { statusRef.current = status; }, [status]);
-  useEffect(() => { sendMessageRef.current = (content: string) => sendMessageRaw({ text: content }); }, [sendMessageRaw]);
-  const sendMessage = (args: { text: string }) => sendMessageRaw(args);
-
-  // Capture initial snapshot once the WebContainer is ready
-  useEffect(() => {
-    (async () => {
-      const inst = instanceRef.current;
-      if (!inst) return;
-      if (undoStackRef.current.length > 0) return;
-      try {
-        const { gz } = await buildDesktopSnapshot(inst);
-        undoStackRef.current.push(gz);
-        setUndoDepth(undoStackRef.current.length);
-        console.log('📸 [UNDO] Initial snapshot captured');
-      } catch (e) {
-        console.warn('[UNDO] Initial snapshot failed', e);
-      }
-    })();
-  }, [instance]);
-
-  // On agent run completion: if FS changed, push a new snapshot and reset flag
-  useEffect(() => {
-    const prev = prevStatusRef.current;
-    const now = status;
-    const started = (prev === 'ready') && (now === 'submitted' || now === 'streaming');
-    const finished = (prev === 'submitted' || prev === 'streaming') && now === 'ready';
-    const readRegistry = async (): Promise<AppRegistryEntry[] | null> => {
-      try {
-        const raw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        const isRegistryEntry = (entry: unknown): entry is AppRegistryEntry => {
-          return Boolean(
-            entry &&
-            typeof entry === 'object' &&
-            typeof (entry as { id?: unknown }).id === 'string' &&
-            typeof (entry as { path?: unknown }).path === 'string'
-          );
-        };
-        return parsed
-          .filter(isRegistryEntry)
-          .map((entry) => ({
-            id: entry.id,
-            name: typeof entry.name === 'string' ? entry.name : entry.id,
-            icon: typeof entry.icon === 'string' ? entry.icon : undefined,
-            path: entry.path,
-          }));
-      } catch (error) {
-        console.warn('[AGENT] Failed to read app registry snapshot', error);
-        return null;
-      }
-    };
-    // Reset first-tool-call gate at run start so subsequent runs can pause HMR again
-    if (started) {
-      setAgentActive(true);
-      try {
-        const globalWin = getMutableWindow();
-        if (globalWin?.__FYOS_FIRST_TOOL_CALLED_REF) {
-          globalWin.__FYOS_FIRST_TOOL_CALLED_REF.current = false;
-        }
-      } catch {}
-      registryBeforeRunRef.current = null;
-      (async () => {
-        const snapshot = await readRegistry();
-        if (snapshot) {
-          registryBeforeRunRef.current = snapshot;
-        }
-      })();
-    }
-    // Signal run end only if we actually paused during this run
-    const runFinishedWithGate = finished && hmrGateActiveRef.current;
-    if (runFinishedWithGate) {
-      try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
-      hmrGateActiveRef.current = false;
-      agentActiveRef.current = false;
-      setAgentActive(false);
-    }
-    if (finished && !runFinishedWithGate) {
-      setAgentActive(false);
-    }
-    if (finished && fsChangedRef.current && instanceRef.current) {
-      (async () => {
-        try {
-          const inst = instanceRef.current;
-          if (!inst) return;
-          const { gz } = await buildDesktopSnapshot(inst);
-          undoStackRef.current.push(gz);
-          setUndoDepth(undoStackRef.current.length);
-          fsChangedRef.current = false;
-          console.log('📸 [UNDO] Snapshot captured after agent run. Depth:', undoStackRef.current.length);
-        } catch (e) {
-          console.warn('[UNDO] Snapshot after run failed', e);
-        }
-      })();
-    }
-    if (runFinishedWithGate) {
-      (async () => {
-        const previous = registryBeforeRunRef.current;
-        registryBeforeRunRef.current = null;
-        if (!previous) return;
-        const latest = await readRegistry();
-        if (!latest || latest.length === 0) return;
-        const previousIds = new Set(previous.map((entry) => entry.id));
-        const newEntries = latest.filter((entry) => !previousIds.has(entry.id));
-        if (newEntries.length === 0) return;
-        const targetApp = newEntries[newEntries.length - 1];
-        if (!targetApp || typeof targetApp.id !== 'string' || typeof targetApp.path !== 'string') return;
-        try {
-          window.postMessage({ type: 'FYOS_OPEN_APP', app: targetApp, source: 'agent-auto-open' }, '*');
-        } catch (error) {
-          console.warn('[AGENT] Failed to auto-open created app', error);
-        }
-      })();
-    } else if (finished) {
-      registryBeforeRunRef.current = null;
-    }
-    prevStatusRef.current = now;
-  }, [status]);
-
-  // Undo handler
-  const handleUndo = useMemo(() => {
-    return async () => {
-      const inst = instanceRef.current;
-      const stack = undoStackRef.current;
-      if (!inst) return;
-      if (stack.length < 2) return;
-      try {
-        // Temporarily suppress preview errors during restore to avoid false alarms
-        const globalWin = getMutableWindow();
-        if (globalWin) {
-          try { globalWin.__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL = Date.now() + 1500; } catch {}
-        }
-        // Drop the current snapshot and restore the previous
-        stack.pop();
-        const prev = stack[stack.length - 1];
-        await restoreDesktopSnapshot(inst, prev);
-        setUndoDepth(stack.length);
-        console.log('↩️ [UNDO] Restored previous snapshot. Depth:', stack.length);
-      } catch (e) {
-        console.error('[UNDO] Restore failed', e);
-      } finally {
-        // Clear suppression shortly after
-        setTimeout(() => {
-          const win = getMutableWindow();
-          if (win) {
-            try { win.__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL = 0; } catch {}
-          }
-        }, 1600);
-      }
-    };
-  }, []);
-
-  // Global drag & drop handled by useGlobalDrop hook
-  useGlobalDrop({
-    onFiles: async (files) => { await uploadFiles(files); setMode('chat'); },
-    onUrl: async (url) => { await ingestFromUrl(url); setMode('chat'); },
-    onTextAsFile: async (text) => {
-      const file = new File([text], 'dropped.txt', { type: 'text/plain' });
-      await uploadFiles([file]);
-      setMode('chat');
-    },
-    setIsDraggingOver,
-  });
+  }, [restorePreviousSnapshot]);
 
   // UI state
   const isOpen = mode !== 'compact';
@@ -684,34 +241,7 @@ export default function AIAgentBar() {
   useEffect(() => {
     const t = setTimeout(() => setDidAnimateWelcome(true), 500);
     return () => clearTimeout(t);
-  }, []);
-
-  // Add pop animation to newly added bubbles
-  useEffect(() => {
-    const currentIds = new Set(messages.map(m => m.id));
-    const unseen: string[] = [];
-    for (const id of currentIds) {
-      if (!seenMessageIdsRef.current.has(id)) unseen.push(id);
-    }
-    if (unseen.length === 0) return;
-
-    unseen.forEach(id => seenMessageIdsRef.current.add(id));
-    setBubbleAnimatingIds(prev => {
-      const next = new Set(prev);
-      unseen.forEach(id => next.add(id));
-      return next;
-    });
-
-    const timeout = setTimeout(() => {
-      setBubbleAnimatingIds(prev => {
-        const next = new Set(prev);
-        unseen.forEach(id => next.delete(id));
-        return next;
-      });
-    }, 450);
-
-    return () => clearTimeout(timeout);
-  }, [messages]);
+  }, [setDidAnimateWelcome]);
 
   // Visit desktops fetcher
   useEffect(() => {
@@ -769,140 +299,9 @@ export default function AIAgentBar() {
   }, [mode]);
 
   // Handlers
-  const handleUploadFiles = async (files: FileList | File[] | null) => {
-    await uploadFiles(files);
-  };
-
-  const handleIngestFromUrl = async () => {
-    const url = ingestUrl.trim();
-    if (!url) return;
-    await ingestFromUrl(url);
-    setIngestUrl('');
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmedInput = input.trim();
-    if (!trimmedInput) return;
-
-    const attachmentsForDisplay = (attachmentsRef.current || attachments).map((a) => ({ ...a }));
-    const optimisticId = `optimistic_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const optimisticEntry: OptimisticChatMessage = {
-      id: optimisticId,
-      role: 'user',
-      parts: [{ type: 'text', text: trimmedInput }],
-      metadata: { optimistic: true, optimisticAttachments: attachmentsForDisplay },
-    };
-    setOptimisticMessages((prev) => [...prev, optimisticEntry]);
-    forceFollow();
-
-    const removeOptimistic = () => {
-      setOptimisticMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-    };
-
-    let userText = trimmedInput;
-
-    const waitForDurable = async (timeoutMs = 6000, intervalMs = 80) => {
-      const started = Date.now();
-      while (Date.now() - started < timeoutMs) {
-        const curr = attachmentsRef.current || [];
-        const hasDurable = curr.some(a => /^https?:\/\//i.test(a.publicUrl));
-        const hasBlobOnly = curr.length > 0 && curr.every(a => /^blob:/i.test(a.publicUrl));
-        const stillUploading = uploadBusyRef.current;
-        if (hasDurable || (!hasBlobOnly && !stillUploading)) break;
-        await new Promise(r => setTimeout(r, intervalMs));
-      }
-    };
-
-    try {
-      if (!activeThreadIdImmediateRef.current && isChatAuthenticated) {
-        skipOptimisticClearRef.current = true;
-        const ensured = await ensureActiveThread({ titleHint: trimmedInput });
-        if (ensured) {
-          activeThreadIdImmediateRef.current = ensured;
-          await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
-        } else {
-          skipOptimisticClearRef.current = false;
-        }
-      }
-
-      await waitForDurable();
-      const snapshot = projectAttachmentsToDurable((attachmentsRef.current || attachments).map((a) => ({ ...a })));
-
-      if (snapshot.length > 0) {
-        const durable = snapshot.filter(a => /^https?:\/\//i.test(a.publicUrl));
-        if (durable.length > 0) {
-          const lines = durable.map(a => `Attached ${a.contentType || 'file'}: ${a.publicUrl}`);
-          userText += '\n' + lines.join('\n');
-        }
-      }
-
-      console.log('📤 [CHAT] Sending with attachments snapshot:', snapshot);
-
-      pendingAttachmentsRef.current = snapshot;
-      setLastSentAttachments(snapshot);
-
-      let sendPromise: Promise<void> | void;
-      try {
-        sendPromise = sendMessage({ text: userText });
-      } catch (error) {
-        pendingAttachmentsRef.current = null;
-        removeOptimistic();
-        throw error;
-      }
-
-      setInput('');
-      setAttachments([]);
-      const finalize = () => {
-        removeOptimistic();
-        setTimeout(() => { pendingAttachmentsRef.current = null; }, 1500);
-      };
-
-      if (sendPromise && typeof sendPromise.then === 'function') {
-        sendPromise
-          .then(() => finalize())
-          .catch((error) => {
-            console.error('[CHAT] sendMessage failed', error);
-            finalize();
-          });
-      } else {
-        finalize();
-      }
-    } catch (error) {
-      console.error('[CHAT] Failed to prepare message', error);
-      removeOptimistic();
-      pendingAttachmentsRef.current = null;
-      skipOptimisticClearRef.current = false;
-    }
-  };
+  const handleAgentSubmit = agent.composer.handleSubmit;
 
   // Drag overlay
-  const dragOverlay = isDraggingOver ? (
-    <div
-      className="fixed inset-0 z-[60] pointer-events-auto"
-      onDragOver={(e) => { e.preventDefault(); }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setIsDraggingOver(false);
-      }}
-      onDragLeave={() => {
-        setIsDraggingOver(false);
-      }}
-      aria-label="Drop files to attach"
-    >
-      <div className="absolute inset-0 bg-black/30" />
-      <div className="absolute inset-0 flex items-center justify-center p-6">
-        <div className="rounded border-2 border-dashed border-sky-300/70 bg-black/40 text-white px-4 py-3 text-sm">
-          Drop to attach
-        </div>
-      </div>
-    </div>
-  ) : null;
-
   // Bottom bar
   const bottomBar = (
     <div className="rounded-none px-4 py-3 bg-transparent">
@@ -921,12 +320,12 @@ export default function AIAgentBar() {
             <ChatComposer
               input={input}
               setInput={setInput}
-              status={status}
+              status={agentStatus}
               attachments={attachments}
               removeAttachment={removeAttachment}
-              onSubmit={onSubmit}
+              onSubmit={handleAgentSubmit}
               onFileSelect={handleUploadFiles}
-              onStop={() => stop()}
+              onStop={() => stopAgent()}
               onFocus={() => setMode('chat')}
               uploadBusy={busyFlags.uploadBusy}
 
@@ -989,9 +388,9 @@ export default function AIAgentBar() {
 
                     {leftPane==='friend' && (
                       <div className="mt-2 flex flex-col gap-2">
-                        {friendsLoading && (<div className="text-xs text-white/60">Loading friends…</div>)}
-                        {friendsError && (<div className="text-xs text-red-300">{friendsError}</div>)}
-                        {groupsLoading && (<div className="text-xs text-white/60">Loading groups…</div>)}
+                        {friendsState.friendsLoading && (<div className="text-xs text-white/60">Loading friends…</div>)}
+                        {friendsState.friendsError && (<div className="text-xs text-red-300">{friendsState.friendsError}</div>)}
+                        {groupState.groupsLoading && (<div className="text-xs text-white/60">Loading groups…</div>)}
                         <div className="flex flex-col gap-1 max-h-[260px] overflow-auto">
                           {chatItems.map((item) => {
                             const isActive = item.key === activeChatKey;
@@ -1023,7 +422,7 @@ export default function AIAgentBar() {
                               </button>
                             );
                           })}
-                          {chatItems.length === 0 && !friendsLoading && !groupsLoading && (
+                          {chatItems.length === 0 && !friendsState.friendsLoading && !groupState.groupsLoading && (
                             <div className="text-xs text-white/60">No chats yet. Use the Friends panel to start one.</div>
                           )}
                         </div>
@@ -1044,9 +443,18 @@ export default function AIAgentBar() {
                           activeThreadId={activeThreadId}
                           setActiveThreadId={setActiveThreadId}
                           showHistory={showThreadHistory}
-                          setShowHistory={setShowThreadHistory}
+                          setShowHistory={(next) => {
+                            if (typeof next === 'function') {
+                              setShowThreadHistory((prev) => (next as (prev: boolean) => boolean)(prev));
+                              return;
+                            }
+                            setShowThreadHistory(next);
+                          }}
                           onRefresh={() => { void refreshThreads(); }}
-                          onNewConversation={() => { activeThreadIdImmediateRef.current = null; startBlankThread(); }}
+                          onNewConversation={() => {
+                            activeThreadIdImmediateRef.current = null;
+                            startBlankThread();
+                          }}
                           onClose={(id) => {
                             if (activeThreadIdImmediateRef.current === id) {
                               activeThreadIdImmediateRef.current = null;
@@ -1060,9 +468,9 @@ export default function AIAgentBar() {
                         />
                         <div className="flex-1 min-h-0">
                           <MessagesPane
-                            messages={messages}
-                            optimisticMessages={optimisticMessages}
-                            status={status}
+                            messages={agentMessages}
+                            optimisticMessages={agentOptimisticMessages}
+                            status={agentStatus}
                             messagesContainerRef={messagesContainerRef}
                             messagesInnerRef={messagesInnerRef}
                             containerHeight={containerHeight}
@@ -1086,16 +494,16 @@ export default function AIAgentBar() {
                                   type="text"
                                   className="rounded-none text-black px-2 py-1 text-xs flex-1"
                                   placeholder="Nickname"
-                                  defaultValue={me?.nickname || ''}
-                                  onBlur={(e)=>{ const v = e.target.value.trim(); if (v && v !== (me?.nickname||'')) void setNickname(v); }}
-                                  disabled={!isAuthed}
+                                  defaultValue={friendsState.me?.nickname || ''}
+                                  onBlur={(e)=>{ const v = e.target.value.trim(); if (v && v !== (friendsState.me?.nickname||'')) void friendsState.setNickname(v); }}
+                                  disabled={!friendsState.isAuthenticated}
                                 />
                               </div>
                             </div>
 
                             <div className="flex flex-col gap-2">
                               <div className="text-xs text-white/70 mb-1">Add friend</div>
-                              <AddFriendForm onAdd={(nickname)=> addFriend(nickname)} disabled={!isAuthed} />
+                              <AddFriendForm onAdd={(nickname)=> friendsState.addFriend(nickname)} disabled={!friendsState.isAuthenticated} />
                             </div>
 
                             <div className="flex flex-col gap-2 text-xs text-white/70">
@@ -1125,7 +533,7 @@ export default function AIAgentBar() {
                                     disabled={groupFormBusy}
                                   />
                                   <div className="flex flex-col gap-1 max-h-28 overflow-auto">
-                                    {friends.map((friend) => {
+                                    {friendsState.friends.map((friend) => {
                                       const label = friend.nickname || friend.email || friend.ownerId.slice(0, 8);
                                       const checked = newGroupMemberIds.includes(friend.ownerId);
                                       return (
@@ -1140,7 +548,7 @@ export default function AIAgentBar() {
                                         </label>
                                       );
                                     })}
-                                    {friends.length === 0 && (
+                                    {friendsState.friends.length === 0 && (
                                       <div className="text-white/60">Add friends to invite them to a group.</div>
                                     )}
                                   </div>
@@ -1166,9 +574,9 @@ export default function AIAgentBar() {
                                   </div>
                                 </form>
                               )}
-                              {groups.length > 0 && (
+                              {groupState.groups.length > 0 && (
                                 <div className="flex flex-wrap gap-2 text-white/60">
-                                  {groups.map((group) => (
+                                  {groupState.groups.map((group) => (
                                     <button
                                       key={group.id}
                                       className="px-2 py-1 rounded border border-white/20 text-white/80 hover:bg-white/10"
@@ -1179,16 +587,16 @@ export default function AIAgentBar() {
                                   ))}
                                 </div>
                               )}
-                              {groups.length === 0 && !showCreateGroupForm && (
+                              {groupState.groups.length === 0 && !showCreateGroupForm && (
                                 <div className="text-white/60">You have no groups yet.</div>
                               )}
                             </div>
 
                             <div className="flex flex-col gap-2 text-xs text-white/70">
                               <span>Auto group</span>
-                              {autoRoom?.chat ? (
+                              {groupState.autoRoom?.chat ? (
                                 <div className="flex flex-col gap-2 text-white/80">
-                                  <div>{autoRoom.chat.name} · {autoRoomMembers.length} people</div>
+                                  <div>{groupState.autoRoom.chat.name} · {autoRoomMembers.length} people</div>
                                   <div className="flex items-center gap-2">
                                     <button
                                       className="px-2 py-1 rounded border border-white/20 hover:bg-white/10"
@@ -1210,7 +618,7 @@ export default function AIAgentBar() {
                                   <button
                                     className="px-2 py-1 rounded border border-sky-300/60 text-white hover:bg-sky-500/40 disabled:opacity-60"
                                     onClick={() => void handleJoinAutoRoom()}
-                                    disabled={!isAuthed || !isGroupAuthed}
+                                    disabled={!friendsState.isAuthenticated || !groupState.isAuthenticated}
                                   >
                                     Join auto room
                                   </button>
@@ -1227,7 +635,7 @@ export default function AIAgentBar() {
                             </div>
                             <div className="flex-1 min-h-0">
                               <FriendMessagesPane
-                                messages={dmMessages || []}
+                                messages={friendsState.dmMessages || []}
                                 activePeerId={socialView.peerId}
                                 currentUserId={myUserId ?? undefined}
                                 meLabel={meDisplayName}
@@ -1245,7 +653,7 @@ export default function AIAgentBar() {
                                 <button
                                   className="px-2 py-1 rounded border border-red-400/60 text-red-200 hover:bg-red-500/20"
                                   onClick={() => {
-                                    void leaveGroup(activeGroupSummary.id).then(() => {
+                                    void groupState.leaveGroup(activeGroupSummary.id).then(() => {
                                       openFriendsSettings();
                                     });
                                   }}
@@ -1258,8 +666,8 @@ export default function AIAgentBar() {
                               <GroupMessagesPane
                                 active={Boolean(activeGroupSummary)}
                                 emptyLabel="Select a group to view messages."
-                                messages={groupMessages}
-                                members={groupMembers}
+                                messages={groupState.groupMessages}
+                                members={groupState.groupMembers}
                                 currentUserId={myUserId ?? undefined}
                               />
                             </div>
@@ -1269,25 +677,25 @@ export default function AIAgentBar() {
                         {socialView.kind === 'auto' && (
                           <div className="flex flex-col gap-2 flex-1 min-h-0">
                             <div className="text-xs text-white/70 flex items-center justify-between">
-                              <span>{autoRoom?.chat ? autoRoom.chat.name : 'Auto group lobby'}</span>
-                              {autoRoom?.chat && (
+                              <span>{groupState.autoRoom?.chat ? groupState.autoRoom.chat.name : 'Auto group lobby'}</span>
+                              {groupState.autoRoom?.chat && (
                                 <span className="text-white/50 text-[10px]">{autoRoomMembers.length} people</span>
                               )}
                             </div>
                             <div className="flex-1 min-h-0">
                               <GroupMessagesPane
-                                active={Boolean(autoRoom?.chat)}
+                                active={Boolean(groupState.autoRoom?.chat)}
                                 emptyLabel="Join the auto room to start chatting."
                                 messages={autoRoomMessages}
                                 members={autoRoomMembers}
                                 currentUserId={myUserId ?? undefined}
                               />
                             </div>
-                            {!autoRoom?.chat && (
+                            {!groupState.autoRoom?.chat && (
                               <button
                                 className="self-start px-2 py-1 rounded border border-sky-300/60 text-white hover:bg-sky-500/40 disabled:opacity-60"
                                 onClick={() => void handleJoinAutoRoom()}
-                                disabled={!isAuthed || !isGroupAuthed}
+                                disabled={!friendsState.isAuthenticated || !groupState.isAuthenticated}
                               >
                                 Join auto room
                               </button>
@@ -1301,7 +709,7 @@ export default function AIAgentBar() {
               </div>
             </div>
 
-            {status === 'ready' && undoDepth > 1 && (
+            {agentStatus === 'ready' && undoDepth > 1 && (
               <button
                 onClick={handleUndo}
                 className="absolute right-6 bottom-2 z-40 p-3 text-white/70 hover:text-white transition-colors flex items-center gap-2"
