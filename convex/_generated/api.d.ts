@@ -13,6 +13,7 @@ import type * as chat from "../chat.js";
 import type * as desktops from "../desktops.js";
 import type * as desktops_private from "../desktops_private.js";
 import type * as friends from "../friends.js";
+import type * as groupChats from "../groupChats.js";
 import type * as media from "../media.js";
 import type * as messages from "../messages.js";
 import type * as metrics from "../metrics.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   desktops: typeof desktops;
   desktops_private: typeof desktops_private;
   friends: typeof friends;
+  groupChats: typeof groupChats;
   media: typeof media;
   messages: typeof messages;
   metrics: typeof metrics;

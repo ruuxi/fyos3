@@ -164,4 +164,38 @@ export default defineSchema({
   })
     .index("by_owner_peer_createdAt", ["ownerId", "peerId", "createdAt"]) 
     .index("by_owner_createdAt", ["ownerId", "createdAt"]),
+
+  // Group chat metadata (manual and auto-assigned rooms)
+  group_chats: defineTable({
+    ownerId: v.string(),
+    name: v.string(),
+    isAuto: v.boolean(),
+    capacity: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"]) 
+    .index("by_isAuto", ["isAuto", "createdAt"]) 
+    .index("by_updatedAt", ["updatedAt"]),
+
+  // Group chat members
+  group_members: defineTable({
+    chatId: v.id("group_chats"),
+    memberId: v.string(),
+    role: v.optional(v.string()),
+    joinedAt: v.number(),
+  })
+    .index("by_chat", ["chatId"]) 
+    .index("by_member", ["memberId"]) 
+    .index("by_chat_member", ["chatId", "memberId"]),
+
+  // Group chat messages
+  group_messages: defineTable({
+    chatId: v.id("group_chats"),
+    senderId: v.string(),
+    content: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_chat", ["chatId"]) 
+    .index("by_chat_createdAt", ["chatId", "createdAt"]),
 });
