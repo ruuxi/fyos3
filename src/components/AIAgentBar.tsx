@@ -62,6 +62,7 @@ export default function AIAgentBar() {
   const skipOptimisticClearRef = useRef(false);
   // Undo stack depth for UI invalidation
   const [undoDepth, setUndoDepth] = useState<number>(0);
+  const [agentActive, setAgentActive] = useState<boolean>(false);
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
   
   const { goTo, activeIndex } = useScreens();
@@ -181,6 +182,7 @@ export default function AIAgentBar() {
       hmrGateActiveRef.current = true;
       try { window.postMessage({ type: 'FYOS_AGENT_RUN_STARTED' }, '*'); } catch {}
       agentActiveRef.current = true;
+      setAgentActive(true);
     },
     onToolProgress: (_toolName: string) => {
       // Tool progress callback
@@ -304,6 +306,7 @@ export default function AIAgentBar() {
     };
     // Reset first-tool-call gate at run start so subsequent runs can pause HMR again
     if (started) {
+      setAgentActive(true);
       try {
         const globalWin = getMutableWindow();
         if (globalWin?.__FYOS_FIRST_TOOL_CALLED_REF) {
@@ -324,6 +327,10 @@ export default function AIAgentBar() {
       try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
       hmrGateActiveRef.current = false;
       agentActiveRef.current = false;
+      setAgentActive(false);
+    }
+    if (finished && !runFinishedWithGate) {
+      setAgentActive(false);
     }
     if (finished && fsChangedRef.current && instanceRef.current) {
       (async () => {
@@ -801,6 +808,7 @@ export default function AIAgentBar() {
                             bubbleAnimatingIds={bubbleAnimatingIds}
                             lastSentAttachments={lastSentAttachments || undefined}
                             activeThreadId={activeThreadId || undefined}
+                            agentActive={agentActive}
                           />
                         </div>
                       </>

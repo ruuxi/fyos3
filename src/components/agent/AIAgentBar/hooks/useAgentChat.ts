@@ -471,6 +471,87 @@ export function useAgentChat(opts: UseAgentChatOptions) {
     },
   });
 
+  const translatingMessageIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    if (!Array.isArray(messages) || messages.length === 0) return;
+
+    messages.forEach((message) => {
+      if (!message || message.role !== 'assistant') return;
+      const metadata = (message.metadata ?? {}) as {
+        mode?: string;
+        translator?: { state?: string };
+      };
+      const mode = metadata.mode ?? (message as { mode?: string }).mode ?? 'agent';
+      if (mode !== 'agent') return;
+
+      const translatorState = metadata.translator?.state;
+      if (translatorState === 'done' || translatorState === 'error') return;
+
+      const textParts = Array.isArray(message.parts)
+        ? message.parts.filter(isTextPart).map((part) => part.text?.trim()).filter((text): text is string => Boolean(text && text.length > 0))
+        : [];
+      if (textParts.length === 0) return;
+
+      const messageId = message.id;
+      if (!messageId) return;
+      if (translatingMessageIdsRef.current.has(messageId)) return;
+      translatingMessageIdsRef.current.add(messageId);
+
+      setMessages((prev) => prev.map((msg) => {
+        if (msg.id !== messageId) return msg;
+        const nextMetadata = { ...(msg.metadata ?? {}) } as Record<string, unknown>;
+        const translator = { ...(nextMetadata.translator as Record<string, unknown> ?? {}) };
+        translator.state = 'translating';
+        nextMetadata.translator = translator;
+        return { ...msg, metadata: nextMetadata } as UIMessage;
+      }));
+
+      (async () => {
+        try {
+          const response = await fetch('/api/agent/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parts: textParts }),
+          });
+          if (!response.ok) {
+            throw new Error(`Translator returned ${response.status}`);
+          }
+          const payload = await response.json();
+          const translations = Array.isArray(payload?.translations)
+            ? payload.translations.map((item: unknown) => (typeof item === 'string' ? item : '')).filter(Boolean)
+            : [];
+
+          setMessages((prev) => prev.map((msg) => {
+            if (msg.id !== messageId) return msg;
+            const nextMetadata = { ...(msg.metadata ?? {}) } as Record<string, unknown>;
+            nextMetadata.translator = {
+              ...(nextMetadata.translator as Record<string, unknown> ?? {}),
+              state: 'done',
+              outputs: translations,
+            };
+            return { ...msg, metadata: nextMetadata } as UIMessage;
+          }));
+        } catch (error) {
+          const messageText = error instanceof Error ? error.message : 'Translation failed';
+          setMessages((prev) => prev.map((msg) => {
+            if (msg.id !== messageId) return msg;
+            const nextMetadata = { ...(msg.metadata ?? {}) } as Record<string, unknown>;
+            nextMetadata.translator = {
+              ...(nextMetadata.translator as Record<string, unknown> ?? {}),
+              state: 'error',
+              error: messageText,
+            };
+            return { ...msg, metadata: nextMetadata } as UIMessage;
+          }));
+        } finally {
+          translatingMessageIdsRef.current.delete(messageId);
+        }
+      })();
+    });
+  }, [messages, setMessages, status]);
+
   const initialMessagesSignatureRef = useRef<string | null>(null);
   useEffect(() => {
     if (!Array.isArray(initialMessages)) return;

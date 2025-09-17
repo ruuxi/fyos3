@@ -2,6 +2,7 @@ import type { ReactNode, RefObject } from 'react';
 import { useConvexAuth, useQuery } from 'convex/react';
 import { api as convexApi } from '../../../../../convex/_generated/api';
 import { formatBytes, guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
+import AgentVerbCarousel from './AgentVerbCarousel';
 import type { Doc } from '../../../../../convex/_generated/dataModel';
 
 type ChatMode = 'agent' | 'persona';
@@ -19,6 +20,11 @@ type AgentMessageMetadata = {
   mode?: ChatMode;
   optimistic?: true;
   optimisticAttachments?: AttachmentPreview[];
+  translator?: {
+    state?: 'translating' | 'done' | 'error';
+    outputs?: string[];
+    error?: string;
+  };
   [key: string]: unknown;
 };
 
@@ -120,6 +126,7 @@ export type MessagesPaneProps = {
   bubbleAnimatingIds: Set<string>;
   lastSentAttachments?: AttachmentPreview[];
   activeThreadId?: string;
+  agentActive: boolean;
 };
 
 function extractAttachmentsFromText(text: string): { cleanedText: string; items: AttachmentPreview[] } {
@@ -245,11 +252,24 @@ function resolveMode(message: DisplayMessage): ChatMode | undefined {
   if (meta === 'persona' || meta === 'agent') return meta;
   const fallback = (message as { mode?: ChatMode })?.mode;
   if (fallback === 'persona' || fallback === 'agent') return fallback;
+  if ('role' in message && message.role === 'assistant') return 'agent';
   return undefined;
 }
 
 export default function MessagesPane(props: MessagesPaneProps) {
-  const { messages, optimisticMessages = [], status: _status, messagesContainerRef, messagesInnerRef, containerHeight, didAnimateWelcome, bubbleAnimatingIds, lastSentAttachments, activeThreadId } = props;
+  const {
+    messages,
+    optimisticMessages = [],
+    status: _status,
+    messagesContainerRef,
+    messagesInnerRef,
+    containerHeight,
+    didAnimateWelcome,
+    bubbleAnimatingIds,
+    lastSentAttachments,
+    activeThreadId,
+    agentActive,
+  } = props;
   const displayMessages: DisplayMessage[] = optimisticMessages.length > 0 ? [...messages, ...optimisticMessages] : messages;
   const { isAuthenticated } = useConvexAuth();
   const liveMedia = useQuery(
@@ -285,13 +305,18 @@ export default function MessagesPane(props: MessagesPaneProps) {
           </div>
         )}
         {displayMessages.map((m, idx) => {
+          const metadata = 'metadata' in m ? (m.metadata as AgentMessageMetadata | undefined) : undefined;
+          const mode = resolveMode(m);
+          const translatorMeta = metadata?.translator;
+          const shouldShowOriginalText = mode !== 'agent';
+
           // Build content and collect any attachments referenced in text
           const textNodes: ReactNode[] = [];
           let collectedFromText: AttachmentPreview[] = [];
           (m.parts || []).forEach((part, index: number) => {
             if (isTextPart(part)) {
               const { cleanedText, items } = extractAttachmentsFromText(part.text || '');
-              if (cleanedText) {
+              if (shouldShowOriginalText && cleanedText) {
                 textNodes.push(<span key={`t-${index}`}>{cleanedText}</span>);
               }
               if (items.length) {
@@ -299,7 +324,6 @@ export default function MessagesPane(props: MessagesPaneProps) {
               }
             }
           });
-          const metadata = 'metadata' in m ? (m.metadata as AgentMessageMetadata | undefined) : undefined;
           const isLastUser = m.role === 'user' && m.id === lastUserMessageId;
           const optimisticAttachmentOverride = getOptimisticAttachments(metadata);
           const previewItems = collectedFromText.length > 0
@@ -309,7 +333,6 @@ export default function MessagesPane(props: MessagesPaneProps) {
           // Determine if this is the last assistant message to attach live media below
           const isAssistant = m.role === 'assistant';
           const isLastAssistant = isAssistant && displayMessages.slice(idx + 1).every(mm => mm.role !== 'assistant');
-          const mode = resolveMode(m);
           const personaLabel = 'Sim';
           const authorLabel = m.role === 'assistant' ? (mode === 'persona' ? personaLabel : 'AI Agent') : 'You';
           const assistantBubble = mode === 'persona'
@@ -321,6 +344,28 @@ export default function MessagesPane(props: MessagesPaneProps) {
             : assistantBubble;
           const bubbleClass = isOptimistic ? `${bubbleBase} opacity-80` : bubbleBase;
 
+          const textContent: ReactNode | ReactNode[] = (() => {
+            if (mode !== 'agent') {
+              return textNodes;
+            }
+            if (agentActive) {
+              return <AgentVerbCarousel />;
+            }
+            if (translatorMeta?.state === 'done' && Array.isArray(translatorMeta.outputs) && translatorMeta.outputs.length > 0) {
+              return translatorMeta.outputs.map((text, index) => (
+                <span key={`translated-${index}`}>{text}</span>
+              ));
+            }
+            if (translatorMeta?.state === 'error') {
+              return (
+                <span className="text-white/70">
+                  Translator glitched. Original reply stashed off-screen.
+                </span>
+              );
+            }
+            return <AgentVerbCarousel />;
+          })();
+
           return (
             <div key={m.id} className={`text-sm flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} ${isOptimistic ? 'opacity-80' : ''}`}>
               <div className={`${m.role === 'user' ? 'flex flex-col items-end max-w-[80%]' : 'max-w-full flex-1'}`}>
@@ -328,8 +373,8 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   {authorLabel}
                 </div>
                 <div className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${bubbleClass} ${bubbleAnimatingIds.has(m.id) ? 'ios-pop' : ''}`}>
-                  {/* Render cleaned text parts first */}
-                  {textNodes}
+                  {/* Render agent-friendly content or original text */}
+                  {textContent}
                   {/* Render tool results and media blocks */}
                   {(m.parts || []).map((part, index: number) => {
                     if (!isToolResultPart(part)) return null;
