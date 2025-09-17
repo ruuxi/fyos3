@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react';
+import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { useConvexAuth, useQuery } from 'convex/react';
 import { api as convexApi } from '../../../../../convex/_generated/api';
 import { formatBytes, guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
@@ -309,6 +309,9 @@ export default function MessagesPane(props: MessagesPaneProps) {
           const mode = resolveMode(m);
           const translatorMeta = metadata?.translator;
           const shouldShowOriginalText = mode !== 'agent';
+          const translatorState = translatorMeta?.state ?? null;
+          const awaitingTranslation = mode === 'agent' && translatorState !== 'done' && translatorState !== 'error';
+          const showCarousel = awaitingTranslation && (agentActive || translatorState === 'translating' || translatorState === null);
 
           // Build content and collect any attachments referenced in text
           const textNodes: ReactNode[] = [];
@@ -343,27 +346,33 @@ export default function MessagesPane(props: MessagesPaneProps) {
             ? 'bg-sky-500 text-white max-w-full'
             : assistantBubble;
           const bubbleClass = isOptimistic ? `${bubbleBase} opacity-80` : bubbleBase;
+          const bubbleStyle: CSSProperties | undefined = showCarousel
+            ? {
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+              }
+            : undefined;
 
           const textContent: ReactNode | ReactNode[] = (() => {
             if (mode !== 'agent') {
               return textNodes;
             }
-            if (translatorMeta?.state === 'done' && Array.isArray(translatorMeta.outputs) && translatorMeta.outputs.length > 0) {
+            if (translatorState === 'done' && Array.isArray(translatorMeta?.outputs) && translatorMeta.outputs.length > 0) {
               return translatorMeta.outputs.map((text, index) => (
                 <span key={`translated-${index}`}>{text}</span>
               ));
             }
-            if (translatorMeta?.state === 'error') {
+            if (translatorState === 'error') {
               return (
                 <span className="text-white/70">
                   Translator glitched. Original reply stashed off-screen.
                 </span>
               );
             }
-            if (translatorMeta?.state === 'done') {
+            if (translatorState === 'done') {
               return textNodes;
             }
-            if (agentActive || translatorMeta?.state === 'translating') {
+            if (showCarousel) {
               return <AgentVerbCarousel />;
             }
             return <AgentVerbCarousel />;
@@ -375,7 +384,10 @@ export default function MessagesPane(props: MessagesPaneProps) {
                 <div className={`text-xs mb-1 ${m.role === 'user' ? 'text-white/60 pr-1' : 'text-white/60 pl-1'}`}>
                   {authorLabel}
                 </div>
-                <div className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${bubbleClass} ${bubbleAnimatingIds.has(m.id) ? 'ios-pop' : ''}`}>
+                <div
+                  className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${bubbleClass} ${bubbleAnimatingIds.has(m.id) ? 'ios-pop' : ''}`}
+                  style={bubbleStyle}
+                >
                   {/* Render agent-friendly content or original text */}
                   {textContent}
                   {/* Render tool results and media blocks */}

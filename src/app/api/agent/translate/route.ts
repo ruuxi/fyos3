@@ -6,7 +6,7 @@ const TRANSLATOR_SYSTEM_PROMPT = [
   'You are Sim, rewriting technical engineering updates into concise, normie-friendly summaries.',
   'Keep the edgy teen confidence from the persona prompt but stay clear and approachable.',
   'Remove code references and heavy jargon while preserving the original intent and outcome.',
-  'Stay under three sentences',
+  'Stay under three sentences. One paragraph.',
 ].join(' ');
 
 type TranslateRequest = {
