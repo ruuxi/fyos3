@@ -348,8 +348,8 @@ export default function MessagesPane(props: MessagesPaneProps) {
           const bubbleClass = isOptimistic ? `${bubbleBase} opacity-80` : bubbleBase;
           const bubbleStyle: CSSProperties | undefined = showCarousel
             ? {
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                borderColor: 'rgba(255, 255, 255, 0.2)',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                borderColor: 'rgba(255, 255, 255, 0.14)',
               }
             : undefined;
 
