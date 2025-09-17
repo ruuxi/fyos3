@@ -143,3 +143,74 @@ export const listDmMessages = query({
   },
 });
 
+export const listDmThreads = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const ownerId = getOwnerId(identity);
+
+    const latestByPeer = new Map<
+      string,
+      { lastMessageAt: number; content: string; senderId: string }
+    >();
+
+    const recentMessages = await ctx.db
+      .query("dm_messages")
+      .withIndex("by_owner_createdAt", (q) => q.eq("ownerId", ownerId))
+      .order("desc")
+      .take(500);
+
+    for (const message of recentMessages) {
+      if (!latestByPeer.has(message.peerId)) {
+        latestByPeer.set(message.peerId, {
+          lastMessageAt: message.createdAt,
+          content: message.content,
+          senderId: message.senderId,
+        });
+      }
+    }
+
+    const friendships = await ctx.db
+      .query("friendships")
+      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      .collect();
+
+    const peerIds = new Set<string>();
+    for (const row of friendships) {
+      peerIds.add(row.friendId);
+    }
+    for (const peerId of latestByPeer.keys()) {
+      peerIds.add(peerId);
+    }
+
+    const threads: Array<{
+      peerId: string;
+      peerNickname?: string;
+      peerEmail?: string;
+      lastMessageAt: number;
+      lastMessageContent?: string;
+      lastMessageSenderId?: string;
+    }> = [];
+
+    for (const peerId of peerIds) {
+      const latest = latestByPeer.get(peerId);
+      const profile = await ctx.db
+        .query("profiles")
+        .withIndex("by_owner", (q) => q.eq("ownerId", peerId))
+        .first();
+
+      threads.push({
+        peerId,
+        peerNickname: profile?.nickname ?? undefined,
+        peerEmail: profile?.email ?? undefined,
+        lastMessageAt: latest?.lastMessageAt ?? 0,
+        lastMessageContent: latest?.content ?? undefined,
+        lastMessageSenderId: latest?.senderId ?? undefined,
+      });
+    }
+
+    threads.sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0));
+    return threads;
+  },
+});

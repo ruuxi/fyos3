@@ -7,6 +7,15 @@ export type FriendProfile = { ownerId: string; nickname?: string; email?: string
 
 type DmMessage = Doc<'dm_messages'>;
 
+export type DmThread = {
+  peerId: string;
+  peerNickname?: string;
+  peerEmail?: string;
+  lastMessageAt: number;
+  lastMessageContent?: string;
+  lastMessageSenderId?: string;
+};
+
 type UseFriendsState = {
   isAuthenticated: boolean;
   me: FriendProfile | null | undefined;
@@ -19,6 +28,8 @@ type UseFriendsState = {
   setActivePeerId: (id: string | null) => void;
   dmMessages: DmMessage[] | undefined;
   sendDm: (content: string) => Promise<void>;
+  sendDmToPeer: (peerId: string, content: string) => Promise<void>;
+  dmThreads: DmThread[];
 };
 
 export function useFriends(): UseFriendsState {
@@ -31,6 +42,10 @@ export function useFriends(): UseFriendsState {
   );
   const friendsList = useQuery(
     convexApi.friends.listFriends,
+    isAuthenticated ? {} : 'skip',
+  );
+  const dmThreadsData = useQuery(
+    convexApi.friends.listDmThreads,
     isAuthenticated ? {} : 'skip',
   );
   const dmMessages = useQuery(
@@ -53,6 +68,26 @@ export function useFriends(): UseFriendsState {
     } as const;
   }, [isAuthenticated, authLoading, myProfile]);
 
+  const dmThreads = useMemo(() => {
+    if (!isAuthenticated) return [];
+    const base = dmThreadsData ?? [];
+    const seen = new Set(base.map((thread) => thread.peerId));
+    const extras: DmThread[] = [];
+    for (const friend of friendsList ?? []) {
+      if (!seen.has(friend.ownerId)) {
+        extras.push({
+          peerId: friend.ownerId,
+          peerNickname: friend.nickname,
+          peerEmail: friend.email,
+          lastMessageAt: 0,
+        });
+      }
+    }
+    const combined = [...base, ...extras];
+    combined.sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0));
+    return combined;
+  }, [isAuthenticated, dmThreadsData, friendsList]);
+
   useEffect(() => {
     // Default active to agent (null). If a peer was previously selected, leave it.
   }, []);
@@ -69,11 +104,16 @@ export function useFriends(): UseFriendsState {
     await addFriendMutation({ nickname: v });
   }
 
-  async function sendDm(content: string) {
-    if (!isAuthenticated || !activePeerId) return;
+  async function sendDmToPeer(peerId: string, content: string) {
+    if (!isAuthenticated) return;
     const text = (content || '').trim();
     if (!text) return;
-    await sendDmMutation({ peerId: activePeerId, content: text });
+    await sendDmMutation({ peerId, content: text });
+  }
+
+  async function sendDm(content: string) {
+    if (!isAuthenticated || !activePeerId) return;
+    await sendDmToPeer(activePeerId, content);
   }
 
   return {
@@ -88,6 +128,7 @@ export function useFriends(): UseFriendsState {
     setActivePeerId,
     dmMessages,
     sendDm,
+    sendDmToPeer,
+    dmThreads,
   } as const;
 }
-

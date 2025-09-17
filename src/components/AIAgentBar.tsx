@@ -45,6 +45,22 @@ type MutableWindow = Window & {
   __FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL?: number;
 };
 
+type SocialView =
+  | { kind: 'settings' }
+  | { kind: 'dm'; peerId: string }
+  | { kind: 'group'; groupId: string }
+  | { kind: 'auto' };
+
+type ChatListItem = {
+  key: string;
+  kind: 'dm' | 'group' | 'auto';
+  label: string;
+  description?: string;
+  lastActivity: number;
+  peerId?: string;
+  groupId?: string;
+};
+
 const getMutableWindow = (): MutableWindow | null => {
   if (typeof window === 'undefined') return null;
   return window as MutableWindow;
@@ -54,7 +70,7 @@ export default function AIAgentBar() {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'compact' | 'chat' | 'visit' | 'media' | 'friends'>('chat');
   const [leftPane, setLeftPane] = useState<'agent' | 'friend'>('agent');
-  const [friendTab, setFriendTab] = useState<'dm' | 'group' | 'auto'>('dm');
+  const [socialView, setSocialView] = useState<SocialView>({ kind: 'settings' });
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [ingestUrl, setIngestUrl] = useState('');
   const [showThreadHistory, setShowThreadHistory] = useState<boolean>(false);
@@ -248,10 +264,11 @@ export default function AIAgentBar() {
     friendsLoading,
     friendsError,
     addFriend,
-    activePeerId,
+    activePeerId: _activePeerId,
     setActivePeerId,
     dmMessages,
-    sendDm,
+    sendDmToPeer,
+    dmThreads,
   } = useFriends();
 
   const {
@@ -287,6 +304,88 @@ export default function AIAgentBar() {
     chatId: String(message.chatId),
   }));
 
+  const friendsById = useMemo(() => {
+    const map = new Map<string, (typeof friends)[number]>();
+    friends.forEach((friend) => {
+      map.set(friend.ownerId, friend);
+    });
+    return map;
+  }, [friends]);
+
+  const dmThreadByPeer = useMemo(() => {
+    const map = new Map<string, (typeof dmThreads)[number]>();
+    dmThreads.forEach((thread) => { map.set(thread.peerId, thread); });
+    return map;
+  }, [dmThreads]);
+
+  const chatItems = useMemo<ChatListItem[]>(() => {
+    const items: ChatListItem[] = [];
+    for (const thread of dmThreads) {
+      const friendProfile = friendsById.get(thread.peerId);
+      const label = friendProfile?.nickname
+        || thread.peerNickname
+        || friendProfile?.email
+        || thread.peerEmail
+        || thread.peerId.slice(0, 8);
+      const snippet = thread.lastMessageContent ? thread.lastMessageContent.trim() : '';
+      items.push({
+        key: `dm-${thread.peerId}`,
+        kind: 'dm',
+        label,
+        description: snippet ? (snippet.length > 60 ? `${snippet.slice(0, 57)}…` : snippet) : undefined,
+        lastActivity: thread.lastMessageAt ?? 0,
+        peerId: thread.peerId,
+      });
+    }
+
+    for (const group of groups) {
+      items.push({
+        key: `group-${group.id}`,
+        kind: 'group',
+        label: group.name,
+        description: `${group.memberCount} members`,
+        lastActivity: group.updatedAt ?? group.createdAt ?? 0,
+        groupId: group.id,
+      });
+    }
+
+    if (autoRoom?.chat) {
+      const autoId = String(autoRoom.chat._id);
+      items.push({
+        key: `auto-${autoId}`,
+        kind: 'auto',
+        label: autoRoom.chat.name,
+        description: `${autoRoomMembers.length} people`,
+        lastActivity: autoRoom.chat.updatedAt ?? autoRoom.chat.createdAt ?? 0,
+      });
+    }
+
+    items.sort((a, b) => b.lastActivity - a.lastActivity);
+    return items;
+  }, [dmThreads, friendsById, groups, autoRoom, autoRoomMembers.length]);
+
+  const activeChatKey = useMemo(() => {
+    if (socialView.kind === 'dm') return `dm-${socialView.peerId}`;
+    if (socialView.kind === 'group') return `group-${socialView.groupId}`;
+    if (socialView.kind === 'auto' && autoRoom?.chat?._id) return `auto-${String(autoRoom.chat._id)}`;
+    return null;
+  }, [socialView, autoRoom?.chat?._id]);
+
+  const myUserId = me?.ownerId ?? null;
+  const meDisplayName = me?.nickname || (me ? 'Me' : 'You');
+
+  const activePeerProfile = socialView.kind === 'dm' ? friendsById.get(socialView.peerId) : undefined;
+  const activeDmThread = socialView.kind === 'dm' ? dmThreadByPeer.get(socialView.peerId) : undefined;
+  const activePeerLabel = socialView.kind === 'dm'
+    ? (activePeerProfile?.nickname
+      || activeDmThread?.peerNickname
+      || activePeerProfile?.email
+      || activeDmThread?.peerEmail
+      || socialView.peerId.slice(0, 8))
+    : undefined;
+
+  const panelCardClass = 'rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-lg shadow-[0_24px_60px_-32px_rgba(15,23,42,0.9)]';
+
   function toggleNewGroupMember(memberId: string) {
     setNewGroupMemberIds((prev) => {
       if (prev.includes(memberId)) {
@@ -315,41 +414,78 @@ export default function AIAgentBar() {
     setNewGroupMemberIds([]);
   }
 
+  function openFriendsSettings() {
+    setSocialView({ kind: 'settings' });
+    setActivePeerId(null);
+    setActiveGroupId(null);
+    setLeftPane('friend');
+    setMode('friends');
+  }
+
+  function openDmChat(peerId: string) {
+    setLeftPane('friend');
+    setMode('friends');
+    setActivePeerId(peerId);
+    setActiveGroupId(null);
+    setSocialView({ kind: 'dm', peerId });
+  }
+
+  function openGroupChat(groupId: string) {
+    setLeftPane('friend');
+    setMode('friends');
+    setActivePeerId(null);
+    setActiveGroupId(groupId);
+    setSocialView({ kind: 'group', groupId });
+  }
+
+  function openAutoChat() {
+    setLeftPane('friend');
+    setMode('friends');
+    setActivePeerId(null);
+    setActiveGroupId(null);
+    setSocialView({ kind: 'auto' });
+  }
+
   async function handleJoinAutoRoom() {
     const defaultName = me?.nickname ?? '';
     const promptValue = window.prompt('Choose your name for the auto group chat', defaultName);
     if (promptValue === null) return;
     const nickname = (promptValue || defaultName || '').trim();
     await claimAutoRoom({ nickname: nickname || undefined });
-    setFriendTab('auto');
+    openAutoChat();
   }
 
   async function handleLeaveAutoRoom() {
     await leaveAutoRoom();
+    openFriendsSettings();
   }
 
-  const socialComposerStatus = friendTab === 'dm'
-    ? (activePeerId ? 'ready' : 'idle')
-    : friendTab === 'group'
-      ? (activeGroupId ? 'ready' : 'idle')
-      : (autoRoom?.chat ? 'ready' : 'idle');
+  const socialComposerStatus = socialView.kind === 'dm'
+    ? (socialView.peerId ? 'ready' : 'idle')
+    : socialView.kind === 'group'
+      ? (socialView.groupId ? 'ready' : 'idle')
+      : socialView.kind === 'auto'
+        ? (autoRoom?.chat ? 'ready' : 'idle')
+        : 'idle';
 
   async function handleSocialSubmit(e: React.FormEvent) {
     e.preventDefault();
     const text = input.trim();
     if (!text) return;
     try {
-      if (friendTab === 'dm' && activePeerId) {
-        await sendDm(text);
+      if (socialView.kind === 'dm') {
+        setActivePeerId(socialView.peerId);
+        await sendDmToPeer(socialView.peerId, text);
         setInput('');
         return;
       }
-      if (friendTab === 'group' && activeGroupId) {
-        await sendGroupMessage(activeGroupId, text);
+      if (socialView.kind === 'group') {
+        setActiveGroupId(socialView.groupId);
+        await sendGroupMessage(socialView.groupId, text);
         setInput('');
         return;
       }
-      if (friendTab === 'auto' && autoRoom?.chat) {
+      if (socialView.kind === 'auto' && autoRoom?.chat) {
         await sendAutoMessage(text);
         setInput('');
       }
@@ -776,7 +912,7 @@ export default function AIAgentBar() {
           onToggleHomeStore={() => goTo(activeIndex === 0 ? 1 : 0)}
           onVisit={() => setMode('visit')}
           onMedia={() => setMode('media')}
-          onFriends={() => setMode('friends')}
+          onFriends={() => openFriendsSettings()}
         />
         {/* Left Undo removed */}
         <div className="flex-1 relative">
@@ -796,7 +932,7 @@ export default function AIAgentBar() {
 
             />
           )}
-          {leftPane === 'friend' && (
+          {leftPane === 'friend' && socialView.kind !== 'settings' && (
             <ChatComposer
               input={input}
               setInput={setInput}
@@ -845,173 +981,52 @@ export default function AIAgentBar() {
                       </button>
                       <button
                         className={`text-left text-sm px-2 py-1 rounded ${leftPane==='friend' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                        onClick={()=>{ setLeftPane('friend'); setMode('friends'); }}
+                        onClick={() => { openFriendsSettings(); }}
                       >
                         Friends
                       </button>
                     </div>
 
                     {leftPane==='friend' && (
-                      <div className="mt-2 flex flex-col gap-3">
-                        <div className="flex items-center gap-2 text-xs">
-                          <button
-                            className={`px-2 py-1 rounded ${friendTab==='dm' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                            onClick={() => setFriendTab('dm')}
-                          >
-                            DMs
-                          </button>
-                          <button
-                            className={`px-2 py-1 rounded ${friendTab==='group' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                            onClick={() => setFriendTab('group')}
-                          >
-                            Groups
-                          </button>
-                          <button
-                            className={`px-2 py-1 rounded ${friendTab==='auto' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                            onClick={() => setFriendTab('auto')}
-                          >
-                            Auto Group
-                          </button>
-                        </div>
-
-                        {friendTab==='dm' && (
-                          <div className="flex flex-col gap-2">
-                            {friendsLoading && (<div className="text-xs text-white/60">Loading…</div>)}
-                            {friendsError && (<div className="text-xs text-red-300">{friendsError}</div>)}
-                            {(friends.length > 0) && (
-                              <div className="text-xs text-white/70">Friends</div>
-                            )}
-                            <div className="flex flex-col gap-1 max-h-[240px] overflow-auto">
-                              {friends.map((f)=> (
-                                <button key={f.ownerId}
-                                  className={`text-left text-xs px-2 py-1 rounded ${activePeerId===f.ownerId ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                                  onClick={()=> setActivePeerId(f.ownerId)}
-                                  title={f.email || f.ownerId}
-                                >
-                                  {f.nickname || f.email || f.ownerId.slice(0,8)}
-                                </button>
-                              ))}
-                              {friends.length===0 && !friendsLoading && !friendsError && (
-                                <div className="text-xs text-white/60">No friends yet</div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {friendTab==='group' && (
-                          <div className="flex flex-col gap-2 text-xs">
-                            <div className="flex items-center justify-between">
-                              <span className="text-white/70">Groups</span>
+                      <div className="mt-2 flex flex-col gap-2">
+                        {friendsLoading && (<div className="text-xs text-white/60">Loading friends…</div>)}
+                        {friendsError && (<div className="text-xs text-red-300">{friendsError}</div>)}
+                        {groupsLoading && (<div className="text-xs text-white/60">Loading groups…</div>)}
+                        <div className="flex flex-col gap-1 max-h-[260px] overflow-auto">
+                          {chatItems.map((item) => {
+                            const isActive = item.key === activeChatKey;
+                            const buttonClasses = isActive ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10';
+                            return (
                               <button
-                                className="px-2 py-1 rounded border border-white/20 text-white/80 hover:bg-white/10"
+                                key={item.key}
+                                className={`text-left text-xs px-2 py-1 rounded ${buttonClasses}`}
                                 onClick={() => {
-                                  setShowCreateGroupForm((prev) => !prev);
-                                  resetGroupForm();
+                                  if (item.kind === 'dm' && item.peerId) {
+                                    openDmChat(item.peerId);
+                                    return;
+                                  }
+                                  if (item.kind === 'group' && item.groupId) {
+                                    openGroupChat(item.groupId);
+                                    return;
+                                  }
+                                  if (item.kind === 'auto') {
+                                    openAutoChat();
+                                  }
                                 }}
                               >
-                                {showCreateGroupForm ? 'Close' : 'New group'}
-                              </button>
-                            </div>
-                            {showCreateGroupForm && (
-                              <form onSubmit={handleCreateGroup} className="flex flex-col gap-2 border border-white/15 bg-white/5 p-2 rounded">
-                                <input
-                                  type="text"
-                                  className="rounded-none text-black px-2 py-1 text-xs"
-                                  placeholder="Group name"
-                                  value={newGroupName}
-                                  onChange={(e)=> setNewGroupName(e.target.value)}
-                                  disabled={groupFormBusy}
-                                />
-                                <div className="flex flex-col gap-1 max-h-28 overflow-auto">
-                                  {friends.map((friend) => {
-                                    const label = friend.nickname || friend.email || friend.ownerId.slice(0, 8);
-                                    const checked = newGroupMemberIds.includes(friend.ownerId);
-                                    return (
-                                      <label key={friend.ownerId} className="flex items-center gap-2 text-white/80">
-                                        <input
-                                          type="checkbox"
-                                          checked={checked}
-                                          onChange={() => toggleNewGroupMember(friend.ownerId)}
-                                          disabled={groupFormBusy}
-                                        />
-                                        <span>{label}</span>
-                                      </label>
-                                    );
-                                  })}
-                                  {friends.length === 0 && (
-                                    <div className="text-white/60">Add friends first to invite them.</div>
+                                <div className="flex flex-col gap-0.5">
+                                  <span>{item.label}</span>
+                                  {item.description && (
+                                    <span className="text-[10px] text-white/50">{item.description}</span>
                                   )}
                                 </div>
-                                <div className="flex justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    className="px-2 py-1 border border-white/20 rounded text-white/70 hover:bg-white/10"
-                                    onClick={() => {
-                                      resetGroupForm();
-                                      setShowCreateGroupForm(false);
-                                    }}
-                                    disabled={groupFormBusy}
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    type="submit"
-                                    className="px-2 py-1 border border-sky-300/60 rounded text-white bg-sky-500/40 hover:bg-sky-500/60 disabled:opacity-50"
-                                    disabled={groupFormBusy || !newGroupName.trim()}
-                                  >
-                                    Create
-                                  </button>
-                                </div>
-                              </form>
-                            )}
-                            {groupsLoading && (<div className="text-white/60">Loading groups…</div>)}
-                            <div className="flex flex-col gap-1 max-h-[240px] overflow-auto">
-                              {groups.map((group) => (
-                                <button
-                                  key={group.id}
-                                  className={`text-left text-xs px-2 py-1 rounded ${activeGroupId===group.id ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                                  onClick={() => setActiveGroupId(group.id)}
-                                >
-                                  <div className="flex flex-col gap-0.5">
-                                    <span>{group.name}</span>
-                                    <span className="text-[10px] text-white/50">{group.memberCount} members · cap {group.capacity}</span>
-                                  </div>
-                                </button>
-                              ))}
-                              {groups.length === 0 && !groupsLoading && (
-                                <div className="text-white/60">No groups yet. Create one!</div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {friendTab==='auto' && (
-                          <div className="flex flex-col gap-2 text-xs text-white/70">
-                            {autoRoom?.chat ? (
-                              <>
-                                <div className="text-white">{autoRoom.chat.name}</div>
-                                <div className="text-white/60">Capacity {autoRoom.chat.capacity}</div>
-                                <button
-                                  className="px-2 py-1 rounded border border-red-400/60 text-red-200 hover:bg-red-500/20"
-                                  onClick={() => void handleLeaveAutoRoom()}
-                                >
-                                  Leave room
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <div>No auto room yet. Join a room to meet other builders.</div>
-                                <button
-                                  className="px-2 py-1 rounded border border-sky-300/60 text-white hover:bg-sky-500/40"
-                                  onClick={() => void handleJoinAutoRoom()}
-                                  disabled={!isAuthed || !isGroupAuthed}
-                                >
-                                  Join auto room
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
+                              </button>
+                            );
+                          })}
+                          {chatItems.length === 0 && !friendsLoading && !groupsLoading && (
+                            <div className="text-xs text-white/60">No chats yet. Use the Friends panel to start one.</div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1062,48 +1077,178 @@ export default function AIAgentBar() {
                     )}
                     {leftPane==='friend' && (
                       <div className="flex flex-col gap-3 flex-1 min-h-0">
-                        <div className="flex flex-col gap-2">
-                          <div className="text-xs text-white/70">Me</div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              className="rounded-none text-black px-2 py-1 text-xs flex-1"
-                              placeholder="Nickname"
-                              defaultValue={me?.nickname || ''}
-                              onBlur={(e)=>{ const v = e.target.value.trim(); if (v && v !== (me?.nickname||'')) void setNickname(v); }}
-                              disabled={!isAuthed}
-                            />
-                          </div>
-                        </div>
-                        {friendTab==='dm' && (
-                          <>
-                            <div>
+                        {socialView.kind === 'settings' && (
+                          <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-auto pr-1">
+                            <div className="flex flex-col gap-2">
+                              <div className="text-xs text-white/70">Profile</div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  className="rounded-none text-black px-2 py-1 text-xs flex-1"
+                                  placeholder="Nickname"
+                                  defaultValue={me?.nickname || ''}
+                                  onBlur={(e)=>{ const v = e.target.value.trim(); if (v && v !== (me?.nickname||'')) void setNickname(v); }}
+                                  disabled={!isAuthed}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
                               <div className="text-xs text-white/70 mb-1">Add friend</div>
                               <AddFriendForm onAdd={(nickname)=> addFriend(nickname)} disabled={!isAuthed} />
+                            </div>
+
+                            <div className="flex flex-col gap-2 text-xs text-white/70">
+                              <div className="flex items-center justify-between">
+                                <span>Groups</span>
+                                <button
+                                  className="px-2 py-1 rounded border border-white/20 text-white/80 hover:bg-white/10"
+                                  onClick={() => {
+                                    setShowCreateGroupForm((prev) => {
+                                      const next = !prev;
+                                      if (!next) resetGroupForm();
+                                      return next;
+                                    });
+                                  }}
+                                >
+                                  {showCreateGroupForm ? 'Close' : 'Create group'}
+                                </button>
+                              </div>
+                              {showCreateGroupForm && (
+                                <form onSubmit={handleCreateGroup} className="flex flex-col gap-2 border border-white/15 bg-white/5 p-2 rounded">
+                                  <input
+                                    type="text"
+                                    className="rounded-none text-black px-2 py-1 text-xs"
+                                    placeholder="Group name"
+                                    value={newGroupName}
+                                    onChange={(e)=> setNewGroupName(e.target.value)}
+                                    disabled={groupFormBusy}
+                                  />
+                                  <div className="flex flex-col gap-1 max-h-28 overflow-auto">
+                                    {friends.map((friend) => {
+                                      const label = friend.nickname || friend.email || friend.ownerId.slice(0, 8);
+                                      const checked = newGroupMemberIds.includes(friend.ownerId);
+                                      return (
+                                        <label key={friend.ownerId} className="flex items-center gap-2 text-white/80">
+                                          <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => toggleNewGroupMember(friend.ownerId)}
+                                            disabled={groupFormBusy}
+                                          />
+                                          <span>{label}</span>
+                                        </label>
+                                      );
+                                    })}
+                                    {friends.length === 0 && (
+                                      <div className="text-white/60">Add friends to invite them to a group.</div>
+                                    )}
+                                  </div>
+                                  <div className="flex justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      className="px-2 py-1 border border-white/20 rounded text-white/70 hover:bg-white/10"
+                                      onClick={() => {
+                                        resetGroupForm();
+                                        setShowCreateGroupForm(false);
+                                      }}
+                                      disabled={groupFormBusy}
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="submit"
+                                      className="px-2 py-1 border border-sky-300/60 rounded text-white bg-sky-500/40 hover:bg-sky-500/60 disabled:opacity-50"
+                                      disabled={groupFormBusy || !newGroupName.trim()}
+                                    >
+                                      Create
+                                    </button>
+                                  </div>
+                                </form>
+                              )}
+                              {groups.length > 0 && (
+                                <div className="flex flex-wrap gap-2 text-white/60">
+                                  {groups.map((group) => (
+                                    <button
+                                      key={group.id}
+                                      className="px-2 py-1 rounded border border-white/20 text-white/80 hover:bg-white/10"
+                                      onClick={() => openGroupChat(group.id)}
+                                    >
+                                      {group.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              {groups.length === 0 && !showCreateGroupForm && (
+                                <div className="text-white/60">You have no groups yet.</div>
+                              )}
+                            </div>
+
+                            <div className="flex flex-col gap-2 text-xs text-white/70">
+                              <span>Auto group</span>
+                              {autoRoom?.chat ? (
+                                <div className="flex flex-col gap-2 text-white/80">
+                                  <div>{autoRoom.chat.name} · {autoRoomMembers.length} people</div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      className="px-2 py-1 rounded border border-white/20 hover:bg-white/10"
+                                      onClick={() => openAutoChat()}
+                                    >
+                                      Open chat
+                                    </button>
+                                    <button
+                                      className="px-2 py-1 rounded border border-red-400/60 text-red-200 hover:bg-red-500/20"
+                                      onClick={() => void handleLeaveAutoRoom()}
+                                    >
+                                      Leave
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col gap-2 text-white/80">
+                                  <div>Join a pre-made room with up to 20 creators.</div>
+                                  <button
+                                    className="px-2 py-1 rounded border border-sky-300/60 text-white hover:bg-sky-500/40 disabled:opacity-60"
+                                    onClick={() => void handleJoinAutoRoom()}
+                                    disabled={!isAuthed || !isGroupAuthed}
+                                  >
+                                    Join auto room
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {socialView.kind === 'dm' && (
+                          <div className="flex flex-col gap-2 flex-1 min-h-0">
+                            <div className="text-xs text-white/70 flex items-center justify-between">
+                              <span>{activePeerLabel ?? 'Direct message'}</span>
                             </div>
                             <div className="flex-1 min-h-0">
                               <FriendMessagesPane
                                 messages={dmMessages || []}
-                                activePeerId={activePeerId}
+                                activePeerId={socialView.peerId}
+                                currentUserId={myUserId ?? undefined}
+                                meLabel={meDisplayName}
+                                peerLabel={activePeerLabel || 'Friend'}
                               />
                             </div>
-                          </>
+                          </div>
                         )}
 
-                        {friendTab==='group' && (
+                        {socialView.kind === 'group' && (
                           <div className="flex flex-col gap-2 flex-1 min-h-0">
                             <div className="flex items-center justify-between text-xs text-white/70">
-                              <div>
-                                {activeGroupSummary ? (
-                                  <span>{activeGroupSummary.name}</span>
-                                ) : (
-                                  <span>Select a group to start chatting.</span>
-                                )}
-                              </div>
+                              <span>{activeGroupSummary ? activeGroupSummary.name : 'Select a group to start chatting.'}</span>
                               {activeGroupSummary && (
                                 <button
                                   className="px-2 py-1 rounded border border-red-400/60 text-red-200 hover:bg-red-500/20"
-                                  onClick={() => { void leaveGroup(activeGroupSummary.id); }}
+                                  onClick={() => {
+                                    void leaveGroup(activeGroupSummary.id).then(() => {
+                                      openFriendsSettings();
+                                    });
+                                  }}
                                 >
                                   Leave group
                                 </button>
@@ -1111,16 +1256,17 @@ export default function AIAgentBar() {
                             </div>
                             <div className="flex-1 min-h-0">
                               <GroupMessagesPane
-                                active={Boolean(activeGroupId)}
+                                active={Boolean(activeGroupSummary)}
                                 emptyLabel="Select a group to view messages."
                                 messages={groupMessages}
                                 members={groupMembers}
+                                currentUserId={myUserId ?? undefined}
                               />
                             </div>
                           </div>
                         )}
 
-                        {friendTab==='auto' && (
+                        {socialView.kind === 'auto' && (
                           <div className="flex flex-col gap-2 flex-1 min-h-0">
                             <div className="text-xs text-white/70 flex items-center justify-between">
                               <span>{autoRoom?.chat ? autoRoom.chat.name : 'Auto group lobby'}</span>
@@ -1134,8 +1280,18 @@ export default function AIAgentBar() {
                                 emptyLabel="Join the auto room to start chatting."
                                 messages={autoRoomMessages}
                                 members={autoRoomMembers}
+                                currentUserId={myUserId ?? undefined}
                               />
                             </div>
+                            {!autoRoom?.chat && (
+                              <button
+                                className="self-start px-2 py-1 rounded border border-sky-300/60 text-white hover:bg-sky-500/40 disabled:opacity-60"
+                                onClick={() => void handleJoinAutoRoom()}
+                                disabled={!isAuthed || !isGroupAuthed}
+                              >
+                                Join auto room
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>

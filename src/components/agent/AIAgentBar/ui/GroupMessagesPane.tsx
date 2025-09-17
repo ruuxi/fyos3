@@ -6,9 +6,10 @@ export type GroupMessagesPaneProps = {
   emptyLabel: string;
   messages: GroupMessage[];
   members: GroupMember[];
+  currentUserId?: string;
 };
 
-export default function GroupMessagesPane({ active, emptyLabel, messages, members }: GroupMessagesPaneProps) {
+export default function GroupMessagesPane({ active, emptyLabel, messages, members, currentUserId }: GroupMessagesPaneProps) {
   const roster = members.map((m) => m.nickname || m.email || m.memberId.slice(0, 8));
 
   return (
@@ -44,14 +45,14 @@ export default function GroupMessagesPane({ active, emptyLabel, messages, member
         {active && messages.map((message) => {
           const key = message._id || message.id || `${message.createdAt}-${Math.random()}`;
           const senderLabel = message.senderNickname || message.senderEmail || message.senderId.slice(0, 8) || 'Member';
-          const isMine = false; // styling neutral timeline (all align left)
+          const isMine = currentUserId ? message.senderId === currentUserId : false;
           return (
             <div key={key} className={`text-sm flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-              <div className="max-w-full flex-1">
-                <div className="text-xs mb-1 text-white/60 pl-1">
+              <div className={`${isMine ? 'flex flex-col items-end max-w-[80%]' : 'max-w-full flex-1'}`}>
+                <div className={`text-xs mb-1 ${isMine ? 'text-white/60 pr-1' : 'text-white/60 pl-1'}`}>
                   {senderLabel}
                 </div>
-                <div className="inline-block max-w-[80%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words bg-white/10 border border-white/15 text-white">
+                <div className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${isMine ? 'bg-sky-500 text-white max-w-full' : 'inline-block max-w-[80%] bg-white/10 border border-white/15 text-white'}`}>
                   {message.content}
                 </div>
               </div>
@@ -62,4 +63,3 @@ export default function GroupMessagesPane({ active, emptyLabel, messages, member
     </div>
   );
 }
-
