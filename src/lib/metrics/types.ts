@@ -80,6 +80,8 @@ export type MetricEvent =
 
 export type SessionSummary = {
   sessionId: string;
+  // Optional friendly name/title for display
+  name?: string;
   clientChatId?: string;
   startedAt?: string;
   lastEventAt?: string;
@@ -95,10 +97,11 @@ export type SessionSummary = {
 
 export type SessionDetail = {
   sessionId: string;
+  // Optional friendly name/title for display
+  name?: string;
   clientChatId?: string;
   events: MetricEvent[]; // ordered chronologically
   timeline: MetricEvent[]; // alias for events (explicit for clarity)
   stepToToolMap: Record<number, string[]>; // stepIndex -> toolCallIds
   toolDurations: Record<string, number>; // toolCallId -> durationMs
 };
-

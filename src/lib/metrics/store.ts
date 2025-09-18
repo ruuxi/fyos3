@@ -26,12 +26,16 @@ declare global {
   var __FYOS_METRICS_SESSIONS__: Map<string, SessionBuffer> | undefined;
   // eslint-disable-next-line no-var
   var __FYOS_METRICS_CLIENT2SESSION__: Map<string, string> | undefined;
+  // eslint-disable-next-line no-var
+  var __FYOS_METRICS_SESSION_TITLES__: Map<string, string> | undefined;
 }
 
 const sessions: Map<string, SessionBuffer> =
   globalThis.__FYOS_METRICS_SESSIONS__ ?? (globalThis.__FYOS_METRICS_SESSIONS__ = new Map());
 const clientToSession: Map<string, string> =
   globalThis.__FYOS_METRICS_CLIENT2SESSION__ ?? (globalThis.__FYOS_METRICS_CLIENT2SESSION__ = new Map());
+const sessionTitles: Map<string, string> =
+  globalThis.__FYOS_METRICS_SESSION_TITLES__ ?? (globalThis.__FYOS_METRICS_SESSION_TITLES__ = new Map());
 
 function nowIso(): string { return new Date().toISOString(); }
 
@@ -73,6 +77,21 @@ export function mapClientToSession(clientChatId: string, sessionId: string) {
 
 export function getSessionIdForClient(clientChatId: string): string | undefined {
   return clientToSession.get(clientChatId);
+}
+
+// Session title helpers (in-memory for dev)
+export function getSessionName(sessionId: string): string | undefined {
+  return sessionTitles.get(sessionId);
+}
+
+export function setSessionName(sessionId: string, name: string | undefined) {
+  if (!metricsEnabled) return;
+  const trimmed = (name ?? '').trim();
+  if (!trimmed) {
+    sessionTitles.delete(sessionId);
+  } else {
+    sessionTitles.set(sessionId, trimmed);
+  }
 }
 
 export function appendEvent(event: MetricEvent): { inserted: boolean } {
@@ -183,6 +202,7 @@ export function getSessionsSummary(): SessionSummary[] {
 
     out.push({
       sessionId,
+      name: getSessionName(sessionId),
       clientChatId: buf.clientChatId,
       startedAt,
       lastEventAt,
@@ -221,6 +241,7 @@ export function getSessionDetail(sessionId: string): SessionDetail | undefined {
 
   return {
     sessionId,
+    name: getSessionName(sessionId),
     clientChatId: buf.clientChatId,
     events,
     timeline: events,
@@ -236,4 +257,5 @@ export function getAttributionStrategy(): string {
 export function clearAllForTests() {
   sessions.clear();
   clientToSession.clear();
+  sessionTitles.clear();
 }

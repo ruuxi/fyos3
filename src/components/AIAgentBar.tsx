@@ -54,7 +54,6 @@ export default function AIAgentBar() {
     refreshThreads,
     createNewThread,
     deleteThread,
-    renameThread,
   } = useThreads();
 
   const {
@@ -420,7 +419,6 @@ export default function AIAgentBar() {
               onRefresh={() => refreshThreads(false)}
               onCreate={() => createNewThread('New Chat')}
               onDelete={deleteThread}
-              onRename={renameThread}
             />
             <MessagesPane
               messages={messages}
@@ -500,3 +498,4 @@ export default function AIAgentBar() {
     </AgentBarShell>
   );
 }
+

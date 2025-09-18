@@ -1,11 +1,14 @@
 import { PRICING } from '@/lib/metrics/config';
 import type { MetricEvent, StepUsageEvent, ToolEndEvent, ToolStartEvent } from '@/lib/metrics/types';
 
-export type AttributionStrategy = 'equal' | 'durationWeighted' | 'payloadWeighted';
-
 type PerToolAttribution = Record<string, { inputTokens: number; outputTokens: number; totalTokens: number; cost: number; count: number; totalDurationMs: number; errors: number }>; // toolName aggregations
 
-export function computePerToolAttribution(events: MetricEvent[], strategy: AttributionStrategy = 'equal'): PerToolAttribution {
+export type TokenCounter = (s?: string) => number;
+
+export function computePerToolAttribution(
+  events: MetricEvent[],
+  opts?: { tokenCounter?: TokenCounter }
+): PerToolAttribution {
   const perTool: PerToolAttribution = {};
   const toolEndById = new Map<string, ToolEndEvent>();
   const toolStartById = new Map<string, ToolStartEvent>();
@@ -21,27 +24,17 @@ export function computePerToolAttribution(events: MetricEvent[], strategy: Attri
     const ids = (step.toolCallIds || []).filter(Boolean);
     if (ids.length === 0) continue;
 
-    // Determine weights
-    let weights: number[] = [];
-    if (strategy === 'durationWeighted') {
-      const durations = ids.map(id => toolEndById.get(id)?.durationMs || 0);
-      const sum = durations.reduce((a, b) => a + b, 0);
-      weights = sum > 0 ? durations.map(d => d / sum) : [];
-    } else if (strategy === 'payloadWeighted') {
-      const sizes = ids.map(id => {
-        const start = toolStartById.get(id);
-        const end = toolEndById.get(id);
-        const a = (start?.inputSummary || '').length;
-        const b = (end?.outputSummary || '').length;
-        return a + b;
-      });
-      const sum = sizes.reduce((a, b) => a + b, 0);
-      weights = sum > 0 ? sizes.map(s => s / sum) : [];
-    }
-    if (weights.length !== ids.length) {
-      // fallback to equal
-      weights = ids.map(() => 1 / ids.length);
-    }
+    // Determine weights using payload size (tokenizer-weighted if provided)
+    const count: TokenCounter = opts?.tokenCounter ?? ((s?: string) => (s ? Math.ceil(s.length / 4) : 0));
+    const sizes = ids.map(id => {
+      const start = toolStartById.get(id);
+      const end = toolEndById.get(id);
+      const a = count(start?.inputSummary);
+      const b = count(end?.outputSummary);
+      return a + b;
+    });
+    const sum = sizes.reduce((a, b) => a + b, 0);
+    const weights = sum > 0 ? sizes.map(s => s / sum) : ids.map(() => 1 / ids.length);
 
     // Split tokens per tool in this step
     ids.forEach((id, idx) => {

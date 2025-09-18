@@ -35,19 +35,19 @@ export function useAgentChat(opts: UseAgentChatOptions) {
   const runIdRef = React.useRef<string | null>(null);
 
   // Known client-executed tools (handled in-browser)
-  const CLIENT_TOOL_NAMES = React.useMemo(() => new Set([
-    'web_fs_find',
-    'web_fs_read',
-    'web_fs_write',
-    'web_fs_rm',
-    'web_exec',
-    'app_manage',
-    'validate_project',
-    'ai_generate',
-    'media_list',
-    'code_edit_ast',
-    'submit_plan',
-  ] as const), []);
+  const CLIENT_TOOL_NAMES: ReadonlySet<string> = React.useMemo(() => new Set<string>([
+  'web_fs_find',
+  'web_fs_read',
+  'web_fs_write',
+  'web_fs_rm',
+  'web_exec',
+  'app_manage',
+  'validate_project',
+  'ai_generate',
+  'media_list',
+  'code_edit_ast',
+  'submit_plan',
+  ]), []);
 
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id,
@@ -129,6 +129,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
       };
 
       try {
+        let metricsOutput: any = undefined;
         switch (tc.toolName) {
           case 'web_fs_find': {
             const { root = '.', maxDepth = 10, glob, prefix, limit = 200, offset = 0 } = (tc.input as any) ?? {};
@@ -158,6 +159,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             const page = filtered.slice(start, end);
             const nextOffset = end < filtered.length ? end : null;
             await logAndAddResult({ files: page, count: page.length, total: filtered.length, root, offset: start, nextOffset, hasMore: end < filtered.length, applied: { glob: !!glob, prefix: !!prefix } });
+            metricsOutput = { count: page.length, total: filtered.length, root, filters: { glob: !!glob, prefix: !!prefix }, readOnly: true };
             break;
           }
           case 'web_fs_read': {
@@ -165,11 +167,13 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             const content = await fnsRef.current.readFile(path, encoding);
             const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
             await logAndAddResult({ content, path, size: `${sizeKB}KB` });
+            metricsOutput = { path, bytes: Math.round(parseFloat(sizeKB) * 1024), readOnly: true };
             break;
           }
           case 'web_fs_write': {
             const { path, content, createDirs = true } = tc.input as { path: string; content: string; createDirs?: boolean };
-            const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
+            const sizeBytes = new TextEncoder().encode(content).length;
+            const sizeKB = (sizeBytes / 1024).toFixed(1);
             if (createDirs) {
               const dir = path.split('/').slice(0, -1).join('/') || '.';
               await fnsRef.current.mkdir(dir, true);
@@ -179,6 +183,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             try {
               const lower = path.toLowerCase();
               const isMedia = /(\.png|\.jpg|\.jpeg|\.webp|\.gif|\.mp3|\.wav|\.m4a|\.aac|\.mp4|\.webm|\.mov)$/i.test(lower);
+              metricsOutput = { path, bytes: sizeBytes, isMedia, underApps: /(^|\/)src\/apps\//.test(path) };
               if (isMedia) {
                 (async () => {
                   try {
@@ -210,6 +215,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             const { path, recursive = true } = tc.input as { path: string; recursive?: boolean };
             await fnsRef.current.remove(path, { recursive });
             addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, path, recursive } });
+            metricsOutput = { path, recursive };
             break;
           }
           case 'web_exec': {
@@ -257,12 +263,14 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             } else {
               addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { command: fullCommand, exitCode: result.exitCode, output: trimChars(result.output), cwd } });
             }
+            metricsOutput = { command: fullCommand, exitCode: result.exitCode, maybeProjectChange: isPkgMgrCmd };
             break;
           }
           case 'validate_project': {
             const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
             await runValidation(scope, files);
             addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, scope, files } });
+            metricsOutput = { scope, filesCount: Array.isArray(files) ? files.length : 0, readOnly: true };
             break;
           }
           case 'ai_generate': {
@@ -290,12 +298,14 @@ export function useAgentChat(opts: UseAgentChatOptions) {
                 const enrichedScope = { ...scope, threadId: activeThreadId || undefined, appId: scope?.appId, desktopId: scope?.desktopId, requestId } as any;
                 const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, enrichedScope);
                 addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, result: updated, persistedAssets, autoIngestedCount: ingestedCount } });
+                metricsOutput = { provider: 'fal', task: task || 'image', ingestedInputs: ingestedCount, persistedAssets: Array.isArray(persistedAssets) ? persistedAssets.length : 0 };
               } else if (provider === 'eleven') {
                 const res = await fetch('/api/ai/eleven', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(processedInput) });
                 if (!res.ok) throw new Error(`ElevenLabs API error: ${res.status} ${res.statusText}`);
                 const json = await res.json();
                 const { result: updated, persistedAssets } = await persistAssetsFromAIResult(json, scope);
                 addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, result: updated, persistedAssets, autoIngestedCount: ingestedCount } });
+                metricsOutput = { provider: 'eleven', task: task || 'music', ingestedInputs: ingestedCount, persistedAssets: Array.isArray(persistedAssets) ? persistedAssets.length : 0 };
               } else {
                 throw new Error(`Unsupported provider: ${String(provider)}`);
               }
@@ -349,6 +359,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
                 await fnsRef.current.writeFile(input.path, result.code);
               }
               addToolResult({ tool: 'code_edit_ast', toolCallId: tc.toolCallId, output: { ok: true, applied: result.applied, edits: result.edits, previewDiff: result.previewDiff, path: input.path, elapsedMs: result.elapsedMs, bytesChanged: result.applied ? Math.abs(result.code.length - content.length) : 0 } });
+              metricsOutput = { path: input.path, applied: result.applied, bytesChanged: result.applied ? Math.abs(result.code.length - content.length) : 0 };
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : String(err);
               addToolResult({ tool: 'code_edit_ast', toolCallId: tc.toolCallId, output: { ok: false, error: message, path: (tc.input as any).path } });
@@ -390,6 +401,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
                 }
               } catch {}
               addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, id: finalId, name: finalName, base } });
+              metricsOutput = { action: 'create', appId: finalId, base, registryChanged: true };
               break;
             }
             if (action === 'rename') {
@@ -402,6 +414,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
               registry[idx].name = newName;
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
               addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, id, oldName, newName } });
+              metricsOutput = { action: 'rename', id, oldName, newName, registryChanged: true };
               break;
             }
             if (action === 'remove') {
@@ -418,6 +431,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
               try { await fnsRef.current.remove(p1, { recursive: true }); } catch {}
               try { await fnsRef.current.remove(p2, { recursive: true }); } catch {}
               addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, id, name: appName, removedPaths: [p1, p2] } });
+              metricsOutput = { action: 'remove', id, removedPaths: [p1, p2], registryChanged: true };
               break;
             }
             addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: false, error: `Unsupported action: ${String(action)}` } });
@@ -428,7 +442,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
           }
         }
         // tool_end success after switch completes
-        try { await postIngest({ type: 'tool_end', toolCallId: tc.toolCallId, toolName: tc.toolName, durationMs: Date.now() - startTime, success: true }); } catch {}
+        try { await postIngest({ type: 'tool_end', toolCallId: tc.toolCallId, toolName: tc.toolName, durationMs: Date.now() - startTime, success: true, outputSummary: metricsOutput ? summarize(metricsOutput) : undefined }); } catch {}
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         await logAndAddResult({ error: message });

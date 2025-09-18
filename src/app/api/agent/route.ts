@@ -287,6 +287,9 @@ export async function POST(req: Request) {
 
   // Maintain step index for per-step usage events
   let stepIndexCounter = -1;
+  // Accumulate tool call ids between model steps to attribute the FOLLOW-UP
+  // model usage to the prior tools whose results it consumed.
+  let pendingToolCallIds: string[] = [];
 
   const result = streamText({
     model: 'openai/gpt-5',
@@ -314,14 +317,53 @@ export async function POST(req: Request) {
           cachedInputTokens: usage.cachedInputTokens,
         } : null,
       });
-      // Emit step usage metrics
+      // Attribution model:
+      // - Collect toolCallIds as they are issued by the model.
+      // - Attribute the NEXT step's token usage to the PREVIOUSLY issued tools
+      //   (whose results the model just consumed).
+      // - This aligns per-call cost with the work that produced the context.
       try {
         stepIndexCounter += 1;
-        const toolCallIds = Array.isArray(toolCalls) ? toolCalls.map((tc: any) => tc.toolCallId).filter(Boolean) : [];
+
+        const newToolIds: string[] = Array.isArray(toolCalls)
+          ? toolCalls.map((tc: any) => tc.toolCallId).filter(Boolean)
+          : [];
+
         const inputTokens = usage?.inputTokens ?? 0;
         const outputTokens = usage?.outputTokens ?? 0;
         const totalTokens = usage?.totalTokens ?? (inputTokens + outputTokens);
-        emitStepUsage({ sessionId, clientChatId, stepIndex: stepIndexCounter, inputTokens, outputTokens, totalTokens, toolCallIds, source: 'server' });
+
+        const hasUsage = (inputTokens || outputTokens || totalTokens) > 0;
+
+        // If we have usage, attribute it to the tools accumulated since the last step.
+        // We purposely do NOT attribute usage to tools created in this same step,
+        // since that usage typically represents the follow-up reasoning step.
+        const attributedIds: string[] = hasUsage ? [...pendingToolCallIds] : [];
+
+        // Emit step usage with the attributed tool ids (may be empty for pure-reasoning steps)
+        emitStepUsage({
+          sessionId,
+          clientChatId,
+          stepIndex: stepIndexCounter,
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          toolCallIds: attributedIds,
+          source: 'server',
+        });
+
+        // Update pending set: once we attribute, clear and start a new round.
+        // Always add newly requested tool ids to be attributed on the next step.
+        if (hasUsage) {
+          pendingToolCallIds = [];
+        }
+        if (newToolIds.length > 0) {
+          // Deduplicate while preserving order
+          const seen = new Set(pendingToolCallIds);
+          for (const id of newToolIds) {
+            if (!seen.has(id)) { pendingToolCallIds.push(id); seen.add(id); }
+          }
+        }
       } catch {}
     },
     onFinish: async (event) => {

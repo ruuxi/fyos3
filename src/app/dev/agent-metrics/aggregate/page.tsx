@@ -1,9 +1,8 @@
 "use client";
 import React from 'react';
-import type { AttributionStrategy } from '@/lib/metrics/attribution';
 
 type AggregateResponse = {
-  strategy: AttributionStrategy;
+  strategy: 'payloadWeighted';
   timeframe: { firstEventAt: string | null; lastEventAt: string | null };
   sessions: { count: number };
   totals: { toolCalls: number; inputTokens: number; outputTokens: number; totalTokens: number; totalCost: number };
@@ -31,13 +30,25 @@ type AggregateResponse = {
 
 export default function AgentMetricsAggregatePage() {
   const [data, setData] = React.useState<AggregateResponse | null>(null);
-  const [strategy, setStrategy] = React.useState<AttributionStrategy>('equal');
+  // Payload-weighted attribution only
   const [loading, setLoading] = React.useState<boolean>(false);
+  const [drawerOpen, setDrawerOpen] = React.useState<boolean>(false);
+  const drawerRef = React.useRef<HTMLDivElement | null>(null);
 
-  const fetchData = React.useCallback(async (s: AttributionStrategy) => {
+  type SessionSummary = {
+    sessionId: string;
+    clientChatId?: string;
+    startedAt?: string;
+    lastEventAt?: string;
+    messageCount: number;
+    toolCalls: number;
+  };
+  const [sessions, setSessions] = React.useState<SessionSummary[]>([]);
+
+  const fetchData = React.useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/metrics/aggregate?strategy=${encodeURIComponent(s)}`);
+      const res = await fetch(`/api/metrics/aggregate`);
       if (res.ok) {
         const json = await res.json();
         setData(json as AggregateResponse);
@@ -47,7 +58,37 @@ export default function AgentMetricsAggregatePage() {
     }
   }, []);
 
-  React.useEffect(() => { fetchData(strategy); }, [strategy, fetchData]);
+  React.useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Load sessions for drawer navigation
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/metrics/sessions');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled) return;
+        const list = (json.sessions || []) as SessionSummary[];
+        setSessions(list);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Close drawer when clicking outside of drawer and not on a button
+  React.useEffect(() => {
+    if (!drawerOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (drawerRef.current && drawerRef.current.contains(t)) return;
+      if (t.closest('button')) return; // allow button clicks elsewhere without closing
+      setDrawerOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [drawerOpen]);
 
   const tf = data?.timeframe;
   const fmt = (d: string | null) => (d ? new Date(d).toLocaleString() : '—');
@@ -57,26 +98,61 @@ export default function AgentMetricsAggregatePage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
         <h1 className="text-xl font-semibold">Agent Metrics — All Sessions</h1>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(v => !v)}
+            className="px-2 py-1 border rounded bg-white shadow hover:bg-slate-50 text-sm"
+          >
+            Session List
+          </button>
+        </div>
         <div className="ml-auto flex items-center gap-2">
-          <label className="text-sm text-slate-600">Attribution</label>
-          <select className="border rounded px-2 py-1 text-sm" value={strategy} onChange={(e) => setStrategy(e.target.value as AttributionStrategy)}>
-            <option value="equal">Equal (approx)</option>
-            <option value="durationWeighted">Duration-weighted</option>
-            <option value="payloadWeighted">Payload-weighted</option>
-          </select>
+          <span className="text-sm text-slate-600">Attribution:</span>
+          <span className="text-sm px-2 py-1 border rounded bg-white">Payload-weighted</span>
         </div>
       </div>
 
-      {/* Drawer-like handle for navigation back to single-session view */}
-      <div className="fixed top-1/2 -translate-y-1/2 z-40" style={{ right: 0 }}>
-        <div className="flex flex-col gap-2 items-center">
+      {/* Side Drawer: Sessions list (shared UX with single-session page) */}
+      <div
+        className={`fixed top-0 right-0 h-full w-[320px] max-w-full bg-white border-l shadow-xl transition-transform duration-200 ease-in-out z-40 ${drawerOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        role="complementary"
+        aria-label="Sessions Drawer"
+        ref={drawerRef}
+      >
+        <div className="flex items-center justify-between px-3 py-2 border-b">
+          <div className="font-medium">Sessions</div>
           <button
             type="button"
-            onClick={() => { try { window.location.href = '/dev/agent-metrics'; } catch {} }}
-            className="px-2 py-1 border rounded bg-white shadow hover:bg-slate-50 rotate-90 origin-center text-sm"
+            onClick={() => setDrawerOpen(false)}
+            className="text-sm px-2 py-1 border rounded bg-white hover:bg-slate-50"
           >
-            Single
+            Close
           </button>
+        </div>
+        <div className="overflow-y-auto max-h-[calc(100%-44px)]">
+          <ul className="divide-y">
+            {(sessions || []).map((s) => {
+              const last = s.lastEventAt ? new Date(s.lastEventAt).toLocaleString() : '—';
+              return (
+                <li key={s.sessionId}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try { window.location.href = `/dev/agent-metrics?sessionId=${encodeURIComponent(s.sessionId)}`; } catch {}
+                    }}
+                    className={`w-full text-left px-3 py-2 hover:bg-slate-50`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-mono text-xs truncate max-w-[200px]">{s.sessionId}</div>
+                      <div className="text-[11px] text-slate-500 ml-2">{last}</div>
+                    </div>
+                    <div className="text-[12px] text-slate-600 mt-0.5">msgs:{s.messageCount} · tools:{s.toolCalls}</div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </div>
 

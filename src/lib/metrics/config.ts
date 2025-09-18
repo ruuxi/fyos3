@@ -10,10 +10,10 @@ export const PRICING = {
   outputPerMillion: 10.0,
 } as const;
 
-// Default attribution strategy label
-export type AttributionStrategy = 'equal' | 'durationWeighted' | 'payloadWeighted';
+// Default attribution strategy label (single mode)
+export type AttributionStrategy = 'payloadWeighted';
 
-export const defaultAttributionStrategy: AttributionStrategy = 'equal';
+export const defaultAttributionStrategy: AttributionStrategy = 'payloadWeighted';
 
 // Session store limits
 export const SESSION_LIMITS = {
@@ -22,4 +22,3 @@ export const SESSION_LIMITS = {
   // Maximum number of recent sessions in summaries
   maxRecentSessions: 200,
 } as const;
-

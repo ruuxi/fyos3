@@ -15,7 +15,6 @@ type UseThreadsState = {
   refreshThreads: (selectFirstIfAny?: boolean) => Promise<void>;
   createNewThread: (title?: string) => Promise<void>;
   deleteThread: (id: string) => Promise<void>;
-  renameThread: (id: string, title: string) => Promise<void>;
   loadMessagesForThread: (id: string) => Promise<void>;
 };
 
@@ -29,7 +28,6 @@ export function useThreads(): UseThreadsState {
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const createThreadMutation = useMutation(convexApi.chat.createThread as any);
   const deleteThreadMutation = useMutation(convexApi.chat.deleteThread as any);
-  const renameThreadMutation = useMutation(convexApi.chat.renameThread as any);
 
   const threadsData = useQuery(
     convexApi.chat.listThreads as any,
@@ -114,18 +112,6 @@ export function useThreads(): UseThreadsState {
     }
   }
 
-  async function renameThread(id: string, title: string) {
-    try {
-      if (isAuthenticated) {
-        await renameThreadMutation({ threadId: id as any, title } as any);
-      }
-      // Optimistically update local state for snappy UX
-      setThreads(prev => prev.map(t => (String((t as any)._id) === id ? { ...t, title } : t)) as any);
-    } catch (e) {
-      console.error('Rename thread failed', e);
-    }
-  }
-
   // Keep local threads list in sync with query data
   useEffect(() => {
     if (threadsData !== undefined) {
@@ -204,8 +190,8 @@ export function useThreads(): UseThreadsState {
     refreshThreads,
     createNewThread,
     deleteThread,
-    renameThread,
     loadMessagesForThread,
   };
 }
+
 
