@@ -1,4 +1,5 @@
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
+import * as React from 'react';
 import { useChat } from '@ai-sdk/react';
 import { agentLogger } from '@/lib/agentLogger';
 import { persistAssetsFromAIResult, extractOriginalMediaUrlsFromResult } from '@/utils/ai-media';
@@ -30,22 +31,57 @@ type UseAgentChatOptions = {
 export function useAgentChat(opts: UseAgentChatOptions) {
   const { id, initialMessages, activeThreadId, threadsCount, wc, media, runValidation, attachmentsProvider } = opts;
 
+  // Per-request (send) session id for metrics scoping
+  const runIdRef = React.useRef<string | null>(null);
+
+  // Known client-executed tools (handled in-browser)
+  const CLIENT_TOOL_NAMES = React.useMemo(() => new Set([
+    'web_fs_find',
+    'web_fs_read',
+    'web_fs_write',
+    'web_fs_rm',
+    'web_exec',
+    'app_manage',
+    'validate_project',
+    'ai_generate',
+    'media_list',
+    'code_edit_ast',
+    'submit_plan',
+  ] as const), []);
+
   const { messages, sendMessage, status, stop, addToolResult } = useChat({
     id,
     messages: initialMessages,
     transport: new DefaultChatTransport({
       api: '/api/agent',
       prepareSendMessagesRequest({ messages, id }) {
-        const body: any = { id, messages };
+        // Persist a single run id for the entire user request (including
+        // auto re-sends triggered by tool results). Only start a new run when
+        // the last outgoing message is a user message, or if none exists yet.
+        const last = messages?.[messages.length - 1] as any | undefined;
+        const lastRole = last?.role;
+        const shouldStartNewRun = !runIdRef.current || lastRole === 'user';
+        if (shouldStartNewRun) {
+          runIdRef.current = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        }
+        const body: any = { id, messages, metricsSessionId: runIdRef.current };
         if (activeThreadId && threadsCount > 0) body.threadId = activeThreadId;
         return { body };
       },
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     async onToolCall({ toolCall }) {
-      if (toolCall.dynamic) return;
       const instanceRef = wc.instanceRef;
       const fnsRef = wc.fnsRef;
+      
+      type ToolCall = { toolName: string; toolCallId: string; input: unknown };
+      const tc = toolCall as ToolCall;
+
+      // Only handle known client-side tools here. Server-side tools (e.g., web_search)
+      // are executed on the server and already emit their own metrics.
+      if (!CLIENT_TOOL_NAMES.has(tc.toolName)) {
+        return;
+      }
 
       async function waitForInstance(timeoutMs = 6000, intervalMs = 120) {
         const start = Date.now();
@@ -58,21 +94,38 @@ export function useAgentChat(opts: UseAgentChatOptions) {
       if (!instanceRef.current) {
         await waitForInstance();
       }
+
+      const startTime = Date.now();
+      const summarize = (v: any) => {
+        try {
+          const s = typeof v === 'string' ? v : JSON.stringify(v);
+          return s.length > 2000 ? s.slice(0, 2000) + '…' : s;
+        } catch {
+          try { return String(v); } catch { return ''; }
+        }
+      };
+      const postIngest = async (payload: any) => {
+        try {
+          await fetch('/api/metrics/ingest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // Include explicit sessionId to avoid races with clientChatId→session mapping
+            body: JSON.stringify({ clientChatId: id, sessionId: runIdRef.current, event: payload }),
+          });
+        } catch {}
+      };
+      // Emit tool_start before executing
+      try { await postIngest({ type: 'tool_start', toolCallId: tc.toolCallId, toolName: tc.toolName, inputSummary: summarize(tc.input) }); } catch {}
+      // If instance is not ready even after waiting, emit failure and return
       if (!instanceRef.current) {
-        addToolResult({ tool: toolCall.toolName as string, toolCallId: toolCall.toolCallId, output: { error: 'WebContainer is not ready yet. Still initializing, try again in a moment.' } });
+        const output = { error: 'WebContainer is not ready yet. Still initializing, try again in a moment.' };
+        addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output });
+        try { await postIngest({ type: 'tool_end', toolCallId: tc.toolCallId, toolName: tc.toolName, durationMs: Date.now() - startTime, success: false, error: output.error, outputSummary: summarize(output) }); } catch {}
         return;
       }
 
-      type ToolCall = { toolName: string; toolCallId: string; input: unknown };
-      const tc = toolCall as ToolCall;
-
-      const startTime = Date.now();
       const logAndAddResult = async (output: any) => {
-        const duration = Date.now() - startTime;
         addToolResult({ tool: tc.toolName as string, toolCallId: tc.toolCallId, output });
-        try {
-          await agentLogger.logToolCall('client', tc.toolName, tc.toolCallId, tc.input, output, duration);
-        } catch {}
       };
 
       try {
@@ -374,14 +427,15 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             await logAndAddResult({ error: `Unhandled client tool: ${tc.toolName}` });
           }
         }
+        // tool_end success after switch completes
+        try { await postIngest({ type: 'tool_end', toolCallId: tc.toolCallId, toolName: tc.toolName, durationMs: Date.now() - startTime, success: true }); } catch {}
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         await logAndAddResult({ error: message });
+        try { await postIngest({ type: 'tool_end', toolCallId: tc.toolCallId, toolName: tc.toolName, durationMs: Date.now() - startTime, success: false, error: message, outputSummary: message }); } catch {}
       }
     },
   });
 
   return { messages, sendMessage, status, stop, addToolResult } as const;
 }
-
-

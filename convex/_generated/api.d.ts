@@ -14,7 +14,6 @@ import type * as desktops from "../desktops.js";
 import type * as desktops_private from "../desktops_private.js";
 import type * as media from "../media.js";
 import type * as messages from "../messages.js";
-import type * as metrics from "../metrics.js";
 import type * as r2 from "../r2.js";
 
 import type {
@@ -38,7 +37,6 @@ declare const fullApi: ApiFromModules<{
   desktops_private: typeof desktops_private;
   media: typeof media;
   messages: typeof messages;
-  metrics: typeof metrics;
   r2: typeof r2;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

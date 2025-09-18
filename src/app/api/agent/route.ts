@@ -16,6 +16,13 @@ import {
   SubmitPlanInput,
 } from '@/lib/agentTools';
 import { agentLogger } from '@/lib/agentLogger';
+import {
+  emitSessionInit,
+  emitUserMessage,
+  emitAssistantMessage,
+  emitStepUsage,
+  emitTotalUsage,
+} from '@/lib/metrics/store';
 import { 
   SYSTEM_PROMPT,
   PERSONA_PROMPT
@@ -23,7 +30,7 @@ import {
 import { promises as fs } from 'fs';
 import path from 'path';
 import { api as convexApi } from '../../../../convex/_generated/api';
-import { getInstalledAppNames, sanitizeToolInput, getConvexClientOptional } from '@/lib/agent/server/agentServerHelpers';
+import { getInstalledAppNames, getConvexClientOptional } from '@/lib/agent/server/agentServerHelpers';
 import { buildServerTools } from '@/lib/agent/server/agentServerTools';
 
 // Some tool actions (like package installs) may take longer than 30s
@@ -32,6 +39,9 @@ export const maxDuration = 300;
 export async function POST(req: Request) {
   const body = await req.json();
   const { messages, threadId, attachmentHints }: { messages: UIMessage[]; threadId?: string; attachmentHints?: Array<{ contentType: string; url: string }> } = body as any;
+  const clientChatId: string | undefined = (body as any)?.id;
+  // Allow client to provide a per-request metrics session id to ensure all events are scoped
+  const providedSessionId: string | undefined = (body as any)?.metricsSessionId;
 
   // If the client provided attachment hints, append them to the last user message
   const hints: Array<{ contentType: string; url: string }> = Array.isArray(attachmentHints) ? attachmentHints : [];
@@ -105,14 +115,20 @@ export async function POST(req: Request) {
     }
   }
   
-  // Generate session ID for this conversation
-  const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  // Generate or honor provided session ID for this conversation
+  const sessionId = providedSessionId || `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  // Map clientChatId -> sessionId (dev metrics)
+  if (clientChatId) {
+    try { emitSessionInit({ sessionId, clientChatId, source: 'server' }); } catch {}
+  }
   
   // Log the incoming user message
   const lastMessage = messagesWithHints[messagesWithHints.length - 1];
   if (lastMessage && lastMessage.role === 'user') {
     const content = lastMessage.parts?.map(p => p.type === 'text' ? p.text : '').join('') || '';
     await agentLogger.logMessage(sessionId, lastMessage.id, 'user', content);
+    // Emit metrics event for user message
+    try { emitUserMessage({ sessionId, clientChatId, messageId: lastMessage.id, content, source: 'server' }); } catch {}
     // Persist user message to Convex if threadId and auth are present
     if (threadId) {
       try {
@@ -269,8 +285,8 @@ export async function POST(req: Request) {
   // Use all available tools
   const tools = allTools;
 
-  // Track tool call timings to avoid duplicate logging
-  const toolCallTimings = new Map<string, number>();
+  // Maintain step index for per-step usage events
+  let stepIndexCounter = -1;
 
   const result = streamText({
     model: 'openai/gpt-5',
@@ -298,47 +314,15 @@ export async function POST(req: Request) {
           cachedInputTokens: usage.cachedInputTokens,
         } : null,
       });
-      
-      // Track start times for tool calls (for timing)
-      if (toolCalls?.length) {
-        console.log('🔧 [USAGE-STEP] Tool calls:', toolCalls.map((tc: any) => ({
-          name: tc.toolName,
-          id: tc.toolCallId?.substring(0, 8),
-        })));
-
-        // Record start times for duration tracking
-        for (const tc of toolCalls) {
-          toolCallTimings.set(tc.toolCallId, Date.now());
-        }
-      }
-
-      // Log completed tool calls with results and timing
-      if (toolResults?.length) {
-        for (const result of toolResults) {
-          const startTime = toolCallTimings.get(result.toolCallId) || Date.now();
-          const duration = Date.now() - startTime;
-          
-          // Sanitize large content from tool inputs before logging
-          const sanitizedInput = sanitizeToolInput(result.toolName || 'unknown', (result as any).args || (result as any).input || {});
-          
-          await agentLogger.logToolCall(
-            sessionId,
-            result.toolName || 'unknown',
-            result.toolCallId,
-            sanitizedInput,
-            {
-              result: (result as any).result,
-              state: (result as any).state,
-              isError: (result as any).isError || false,
-              errorMessage: (result as any).errorMessage
-            },
-            duration
-          );
-          
-          // Clean up timing tracking
-          toolCallTimings.delete(result.toolCallId);
-        }
-      }
+      // Emit step usage metrics
+      try {
+        stepIndexCounter += 1;
+        const toolCallIds = Array.isArray(toolCalls) ? toolCalls.map((tc: any) => tc.toolCallId).filter(Boolean) : [];
+        const inputTokens = usage?.inputTokens ?? 0;
+        const outputTokens = usage?.outputTokens ?? 0;
+        const totalTokens = usage?.totalTokens ?? (inputTokens + outputTokens);
+        emitStepUsage({ sessionId, clientChatId, stepIndex: stepIndexCounter, inputTokens, outputTokens, totalTokens, toolCallIds, source: 'server' });
+      } catch {}
     },
     onFinish: async (event) => {
       // Enhanced usage logging
@@ -353,6 +337,7 @@ export async function POST(req: Request) {
       // Log the complete assistant response including tool calls
       if (event.text) {
         await agentLogger.logMessage(sessionId, `assistant_${Date.now()}`, 'assistant', event.text);
+        try { emitAssistantMessage({ sessionId, clientChatId, messageId: `assistant_${Date.now()}`, content: event.text, source: 'server' }); } catch {}
         // Persist assistant message to Convex if threadId and auth are present
         if (threadId) {
           try {
@@ -367,7 +352,7 @@ export async function POST(req: Request) {
       // Tool calls are now logged in onStepFinish with proper timing and results
       // No need to duplicate logging here
 
-      // Detailed token usage logging
+      // Detailed token usage logging + metrics total
       if (event.usage) {
         console.log('📊 [USAGE-TOTAL] Token consumption:', {
           inputTokens: event.usage.inputTokens || 0,
@@ -378,14 +363,14 @@ export async function POST(req: Request) {
         });
 
         // Calculate cost estimates based on model pricing
-        // qwen3-coder: $2.00 per million tokens (input and output)
-        const inputCostPerMillion = 2.00; // $2.00 per 1M input tokens
-        const outputCostPerMillion = 2.00; // $2.00 per 1M output tokens
+        // Gpt-5
+        const inputCostPerMillion = 1.25; // $2.00 per 1M input tokens
+        const outputCostPerMillion = 10.00; // $2.00 per 1M output tokens
         const estimatedCost = 
           ((event.usage.inputTokens || 0) / 1000000) * inputCostPerMillion +
           ((event.usage.outputTokens || 0) / 1000000) * outputCostPerMillion;
         
-        console.log('💰 [USAGE-COST] qwen3-coder estimated cost: $' + estimatedCost.toFixed(6));
+        console.log('💰 [USAGE-COST] GPT-5 estimated cost: $' + estimatedCost.toFixed(6));
         
         // Log token usage and cost to file
         await agentLogger.logTokenUsage(
@@ -393,9 +378,22 @@ export async function POST(req: Request) {
           event.usage.inputTokens || 0,
           event.usage.outputTokens || 0,
           event.usage.totalTokens || 0,
-          'qwen3-coder',
+          'openai/gpt-5',
           estimatedCost
         );
+
+        // Emit metrics total_usage using model and pricing
+        try {
+          emitTotalUsage({
+            sessionId,
+            clientChatId,
+            inputTokens: event.usage.inputTokens || 0,
+            outputTokens: event.usage.outputTokens || 0,
+            totalTokens: event.usage.totalTokens || 0,
+            model: 'openai/gpt-5',
+            source: 'server',
+          });
+        } catch {}
       }
 
       // Log step-by-step breakdown if multiple steps

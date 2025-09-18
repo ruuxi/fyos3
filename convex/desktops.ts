@@ -1,7 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import r2 from "./r2";
-import { internal } from "./_generated/api";
 
 // Start publish: returns signed PUT URL and proposed r2 key
 export const publishDesktopStart = mutation({
@@ -78,7 +77,6 @@ export const publishDesktopFinalize = mutation({
       createdAt: now,
       updatedAt: now,
     });
-    try { await ctx.runMutation(internal.metrics.increment, { name: 'publish_desktops', by: 1 } as any); } catch {}
     return id;
   },
 });

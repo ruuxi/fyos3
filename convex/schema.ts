@@ -60,13 +60,6 @@ export default defineSchema({
     .index("by_target", ["targetType", "targetId"]) 
     .index("by_installedAt", ["installedAt"]),
 
-  metrics_daily: defineTable({
-    day: v.string(), // YYYY-MM-DD
-    name: v.string(), // e.g., installs, publish_apps, publish_desktops
-    count: v.number(),
-  })
-    .index("by_day_name", ["day", "name"]),
-  
   media_public: defineTable({
     ownerId: v.string(),
     desktopId: v.optional(v.string()),

@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { MetricEvent, StepUsageEvent, ToolEndEvent } from '@/lib/metrics/types';
+import type { MetricEvent, StepUsageEvent, ToolEndEvent, ToolStartEvent, TotalUsageEvent } from '@/lib/metrics/types';
 import { computePerToolAttribution, type AttributionStrategy } from '@/lib/metrics/attribution';
 
 type SessionSummary = {
@@ -92,8 +92,8 @@ export default function AgentMetricsPage() {
       acc.total += s.totalTokens || 0;
       return acc;
     }, { input: 0, output: 0, total: 0 });
-    const end = ordered.findLast ? (ordered as any).findLast((e: MetricEvent) => e.type === 'total_usage') : [...ordered].reverse().find((e) => e.type === 'total_usage');
-    const totalCost = end?.type === 'total_usage' ? (end as any).totalCost : ((sum.input / 1_000_000) * 1.25 + (sum.output / 1_000_000) * 10);
+    const end = [...ordered].reverse().find((e) => e.type === 'total_usage') as TotalUsageEvent | undefined;
+    const totalCost = end ? end.totalCost : ((sum.input / 1_000_000) * 1.25 + (sum.output / 1_000_000) * 10);
     return { ...sum, cost: totalCost };
   }, [ordered]);
 
@@ -179,10 +179,10 @@ export default function AgentMetricsPage() {
                 <span className="font-mono text-xs text-slate-500">{new Date(e.timestamp).toLocaleTimeString()}</span>
                 <span className="ml-2 font-semibold">{e.type}</span>
                 {e.type === 'tool_start' && (
-                  <span className="ml-2 text-slate-600">{(e as any).toolName} <span className="text-slate-400">({(e as any).toolCallId})</span></span>
+                  <span className="ml-2 text-slate-600">{(e as ToolStartEvent).toolName} <span className="text-slate-400">{`(${(e as ToolStartEvent).toolCallId})`}</span></span>
                 )}
                 {e.type === 'tool_end' && (
-                  <span className="ml-2 text-slate-600">{(e as any).toolName} <span className="text-slate-400">({(e as any).toolCallId})</span> — {(e as any).durationMs}ms {(e as any).success ? '' : '×'}</span>
+                  <span className="ml-2 text-slate-600">{(e as ToolEndEvent).toolName} <span className="text-slate-400">{`(${(e as ToolEndEvent).toolCallId})`}</span> — {(e as ToolEndEvent).durationMs}ms {((e as ToolEndEvent).success ? '' : '×')}</span>
                 )}
                 {e.type === 'step_usage' && (
                   <span className="ml-2 text-slate-600">step {(e as StepUsageEvent).stepIndex} — tokens {(e as StepUsageEvent).totalTokens} — tools {(e as StepUsageEvent).toolCallIds.length}</span>
@@ -217,4 +217,3 @@ export default function AgentMetricsPage() {
     </div>
   );
 }
-
