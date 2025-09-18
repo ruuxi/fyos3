@@ -115,6 +115,13 @@ const hasOptimisticFlag = (metadata: unknown | undefined): boolean => {
   return Boolean(metadata && typeof metadata === 'object' && (metadata as AgentMessageMetadata).optimistic === true);
 };
 
+const welcomeSuggestions = [
+  'Create an app',
+  'Change my background',
+  'Add sound effects on clicks',
+  'Help me get started',
+] as const;
+
 export type MessagesPaneProps = {
   messages: AgentMessage[];
   optimisticMessages?: OptimisticMessage[];
@@ -127,6 +134,7 @@ export type MessagesPaneProps = {
   lastSentAttachments?: AttachmentPreview[];
   activeThreadId?: string;
   agentActive: boolean;
+  onSuggestionSelect?: (text: string) => void;
 };
 
 function extractAttachmentsFromText(text: string): { cleanedText: string; items: AttachmentPreview[] } {
@@ -269,6 +277,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
     lastSentAttachments,
     activeThreadId,
     agentActive,
+    onSuggestionSelect,
   } = props;
   const displayMessages: DisplayMessage[] = optimisticMessages.length > 0 ? [...messages, ...optimisticMessages] : messages;
   const { isAuthenticated } = useConvexAuth();
@@ -299,7 +308,19 @@ export default function MessagesPane(props: MessagesPaneProps) {
             <div className="max-w-full flex-1">
               <div className="text-xs mb-1 text-white/60 pl-1">AI Agent</div>
               <div className={`inline-block max-w-[80%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words bg-white/10 border border-white/15 text-white ${!didAnimateWelcome ? 'ios-pop' : ''}`}>
-                {"Hello! I'm your AI assistant. I can help you create apps, modify files, and manage your WebContainer workspace."}
+                {"Hello! What can I do for you?"}
+              </div>
+              <div className="flex flex-wrap gap-2 mt-3 pl-1" aria-label="Suggested prompts">
+                {welcomeSuggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    className="rounded-2xl border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                    onClick={() => onSuggestionSelect?.(suggestion)}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

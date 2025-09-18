@@ -479,6 +479,9 @@ export default function AIAgentBar() {
                             lastSentAttachments={lastSentAttachments || undefined}
                             activeThreadId={activeThreadId || undefined}
                             agentActive={agentActive}
+                            onSuggestionSelect={(text) => {
+                              setInput(text);
+                            }}
                           />
                         </div>
                       </>
