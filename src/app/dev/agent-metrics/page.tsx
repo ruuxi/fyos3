@@ -25,6 +25,7 @@ export default function AgentMetricsPage() {
   const [events, setEvents] = useState<MetricEvent[]>([]);
   const [strategy, setStrategy] = useState<AttributionStrategy>('equal');
   const esRef = useRef<EventSource | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Load session list and pick the most recent
   useEffect(() => {
@@ -226,13 +227,69 @@ export default function AgentMetricsPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <label className="text-sm">Session:</label>
-        <select className="border rounded px-2 py-1 text-sm min-w-[280px]" value={selected ?? ''} onChange={(e) => setSelected(e.target.value)}>
-          {(sessions || []).map(s => (
-            <option key={s.sessionId} value={s.sessionId}>{s.sessionId} — msgs:{s.messageCount} tools:{s.toolCalls}</option>
-          ))}
-        </select>
+      {/* Drawer handle/tab on left side of drawer (always visible) */}
+      <div
+        className="fixed top-1/2 -translate-y-1/2 z-40"
+        style={{ right: drawerOpen ? 320 : 0 }}
+      >
+        <div className="flex flex-col gap-2 items-center">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(v => !v)}
+            className="px-2 py-1 border rounded bg-white shadow hover:bg-slate-50 rotate-90 origin-center text-sm"
+            aria-label={drawerOpen ? 'Close sessions drawer' : 'Open sessions drawer'}
+          >
+            Sessions
+          </button>
+          <button
+            type="button"
+            onClick={() => { try { window.location.href = '/dev/agent-metrics/aggregate'; } catch {} }}
+            className="px-2 py-1 border rounded bg-white shadow hover:bg-slate-50 rotate-90 origin-center text-sm"
+          >
+            Summary
+          </button>
+        </div>
+      </div>
+
+      {/* Side Drawer: Sessions list (no backdrop) */}
+      <div
+        className={`fixed top-0 right-0 h-full w-[320px] max-w-full bg-white border-l shadow-xl transition-transform duration-200 ease-in-out z-40 ${drawerOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        role="complementary"
+        aria-label="Sessions Drawer"
+      >
+        <div className="flex items-center justify-between px-3 py-2 border-b">
+          <div className="font-medium">Sessions</div>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(false)}
+            className="text-sm px-2 py-1 border rounded bg-white hover:bg-slate-50"
+          >
+            Close
+          </button>
+        </div>
+        <div className="overflow-y-auto max-h-[calc(100%-44px)]">
+          <ul className="divide-y">
+            {(sessions || []).map((s) => {
+              const isActive = selected === s.sessionId;
+              const last = s.lastEventAt ? new Date(s.lastEventAt).toLocaleString() : '—';
+              return (
+                <li key={s.sessionId}>
+                  <button
+                    type="button"
+                    onClick={() => { setSelected(s.sessionId); setDrawerOpen(false); }}
+                    className={`w-full text-left px-3 py-2 hover:bg-slate-50 ${isActive ? 'bg-slate-100' : ''}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-mono text-xs truncate max-w-[200px]">{s.sessionId}</div>
+                      <div className="text-[11px] text-slate-500 ml-2">{last}</div>
+                    </div>
+                    <div className="text-[12px] text-slate-600 mt-0.5">msgs:{s.messageCount} · tools:{s.toolCalls}</div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
