@@ -127,14 +127,6 @@ export const MediaListInput = z.object({
   responseFormat: ResponseFormat.optional().describe('concise (default) or detailed.'),
 });
 
-// Submit/update app plan.md
-export const SubmitPlanInput = z.object({
-  appId: z.string().describe('Target app id (kebab-case).'),
-  planText: z.string().describe('Full markdown content for plan.md.'),
-  mode: z.enum(['create', 'update']).default('create').describe('Create or update plan.md.'),
-  section: z.string().optional().describe('Optional subsection to update (future use).'),
-});
-
 // Types
 export type TWebFsFindInput = z.infer<typeof WebFsFindInput>;
 export type TWebFsReadInput = z.infer<typeof WebFsReadInput>;
@@ -147,8 +139,6 @@ export type TCodeEditAstInput = z.infer<typeof CodeEditAstInput>;
 export type TWebSearchInput = z.infer<typeof WebSearchInput>;
 export type TAiGenerateInput = z.infer<typeof AiGenerateInput>;
 export type TMediaListInput = z.infer<typeof MediaListInput>;
-export type TSubmitPlanInput = z.infer<typeof SubmitPlanInput>;
-
 // Tool names
 export const TOOL_NAMES = {
   web_fs_find: 'web_fs_find',
@@ -162,7 +152,6 @@ export const TOOL_NAMES = {
   ai_generate: 'ai_generate',
   media_list: 'media_list',
   code_edit_ast: 'code_edit_ast',
-  submit_plan: 'submit_plan',
 } as const;
 
 export type ToolName = typeof TOOL_NAMES[keyof typeof TOOL_NAMES];

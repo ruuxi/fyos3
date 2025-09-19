@@ -12,7 +12,6 @@ import {
   AiGenerateInput,
   MediaListInput,
   CodeEditAstInput,
-  SubmitPlanInput,
 } from '@/lib/agentTools';
 import { agentLogger } from '@/lib/agentLogger';
 import { SYSTEM_PROMPT } from '@/lib/prompts';
@@ -276,10 +275,6 @@ export async function POST(req: Request) {
     [TOOL_NAMES.app_manage]: {
       description: 'Manage apps via action=create|rename|remove; handles scaffolding and registry updates.',
       inputSchema: AppManageInput,
-    },
-    [TOOL_NAMES.submit_plan]: {
-      description: 'Create or update src/apps/<id>/plan.md with structured plan text.',
-      inputSchema: SubmitPlanInput,
     },
     // Validation
     [TOOL_NAMES.validate_project]: {

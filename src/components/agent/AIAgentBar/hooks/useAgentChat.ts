@@ -376,20 +376,6 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             }
             break;
           }
-          case 'submit_plan': {
-            const { appId, planText } = tc.input as { appId: string; planText: string };
-            try {
-              const base = `src/apps/${appId}`;
-              await fnsRef.current.mkdir(base, true);
-              const path = `${base}/plan.md`;
-              await fnsRef.current.writeFile(path, planText);
-              addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, path, bytes: planText.length } });
-            } catch (err: unknown) {
-              const message = err instanceof Error ? err.message : String(err);
-              addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: false, error: message } });
-            }
-            break;
-          }
           case 'code_edit_ast': {
             const input = tc.input as CodeEditAstInput;
             try {
