@@ -7,6 +7,7 @@ import { useAgentChat } from './useAgentChat';
 import { useValidationDiagnostics } from './useValidationDiagnostics';
 import { getMutableWindow } from '../utils/window';
 import type { Attachment } from '../ui/ChatComposer';
+import type { Id } from '../../../../convex/_generated/dataModel';
 
 export type OptimisticChatMessage = {
   id: string;
@@ -48,6 +49,7 @@ type AgentThreadsState = ReturnType<typeof useThreads> & {
   showThreadHistory: boolean;
   setShowThreadHistory: Dispatch<SetStateAction<boolean>>;
   activeThreadIdImmediateRef: MutableRefObject<string | null>;
+  activeThreadConvexIdImmediateRef: MutableRefObject<Id<'chat_threads'> | null>;
 };
 
 type AgentChatState = {
@@ -88,6 +90,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     threadsLoading,
     threadsError,
     activeThreadId,
+    activeThreadConvexId,
     setActiveThreadId,
     initialChatMessages,
     chatSessionKey,
@@ -108,6 +111,8 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
   const skipOptimisticClearRef = useRef(false);
   const activeThreadIdImmediateRef = useRef<string | null>(activeThreadId);
   useEffect(() => { activeThreadIdImmediateRef.current = activeThreadId; }, [activeThreadId]);
+  const activeThreadConvexIdImmediateRef = useRef<Id<'chat_threads'> | null>(activeThreadConvexId);
+  useEffect(() => { activeThreadConvexIdImmediateRef.current = activeThreadConvexId; }, [activeThreadConvexId]);
 
   useEffect(() => {
     if (skipOptimisticClearRef.current) {
@@ -141,7 +146,9 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     id: chatSessionKey,
     initialMessages: initialChatMessages,
     activeThreadId,
+    activeThreadConvexId,
     getActiveThreadId: () => activeThreadIdImmediateRef.current,
+    getActiveThreadConvexId: () => activeThreadConvexIdImmediateRef.current,
     wc: { instanceRef, fnsRef },
     media: { loadMedia },
     runValidation,
@@ -155,6 +162,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     onToolProgress: (_toolName: string) => {
       // Tool progress callback
     },
+    canPersistTranslations: isChatAuthenticated,
   });
 
   useEffect(() => { statusRef.current = status; }, [status]);
@@ -425,6 +433,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     threadsLoading,
     threadsError,
     activeThreadId,
+    activeThreadConvexId,
     setActiveThreadId,
     initialChatMessages,
     chatSessionKey,
@@ -436,12 +445,14 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     showThreadHistory,
     setShowThreadHistory,
     activeThreadIdImmediateRef,
+    activeThreadConvexIdImmediateRef,
   }), [
     openThreads,
     historyThreads,
     threadsLoading,
     threadsError,
     activeThreadId,
+    activeThreadConvexId,
     setActiveThreadId,
     initialChatMessages,
     chatSessionKey,
@@ -451,6 +462,8 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     closeThread,
     isChatAuthenticated,
     showThreadHistory,
+    activeThreadIdImmediateRef,
+    activeThreadConvexIdImmediateRef,
   ]);
 
   const chatState: AgentChatState = {

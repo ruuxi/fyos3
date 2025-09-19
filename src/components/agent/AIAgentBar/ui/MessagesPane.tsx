@@ -329,10 +329,30 @@ export default function MessagesPane(props: MessagesPaneProps) {
           const metadata = 'metadata' in m ? (m.metadata as AgentMessageMetadata | undefined) : undefined;
           const mode = resolveMode(m);
           const translatorMeta = metadata?.translator;
-          const shouldShowOriginalText = mode !== 'agent';
-          const translatorState = translatorMeta?.state ?? null;
-          const awaitingTranslation = mode === 'agent' && translatorState !== 'done' && translatorState !== 'error';
-          const showCarousel = awaitingTranslation && (agentActive || translatorState === 'translating' || translatorState === null);
+          const isAssistant = m.role === 'assistant';
+          let isFinalAgentReply = true;
+          if (isAssistant && mode === 'agent') {
+            for (let cursor = idx + 1; cursor < displayMessages.length; cursor += 1) {
+              const next = displayMessages[cursor];
+              if (!next) break;
+              if (next.role === 'user') break;
+              if (next.role === 'assistant') {
+                isFinalAgentReply = false;
+                break;
+              }
+            }
+          }
+          const translatorState = isAssistant && mode === 'agent' && typeof translatorMeta?.state === 'string'
+            ? translatorMeta.state
+            : undefined;
+          const awaitingTranslation = isAssistant && isFinalAgentReply && mode === 'agent' && translatorState !== 'done' && translatorState !== 'error';
+          const showCarousel = awaitingTranslation && (
+            agentActive ||
+            translatorState === 'translating' ||
+            translatorState === 'pending' ||
+            translatorState === undefined
+          );
+          const allowOriginalText = !(isAssistant && mode === 'agent');
 
           // Build content and collect any attachments referenced in text
           const textNodes: ReactNode[] = [];
@@ -340,7 +360,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
           (m.parts || []).forEach((part, index: number) => {
             if (isTextPart(part)) {
               const { cleanedText, items } = extractAttachmentsFromText(part.text || '');
-              if (shouldShowOriginalText && cleanedText) {
+              if (allowOriginalText && cleanedText) {
                 textNodes.push(<span key={`t-${index}`}>{cleanedText}</span>);
               }
               if (items.length) {
@@ -354,9 +374,11 @@ export default function MessagesPane(props: MessagesPaneProps) {
             ? collectedFromText
             : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
 
-          // Determine if this is the last assistant message to attach live media below
-          const isAssistant = m.role === 'assistant';
-          const isLastAssistant = isAssistant && displayMessages.slice(idx + 1).every(mm => mm.role !== 'assistant');
+          // Hide non-final agent replies to avoid intermediate output flashes
+          if (isAssistant && mode === 'agent' && !isFinalAgentReply) {
+            return null;
+          }
+
           const personaLabel = 'Sim';
           const authorLabel = m.role === 'assistant' ? (mode === 'persona' ? personaLabel : 'AI Agent') : 'You';
           const assistantBubble = mode === 'persona'
@@ -375,13 +397,25 @@ export default function MessagesPane(props: MessagesPaneProps) {
             : undefined;
 
           const textContent: ReactNode | ReactNode[] = (() => {
+            if (!isAssistant) {
+              return textNodes;
+            }
             if (mode !== 'agent') {
               return textNodes;
             }
-            if (translatorState === 'done' && Array.isArray(translatorMeta?.outputs) && translatorMeta.outputs.length > 0) {
-              return translatorMeta.outputs.map((text, index) => (
-                <span key={`translated-${index}`}>{text}</span>
-              ));
+            if (translatorState === 'done') {
+              const outputs = Array.isArray(translatorMeta?.outputs)
+                ? translatorMeta.outputs.filter((text): text is string => typeof text === 'string' && text.trim().length > 0)
+                : [];
+              if (outputs.length > 0) {
+                const latest = outputs[outputs.length - 1];
+                return <span>{latest}</span>;
+              }
+              return (
+                <span className="text-white/70">
+                  Translation missing. Original reply is hidden.
+                </span>
+              );
             }
             if (translatorState === 'error') {
               return (
@@ -390,13 +424,10 @@ export default function MessagesPane(props: MessagesPaneProps) {
                 </span>
               );
             }
-            if (translatorState === 'done') {
-              return textNodes;
-            }
             if (showCarousel) {
               return <AgentVerbCarousel />;
             }
-            return <AgentVerbCarousel />;
+            return null;
           })();
 
           return (
@@ -494,7 +525,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   )}
 
                   {/* Reactive media: if authenticated and thread-bound media exists, show new thumbnails below last assistant message */}
-                  {isLastAssistant && liveMediaList.length > 0 && (
+                  {isFinalAgentReply && liveMediaList.length > 0 && (
                     <div className="mt-2 space-y-2">
                       {liveMediaList.map((asset, assetIndex) => {
                         const publicUrl = asset.publicUrl || '';

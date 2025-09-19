@@ -13,6 +13,7 @@ type UseThreadsState = {
   threadsLoading: boolean;
   threadsError: string | null;
   activeThreadId: string | null;
+  activeThreadConvexId: Id<'chat_threads'> | null;
   setActiveThreadId: (id: string | null, opts?: { ensureOpen?: boolean }) => void;
   initialChatMessages: UIMessage[] | undefined;
   chatSessionKey: string;
@@ -37,7 +38,18 @@ function normalizeTitle(title?: string) {
 
 type ThreadDoc = Pick<Doc<'chat_threads'>, '_id' | 'title' | 'updatedAt' | 'lastMessageAt' | 'createdAt'> & { id?: string };
 
-type MessageDoc = Pick<Doc<'chat_messages'>, '_id' | 'role' | 'content' | 'mode' | 'createdAt'> & { id?: string };
+type MessageDoc = Pick<Doc<'chat_messages'>,
+  '_id'
+  | 'role'
+  | 'content'
+  | 'mode'
+  | 'createdAt'
+  | 'contentHash'
+  | 'translatorState'
+  | 'translatorOutputs'
+  | 'translatorError'
+  | 'translatorUpdatedAt'
+> & { id?: string };
 
 function mapThread(doc: ThreadDoc): ChatThread {
   return {
@@ -51,10 +63,34 @@ function mapThread(doc: ThreadDoc): ChatThread {
 function mapMessage(doc: MessageDoc): UIMessage {
   const parts: UIMessage['parts'] = [{ type: 'text', text: String(doc.content ?? '') }];
   const mode: ChatMode | undefined = doc.mode === 'persona' ? 'persona' : doc.mode === 'agent' ? 'agent' : undefined;
+  const translatorState = typeof doc.translatorState === 'string' ? doc.translatorState : undefined;
+  const translatorOutputs = Array.isArray(doc.translatorOutputs)
+    ? doc.translatorOutputs.filter((item): item is string => typeof item === 'string' && item.length > 0)
+    : undefined;
+  const translatorError = typeof doc.translatorError === 'string' ? doc.translatorError : undefined;
+  const translatorHash = typeof doc.contentHash === 'string' ? doc.contentHash : undefined;
+  const translatorUpdatedAt = typeof doc.translatorUpdatedAt === 'number' ? doc.translatorUpdatedAt : undefined;
+  const translatorMeta = (() => {
+    if (!translatorState && !translatorOutputs && !translatorError && !translatorHash && !translatorUpdatedAt) {
+      return undefined;
+    }
+    const meta: Record<string, unknown> = {};
+    if (translatorState) meta.state = translatorState;
+    if (translatorOutputs && translatorOutputs.length > 0) meta.outputs = translatorOutputs;
+    if (translatorError) meta.error = translatorError;
+    if (translatorHash) meta.hash = translatorHash;
+    if (translatorUpdatedAt) meta.updatedAt = translatorUpdatedAt;
+    return meta;
+  })();
+
+  const metadata: Record<string, unknown> = {};
+  if (mode) metadata.mode = mode;
+  if (translatorMeta) metadata.translator = translatorMeta;
+
   return {
     id: String(doc._id ?? doc.id ?? Math.random().toString(36).slice(2)),
     role: doc.role === 'assistant' ? 'assistant' : 'user',
-    metadata: mode ? { mode } : undefined,
+    metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     parts,
   };
 }
@@ -63,6 +99,7 @@ export function useThreads(): UseThreadsState {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [threadsError, setThreadsError] = useState<string | null>(null);
   const [activeThreadIdState, setActiveThreadIdState] = useState<string | null>(null);
+  const [activeThreadConvexId, setActiveThreadConvexId] = useState<Id<'chat_threads'> | null>(null);
   const [initialChatMessages, setInitialChatMessages] = useState<UIMessage[] | undefined>(undefined);
   const [chatSessionKey, setChatSessionKey] = useState<string>('agent-chat');
   const [openThreadIds, setOpenThreadIds] = useState<string[]>([]);
@@ -138,6 +175,9 @@ export function useThreads(): UseThreadsState {
     threadIdMapRef.current = nextMap;
     setThreads(converted);
 
+    const resolvedActive = activeThreadIdState ? nextMap.get(activeThreadIdState) ?? null : null;
+    setActiveThreadConvexId(resolvedActive ?? null);
+
     const availableIds = new Set(converted.map((t) => t._id));
     const filteredOpen = openThreadIds.filter((id) => availableIds.has(id));
     const openChanged = filteredOpen.length !== openThreadIds.length || filteredOpen.some((id, idx) => id !== openThreadIds[idx]);
@@ -150,6 +190,11 @@ export function useThreads(): UseThreadsState {
       setActiveThreadIdState(fallback ?? null);
     }
   }, [isAuthenticated, threadsData, openThreadIds, activeThreadIdState]);
+
+  useEffect(() => {
+    const resolved = activeThreadIdState ? threadIdMapRef.current.get(activeThreadIdState) ?? null : null;
+    setActiveThreadConvexId(resolved ?? null);
+  }, [activeThreadIdState, threadsData]);
 
   // Seed initial messages when the active thread changes
   useEffect(() => {
@@ -183,6 +228,7 @@ export function useThreads(): UseThreadsState {
       setActiveThreadIdState(null);
       setInitialChatMessages([]);
       setChatSessionKey(`ephemeral:${Date.now()}`);
+      setActiveThreadConvexId(null);
     }
   }, [isAuthenticated, authLoading]);
 
@@ -203,6 +249,8 @@ export function useThreads(): UseThreadsState {
   const setActiveThreadId = useCallback((id: string | null, opts?: { ensureOpen?: boolean }) => {
     activeThreadIdRef.current = id;
     setActiveThreadIdState(id);
+    const resolved = id ? threadIdMapRef.current.get(id) ?? null : null;
+    setActiveThreadConvexId(resolved ?? null);
     if (id && opts?.ensureOpen !== false) {
       setOpenThreadIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
     }
@@ -231,6 +279,7 @@ export function useThreads(): UseThreadsState {
         setOpenThreadIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
         activeThreadIdRef.current = id;
         setActiveThreadIdState(id);
+        setActiveThreadConvexId(tid);
 
         if (bootstrap) {
           const welcomeMessage: UIMessage = {
@@ -354,6 +403,7 @@ export function useThreads(): UseThreadsState {
     threadsLoading,
     threadsError,
     activeThreadId: activeThreadIdState,
+    activeThreadConvexId,
     setActiveThreadId,
     initialChatMessages,
     chatSessionKey,
