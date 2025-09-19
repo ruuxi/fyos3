@@ -129,15 +129,6 @@ export default defineSchema({
     content: v.string(),
     mode: v.optional(v.union(v.literal("agent"), v.literal("persona"))),
     contentHash: v.optional(v.string()),
-    translatorState: v.optional(v.union(
-      v.literal("pending"),
-      v.literal("translating"),
-      v.literal("done"),
-      v.literal("error")
-    )),
-    translatorOutputs: v.optional(v.array(v.string())),
-    translatorError: v.optional(v.string()),
-    translatorUpdatedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_thread", ["threadId"]) 

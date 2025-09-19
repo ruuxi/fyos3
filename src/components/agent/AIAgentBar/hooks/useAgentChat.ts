@@ -1,16 +1,13 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import type React from 'react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type TextUIPart, type UIMessage } from 'ai';
 import { useChat } from '@ai-sdk/react';
-import { useMutation } from 'convex/react';
 import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
 import { agentLogger } from '@/lib/agentLogger';
 import { persistAssetsFromAIResult, extractOriginalMediaUrlsFromResult, type MediaScope } from '@/utils/ai-media';
 import { autoIngestInputs } from '@/utils/auto-ingest';
 import { guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 import type { TCodeEditAstInput } from '@/lib/agentTools';
-import { api as convexApi } from '../../../../../convex/_generated/api';
-import type { Id } from '../../../../../convex/_generated/dataModel';
 
 type WebContainerFns = {
   mkdir: (path: string, recursive?: boolean) => Promise<void>;
@@ -26,8 +23,6 @@ type UseAgentChatOptions = {
   initialMessages?: UIMessage[];
   activeThreadId: string | null;
   getActiveThreadId?: () => string | null;
-  activeThreadConvexId: Id<'chat_threads'> | null;
-  getActiveThreadConvexId?: () => Id<'chat_threads'> | null;
   wc: {
     instanceRef: React.MutableRefObject<WebContainerAPI | null>;
     fnsRef: React.MutableRefObject<WebContainerFns>;
@@ -39,7 +34,6 @@ type UseAgentChatOptions = {
   attachmentsProvider?: () => Array<{ name: string; publicUrl: string; contentType: string }>;
   onFirstToolCall?: () => void;
   onToolProgress?: (toolName: string) => void;
-  canPersistTranslations?: boolean;
 };
 
 type WebFsFindInput = {
@@ -82,38 +76,17 @@ const getMutableWindow = (): MutableWindow | null => {
   return window as MutableWindow;
 };
 
-const normalizeAgentContent = (text: string): string => {
-  return text
-    .replace(/\r\n/g, '\n')
-    .replace(/[\t\f\v\u00a0]+/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/ +/g, ' ')
-    .trim();
-};
-
-const simpleHash = (text: string): string => {
-  let hash = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    hash = (hash << 5) - hash + text.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash).toString(36);
-};
-
 export function useAgentChat(opts: UseAgentChatOptions) {
   const {
     id,
     initialMessages,
     activeThreadId,
-    activeThreadConvexId,
     getActiveThreadId,
-    getActiveThreadConvexId,
     wc,
     runValidation,
     attachmentsProvider,
     onFirstToolCall,
     onToolProgress,
-    canPersistTranslations = false,
   } = opts;
   const mutableWindow = getMutableWindow();
   const firstToolCalledRef = mutableWindow?.__FYOS_FIRST_TOOL_CALLED_REF ?? { current: false };
@@ -123,50 +96,6 @@ export function useAgentChat(opts: UseAgentChatOptions) {
 
   const activeThreadIdRef = useRef<string | null>(activeThreadId);
   useEffect(() => { activeThreadIdRef.current = activeThreadId; }, [activeThreadId]);
-  const persistedTranslatorKeysRef = useRef<Set<string>>(new Set());
-  const updateTranslatorMutation = useMutation(convexApi.chat.updateMessageTranslator);
-  const resolveThreadConvexId = useCallback((): Id<'chat_threads'> | null => {
-    if (typeof getActiveThreadConvexId === 'function') {
-      const resolved = getActiveThreadConvexId();
-      if (resolved) return resolved;
-    }
-    return activeThreadConvexId ?? null;
-  }, [getActiveThreadConvexId, activeThreadConvexId]);
-
-  const persistTranslation = useCallback(async (
-    args: {
-      messageId: string;
-      normalizedContent: string;
-      state: 'done' | 'error';
-      outputs?: string[];
-      error?: string;
-    }
-  ) => {
-    if (!canPersistTranslations) return;
-    const threadId = resolveThreadConvexId();
-    if (!threadId) return;
-    const normalized = normalizeAgentContent(args.normalizedContent);
-    if (!normalized) return;
-
-    const key = `${threadId}|${args.messageId}|${simpleHash(`${args.state}:${normalized}`)}`;
-    if (persistedTranslatorKeysRef.current.has(key)) return;
-    persistedTranslatorKeysRef.current.add(key);
-
-    try {
-      await updateTranslatorMutation({
-        threadId,
-        messageId: args.messageId,
-        normalizedContent: normalized,
-        translatorState: args.state,
-        translatorOutputs: args.outputs && args.outputs.length > 0 ? args.outputs : undefined,
-        translatorError: args.error,
-      });
-    } catch (error) {
-      console.warn('[agent-chat] Failed to persist translator state', error);
-      persistedTranslatorKeysRef.current.delete(key);
-    }
-  }, [canPersistTranslations, resolveThreadConvexId, updateTranslatorMutation]);
-
   const { messages, sendMessage, status, stop, addToolResult, setMessages } = useChat<UIMessage>({
     id,
     messages: initialMessages,
@@ -552,129 +481,8 @@ export function useAgentChat(opts: UseAgentChatOptions) {
     },
   });
 
-  const translatingMessageIdsRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => {
-    if (status !== 'ready') return;
-    if (!Array.isArray(messages) || messages.length === 0) return;
-
-    const lastAgentAssistantMessage = [...messages].reverse().find((msg) => {
-      if (!msg || msg.role !== 'assistant') return false;
-      const meta = (msg.metadata ?? {}) as { mode?: string };
-      const mode = meta.mode ?? (msg as { mode?: string }).mode ?? 'agent';
-      return mode === 'agent';
-    });
-    const lastAgentAssistantMessageId = lastAgentAssistantMessage?.id ?? null;
-
-    messages.forEach((message) => {
-      if (!message || message.role !== 'assistant') return;
-      const metadata = (message.metadata ?? {}) as {
-        mode?: string;
-        translator?: { state?: string };
-      };
-      const mode = metadata.mode ?? (message as { mode?: string }).mode ?? 'agent';
-      if (mode !== 'agent') return;
-
-      const isLastAgentMessage = message.id && message.id === lastAgentAssistantMessageId;
-      if (!isLastAgentMessage) return;
-
-      const translatorState = typeof metadata.translator?.state === 'string' ? metadata.translator.state : undefined;
-      if (translatorState === 'done' || translatorState === 'error') return;
-
-      const rawTextParts = Array.isArray(message.parts)
-        ? message.parts.filter(isTextPart).map((part) => part.text ?? '')
-        : [];
-      const translatorParts = rawTextParts
-        .map((text) => text.trim())
-        .filter((text): text is string => Boolean(text && text.length > 0));
-      if (translatorParts.length === 0) return;
-
-      const messageId = message.id;
-      if (!messageId) return;
-      if (translatingMessageIdsRef.current.has(messageId)) return;
-      translatingMessageIdsRef.current.add(messageId);
-
-      const normalizedContent = normalizeAgentContent(rawTextParts.join('\n\n'));
-      if (!normalizedContent) {
-        translatingMessageIdsRef.current.delete(messageId);
-        return;
-      }
-      const normalizedHash = simpleHash(normalizedContent);
-
-      setMessages((prev) => prev.map((msg) => {
-        if (msg.id !== messageId) return msg;
-        const nextMetadata = { ...(msg.metadata ?? {}) } as Record<string, unknown>;
-        const translator = { ...(nextMetadata.translator as Record<string, unknown> ?? {}) };
-        translator.state = 'translating';
-        translator.normalized = normalizedContent;
-        translator.hash = normalizedHash;
-        nextMetadata.translator = translator;
-        return { ...msg, metadata: nextMetadata } as UIMessage;
-      }));
-
-      (async () => {
-        try {
-          const response = await fetch('/api/agent/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ parts: translatorParts }),
-          });
-          if (!response.ok) {
-            throw new Error(`Translator returned ${response.status}`);
-          }
-          const payload = await response.json();
-          const translations = Array.isArray(payload?.translations)
-            ? payload.translations.map((item: unknown) => (typeof item === 'string' ? item : '')).filter(Boolean)
-            : [];
-
-          setMessages((prev) => prev.map((msg) => {
-            if (msg.id !== messageId) return msg;
-            const nextMetadata = { ...(msg.metadata ?? {}) } as Record<string, unknown>;
-            nextMetadata.translator = {
-              ...(nextMetadata.translator as Record<string, unknown> ?? {}),
-              state: 'done',
-              outputs: translations,
-              normalized: normalizedContent,
-              hash: normalizedHash,
-            };
-            return { ...msg, metadata: nextMetadata } as UIMessage;
-          }));
-
-          void persistTranslation({
-            messageId,
-            normalizedContent,
-            state: 'done',
-            outputs: translations,
-          });
-        } catch (error) {
-          const messageText = error instanceof Error ? error.message : 'Translation failed';
-          setMessages((prev) => prev.map((msg) => {
-            if (msg.id !== messageId) return msg;
-            const nextMetadata = { ...(msg.metadata ?? {}) } as Record<string, unknown>;
-            nextMetadata.translator = {
-              ...(nextMetadata.translator as Record<string, unknown> ?? {}),
-              state: 'error',
-              error: messageText,
-              normalized: normalizedContent,
-              hash: normalizedHash,
-            };
-            return { ...msg, metadata: nextMetadata } as UIMessage;
-          }));
-
-          void persistTranslation({
-            messageId,
-            normalizedContent,
-            state: 'error',
-            error: messageText,
-          });
-        } finally {
-          translatingMessageIdsRef.current.delete(messageId);
-        }
-      })();
-    });
-  }, [messages, setMessages, status, persistTranslation]);
-
-  const initialMessagesSignatureRef = useRef<string | null>(null);
+    const initialMessagesSignatureRef = useRef<string | null>(null);
   useEffect(() => {
     if (!Array.isArray(initialMessages)) return;
     const signature = JSON.stringify(

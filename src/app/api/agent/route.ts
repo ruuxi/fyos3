@@ -1,4 +1,4 @@
-import { convertToModelMessages, streamText, UIMessage, stepCountIs, generateText } from 'ai';
+import { convertToModelMessages, streamText, UIMessage, stepCountIs } from 'ai';
 // z is used in tool schemas but not directly here
 import {
   TOOL_NAMES,
@@ -15,11 +15,7 @@ import {
   SubmitPlanInput,
 } from '@/lib/agentTools';
 import { agentLogger } from '@/lib/agentLogger';
-import { 
-  SYSTEM_PROMPT,
-  PERSONA_PROMPT,
-  CLASSIFIER_PROMPT
-} from '@/lib/prompts';
+import { SYSTEM_PROMPT } from '@/lib/prompts';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { api as convexApi } from '../../../../convex/_generated/api';
 import { getInstalledAppNames, sanitizeToolInput, getConvexClientOptional } from '@/lib/agent/server/agentServerHelpers';
@@ -211,8 +207,7 @@ export async function POST(req: Request) {
 
   const appendMessageToThread = async (
     role: 'user' | 'assistant',
-    content: string,
-    mode: 'agent' | 'persona'
+    content: string
   ) => {
     if (!threadIdRaw) return;
     try {
@@ -222,43 +217,13 @@ export async function POST(req: Request) {
           threadId: threadIdRaw as Id<'chat_threads'>,
           role,
           content,
-          mode,
+          mode: role === 'assistant' ? 'agent' : undefined,
         });
       }
     } catch (error) {
       console.warn('⚠️ [AGENT] Failed to append message to thread', error);
     }
   };
-
-
-  // Persona-only mode: returns a parallel, personality-driven stream that does not use tools
-  const url = new URL(req.url);
-  let personaMode = url.searchParams.get('persona') === '1' || url.searchParams.get('mode') === 'persona';
-
-  // If not explicitly forced, auto-classify last user message using CLASSIFIER_PROMPT (0=persona, 1=agent)
-  if (!personaMode) {
-    try {
-      const lastUser = [...sanitizedMessages].reverse().find(m => m.role === 'user');
-      const lastText = lastUser ? extractTextFromMessage(lastUser) : '';
-      const attachmentsMentioned = hints.length > 0
-        ? `\nAttachments:\n${hints.map(h => `- ${h.contentType || 'file'}: ${h.url}`).join('\n')}`
-        : '';
-      const classifyInput = (lastText || '') + attachmentsMentioned;
-      if (classifyInput) {
-        const classification = await generateText({
-          model: 'google/gemini-2.0-flash',
-          system: CLASSIFIER_PROMPT,
-          prompt: classifyInput,
-        });
-        const raw = (classification?.text || '').trim();
-        if (raw === '0') personaMode = true;
-        else if (raw === '1') personaMode = false;
-        // If unexpected output, default to agent (personaMode=false)
-      }
-    } catch {
-      // On classifier error, default to agent mode
-    }
-  }
 
   const lastMessage = messagesWithHints[messagesWithHints.length - 1];
   if (lastMessage && lastMessage.role === 'user') {
@@ -267,54 +232,7 @@ export async function POST(req: Request) {
       ? lastMessage.id
       : `user_${Date.now()}`;
     await agentLogger.logMessage(sessionId, messageId, 'user', content);
-    await appendMessageToThread('user', content, personaMode ? 'persona' : 'agent');
-  }
-  if (personaMode) {
-    const personaSystem = PERSONA_PROMPT;
-
-    // Only provide user messages as context; ignore assistant/tool messages entirely
-    // Use the last 20 user messages to give the persona adequate context
-    const personaMessagesAll = messages.filter(m => m.role === 'user');
-    const personaMessages = personaMessagesAll.slice(-20);
-
-    const result = streamText({
-      model: 'google/gemini-2.0-flash',
-      messages: convertToModelMessages(personaMessages),
-      system: personaSystem,
-      onFinish: async ({ usage, finishReason, text }: { usage?: TokenUsageSummary; finishReason?: string; text?: string }) => {
-        console.log('🎭 [PERSONA] Response finished:', {
-          finishReason,
-          textLength: text?.length || 0,
-          messagesCount: personaMessages.length,
-        });
-        if (text) {
-          await agentLogger.logMessage(sessionId, `assistant_${Date.now()}`, 'assistant', text);
-          await appendMessageToThread('assistant', text, 'persona');
-        }
-        
-        if (usage) {
-          console.log('📊 [USAGE-PERSONA] Token consumption:', {
-            inputTokens: usage.inputTokens || 0,
-            outputTokens: usage.outputTokens || 0,
-            totalTokens: usage.totalTokens || 0,
-            reasoningTokens: usage.reasoningTokens || 0,
-            cachedInputTokens: usage.cachedInputTokens || 0,
-          });
-          
-          // Calculate cost for gemini-2.0-flash: $0.10 per million input, $0.40 per million output
-          const inputCostPerMillion = 0.10;
-          const outputCostPerMillion = 0.40;
-          const estimatedCost = 
-            ((usage.inputTokens || 0) / 1000000) * inputCostPerMillion +
-            ((usage.outputTokens || 0) / 1000000) * outputCostPerMillion;
-          
-          console.log('💰 [USAGE-COST] gemini-2.0-flash estimated cost: $' + estimatedCost.toFixed(6));
-        }
-      },
-    });
-
-    console.log('📤 [PERSONA] Returning streaming response');
-    return result.toUIMessageStreamResponse();
+    await appendMessageToThread('user', content);
   }
 
   // Use the comprehensive system prompt
@@ -477,7 +395,7 @@ export async function POST(req: Request) {
       // Log the complete assistant response including tool calls
       if (event.text) {
         await agentLogger.logMessage(sessionId, `assistant_${Date.now()}`, 'assistant', event.text);
-        await appendMessageToThread('assistant', event.text, 'agent');
+        await appendMessageToThread('assistant', event.text);
       }
 
       // Tool calls are now logged in onStepFinish with proper timing and results

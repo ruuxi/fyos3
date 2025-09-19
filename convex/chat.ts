@@ -1,7 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import type { UserIdentity } from "convex/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
 
 function normalizeAgentContent(text: string): string {
   return text
@@ -69,142 +68,11 @@ export const appendMessage = mutation({
       content: args.content,
       mode: args.mode,
       contentHash: contentHash ?? undefined,
-      translatorState: args.role === "assistant" && args.mode === "agent" ? "pending" : undefined,
       createdAt: now,
     });
 
     await ctx.db.patch(args.threadId, { updatedAt: now, lastMessageAt: now });
     return id;
-  },
-});
-
-export const updateMessageTranslator = mutation({
-  args: {
-    threadId: v.id("chat_threads"),
-    messageId: v.optional(v.string()),
-    normalizedContent: v.string(),
-    translatorState: v.union(
-      v.literal("pending"),
-      v.literal("translating"),
-      v.literal("done"),
-      v.literal("error")
-    ),
-    translatorOutputs: v.optional(v.array(v.string())),
-    translatorError: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-    const ownerId = getOwnerId(identity);
-
-    const thread = await ctx.db.get(args.threadId);
-    if (!thread || thread.ownerId !== ownerId) throw new Error("Not found");
-
-    const normalizedContent = normalizeAgentContent(args.normalizedContent);
-    if (!normalizedContent) {
-      throw new Error("Empty content payload");
-    }
-
-    const contentHash = hashAgentContent(normalizedContent);
-
-    let targetMessageId: Id<'chat_messages'> | null = null;
-    if (args.messageId) {
-      try {
-        targetMessageId = args.messageId as Id<'chat_messages'>;
-        const direct = await ctx.db.get(targetMessageId);
-        if (!direct || direct.ownerId !== ownerId || direct.threadId !== args.threadId) {
-          targetMessageId = null;
-        }
-      } catch {
-        targetMessageId = null;
-      }
-    }
-
-    let messageRecord: {
-      _id: Id<'chat_messages'>;
-      ownerId: string;
-      threadId: Id<'chat_threads'>;
-      role: 'user' | 'assistant';
-      content: string;
-      createdAt: number;
-      contentHash?: string;
-    } | null = null;
-
-    if (targetMessageId) {
-      const direct = await ctx.db.get(targetMessageId);
-      if (direct && direct.ownerId === ownerId && direct.threadId === args.threadId) {
-        messageRecord = {
-          _id: targetMessageId,
-          ownerId: direct.ownerId,
-          threadId: direct.threadId,
-          role: direct.role,
-          content: direct.content,
-          createdAt: direct.createdAt,
-          contentHash: direct.contentHash,
-        };
-      }
-    }
-
-    if (!messageRecord) {
-      let candidates: Array<{
-        _id: Id<'chat_messages'>;
-        threadId: Id<'chat_threads'>;
-        ownerId: string;
-        role: 'user' | 'assistant';
-        content: string;
-        createdAt: number;
-        contentHash?: string;
-      }> = [];
-
-      if (contentHash) {
-        candidates = await ctx.db
-          .query("chat_messages")
-          .withIndex("by_thread_hash", (q) => q.eq("threadId", args.threadId).eq("contentHash", contentHash))
-          .collect();
-      }
-
-      if (!candidates.length) {
-        const fallback = await ctx.db
-          .query("chat_messages")
-          .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-          .collect();
-        candidates = fallback.filter((doc) => {
-          if (!doc || doc.ownerId !== ownerId) return false;
-          if (doc.role !== 'assistant') return false;
-          const normalizedStored = normalizeAgentContent(doc.content ?? '');
-          return normalizedStored === normalizedContent;
-        });
-      }
-
-      if (!candidates.length) {
-        throw new Error("Message not found for translator update");
-      }
-
-      const message = candidates.reduce((latest, current) => {
-        if (!latest) return current;
-        return (current.createdAt ?? 0) > (latest.createdAt ?? 0) ? current : latest;
-      });
-
-      if (!message || message.ownerId !== ownerId) {
-        throw new Error("Not authorized to update message");
-      }
-      messageRecord = message;
-      targetMessageId = message._id;
-    }
-
-    if (!messageRecord || !targetMessageId) {
-      throw new Error("Message not found for translator update");
-    }
-
-    await ctx.db.patch(targetMessageId, {
-      translatorState: args.translatorState,
-      translatorOutputs: args.translatorOutputs,
-      translatorError: args.translatorError,
-      translatorUpdatedAt: Date.now(),
-      contentHash: contentHash ?? hashAgentContent(normalizedContent) ?? undefined,
-    });
-
-    return true;
   },
 });
 

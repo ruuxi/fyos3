@@ -20,11 +20,6 @@ type AgentMessageMetadata = {
   mode?: ChatMode;
   optimistic?: true;
   optimisticAttachments?: AttachmentPreview[];
-  translator?: {
-    state?: 'translating' | 'done' | 'error';
-    outputs?: string[];
-    error?: string;
-  };
   [key: string]: unknown;
 };
 
@@ -328,8 +323,8 @@ export default function MessagesPane(props: MessagesPaneProps) {
         {displayMessages.map((m, idx) => {
           const metadata = 'metadata' in m ? (m.metadata as AgentMessageMetadata | undefined) : undefined;
           const mode = resolveMode(m);
-          const translatorMeta = metadata?.translator;
           const isAssistant = m.role === 'assistant';
+          const isAgentAssistant = isAssistant && mode === 'agent';
           let isFinalAgentReply = true;
           if (isAssistant && mode === 'agent') {
             for (let cursor = idx + 1; cursor < displayMessages.length; cursor += 1) {
@@ -342,17 +337,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
               }
             }
           }
-          const translatorState = isAssistant && mode === 'agent' && typeof translatorMeta?.state === 'string'
-            ? translatorMeta.state
-            : undefined;
-          const awaitingTranslation = isAssistant && isFinalAgentReply && mode === 'agent' && translatorState !== 'done' && translatorState !== 'error';
-          const showCarousel = awaitingTranslation && (
-            agentActive ||
-            translatorState === 'translating' ||
-            translatorState === 'pending' ||
-            translatorState === undefined
-          );
-          const allowOriginalText = !(isAssistant && mode === 'agent');
+          const showVerbAnimation = isAgentAssistant && isFinalAgentReply && agentActive;
 
           // Build content and collect any attachments referenced in text
           const textNodes: ReactNode[] = [];
@@ -360,7 +345,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
           (m.parts || []).forEach((part, index: number) => {
             if (isTextPart(part)) {
               const { cleanedText, items } = extractAttachmentsFromText(part.text || '');
-              if (allowOriginalText && cleanedText) {
+              if (cleanedText) {
                 textNodes.push(<span key={`t-${index}`}>{cleanedText}</span>);
               }
               if (items.length) {
@@ -389,7 +374,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
             ? 'bg-sky-500 text-white max-w-full'
             : assistantBubble;
           const bubbleClass = isOptimistic ? `${bubbleBase} opacity-80` : bubbleBase;
-          const bubbleStyle: CSSProperties | undefined = showCarousel
+          const bubbleStyle: CSSProperties | undefined = showVerbAnimation
             ? {
                 backgroundColor: 'rgba(255, 255, 255, 0.05)',
                 borderColor: 'rgba(255, 255, 255, 0.14)',
@@ -400,32 +385,14 @@ export default function MessagesPane(props: MessagesPaneProps) {
             if (!isAssistant) {
               return textNodes;
             }
-            if (mode !== 'agent') {
+            if (!isAgentAssistant) {
               return textNodes;
             }
-            if (translatorState === 'done') {
-              const outputs = Array.isArray(translatorMeta?.outputs)
-                ? translatorMeta.outputs.filter((text): text is string => typeof text === 'string' && text.trim().length > 0)
-                : [];
-              if (outputs.length > 0) {
-                const latest = outputs[outputs.length - 1];
-                return <span>{latest}</span>;
-              }
-              return (
-                <span className="text-white/70">
-                  Translation missing. Original reply is hidden.
-                </span>
-              );
-            }
-            if (translatorState === 'error') {
-              return (
-                <span className="text-white/70">
-                  Translator glitched. Original reply stashed off-screen.
-                </span>
-              );
-            }
-            if (showCarousel) {
+            if (showVerbAnimation) {
               return <AgentVerbCarousel />;
+            }
+            if (textNodes.length > 0) {
+              return textNodes;
             }
             return null;
           })();

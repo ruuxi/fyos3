@@ -45,10 +45,6 @@ type MessageDoc = Pick<Doc<'chat_messages'>,
   | 'mode'
   | 'createdAt'
   | 'contentHash'
-  | 'translatorState'
-  | 'translatorOutputs'
-  | 'translatorError'
-  | 'translatorUpdatedAt'
 > & { id?: string };
 
 function mapThread(doc: ThreadDoc): ChatThread {
@@ -63,29 +59,8 @@ function mapThread(doc: ThreadDoc): ChatThread {
 function mapMessage(doc: MessageDoc): UIMessage {
   const parts: UIMessage['parts'] = [{ type: 'text', text: String(doc.content ?? '') }];
   const mode: ChatMode | undefined = doc.mode === 'persona' ? 'persona' : doc.mode === 'agent' ? 'agent' : undefined;
-  const translatorState = typeof doc.translatorState === 'string' ? doc.translatorState : undefined;
-  const translatorOutputs = Array.isArray(doc.translatorOutputs)
-    ? doc.translatorOutputs.filter((item): item is string => typeof item === 'string' && item.length > 0)
-    : undefined;
-  const translatorError = typeof doc.translatorError === 'string' ? doc.translatorError : undefined;
-  const translatorHash = typeof doc.contentHash === 'string' ? doc.contentHash : undefined;
-  const translatorUpdatedAt = typeof doc.translatorUpdatedAt === 'number' ? doc.translatorUpdatedAt : undefined;
-  const translatorMeta = (() => {
-    if (!translatorState && !translatorOutputs && !translatorError && !translatorHash && !translatorUpdatedAt) {
-      return undefined;
-    }
-    const meta: Record<string, unknown> = {};
-    if (translatorState) meta.state = translatorState;
-    if (translatorOutputs && translatorOutputs.length > 0) meta.outputs = translatorOutputs;
-    if (translatorError) meta.error = translatorError;
-    if (translatorHash) meta.hash = translatorHash;
-    if (translatorUpdatedAt) meta.updatedAt = translatorUpdatedAt;
-    return meta;
-  })();
-
   const metadata: Record<string, unknown> = {};
   if (mode) metadata.mode = mode;
-  if (translatorMeta) metadata.translator = translatorMeta;
 
   return {
     id: String(doc._id ?? doc.id ?? Math.random().toString(36).slice(2)),

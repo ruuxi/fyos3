@@ -146,9 +146,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     id: chatSessionKey,
     initialMessages: initialChatMessages,
     activeThreadId,
-    activeThreadConvexId,
     getActiveThreadId: () => activeThreadIdImmediateRef.current,
-    getActiveThreadConvexId: () => activeThreadConvexIdImmediateRef.current,
     wc: { instanceRef, fnsRef },
     media: { loadMedia },
     runValidation,
@@ -162,7 +160,6 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     onToolProgress: (_toolName: string) => {
       // Tool progress callback
     },
-    canPersistTranslations: isChatAuthenticated,
   });
 
   useEffect(() => { statusRef.current = status; }, [status]);
