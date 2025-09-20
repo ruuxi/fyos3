@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import type { MutableRefObject, Dispatch, SetStateAction, FormEvent } from 'react';
 import type { UIMessage } from 'ai';
 import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
@@ -305,18 +306,26 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     }
 
     const runFinishedWithGate = finished && hmrGateActiveRef.current;
-    if (finished) {
-      clearRunId();
-    }
+
+    // If the chat library is about to auto-send a follow-up (e.g., after tool results),
+    // do NOT clear the run/session id yet; keep it stable across the whole run.
+    const pendingAutoFollowUp = lastAssistantMessageIsCompleteWithToolCalls({ messages });
 
     if (runFinishedWithGate) {
       try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
       hmrGateActiveRef.current = false;
       agentActiveRef.current = false;
       setAgentActive(false);
+      // Clear run id only when the gated run actually ends (not between follow-ups)
+      if (!pendingAutoFollowUp) {
+        clearRunId();
+      }
     }
     if (finished && !runFinishedWithGate) {
       setAgentActive(false);
+      if (!pendingAutoFollowUp) {
+        clearRunId();
+      }
     }
 
     if (runFinishedWithGate) {
@@ -342,7 +351,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     }
 
     agentStatusPrevRef.current = now;
-  }, [clearRunId, ensureRunId, readRegistry, status]);
+  }, [clearRunId, ensureRunId, readRegistry, status, messages]);
 
   const sendMessage = useCallback((args: { text: string }) => sendMessageRaw(args), [sendMessageRaw]);
 

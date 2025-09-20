@@ -172,7 +172,14 @@ export function useAgentChat(opts: UseAgentChatOptions) {
 
   const runDispatchRef = useRef<{ runId: string | null; nextSequence: number }>({ runId: null, nextSequence: 0 });
 
-  const { messages, sendMessage, status, stop, addToolResult, setMessages } = useChat<UIMessage>({
+  const {
+    messages: rawMessages,
+    sendMessage,
+    status,
+    stop,
+    addToolResult,
+    setMessages,
+  } = useChat<UIMessage>({
     id,
     messages: initialMessages,
     transport: new DefaultChatTransport({
@@ -788,11 +795,13 @@ export function useAgentChat(opts: UseAgentChatOptions) {
     },
   });
 
+  const messages = Array.isArray(rawMessages) ? rawMessages : [];
+
   const translatingMessageIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (status !== 'ready') return;
-    if (!Array.isArray(messages) || messages.length === 0) return;
+    if (messages.length === 0) return;
 
     messages.forEach((message) => {
       if (!message || message.role !== 'assistant') return;

@@ -182,6 +182,13 @@ type ToolCallSummaryRow = {
   accentClass: string;
 };
 
+type SessionSidebarMetrics = {
+  totalTokens: number | null;
+  totalCostUSD: number | null;
+  durationMs: number | null;
+  toolCallCount: number | null;
+};
+
 const safeJsonStringify = (value: unknown, spacing = 2): string => {
   try {
     return JSON.stringify(value, null, spacing);
@@ -993,6 +1000,36 @@ export default function AgentDashboardPage() {
     });
   }, [activeTimeline]);
 
+  const selectedSessionSidebarMetrics = useMemo((): SessionSidebarMetrics | null => {
+    if (!selectedSession) return null;
+
+    const totalTokens = sessionSummary.tokens?.total ?? null;
+    const totalCostUSD = sessionSummary.costs?.totalCostUSD ?? null;
+    const durationMs = sessionSummary.durationMs ?? null;
+    const toolCallCount =
+      toolCallSummaryRows.length > 0
+        ? toolCallSummaryRows.length
+        : typeof selectedSession.toolCallCount === 'number'
+          ? selectedSession.toolCallCount
+          : null;
+
+    if (
+      totalTokens === null &&
+      totalCostUSD === null &&
+      durationMs === null &&
+      toolCallCount === null
+    ) {
+      return null;
+    }
+
+    return {
+      totalTokens,
+      totalCostUSD,
+      durationMs,
+      toolCallCount,
+    };
+  }, [selectedSession, sessionSummary, toolCallSummaryRows]);
+
   const timelineEntries = useMemo(() => {
     if (!activeTimeline) return [] as TimelineEntry[];
 
@@ -1367,8 +1404,39 @@ export default function AgentDashboardPage() {
                   <div className="space-y-3 pt-1 pb-3">
                     {sessions.map((session) => {
                       const isSelected = session.sessionId === selectedSessionId;
-                      const estimatedTokens = tokensFromUsage(session.estimatedUsage, 'totalTokens');
-                      const actualTokens = tokensFromUsage(session.actualUsage, 'totalTokens');
+                      const sidebarMetrics = isSelected ? selectedSessionSidebarMetrics : null;
+                      const toolCallLabel = (() => {
+                        if (sidebarMetrics && sidebarMetrics.toolCallCount !== null && sidebarMetrics.toolCallCount !== undefined) {
+                          return `${formatNumber(sidebarMetrics.toolCallCount)} (steps ${formatNumber(session.stepCount)})`;
+                        }
+                        return `${formatNumber(session.toolCallCount)} (steps ${formatNumber(session.stepCount)})`;
+                      })();
+                      const tokensLabel = (() => {
+                        if (sidebarMetrics && sidebarMetrics.totalTokens !== null && sidebarMetrics.totalTokens !== undefined) {
+                          return `${formatNumber(sidebarMetrics.totalTokens)} tokens`;
+                        }
+                        const estimated = tokensFromUsage(session.estimatedUsage, 'totalTokens');
+                        const actual = tokensFromUsage(session.actualUsage, 'totalTokens');
+                        return `${formatNumber(estimated)} est. / ${formatNumber(actual)} actual`;
+                      })();
+                      const costLabel = sidebarMetrics
+                        ? formatCostExact(sidebarMetrics.totalCostUSD)
+                        : `${formatCost(session.estimatedCostUSD)} est. / ${formatCost(session.actualCostUSD)}`;
+                      const durationLabel = (() => {
+                        if (sidebarMetrics && sidebarMetrics.durationMs !== null && sidebarMetrics.durationMs !== undefined) {
+                          return `Duration ${formatDuration(sidebarMetrics.durationMs)}`;
+                        }
+                        const fallbackDurationMs =
+                          typeof session.endToEndDurationMs === 'number'
+                            ? session.endToEndDurationMs
+                            : typeof session.durationMs === 'number'
+                              ? session.durationMs
+                              : null;
+                        if (fallbackDurationMs !== null) {
+                          return `Duration ${formatDuration(fallbackDurationMs)}`;
+                        }
+                        return session.status === 'active' ? 'In progress' : 'Duration —';
+                      })();
                       const completedStatusClasses = 'bg-green-100 text-green-800 border-green-200';
                       const { title: sessionTitle, subtitle: sessionSubtitle } = getSessionTitle(session);
                       const isSessionDetailsExpanded = Boolean(expandedSessions[session.sessionId]);
@@ -1538,24 +1606,20 @@ export default function AgentDashboardPage() {
                                 </div>
                                 <div className="flex flex-col">
                                   <span className="text-muted-foreground">Tool Calls</span>
-                                  <span>{formatNumber(session.toolCallCount)} (steps {formatNumber(session.stepCount)})</span>
+                                  <span>{toolCallLabel}</span>
                                 </div>
                                 <div className="flex flex-col">
                                   <span className="text-muted-foreground">Tokens</span>
-                                  <span>{formatNumber(estimatedTokens)} est. / {formatNumber(actualTokens)} actual</span>
+                                  <span>{tokensLabel}</span>
                                 </div>
                                 <div className="flex flex-col">
                                   <span className="text-muted-foreground">Cost</span>
-                                  <span>{formatCost(session.estimatedCostUSD)} est. / {formatCost(session.actualCostUSD)}</span>
+                                  <span>{costLabel}</span>
                                 </div>
                               </div>
                               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                                 <span>Started {formatTimestamp(session.sessionStartedAt)}</span>
-                                <span>
-                                  {sessionDurationMs !== null
-                                    ? `Duration ${formatDuration(sessionDurationMs)}`
-                                    : 'In progress'}
-                                </span>
+                                <span>{durationLabel}</span>
                               </div>
                             </>
                           )}
