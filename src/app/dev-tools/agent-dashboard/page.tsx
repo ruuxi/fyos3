@@ -35,7 +35,10 @@ type SessionListItem = {
   actualUsage: UsageRecord | null;
   sessionStartedAt: number;
   sessionFinishedAt: number | null;
-  durationMs?: number;
+  durationMs?: number | null;
+  endToEndStartedAt?: number | null;
+  endToEndFinishedAt?: number | null;
+  endToEndDurationMs?: number | null;
   attachmentsCount: number;
   messagePreviews: AgentMessagePreview[] | null | undefined;
   tags: string[];
@@ -125,6 +128,7 @@ const formatTimeOfDay = (ts?: number | null): string => {
   return new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hour12: false,
   }).format(new Date(ts));
 };
@@ -175,7 +179,6 @@ type ToolCallSummaryRow = {
   name: string;
   tokensLabel: string;
   costLabel: string;
-  latencyLabel: string;
   accentClass: string;
 };
 
@@ -280,7 +283,18 @@ export default function AgentDashboardPage() {
     convexApi.agentMetrics.getSessionTimeline,
     selectedSessionId ? { sessionId: selectedSessionId } : 'skip',
   ) as TimelineData | null | undefined;
-  const timelineLoading = Boolean(selectedSessionId && timeline === undefined);
+
+  const timelineSessionId =
+    typeof timeline?.session?.sessionId === 'string' ? timeline.session.sessionId : null;
+  const timelineMatchesSelection = Boolean(selectedSessionId && timelineSessionId === selectedSessionId);
+  const timelineStaleForSelection = Boolean(
+    selectedSessionId && timeline && timelineSessionId !== selectedSessionId,
+  );
+  const timelineLoading = Boolean(
+    selectedSessionId && (timeline === undefined || timelineStaleForSelection),
+  );
+  const activeTimeline = timelineMatchesSelection ? timeline : null;
+  const showTimelineNotFound = Boolean(selectedSessionId && !timelineLoading && timeline === null);
 
   const setSessionTagMutation = useMutation(convexApi.agentMetrics.setSessionTag);
   const addSessionTagMutation = useMutation(convexApi.agentMetrics.addSessionTag);
@@ -729,11 +743,11 @@ export default function AgentDashboardPage() {
   };
 
   const sessionSummary = useMemo(() => {
-    const sessionSource = (selectedSession ?? (timeline?.session as SessionListItem | null | undefined) ?? null) as
+    const sessionSource = (selectedSession ?? (activeTimeline?.session as SessionListItem | null | undefined) ?? null) as
       | SessionListItem
       | null;
 
-    const sessionDoc = (timeline?.session as (SessionListItem & DocId) | null | undefined) ?? null;
+    const sessionDoc = (activeTimeline?.session as (SessionListItem & DocId) | null | undefined) ?? null;
 
     const actualUsage =
       ((sessionSource?.actualUsage ?? null) as Nullable<UsageRecord>) ??
@@ -758,30 +772,6 @@ export default function AgentDashboardPage() {
     const model = sessionSource?.model ?? (sessionDoc?.model as string | undefined);
     const costBreakdown = usage ? getUsageCostBreakdown(usage, model ?? undefined) : null;
 
-    const events = timeline && Array.isArray(timeline.events) ? timeline.events : [];
-
-    let earliestUser: number | null = null;
-    let latestAssistant: number | null = null;
-
-    for (const event of events) {
-      if (event.kind !== 'message_logged') continue;
-      const payload = (event.payload ?? {}) as Record<string, unknown>;
-      const role = typeof payload.role === 'string' ? (payload.role as string) : null;
-      if (!role) continue;
-      const ts = typeof event.timestamp === 'number' ? event.timestamp : null;
-      if (ts === null) continue;
-
-      if (role === 'user') {
-        if (earliestUser === null || ts < earliestUser) {
-          earliestUser = ts;
-        }
-      } else if (role === 'assistant') {
-        if (latestAssistant === null || ts > latestAssistant) {
-          latestAssistant = ts;
-        }
-      }
-    }
-
     const sessionStart =
       typeof sessionSource?.sessionStartedAt === 'number'
         ? sessionSource.sessionStartedAt
@@ -795,30 +785,66 @@ export default function AgentDashboardPage() {
         : typeof sessionDoc?.sessionFinishedAt === 'number'
           ? sessionDoc.sessionFinishedAt
           : null;
+    const aggregatedDuration =
+      typeof sessionSource?.endToEndDurationMs === 'number'
+        ? sessionSource.endToEndDurationMs
+        : typeof sessionDoc?.endToEndDurationMs === 'number'
+          ? sessionDoc.endToEndDurationMs
+          : null;
 
-    const fallbackEarliest = events.reduce<number | null>((acc, event) => {
-      const ts = typeof event.timestamp === 'number' ? event.timestamp : null;
-      if (ts === null) return acc;
-      if (acc === null || ts < acc) return ts;
-      return acc;
-    }, null);
+    const events = activeTimeline && Array.isArray(activeTimeline.events) ? activeTimeline.events : [];
 
-    const fallbackLatest = events.reduce<number | null>((acc, event) => {
-      const ts = typeof event.timestamp === 'number' ? event.timestamp : null;
-      if (ts === null) return acc;
-      if (acc === null || ts > acc) return ts;
-      return acc;
-    }, null);
+    let durationMs: number | null = typeof aggregatedDuration === 'number' && aggregatedDuration >= 0 ? aggregatedDuration : null;
 
-    const startTimestamp = earliestUser ?? sessionStart ?? fallbackEarliest;
-    const endTimestamp = latestAssistant ?? sessionFinish ?? fallbackLatest;
+    if (durationMs === null) {
+      // Fall back to scanning the timeline for legacy sessions without Convex timing
+      let earliestUser: number | null = null;
+      let latestAssistant: number | null = null;
 
-    const durationMs =
-      typeof startTimestamp === 'number' &&
-      typeof endTimestamp === 'number' &&
-      endTimestamp >= startTimestamp
-        ? endTimestamp - startTimestamp
-        : null;
+      for (const event of events) {
+        if (event.kind !== 'message_logged') continue;
+        const payload = (event.payload ?? {}) as Record<string, unknown>;
+        const role = typeof payload.role === 'string' ? (payload.role as string) : null;
+        if (!role) continue;
+        const ts = typeof event.timestamp === 'number' ? event.timestamp : null;
+        if (ts === null) continue;
+
+        if (role === 'user') {
+          if (earliestUser === null || ts < earliestUser) {
+            earliestUser = ts;
+          }
+        } else if (role === 'assistant') {
+          if (latestAssistant === null || ts > latestAssistant) {
+            latestAssistant = ts;
+          }
+        }
+      }
+
+      const fallbackEarliest = events.reduce<number | null>((acc, event) => {
+        const ts = typeof event.timestamp === 'number' ? event.timestamp : null;
+        if (ts === null) return acc;
+        if (acc === null || ts < acc) return ts;
+        return acc;
+      }, null);
+
+      const fallbackLatest = events.reduce<number | null>((acc, event) => {
+        const ts = typeof event.timestamp === 'number' ? event.timestamp : null;
+        if (ts === null) return acc;
+        if (acc === null || ts > acc) return ts;
+        return acc;
+      }, null);
+
+      const startTimestamp = earliestUser ?? sessionStart ?? fallbackEarliest;
+      const endTimestamp = latestAssistant ?? sessionFinish ?? fallbackLatest;
+
+      if (
+        typeof startTimestamp === 'number' &&
+        typeof endTimestamp === 'number' &&
+        endTimestamp >= startTimestamp
+      ) {
+        durationMs = endTimestamp - startTimestamp;
+      }
+    }
 
     return {
       usageKind,
@@ -832,7 +858,7 @@ export default function AgentDashboardPage() {
       costs: costBreakdown,
       durationMs,
     };
-  }, [selectedSession, timeline]);
+  }, [selectedSession, activeTimeline]);
 
   const sessionStatus = selectedSession?.status ?? null;
   const summaryTokensPlaceholder = sessionsLoading ? 'Loading…' : '—';
@@ -888,16 +914,10 @@ export default function AgentDashboardPage() {
   const usageSummaryRows = summaryRows.filter((row) => row.key !== 'duration');
   const auxiliarySummaryRows = summaryRows.filter((row) => row.key === 'duration');
 
-  const summaryUsageLabel = sessionSummary.usageKind === 'actual'
-    ? 'Actual usage'
-    : sessionSummary.usageKind === 'estimated'
-      ? 'Estimated usage'
-      : null;
-
   const toolCallSummaryRows = useMemo(() => {
-    if (!timeline?.toolCalls || timeline.toolCalls.length === 0) return [] as ToolCallSummaryRow[];
+    if (!activeTimeline?.toolCalls || activeTimeline.toolCalls.length === 0) return [] as ToolCallSummaryRow[];
 
-    const completedCalls = timeline.toolCalls.filter((call) => call.status === 'completed');
+    const completedCalls = activeTimeline.toolCalls.filter((call) => call.status === 'completed');
     if (completedCalls.length === 0) return [] as ToolCallSummaryRow[];
 
     const compareMaybeNumber = (a?: number, b?: number) => {
@@ -951,14 +971,6 @@ export default function AgentDashboardPage() {
 
       const costUSD = typeof call.costUSD === 'number' && Number.isFinite(call.costUSD) ? call.costUSD : null;
 
-      let latencyMs: number | null = null;
-      if (typeof call.durationMs === 'number' && Number.isFinite(call.durationMs) && call.durationMs >= 0) {
-        latencyMs = call.durationMs;
-      } else if (typeof call.startedAt === 'number' && typeof call.completedAt === 'number') {
-        const delta = call.completedAt - call.startedAt;
-        latencyMs = delta >= 0 ? delta : null;
-      }
-
       const name = call.toolName || call.toolCallId || 'Tool call';
       const id = call._id ?? call.toolCallId ?? `${name}-${call.stepIndex}`;
 
@@ -976,19 +988,18 @@ export default function AgentDashboardPage() {
         name,
         tokensLabel: `${formatNumber(totalTokens)} tokens`,
         costLabel: formatCostExact(costUSD),
-        latencyLabel: formatDuration(latencyMs ?? null),
         accentClass,
       } satisfies ToolCallSummaryRow;
     });
-  }, [timeline]);
+  }, [activeTimeline]);
 
   const timelineEntries = useMemo(() => {
-    if (!timeline) return [] as TimelineEntry[];
+    if (!activeTimeline) return [] as TimelineEntry[];
 
     const entries: TimelineEntry[] = [];
-    const session = timeline.session;
+    const session = activeTimeline.session;
 
-    const events = Array.isArray(timeline.events) ? [...timeline.events] : [];
+    const events = Array.isArray(activeTimeline.events) ? [...activeTimeline.events] : [];
     // Sort chronologically by timestamp to reflect the real emission order; fall back to
     // sequence/_id when timestamps collide or are missing.
     events.sort((a, b) => {
@@ -1154,7 +1165,7 @@ export default function AgentDashboardPage() {
             meta.push({ label: 'Cost', value: formatCost(payload.costUSD as number) });
           }
           const isError = Boolean((resultSummary.isError as boolean | undefined) ?? false);
-          status = isError ? 'error' : 'success';
+          status = isError ? 'error' : 'default';
           const errorMessage = typeof resultSummary.errorMessage === 'string' ? (resultSummary.errorMessage as string) : undefined;
           if (errorMessage) {
             meta.push({ label: 'Error', value: errorMessage });
@@ -1183,7 +1194,7 @@ export default function AgentDashboardPage() {
           }
           const resultSummary = (payload.resultSummary ?? {}) as Record<string, unknown>;
           const isError = Boolean((resultSummary.isError as boolean | undefined) ?? false);
-          status = isError ? 'error' : 'success';
+          status = isError ? 'error' : 'default';
           const errorMessage = typeof resultSummary.errorMessage === 'string' ? resultSummary.errorMessage : undefined;
           if (errorMessage) {
             meta.push({ label: 'Error', value: errorMessage });
@@ -1244,7 +1255,7 @@ export default function AgentDashboardPage() {
     }
 
     return entries;
-  }, [timeline]);
+  }, [activeTimeline]);
 
   const handleRowToggle = (entryId: string) => {
     setExpandedEntries((prev) => {
@@ -1367,6 +1378,12 @@ export default function AgentDashboardPage() {
                       const displayTitle = hasCustomTitle ? sessionTitleOverride : sessionTitle;
                       const tagValues = sessionTagLists[session.sessionId] ?? [];
                       const isAddingTag = activeTagInputSessionId === session.sessionId;
+                      const sessionDurationMs =
+                        typeof session.endToEndDurationMs === 'number'
+                          ? session.endToEndDurationMs
+                          : typeof session.durationMs === 'number'
+                            ? session.durationMs
+                            : null;
 
                       return (
                         <div
@@ -1534,7 +1551,11 @@ export default function AgentDashboardPage() {
                               </div>
                               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                                 <span>Started {formatTimestamp(session.sessionStartedAt)}</span>
-                                <span>{session.durationMs ? `Duration ${formatDuration(session.durationMs)}` : 'In progress'}</span>
+                                <span>
+                                  {sessionDurationMs !== null
+                                    ? `Duration ${formatDuration(sessionDurationMs)}`
+                                    : 'In progress'}
+                                </span>
                               </div>
                             </>
                           )}
@@ -1555,13 +1576,6 @@ export default function AgentDashboardPage() {
                 <CardHeader className="pb-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <CardTitle className="text-base">Session Summary</CardTitle>
-                    {summaryUsageLabel ? (
-                      <Badge variant="outline" className="text-[11px] uppercase tracking-wide">
-                        {summaryUsageLabel}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">No usage data yet</span>
-                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -1616,18 +1630,17 @@ export default function AgentDashboardPage() {
                         )}
                       >
                         <div className="rounded-md border border-border">
-                          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3 px-4 py-2 text-xs uppercase tracking-wide text-muted-foreground">
+                          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3 px-4 py-2 text-xs uppercase tracking-wide text-muted-foreground">
                             <span>Tool Call</span>
                             <span className="text-right">Tokens</span>
                             <span className="text-right">Cost</span>
-                            <span className="text-right">Latency</span>
                           </div>
                           <div className="divide-y">
                             {toolCallSummaryRows.map((row) => (
                               <div
                                 key={row.id}
                                 className={cn(
-                                  'grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 px-4 py-3 text-sm transition-colors',
+                                  'grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 px-4 py-3 text-sm transition-colors',
                                   row.accentClass,
                                 )}
                               >
@@ -1636,7 +1649,6 @@ export default function AgentDashboardPage() {
                                 </span>
                                 <span className="tabular-nums text-right text-foreground">{row.tokensLabel}</span>
                                 <span className="tabular-nums text-right text-foreground">{row.costLabel}</span>
-                                <span className="tabular-nums text-right text-muted-foreground">{row.latencyLabel}</span>
                               </div>
                             ))}
                           </div>
@@ -1677,7 +1689,7 @@ export default function AgentDashboardPage() {
               </Card>
             )}
 
-            {selectedSessionId && timeline === undefined && (
+            {selectedSessionId && timelineLoading && (
               <Card>
                 <CardContent>
                   <div className="py-6 text-sm text-muted-foreground">Loading timeline…</div>
@@ -1685,7 +1697,7 @@ export default function AgentDashboardPage() {
               </Card>
             )}
 
-            {selectedSessionId && timeline === null && (
+            {selectedSessionId && showTimelineNotFound && (
               <Card>
                 <CardContent>
                   <div className="py-6 text-sm text-muted-foreground">Session not found. It may have been archived.</div>
@@ -1693,7 +1705,7 @@ export default function AgentDashboardPage() {
               </Card>
             )}
 
-            {selectedSessionId && timeline && (
+            {selectedSessionId && activeTimeline && (
               <Card className="min-w-0">
                 <CardContent>
                   {timelineEntries.length === 0 ? (
@@ -1713,8 +1725,9 @@ export default function AgentDashboardPage() {
                             ? formatDuration(entry.durationMs)
                             : null;
                         const statusBadge = (() => {
-                          if (entry.status === 'error') return <Badge variant="destructive" className="text-[10px]">Error</Badge>;
-                          if (entry.status === 'success') return <Badge variant="outline" className="text-[10px]">Success</Badge>;
+                          if (entry.status === 'error') {
+                            return <Badge variant="destructive" className="text-[10px]">Error</Badge>;
+                          }
                           return null;
                         })();
 

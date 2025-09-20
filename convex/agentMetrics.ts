@@ -135,6 +135,38 @@ const serializeSessionTagStorage = (title: string | null, tags: string[]): strin
   return result.length > 0 ? result : undefined;
 };
 
+const selectTimestamp = (...candidates: Array<number | null | undefined>): number | undefined => {
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
+};
+
+const deriveEndToEndTiming = (
+  session: Pick<Doc<'agent_sessions'>, 'sessionStartedAt' | 'sessionFinishedAt'> &
+    Partial<Pick<Doc<'agent_sessions'>, 'firstEventAt' | 'lastEventAt' | 'firstUserMessageAt' | 'lastAssistantMessageAt'>>
+    & Partial<Pick<Doc<'agent_sessions'>, 'endToEndStartedAt' | 'endToEndFinishedAt' | 'endToEndDurationMs'>>,
+) => {
+  const startedAt = selectTimestamp(session.firstUserMessageAt, session.sessionStartedAt, session.firstEventAt);
+  const finishedAt = selectTimestamp(session.lastAssistantMessageAt, session.sessionFinishedAt, session.lastEventAt);
+
+  if (typeof startedAt === 'number' && typeof finishedAt === 'number' && finishedAt >= startedAt) {
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt - startedAt,
+    } as const;
+  }
+
+  return {
+    startedAt,
+    finishedAt,
+    durationMs: undefined,
+  } as const;
+};
+
 const getSessionBySessionId = async (ctx: MutationCtx, sessionId: string): Promise<Doc<'agent_sessions'> | null> => {
   return await ctx.db
     .query('agent_sessions')
@@ -231,6 +263,82 @@ const recordEvent = async (ctx: MutationCtx, event: IncomingEvent): Promise<Id<'
     dedupeKey: event.dedupeKey,
     createdAt: event.timestamp,
   });
+};
+
+const updateSessionTiming = async (ctx: MutationCtx, event: IncomingEvent) => {
+  const session = await getSessionBySessionId(ctx, event.sessionId);
+  if (!session) return;
+
+  const patch: Partial<Doc<'agent_sessions'>> = {};
+  const timestamp = event.timestamp;
+
+  const currentFirstEvent = typeof session.firstEventAt === 'number' ? session.firstEventAt : undefined;
+  if (currentFirstEvent === undefined || timestamp < currentFirstEvent) {
+    patch.firstEventAt = timestamp;
+  }
+
+  const currentLastEvent = typeof session.lastEventAt === 'number' ? session.lastEventAt : undefined;
+  if (currentLastEvent === undefined || timestamp > currentLastEvent) {
+    patch.lastEventAt = timestamp;
+  }
+
+  if (event.kind === 'message_logged') {
+    const payload = event.payload ?? {};
+    const role = typeof payload.role === 'string' ? (payload.role as string) : null;
+
+    if (role === 'user') {
+      const firstUser = typeof session.firstUserMessageAt === 'number' ? session.firstUserMessageAt : undefined;
+      if (firstUser === undefined || timestamp < firstUser) {
+        patch.firstUserMessageAt = timestamp;
+      }
+    } else if (role === 'assistant') {
+      const lastAssistant = typeof session.lastAssistantMessageAt === 'number' ? session.lastAssistantMessageAt : undefined;
+      if (lastAssistant === undefined || timestamp > lastAssistant) {
+        patch.lastAssistantMessageAt = timestamp;
+      }
+    }
+  }
+
+  if (Object.keys(patch).length > 0) {
+    const nextSession = { ...session, ...patch } as Doc<'agent_sessions'>;
+    const timing = deriveEndToEndTiming(nextSession);
+
+    if (timing.startedAt !== session.endToEndStartedAt) {
+      patch.endToEndStartedAt = timing.startedAt;
+    }
+    if (timing.finishedAt !== session.endToEndFinishedAt) {
+      patch.endToEndFinishedAt = timing.finishedAt;
+    }
+    if (timing.durationMs !== session.endToEndDurationMs) {
+      patch.endToEndDurationMs = timing.durationMs;
+    }
+
+    const nextUpdatedAt = session.updatedAt > timestamp ? session.updatedAt : timestamp;
+    patch.updatedAt = nextUpdatedAt;
+
+    await ctx.db.patch(session._id, pickDefined(patch));
+  } else {
+    const hasExistingTiming =
+      typeof session.endToEndStartedAt === 'number' &&
+      typeof session.endToEndFinishedAt === 'number' &&
+      typeof session.endToEndDurationMs === 'number';
+
+    if (!hasExistingTiming) {
+      const timing = deriveEndToEndTiming(session);
+      if (
+        timing.startedAt !== session.endToEndStartedAt ||
+        timing.finishedAt !== session.endToEndFinishedAt ||
+        timing.durationMs !== session.endToEndDurationMs
+      ) {
+        await ctx.db.patch(session._id, pickDefined({
+          endToEndStartedAt: timing.startedAt,
+          endToEndFinishedAt: timing.finishedAt,
+          endToEndDurationMs: timing.durationMs,
+          updatedAt: session.updatedAt > timestamp ? session.updatedAt : timestamp,
+        }));
+      }
+    }
+  }
 };
 
 const handleSessionStarted = async (ctx: MutationCtx, event: IncomingEvent) => {
@@ -609,6 +717,8 @@ export const ingestEvent = mutation({
       await ctx.db.patch(session._id, pickDefined({ updatedAt: event.timestamp }));
     }
 
+    await updateSessionTiming(ctx, event);
+
     return { ok: true } as const;
   },
 });
@@ -633,9 +743,10 @@ export const listSessions = query({
     return sessions.map((session) => {
       const estimatedUsage = session.estimatedUsage as UsageRecord | undefined;
       const actualUsage = session.actualUsage as UsageRecord | undefined;
-      const durationMs = typeof session.sessionFinishedAt === 'number'
-        ? session.sessionFinishedAt - session.sessionStartedAt
-        : undefined;
+      const timing = deriveEndToEndTiming(session);
+      const endToEndStartedAt = session.endToEndStartedAt ?? timing.startedAt;
+      const endToEndFinishedAt = session.endToEndFinishedAt ?? timing.finishedAt;
+      const endToEndDurationMs = session.endToEndDurationMs ?? timing.durationMs;
       const parsedTags = parseSessionTagStorage(session.tags);
 
       return {
@@ -652,7 +763,10 @@ export const listSessions = query({
         actualUsage,
         sessionStartedAt: session.sessionStartedAt,
         sessionFinishedAt: session.sessionFinishedAt ?? null,
-        durationMs,
+        durationMs: endToEndDurationMs,
+        endToEndStartedAt: endToEndStartedAt ?? null,
+        endToEndFinishedAt: endToEndFinishedAt ?? null,
+        endToEndDurationMs: endToEndDurationMs ?? null,
         attachmentsCount: session.attachmentsCount ?? 0,
         messagePreviews: session.messagePreviews ?? null,
         tags: parsedTags.tags,
@@ -677,10 +791,14 @@ export const getSessionTimeline = query({
     if (!session) return null;
 
     const parsedTags = parseSessionTagStorage(session.tags);
+    const timing = deriveEndToEndTiming(session);
     const normalizedSession = {
       ...session,
       tags: parsedTags.tags,
       customTitle: parsedTags.title,
+      endToEndStartedAt: session.endToEndStartedAt ?? timing.startedAt ?? null,
+      endToEndFinishedAt: session.endToEndFinishedAt ?? timing.finishedAt ?? null,
+      endToEndDurationMs: session.endToEndDurationMs ?? timing.durationMs ?? null,
     };
 
     const steps = await ctx.db
