@@ -57,6 +57,84 @@ const hasUsage = (usage?: UsageRecord): boolean => {
   return usageKeys.some((key) => typeof usage[key] === 'number' && (usage[key] as number) > 0);
 };
 
+const TITLE_TAG_PREFIX = 'title:';
+const SESSION_TAG_PREFIX = 'tag:';
+
+const normalizeTagValue = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const dedupePreserveOrder = (values: string[]): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(value);
+  }
+  return result;
+};
+
+const parseSessionTagStorage = (stored: unknown): { title: string | null; tags: string[] } => {
+  const input = Array.isArray(stored) ? stored : [];
+  let title: string | null = null;
+  const tags: string[] = [];
+  let consumedLegacyTitle = false;
+
+  for (const raw of input) {
+    if (typeof raw !== 'string') continue;
+
+    if (raw.startsWith(TITLE_TAG_PREFIX)) {
+      const value = normalizeTagValue(raw.slice(TITLE_TAG_PREFIX.length));
+      if (value) {
+        title = value;
+      }
+      continue;
+    }
+
+    if (raw.startsWith(SESSION_TAG_PREFIX)) {
+      const value = normalizeTagValue(raw.slice(SESSION_TAG_PREFIX.length));
+      if (value) {
+        tags.push(value);
+      }
+      continue;
+    }
+
+    const value = normalizeTagValue(raw);
+    if (!value) continue;
+
+    if (!consumedLegacyTitle && !title) {
+      title = value;
+      consumedLegacyTitle = true;
+    } else {
+      tags.push(value);
+    }
+  }
+
+  return {
+    title,
+    tags: dedupePreserveOrder(tags),
+  };
+};
+
+const serializeSessionTagStorage = (title: string | null, tags: string[]): string[] | undefined => {
+  const cleaned = dedupePreserveOrder(tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0));
+  const result: string[] = [];
+
+  if (title) {
+    result.push(`${TITLE_TAG_PREFIX}${title}`);
+  }
+
+  for (const tag of cleaned) {
+    result.push(`${SESSION_TAG_PREFIX}${tag}`);
+  }
+
+  return result.length > 0 ? result : undefined;
+};
+
 const getSessionBySessionId = async (ctx: MutationCtx, sessionId: string): Promise<Doc<'agent_sessions'> | null> => {
   return await ctx.db
     .query('agent_sessions')
@@ -558,11 +636,7 @@ export const listSessions = query({
       const durationMs = typeof session.sessionFinishedAt === 'number'
         ? session.sessionFinishedAt - session.sessionStartedAt
         : undefined;
-      const tags = Array.isArray(session.tags)
-        ? session.tags
-            .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
-            .map((tag) => tag.trim())
-        : [];
+      const parsedTags = parseSessionTagStorage(session.tags);
 
       return {
         sessionId: session.sessionId,
@@ -581,7 +655,8 @@ export const listSessions = query({
         durationMs,
         attachmentsCount: session.attachmentsCount ?? 0,
         messagePreviews: session.messagePreviews ?? null,
-        tags,
+        tags: parsedTags.tags,
+        customTitle: parsedTags.title,
         status: session.sessionFinishedAt ? 'completed' : 'active',
         updatedAt: session.updatedAt,
         createdAt: session.createdAt,
@@ -601,6 +676,13 @@ export const getSessionTimeline = query({
       .first();
     if (!session) return null;
 
+    const parsedTags = parseSessionTagStorage(session.tags);
+    const normalizedSession = {
+      ...session,
+      tags: parsedTags.tags,
+      customTitle: parsedTags.title,
+    };
+
     const steps = await ctx.db
       .query('agent_steps')
       .withIndex('by_session', (q) => q.eq('sessionId', args.sessionId))
@@ -619,7 +701,7 @@ export const getSessionTimeline = query({
       .take(2000);
 
     return {
-      session,
+      session: normalizedSession,
       steps,
       toolCalls,
       events,
@@ -643,16 +725,92 @@ export const setSessionTag = mutation({
     }
 
     const normalized = typeof args.tag === 'string' ? args.tag.trim() : '';
-    const hasTag = normalized.length > 0;
+    const nextTitle = normalized.length > 0 ? normalized : null;
 
-    const patch = {
-      tags: hasTag ? [normalized] : undefined,
+    const parsed = parseSessionTagStorage(session.tags);
+    const nextStorage = serializeSessionTagStorage(nextTitle, parsed.tags);
+
+    await ctx.db.patch(session._id, {
+      tags: nextStorage,
       updatedAt: Date.now(),
-    } as Partial<Doc<'agent_sessions'>>;
+    } satisfies Partial<Doc<'agent_sessions'>>);
 
-    await ctx.db.patch(session._id, patch);
+    return { ok: true as const, tag: nextTitle };
+  },
+});
 
-    return { ok: true as const, tag: hasTag ? normalized : null };
+export const addSessionTag = mutation({
+  args: {
+    sessionId: v.string(),
+    tag: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query('agent_sessions')
+      .withIndex('by_sessionId', (q) => q.eq('sessionId', args.sessionId))
+      .first();
+
+    if (!session) {
+      return { ok: false as const, error: 'not_found' as const };
+    }
+
+    const normalized = args.tag.trim();
+    if (normalized.length === 0) {
+      return { ok: false as const, error: 'invalid_tag' as const };
+    }
+
+    const parsed = parseSessionTagStorage(session.tags);
+    if (parsed.tags.some((tag) => tag.toLowerCase() === normalized.toLowerCase())) {
+      return { ok: true as const, tags: parsed.tags };
+    }
+
+    const nextTags = [...parsed.tags, normalized];
+    const nextStorage = serializeSessionTagStorage(parsed.title, nextTags);
+
+    await ctx.db.patch(session._id, {
+      tags: nextStorage,
+      updatedAt: Date.now(),
+    } satisfies Partial<Doc<'agent_sessions'>>);
+
+    return { ok: true as const, tags: dedupePreserveOrder(nextTags) };
+  },
+});
+
+export const removeSessionTag = mutation({
+  args: {
+    sessionId: v.string(),
+    tag: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query('agent_sessions')
+      .withIndex('by_sessionId', (q) => q.eq('sessionId', args.sessionId))
+      .first();
+
+    if (!session) {
+      return { ok: false as const, error: 'not_found' as const };
+    }
+
+    const normalized = args.tag.trim();
+    if (normalized.length === 0) {
+      return { ok: false as const, error: 'invalid_tag' as const };
+    }
+
+    const parsed = parseSessionTagStorage(session.tags);
+    const remaining = parsed.tags.filter((tag) => tag.toLowerCase() !== normalized.toLowerCase());
+
+    if (remaining.length === parsed.tags.length) {
+      return { ok: true as const, tags: parsed.tags };
+    }
+
+    const nextStorage = serializeSessionTagStorage(parsed.title, remaining);
+
+    await ctx.db.patch(session._id, {
+      tags: nextStorage,
+      updatedAt: Date.now(),
+    } satisfies Partial<Doc<'agent_sessions'>>);
+
+    return { ok: true as const, tags: remaining };
   },
 });
 

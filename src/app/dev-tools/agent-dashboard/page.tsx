@@ -39,6 +39,7 @@ type SessionListItem = {
   attachmentsCount: number;
   messagePreviews: AgentMessagePreview[] | null | undefined;
   tags: string[];
+  customTitle?: string | null;
   status: 'active' | 'completed';
   updatedAt: number;
   createdAt: number;
@@ -119,6 +120,15 @@ const formatTimestamp = (ts?: number | null): string => {
   return new Date(ts).toLocaleString();
 };
 
+const formatTimeOfDay = (ts?: number | null): string => {
+  if (typeof ts !== 'number' || Number.isNaN(ts)) return '—';
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(ts));
+};
+
 const shortId = (value: string, max = 16): string => {
   if (value.length <= max) return value;
   return `${value.slice(0, max)}...`;
@@ -149,6 +159,7 @@ type TimelineEntry = {
   kind: TimelineEntryKind;
   title: string;
   timestamp?: number;
+  durationMs?: number;
   subtitle?: string;
   status?: 'default' | 'success' | 'warning' | 'error';
   accent: string;
@@ -157,6 +168,15 @@ type TimelineEntry = {
   payload?: Record<string, unknown>;
   payloadString?: string;
   sequence?: number;
+};
+
+type ToolCallSummaryRow = {
+  id: string;
+  name: string;
+  tokensLabel: string;
+  costLabel: string;
+  latencyLabel: string;
+  accentClass: string;
 };
 
 const safeJsonStringify = (value: unknown, spacing = 2): string => {
@@ -263,6 +283,8 @@ export default function AgentDashboardPage() {
   const timelineLoading = Boolean(selectedSessionId && timeline === undefined);
 
   const setSessionTagMutation = useMutation(convexApi.agentMetrics.setSessionTag);
+  const addSessionTagMutation = useMutation(convexApi.agentMetrics.addSessionTag);
+  const removeSessionTagMutation = useMutation(convexApi.agentMetrics.removeSessionTag);
 
   const handleSessionSelect = (sessionId: string) => {
     if (sessionId === selectedSessionId) return;
@@ -285,48 +307,60 @@ export default function AgentDashboardPage() {
     [sessions, selectedSessionId],
   );
 
-  const [sessionTags, setSessionTags] = useState<Record<string, string>>({});
+  const [sessionTitles, setSessionTitles] = useState<Record<string, string>>({});
+  const [sessionTagLists, setSessionTagLists] = useState<Record<string, string[]>>({});
 
   const selectedSessionTitle = useMemo(() => {
     if (!selectedSession) return null;
-    const override = sessionTags[selectedSession.sessionId]?.trim();
+    const override = sessionTitles[selectedSession.sessionId]?.trim();
     if (override) return override;
     return getSessionTitle(selectedSession).title;
-  }, [selectedSession, sessionTags]);
+  }, [selectedSession, sessionTitles]);
 
   const [expandedEntries, setExpandedEntries] = useState<Record<string, boolean>>({});
   const [expandedPayloads, setExpandedPayloads] = useState<Record<string, boolean>>({});
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
-  const [editingTagSessionId, setEditingTagSessionId] = useState<string | null>(null);
-  const [tagDraftValue, setTagDraftValue] = useState('');
-  const tagInputRef = useRef<HTMLInputElement | null>(null);
-  const skipTagCommitRef = useRef(false);
-  const pendingTagMutationsRef = useRef(new Set<string>());
+  const [editingTitleSessionId, setEditingTitleSessionId] = useState<string | null>(null);
+  const [titleDraftValue, setTitleDraftValue] = useState('');
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const skipTitleCommitRef = useRef(false);
+  const pendingTitleMutationsRef = useRef(new Set<string>());
+  const pendingTagListMutationsRef = useRef(new Set<string>());
+  const [activeTagInputSessionId, setActiveTagInputSessionId] = useState<string | null>(null);
+  const [newTagDraftValue, setNewTagDraftValue] = useState('');
+  const newTagInputRef = useRef<HTMLInputElement | null>(null);
+  const [pendingTagRemovalKeys, setPendingTagRemovalKeys] = useState<Record<string, number>>({});
+  const tagRemovalTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
-    if (editingTagSessionId && tagInputRef.current) {
-      tagInputRef.current.focus();
-      tagInputRef.current.select();
+    if (editingTitleSessionId && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
     }
-  }, [editingTagSessionId]);
+  }, [editingTitleSessionId]);
+
+  useEffect(() => {
+    if (activeTagInputSessionId && newTagInputRef.current) {
+      newTagInputRef.current.focus();
+      newTagInputRef.current.select();
+    }
+  }, [activeTagInputSessionId]);
 
   useEffect(() => {
     if (!sessions) return;
-    setSessionTags((prev) => {
+    setSessionTitles((prev) => {
       const next = { ...prev };
       let didChange = false;
       const activeIds = new Set(sessions.map((session) => session.sessionId));
 
       for (const session of sessions) {
         const sessionId = session.sessionId;
-        if (pendingTagMutationsRef.current.has(sessionId)) {
+        if (pendingTitleMutationsRef.current.has(sessionId)) {
           continue;
         }
-        const serverTag = Array.isArray(session.tags)
-          ? session.tags.find((tag) => typeof tag === 'string' && tag.trim().length > 0)
-          : undefined;
-        if (serverTag) {
-          const trimmed = serverTag.trim();
+        const serverTitle = typeof session.customTitle === 'string' ? session.customTitle.trim() : '';
+        if (serverTitle) {
+          const trimmed = serverTitle.trim();
           if (next[sessionId] !== trimmed) {
             next[sessionId] = trimmed;
             didChange = true;
@@ -338,7 +372,7 @@ export default function AgentDashboardPage() {
       }
 
       for (const sessionId of Object.keys(next)) {
-        if (!activeIds.has(sessionId) && !pendingTagMutationsRef.current.has(sessionId)) {
+        if (!activeIds.has(sessionId) && !pendingTitleMutationsRef.current.has(sessionId)) {
           delete next[sessionId];
           didChange = true;
         }
@@ -350,25 +384,88 @@ export default function AgentDashboardPage() {
 
   useEffect(() => {
     if (!sessions) return;
-    if (editingTagSessionId && !sessions.some((session) => session.sessionId === editingTagSessionId)) {
-      setEditingTagSessionId(null);
-      setTagDraftValue('');
-    }
-  }, [editingTagSessionId, sessions]);
 
-  const persistTag = (sessionId: string, value: string | null) => {
+    const arraysEqual = (a: string[] | undefined, b: string[]): boolean => {
+      if (!a) return b.length === 0;
+      if (a.length !== b.length) return false;
+      return a.every((value, index) => value === b[index]);
+    };
+
+    setSessionTagLists((prev) => {
+      const next = { ...prev };
+      let didChange = false;
+      const activeIds = new Set(sessions.map((session) => session.sessionId));
+
+      for (const session of sessions) {
+        const sessionId = session.sessionId;
+        if (pendingTagListMutationsRef.current.has(sessionId)) {
+          continue;
+        }
+        const serverTags = Array.isArray(session.tags)
+          ? session.tags
+              .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+              .filter((tag) => tag.length > 0)
+          : [];
+
+        if (serverTags.length > 0) {
+          if (!arraysEqual(next[sessionId], serverTags)) {
+            next[sessionId] = serverTags;
+            didChange = true;
+          }
+        } else if (next[sessionId] !== undefined) {
+          delete next[sessionId];
+          didChange = true;
+        }
+      }
+
+      for (const sessionId of Object.keys(next)) {
+        if (!activeIds.has(sessionId) && !pendingTagListMutationsRef.current.has(sessionId)) {
+          delete next[sessionId];
+          didChange = true;
+        }
+      }
+
+      return didChange ? next : prev;
+    });
+  }, [sessions]);
+
+  useEffect(() => {
+    if (!sessions) return;
+    if (editingTitleSessionId && !sessions.some((session) => session.sessionId === editingTitleSessionId)) {
+      setEditingTitleSessionId(null);
+      setTitleDraftValue('');
+    }
+  }, [editingTitleSessionId, sessions]);
+
+  useEffect(() => {
+    if (!sessions) return;
+    if (activeTagInputSessionId && !sessions.some((session) => session.sessionId === activeTagInputSessionId)) {
+      setActiveTagInputSessionId(null);
+      setNewTagDraftValue('');
+    }
+  }, [activeTagInputSessionId, sessions]);
+
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of Object.values(tagRemovalTimersRef.current)) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
+  const persistTitle = (sessionId: string, value: string | null) => {
     const normalizedInput = typeof value === 'string' ? value.trim() : '';
     const finalValue = normalizedInput.length > 0 ? normalizedInput : null;
-    const previousValue = sessionTags[sessionId];
+    const previousValue = sessionTitles[sessionId];
     const previousNormalized = typeof previousValue === 'string' && previousValue.trim().length > 0 ? previousValue : null;
 
     if (previousNormalized === finalValue) {
       return;
     }
 
-    pendingTagMutationsRef.current.add(sessionId);
+    pendingTitleMutationsRef.current.add(sessionId);
 
-    setSessionTags((prev) => {
+    setSessionTitles((prev) => {
       if (finalValue) {
         if (prev[sessionId] === finalValue) {
           return prev;
@@ -386,7 +483,7 @@ export default function AgentDashboardPage() {
     void setSessionTagMutation({ sessionId, tag: finalValue })
       .catch((error) => {
         console.error('Failed to update session tag', error);
-        setSessionTags((prev) => {
+        setSessionTitles((prev) => {
           if (previousNormalized) {
             if (prev[sessionId] === previousNormalized) {
               return prev;
@@ -402,58 +499,233 @@ export default function AgentDashboardPage() {
         });
       })
       .finally(() => {
-        pendingTagMutationsRef.current.delete(sessionId);
+        pendingTitleMutationsRef.current.delete(sessionId);
       });
   };
 
-  const commitTagEdit = (sessionId: string) => {
-    persistTag(sessionId, tagDraftValue);
-    setEditingTagSessionId(null);
-    setTagDraftValue('');
+  const commitTitleEdit = (sessionId: string) => {
+    persistTitle(sessionId, titleDraftValue);
+    setEditingTitleSessionId(null);
+    setTitleDraftValue('');
   };
 
-  const cancelTagEdit = () => {
-    skipTagCommitRef.current = true;
-    setEditingTagSessionId(null);
-    setTagDraftValue('');
+  const cancelTitleEdit = () => {
+    skipTitleCommitRef.current = true;
+    setEditingTitleSessionId(null);
+    setTitleDraftValue('');
     setTimeout(() => {
-      skipTagCommitRef.current = false;
+      skipTitleCommitRef.current = false;
     }, 0);
   };
 
-  const handleTagInputBlur = (_event: FocusEvent<HTMLInputElement>, sessionId: string) => {
-    if (skipTagCommitRef.current) {
-      skipTagCommitRef.current = false;
+  const handleTitleInputBlur = (_event: FocusEvent<HTMLInputElement>, sessionId: string) => {
+    if (skipTitleCommitRef.current) {
+      skipTitleCommitRef.current = false;
       return;
     }
-    commitTagEdit(sessionId);
+    commitTitleEdit(sessionId);
   };
 
-  const handleTagInputKeyDown = (event: KeyboardEvent<HTMLInputElement>, sessionId: string) => {
+  const handleTitleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>, sessionId: string) => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      commitTagEdit(sessionId);
+      commitTitleEdit(sessionId);
     }
     if (event.key === 'Escape') {
       event.preventDefault();
-      cancelTagEdit();
+      cancelTitleEdit();
     }
   };
 
-  const beginTagEdit = (sessionId: string) => {
-    skipTagCommitRef.current = false;
-    setEditingTagSessionId(sessionId);
-    setTagDraftValue(sessionTags[sessionId] ?? '');
+  const beginTitleEdit = (sessionId: string) => {
+    skipTitleCommitRef.current = false;
+    setEditingTitleSessionId(sessionId);
+    setTitleDraftValue(sessionTitles[sessionId] ?? '');
   };
 
   const clearSessionName = (sessionId: string) => {
-    skipTagCommitRef.current = true;
-    setEditingTagSessionId((current) => (current === sessionId ? null : current));
-    setTagDraftValue('');
-    persistTag(sessionId, null);
+    skipTitleCommitRef.current = true;
+    setEditingTitleSessionId((current) => (current === sessionId ? null : current));
+    setTitleDraftValue('');
+    persistTitle(sessionId, null);
     setTimeout(() => {
-      skipTagCommitRef.current = false;
+      skipTitleCommitRef.current = false;
     }, 0);
+  };
+
+  const addTagToSession = (sessionId: string, rawValue: string) => {
+    const normalized = rawValue.trim();
+    if (normalized.length === 0) {
+      return;
+    }
+
+    const previousTags = [...(sessionTagLists[sessionId] ?? [])];
+    if (previousTags.some((tag) => tag.toLowerCase() === normalized.toLowerCase())) {
+      return;
+    }
+
+    pendingTagListMutationsRef.current.add(sessionId);
+
+    setSessionTagLists((prev) => {
+      const existing = prev[sessionId] ?? [];
+      return {
+        ...prev,
+        [sessionId]: [...existing, normalized],
+      };
+    });
+
+    void addSessionTagMutation({ sessionId, tag: normalized })
+      .catch((error) => {
+        console.error('Failed to add session tag', error);
+        setSessionTagLists((prev) => {
+          const current = prev[sessionId] ?? [];
+          const hasOptimistic = current.some((tag) => tag === normalized);
+          if (!hasOptimistic) {
+            return prev;
+          }
+          if (previousTags.length === 0) {
+            const { [sessionId]: _removed, ...rest } = prev;
+            return rest;
+          }
+          return {
+            ...prev,
+            [sessionId]: previousTags,
+          };
+        });
+      })
+      .finally(() => {
+        pendingTagListMutationsRef.current.delete(sessionId);
+      });
+  };
+
+  const removeTagFromSession = (sessionId: string, rawValue: string) => {
+    const normalized = rawValue.trim();
+    if (normalized.length === 0) {
+      return;
+    }
+
+    const previousTags = [...(sessionTagLists[sessionId] ?? [])];
+    if (!previousTags.some((tag) => tag.toLowerCase() === normalized.toLowerCase())) {
+      return;
+    }
+
+    pendingTagListMutationsRef.current.add(sessionId);
+
+    setSessionTagLists((prev) => {
+      const existing = prev[sessionId] ?? [];
+      const next = existing.filter((tag) => tag.toLowerCase() !== normalized.toLowerCase());
+      if (next.length === 0) {
+        const { [sessionId]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [sessionId]: next,
+      };
+    });
+
+    void removeSessionTagMutation({ sessionId, tag: normalized })
+      .catch((error) => {
+        console.error('Failed to remove session tag', error);
+        setSessionTagLists((prev) => {
+          if (previousTags.length === 0) {
+            return prev;
+          }
+          return {
+            ...prev,
+            [sessionId]: previousTags,
+          };
+        });
+      })
+      .finally(() => {
+        pendingTagListMutationsRef.current.delete(sessionId);
+      });
+  };
+
+  const beginNewTagForSession = (sessionId: string) => {
+    if (activeTagInputSessionId && activeTagInputSessionId !== sessionId) {
+      const pendingValue = newTagDraftValue.trim();
+      if (pendingValue.length > 0) {
+        addTagToSession(activeTagInputSessionId, pendingValue);
+      }
+    }
+    setActiveTagInputSessionId(sessionId);
+    setNewTagDraftValue('');
+  };
+
+  const cancelNewTag = () => {
+    setActiveTagInputSessionId(null);
+    setNewTagDraftValue('');
+  };
+
+  const commitNewTagForSession = (sessionId: string) => {
+    const value = newTagDraftValue.trim();
+    setActiveTagInputSessionId(null);
+    setNewTagDraftValue('');
+    if (value.length === 0) {
+      return;
+    }
+    addTagToSession(sessionId, value);
+  };
+
+  const handleNewTagInputBlur = (_event: FocusEvent<HTMLInputElement>, sessionId: string) => {
+    commitNewTagForSession(sessionId);
+  };
+
+  const handleNewTagInputKeyDown = (event: KeyboardEvent<HTMLInputElement>, sessionId: string) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitNewTagForSession(sessionId);
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelNewTag();
+    }
+  };
+
+  const getTagRemovalKey = (sessionId: string, tag: string) => `${sessionId}::${tag.toLowerCase()}`;
+
+  const isTagRemovalPending = (sessionId: string, tag: string) => {
+    const key = getTagRemovalKey(sessionId, tag);
+    return Boolean(pendingTagRemovalKeys[key]);
+  };
+
+  const handleTagRemoveClick = (
+    event: MouseEvent<HTMLButtonElement>,
+    sessionId: string,
+    tag: string,
+  ) => {
+    event.stopPropagation();
+    const key = getTagRemovalKey(sessionId, tag);
+
+    if (pendingTagRemovalKeys[key]) {
+      const timerId = tagRemovalTimersRef.current[key];
+      if (timerId) {
+        clearTimeout(timerId);
+        delete tagRemovalTimersRef.current[key];
+      }
+      setPendingTagRemovalKeys((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      removeTagFromSession(sessionId, tag);
+      return;
+    }
+
+    setPendingTagRemovalKeys((prev) => ({ ...prev, [key]: Date.now() }));
+    const timerId = window.setTimeout(() => {
+      setPendingTagRemovalKeys((prev) => {
+        if (!(key in prev)) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      delete tagRemovalTimersRef.current[key];
+    }, 2000);
+    tagRemovalTimersRef.current[key] = timerId;
   };
 
   const sessionSummary = useMemo(() => {
@@ -622,6 +894,94 @@ export default function AgentDashboardPage() {
       ? 'Estimated usage'
       : null;
 
+  const toolCallSummaryRows = useMemo(() => {
+    if (!timeline?.toolCalls || timeline.toolCalls.length === 0) return [] as ToolCallSummaryRow[];
+
+    const completedCalls = timeline.toolCalls.filter((call) => call.status === 'completed');
+    if (completedCalls.length === 0) return [] as ToolCallSummaryRow[];
+
+    const compareMaybeNumber = (a?: number, b?: number) => {
+      const aHas = typeof a === 'number';
+      const bHas = typeof b === 'number';
+      if (aHas && bHas) {
+        if ((a as number) < (b as number)) return -1;
+        if ((a as number) > (b as number)) return 1;
+        return 0;
+      }
+      if (aHas) return -1;
+      if (bHas) return 1;
+      return 0;
+    };
+
+    const sortedCalls = [...completedCalls].sort((a, b) => {
+      const startOrder = compareMaybeNumber(a.startedAt, b.startedAt);
+      if (startOrder !== 0) return startOrder;
+
+      if (typeof a.stepIndex === 'number' && typeof b.stepIndex === 'number') {
+        if (a.stepIndex < b.stepIndex) return -1;
+        if (a.stepIndex > b.stepIndex) return 1;
+      }
+
+      const endOrder = compareMaybeNumber(a.completedAt, b.completedAt);
+      if (endOrder !== 0) return endOrder;
+
+      const aId = typeof a.toolCallId === 'string' ? a.toolCallId : a._id;
+      const bId = typeof b.toolCallId === 'string' ? b.toolCallId : b._id;
+      return aId.localeCompare(bId);
+    });
+
+    const palette = [
+      'border-l-2 border-l-sky-500/60 bg-sky-500/5 dark:border-l-sky-300/50 dark:bg-sky-500/10',
+      'border-l-2 border-l-emerald-500/60 bg-emerald-500/5 dark:border-l-emerald-300/50 dark:bg-emerald-500/10',
+      'border-l-2 border-l-amber-500/60 bg-amber-500/10 dark:border-l-amber-300/50 dark:bg-amber-500/15',
+      'border-l-2 border-l-purple-500/60 bg-purple-500/10 dark:border-l-purple-300/50 dark:bg-purple-500/15',
+      'border-l-2 border-l-rose-500/60 bg-rose-500/10 dark:border-l-rose-300/50 dark:bg-rose-500/15',
+      'border-l-2 border-l-indigo-500/60 bg-indigo-500/10 dark:border-l-indigo-300/50 dark:bg-indigo-500/15',
+    ];
+
+    const assignment = new Map<string, string>();
+    let paletteIndex = 0;
+
+    return sortedCalls.map((call) => {
+      const usage = call.tokenUsage as Nullable<UsageRecord>;
+      let totalTokens = usage ? tokensFromUsage(usage, 'totalTokens') : 0;
+      if (totalTokens === 0 && usage) {
+        totalTokens = tokensFromUsage(usage, 'promptTokens') + tokensFromUsage(usage, 'completionTokens');
+      }
+
+      const costUSD = typeof call.costUSD === 'number' && Number.isFinite(call.costUSD) ? call.costUSD : null;
+
+      let latencyMs: number | null = null;
+      if (typeof call.durationMs === 'number' && Number.isFinite(call.durationMs) && call.durationMs >= 0) {
+        latencyMs = call.durationMs;
+      } else if (typeof call.startedAt === 'number' && typeof call.completedAt === 'number') {
+        const delta = call.completedAt - call.startedAt;
+        latencyMs = delta >= 0 ? delta : null;
+      }
+
+      const name = call.toolName || call.toolCallId || 'Tool call';
+      const id = call._id ?? call.toolCallId ?? `${name}-${call.stepIndex}`;
+
+      const assignmentKey = name.toLowerCase();
+      if (!assignment.has(assignmentKey)) {
+        const paletteClass = palette[paletteIndex % palette.length];
+        assignment.set(assignmentKey, paletteClass);
+        paletteIndex += 1;
+      }
+
+      const accentClass = assignment.get(assignmentKey) ?? palette[0];
+
+      return {
+        id,
+        name,
+        tokensLabel: `${formatNumber(totalTokens)} tokens`,
+        costLabel: formatCostExact(costUSD),
+        latencyLabel: formatDuration(latencyMs ?? null),
+        accentClass,
+      } satisfies ToolCallSummaryRow;
+    });
+  }, [timeline]);
+
   const timelineEntries = useMemo(() => {
     if (!timeline) return [] as TimelineEntry[];
 
@@ -647,6 +1007,7 @@ export default function AgentDashboardPage() {
       let title = describeEventKind(kind);
       let subtitle: string | undefined;
       let preview: string | undefined;
+      let durationMs: number | undefined;
 
       switch (kind) {
         case 'session_started': {
@@ -693,6 +1054,7 @@ export default function AgentDashboardPage() {
         case 'step_finished': {
           const stepIndex = typeof payload.stepIndex === 'number' ? payload.stepIndex : undefined;
           const finishReason = typeof payload.finishReason === 'string' ? payload.finishReason : undefined;
+          durationMs = typeof payload.durationMs === 'number' && payload.durationMs >= 0 ? payload.durationMs : undefined;
           const finishReasonLabel = (() => {
             switch (finishReason) {
               case 'tool-calls':
@@ -716,6 +1078,9 @@ export default function AgentDashboardPage() {
           }
           if (typeof payload.toolCallsCount === 'number') meta.push({ label: 'Tool Calls', value: formatNumber(payload.toolCallsCount) });
           if (typeof payload.toolResultsCount === 'number') meta.push({ label: 'Tool Results', value: formatNumber(payload.toolResultsCount) });
+          if (durationMs !== undefined) {
+            meta.push({ label: 'Duration', value: formatDuration(durationMs) });
+          }
           const usage = payload.usage as Nullable<UsageRecord>;
           if (usage) {
             meta.push({ label: 'Tokens', value: usageSummary(usage) });
@@ -867,6 +1232,7 @@ export default function AgentDashboardPage() {
         title,
         subtitle,
         timestamp: event.timestamp,
+        durationMs,
         status,
         accent,
         meta,
@@ -995,10 +1361,12 @@ export default function AgentDashboardPage() {
                       const completedStatusClasses = 'bg-green-100 text-green-800 border-green-200';
                       const { title: sessionTitle, subtitle: sessionSubtitle } = getSessionTitle(session);
                       const isSessionDetailsExpanded = Boolean(expandedSessions[session.sessionId]);
-                      const sessionTag = sessionTags[session.sessionId]?.trim();
-                      const isTagEditing = editingTagSessionId === session.sessionId;
-                      const hasCustomTitle = Boolean(sessionTag);
-                      const displayTitle = sessionTag && sessionTag.length > 0 ? sessionTag : sessionTitle;
+                      const sessionTitleOverride = sessionTitles[session.sessionId]?.trim();
+                      const isTitleEditing = editingTitleSessionId === session.sessionId;
+                      const hasCustomTitle = Boolean(sessionTitleOverride);
+                      const displayTitle = hasCustomTitle ? sessionTitleOverride : sessionTitle;
+                      const tagValues = sessionTagLists[session.sessionId] ?? [];
+                      const isAddingTag = activeTagInputSessionId === session.sessionId;
 
                       return (
                         <div
@@ -1016,13 +1384,13 @@ export default function AgentDashboardPage() {
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex min-w-0 flex-col gap-1">
                               <div className="group inline-flex max-w-full items-center gap-2">
-                                {isTagEditing ? (
+                                {isTitleEditing ? (
                                   <input
-                                    ref={tagInputRef}
-                                    value={tagDraftValue}
-                                    onChange={(event) => setTagDraftValue(event.target.value)}
-                                    onBlur={(event) => handleTagInputBlur(event, session.sessionId)}
-                                    onKeyDown={(event) => handleTagInputKeyDown(event, session.sessionId)}
+                                    ref={titleInputRef}
+                                    value={titleDraftValue}
+                                    onChange={(event) => setTitleDraftValue(event.target.value)}
+                                    onBlur={(event) => handleTitleInputBlur(event, session.sessionId)}
+                                    onKeyDown={(event) => handleTitleInputKeyDown(event, session.sessionId)}
                                     onClick={(event) => event.stopPropagation()}
                                     placeholder="Name this session"
                                     className="h-7 w-full max-w-xs bg-transparent px-0 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-0"
@@ -1034,7 +1402,7 @@ export default function AgentDashboardPage() {
                                       className="group inline-flex max-w-full items-center gap-2 text-left text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none"
                                       onClick={(event) => {
                                         event.stopPropagation();
-                                        beginTagEdit(session.sessionId);
+                                        beginTitleEdit(session.sessionId);
                                       }}
                                     >
                                       <span className="line-clamp-2" title={displayTitle}>
@@ -1065,6 +1433,61 @@ export default function AgentDashboardPage() {
                                   Based on: {sessionTitle}
                                 </span>
                               ) : null}
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                {tagValues.map((tag) => {
+                                  const removalPending = isTagRemovalPending(session.sessionId, tag);
+                                  return (
+                                    <div
+                                      key={tag}
+                                      className={cn(
+                                        'inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium transition-colors',
+                                        removalPending
+                                          ? 'border-destructive/70 bg-destructive/10 text-destructive'
+                                          : 'border-border/70 bg-muted/40 text-muted-foreground'
+                                      )}
+                                    >
+                                      <span className="max-w-[140px] truncate" title={tag}>
+                                        {tag}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className={cn(
+                                          'inline-flex h-4 w-4 items-center justify-center rounded-full border border-transparent text-[10px] text-muted-foreground transition-colors',
+                                          removalPending ? 'border-destructive/80 text-destructive' : 'hover:text-destructive/90'
+                                        )}
+                                        onClick={(event) => handleTagRemoveClick(event, session.sessionId, tag)}
+                                        aria-label={removalPending ? `Click again to remove tag ${tag}` : `Remove tag ${tag}`}
+                                        title={removalPending ? 'Click again to remove' : 'Remove tag'}
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                                {isAddingTag ? (
+                                  <input
+                                    ref={newTagInputRef}
+                                    value={newTagDraftValue}
+                                    onChange={(event) => setNewTagDraftValue(event.target.value)}
+                                    onBlur={(event) => handleNewTagInputBlur(event, session.sessionId)}
+                                    onKeyDown={(event) => handleNewTagInputKeyDown(event, session.sessionId)}
+                                    onClick={(event) => event.stopPropagation()}
+                                    placeholder="Tag name"
+                                    className="h-7 w-28 rounded-full border border-dashed border-primary/70 bg-transparent px-3 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-0"
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="inline-flex h-7 items-center rounded-full border border-dashed border-muted-foreground/60 px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/70 hover:text-primary focus-visible:outline-none"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      beginNewTagForSession(session.sessionId);
+                                    }}
+                                  >
+                                    + add tag
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center gap-1">
                               {session.status === 'completed' && (
@@ -1183,6 +1606,43 @@ export default function AgentDashboardPage() {
                         ))}
                       </div>
                     )}
+                    {toolCallSummaryRows.length > 0 && (
+                      <div
+                        className={cn(
+                          'mt-4',
+                          usageSummaryRows.length > 0 || auxiliarySummaryRows.length > 0
+                            ? 'border-t border-border/60 pt-4'
+                            : ''
+                        )}
+                      >
+                        <div className="rounded-md border border-border">
+                          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3 px-4 py-2 text-xs uppercase tracking-wide text-muted-foreground">
+                            <span>Tool Call</span>
+                            <span className="text-right">Tokens</span>
+                            <span className="text-right">Cost</span>
+                            <span className="text-right">Latency</span>
+                          </div>
+                          <div className="divide-y">
+                            {toolCallSummaryRows.map((row) => (
+                              <div
+                                key={row.id}
+                                className={cn(
+                                  'grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 px-4 py-3 text-sm transition-colors',
+                                  row.accentClass,
+                                )}
+                              >
+                                <span className="truncate font-medium text-foreground" title={row.name}>
+                                  {row.name}
+                                </span>
+                                <span className="tabular-nums text-right text-foreground">{row.tokensLabel}</span>
+                                <span className="tabular-nums text-right text-foreground">{row.costLabel}</span>
+                                <span className="tabular-nums text-right text-muted-foreground">{row.latencyLabel}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1246,7 +1706,12 @@ export default function AgentDashboardPage() {
                         const isExpanded = Boolean(expandedEntries[entry.id]);
                         const isPayloadExpanded = Boolean(expandedPayloads[entry.id]);
                         const hasPayload = Boolean(entry.payloadString && entry.payloadString.trim().length > 2);
-                        const timestampLabel = entry.timestamp ? formatTimestamp(entry.timestamp) : '—';
+                        const timestampLabel = formatTimeOfDay(entry.timestamp);
+                        const timestampTitle = entry.timestamp ? formatTimestamp(entry.timestamp) : undefined;
+                        const durationLabel =
+                          entry.kind === 'step_finished' && typeof entry.durationMs === 'number' && entry.durationMs > 0
+                            ? formatDuration(entry.durationMs)
+                            : null;
                         const statusBadge = (() => {
                           if (entry.status === 'error') return <Badge variant="destructive" className="text-[10px]">Error</Badge>;
                           if (entry.status === 'success') return <Badge variant="outline" className="text-[10px]">Success</Badge>;
@@ -1281,7 +1746,12 @@ export default function AgentDashboardPage() {
                                 </div>
                               </div>
                               <div className="flex flex-shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                                <span>{timestampLabel}</span>
+                                {durationLabel ? (
+                                  <span className="tabular-nums text-foreground" title="Step duration">
+                                    {durationLabel}
+                                  </span>
+                                ) : null}
+                                <span title={timestampTitle}>{timestampLabel}</span>
                                 <span className="text-base leading-none text-muted-foreground">{isExpanded ? '-' : '+'}</span>
                               </div>
                             </button>
