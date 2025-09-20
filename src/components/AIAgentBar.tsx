@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Monitor, Store, Image as ImageIcon, MessageCircle, UserPlus, Users, Undo2 } from 'lucide-react';
+import { ArrowLeft, Monitor, Store, Image as ImageIcon, MessageCircle, UserPlus, Users, Undo2 } from 'lucide-react';
 import { useWebContainer } from './WebContainerProvider';
 import { useScreens } from './ScreensProvider';
 import { formatBytes } from '@/lib/agent/agentUtils';
@@ -25,7 +25,7 @@ import type { Doc } from '../../convex/_generated/dataModel';
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'compact' | 'chat' | 'visit' | 'media' | 'friends'>('chat');
-  const [leftPane, setLeftPane] = useState<'agent' | 'friend'>('agent');
+  const [chatSurface, setChatSurface] = useState<'agent' | 'history' | 'friend'>('agent');
   
   const { goTo, activeIndex } = useScreens();
   const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
@@ -57,9 +57,9 @@ export default function AIAgentBar() {
   const { messagesContainerRef, messagesInnerRef, containerHeight, forceFollow } = useScrollSizing(mode === 'friends' ? 'chat' : mode);
 
   const enterFriendsView = useCallback(() => {
-    setLeftPane('friend');
+    setChatSurface('friend');
     setMode('friends');
-  }, [setLeftPane, setMode]);
+  }, [setMode]);
 
   const clearSocialInput = useCallback(() => {
     setInput('');
@@ -301,65 +301,27 @@ export default function AIAgentBar() {
   const handleAgentSubmit = agent.composer.handleSubmit;
 
   // Drag overlay
-  // Bottom bar
-  const bottomBar = (
-    <div className="border-t border-white/10 bg-black/35 px-4 py-4 backdrop-blur-md">
-      {leftPane === 'agent' && (
-        <ChatComposer
-          input={input}
-          setInput={setInput}
-          status={agentStatus}
-          attachments={attachments}
-          removeAttachment={removeAttachment}
-          onSubmit={handleAgentSubmit}
-          onFileSelect={handleUploadFiles}
-          onStop={() => stopAgent()}
-          onFocus={() => setMode('chat')}
-          uploadBusy={busyFlags.uploadBusy}
-        />
-      )}
-      {leftPane === 'friend' && socialView.kind !== 'settings' && (
-        <ChatComposer
-          input={input}
-          setInput={setInput}
-          status={socialComposerStatus}
-          attachments={[]}
-          removeAttachment={() => {}}
-          onSubmit={handleSocialSubmit}
-          onFileSelect={() => {}}
-          onStop={() => {}}
-          onFocus={() => setMode('friends')}
-          uploadBusy={false}
-        />
-      )}
-      {leftPane === 'friend' && socialView.kind === 'settings' && (
-        <div className="rounded-md border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60">
-          Select a chat to start messaging.
-        </div>
-      )}
-    </div>
-  );
 
   const handleSelectAgent = useCallback(() => {
-    setLeftPane('agent');
+    setChatSurface('agent');
     setMode('chat');
-  }, [setLeftPane, setMode]);
+  }, [setMode]);
 
   const handleOpenFriendsPanel = useCallback(() => {
-    setLeftPane('friend');
+    setChatSurface('friend');
     setMode('friends');
     openFriendsSettings();
-  }, [openFriendsSettings, setLeftPane, setMode]);
+  }, [openFriendsSettings, setMode]);
 
   const handleStartGroup = useCallback(() => {
-    setLeftPane('friend');
+    setChatSurface('friend');
     setMode('friends');
     openFriendsSettings();
     setShowCreateGroupForm(true);
-  }, [openFriendsSettings, setLeftPane, setMode, setShowCreateGroupForm]);
+  }, [openFriendsSettings, setMode, setShowCreateGroupForm]);
 
   const handleSelectChatItem = useCallback((item: typeof chatItems[number]) => {
-    setLeftPane('friend');
+    setChatSurface('friend');
     setMode('friends');
     if (item.kind === 'dm' && item.peerId) {
       openDmChat(item.peerId);
@@ -372,9 +334,14 @@ export default function AIAgentBar() {
     if (item.kind === 'auto') {
       openAutoChat();
     }
-  }, [openAutoChat, openDmChat, openGroupChat, setLeftPane, setMode]);
+  }, [openAutoChat, openDmChat, openGroupChat, setMode]);
 
-  const baseChatMode = leftPane === 'friend' ? 'friends' : 'chat';
+  const handleBackToHistory = useCallback(() => {
+    setChatSurface('history');
+    setMode('chat');
+  }, [setMode]);
+
+  const baseChatMode = chatSurface === 'friend' ? 'friends' : 'chat';
 
   const navItems = [
     {
@@ -406,152 +373,163 @@ export default function AIAgentBar() {
     },
   ] as const;
 
-  const conversationList = (
-    <div className="flex h-full flex-col">
-      <button
-        type="button"
-        onClick={handleSelectAgent}
-        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${leftPane === 'agent' ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}
-      >
-        <MessageCircle className="h-4 w-4" />
-        <span>Assistant</span>
-      </button>
-
-      <div className="mt-4 flex-1 overflow-y-auto pr-1">
-        {chatItems.length === 0 && !friendsState.friendsLoading && !groupState.groupsLoading && (
-          <div className="rounded-lg bg-white/5 px-3 py-4 text-xs text-white/60">
-            Your chats will show up here. Start one from the buttons below.
-          </div>
+  const historyView = (
+    <div className="flex h-full flex-col px-4 py-4 text-white">
+      <div className="mb-3 flex items-center justify-between text-sm text-white/70">
+        <span className="text-base font-semibold text-white">Chats</span>
+        {(friendsState.friendsLoading || groupState.groupsLoading) && (
+          <span className="text-[11px] text-white/50">Syncing…</span>
         )}
-        <div className="flex flex-col gap-1">
-          {chatItems.map((item) => {
-            const isActive = leftPane === 'friend' && item.key === activeChatKey;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => handleSelectChatItem(item)}
-                className={`flex flex-col rounded-lg px-3 py-2 text-left text-xs transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}
-              >
-                <span className="font-medium">{item.label}</span>
-                {item.description && <span className="text-[10px] text-white/50">{item.description}</span>}
-              </button>
-            );
-          })}
-        </div>
       </div>
-
-      <div className="mt-4 border-t border-white/10 pt-4">
-        <div className="flex flex-col gap-2">
+      <div className="flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+        <div className="flex h-full flex-col gap-3 p-3">
           <button
             type="button"
-            onClick={handleOpenFriendsPanel}
-            className="flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-xs text-white/80 transition-colors hover:bg-white/10"
+            onClick={handleSelectAgent}
+            className={`flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition-colors ${chatSurface === 'agent' ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}
           >
-            <UserPlus className="h-4 w-4" />
-            <span>Add friend</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/40 text-white">
+              <MessageCircle className="h-4 w-4" />
+            </span>
+            <span className="font-medium">Assistant</span>
           </button>
-          <button
-            type="button"
-            onClick={handleStartGroup}
-            className="flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-xs text-white/80 transition-colors hover:bg-white/10"
-          >
-            <Users className="h-4 w-4" />
-            <span>New group chat</span>
-          </button>
+          <div className="flex-1 overflow-y-auto modern-scrollbar space-y-2 pr-1">
+            {chatItems.length === 0 && !friendsState.friendsLoading && !groupState.groupsLoading ? (
+              <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-4 text-xs text-white/60">
+                Your chats will show up here. Use the quick actions below to start one.
+              </div>
+            ) : (
+              chatItems.map((item) => {
+                const isActive = chatSurface === 'friend' && item.key === activeChatKey;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => handleSelectChatItem(item)}
+                    className={`flex flex-col rounded-lg px-3 py-2 text-left text-xs transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}
+                  >
+                    <span className="font-medium">{item.label}</span>
+                    {item.description && <span className="text-[10px] text-white/50">{item.description}</span>}
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <div className="border-t border-white/10 pt-3">
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleOpenFriendsPanel}
+                className="flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-xs text-white/80 transition-colors hover:bg-white/10"
+              >
+                <UserPlus className="h-4 w-4" />
+                <span>Add friend</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleStartGroup}
+                className="flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-xs text-white/80 transition-colors hover:bg-white/10"
+              >
+                <Users className="h-4 w-4" />
+                <span>New group chat</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 
   const agentConversation = (
-    <div className="relative flex h-full flex-col gap-3">
-      <ChatTabs
-        openThreads={openThreads}
-        historyThreads={historyThreads}
-        threadsLoading={threadsLoading}
-        threadsError={threadsError}
-        activeThreadId={activeThreadId}
-        setActiveThreadId={setActiveThreadId}
-        showHistory={showThreadHistory}
-        setShowHistory={(next) => {
-          if (typeof next === 'function') {
-            setShowThreadHistory((prev) => (next as (prev: boolean) => boolean)(prev));
-            return;
-          }
-          setShowThreadHistory(next);
-        }}
-        onRefresh={() => { void refreshThreads(); }}
-        onNewConversation={() => {
-          activeThreadIdImmediateRef.current = null;
-          startBlankThread();
-        }}
-        onClose={(id) => {
-          if (activeThreadIdImmediateRef.current === id) {
-            activeThreadIdImmediateRef.current = null;
-          }
-          closeThread(id);
-        }}
-        onOpenFromHistory={(id) => {
-          activeThreadIdImmediateRef.current = id;
-          setActiveThreadId(id);
-        }}
-      />
-      <div className="flex-1 min-h-0">
-        <MessagesPane
-          messages={agentMessages}
-          optimisticMessages={agentOptimisticMessages}
-          status={agentStatus}
-          messagesContainerRef={messagesContainerRef}
-          messagesInnerRef={messagesInnerRef}
-          containerHeight={containerHeight}
-          didAnimateWelcome={didAnimateWelcome}
-          bubbleAnimatingIds={bubbleAnimatingIds}
-          lastSentAttachments={lastSentAttachments || undefined}
-          activeThreadId={activeThreadId || undefined}
-          agentActive={agentActive}
-          onSuggestionSelect={(text) => {
-            setInput(text);
-          }}
-        />
-      </div>
-
-      {agentStatus === 'ready' && undoDepth > 1 && (
+    <div className="flex h-full flex-col px-4 py-4 text-white">
+      <div className="mb-3 flex items-center gap-2 text-sm text-white/70">
         <button
-          onClick={handleUndo}
-          className="absolute right-4 top-2 flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white/70 transition-colors hover:text-white"
-          title="Undo changes"
+          type="button"
+          onClick={handleBackToHistory}
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 hover:bg-white/10"
+          aria-label="Back to chats"
         >
-          <Undo2 className="h-3.5 w-3.5" />
-          <span>Undo</span>
+          <ArrowLeft className="h-4 w-4" />
         </button>
-      )}
-
-      <style jsx>{`
-        .ios-pop { animation: iosPop 420ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: bottom left; }
-        @keyframes iosPop {
-          0% { transform: scale(0.92); opacity: 0; }
-          60% { transform: scale(1.02); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .ios-pop { animation-duration: 1ms; }
-        }
-      `}</style>
-      <style jsx global>{`
-        .modern-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(56,189,248,0.45) transparent; }
-        .modern-scrollbar::-webkit-scrollbar { width: 9px; height: 9px; }
-        .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .modern-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(56,189,248,0.45); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
-        .modern-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(56,189,248,0.65); }
-      `}</style>
+        <span className="text-base font-semibold text-white">Assistant</span>
+      </div>
+      <div className="relative flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5 p-3">
+        <div className="flex h-full flex-col gap-3">
+          <ChatTabs
+            openThreads={openThreads}
+            historyThreads={historyThreads}
+            threadsLoading={threadsLoading}
+            threadsError={threadsError}
+            activeThreadId={activeThreadId}
+            setActiveThreadId={setActiveThreadId}
+            showHistory={showThreadHistory}
+            setShowHistory={(next) => {
+              if (typeof next === 'function') {
+                setShowThreadHistory((prev) => (next as (prev: boolean) => boolean)(prev));
+                return;
+              }
+              setShowThreadHistory(next);
+            }}
+            onRefresh={() => { void refreshThreads(); }}
+            onNewConversation={() => {
+              activeThreadIdImmediateRef.current = null;
+              startBlankThread();
+            }}
+            onClose={(id) => {
+              if (activeThreadIdImmediateRef.current === id) {
+                activeThreadIdImmediateRef.current = null;
+              }
+              closeThread(id);
+            }}
+            onOpenFromHistory={(id) => {
+              activeThreadIdImmediateRef.current = id;
+              setActiveThreadId(id);
+            }}
+          />
+          <div className="flex-1 min-h-0">
+            <MessagesPane
+              messages={agentMessages}
+              optimisticMessages={agentOptimisticMessages}
+              status={agentStatus}
+              messagesContainerRef={messagesContainerRef}
+              messagesInnerRef={messagesInnerRef}
+              containerHeight={containerHeight}
+              didAnimateWelcome={didAnimateWelcome}
+              bubbleAnimatingIds={bubbleAnimatingIds}
+              lastSentAttachments={lastSentAttachments || undefined}
+              activeThreadId={activeThreadId || undefined}
+              agentActive={agentActive}
+              onSuggestionSelect={(text) => {
+                setInput(text);
+              }}
+            />
+          </div>
+        </div>
+        {agentStatus === 'ready' && undoDepth > 1 && (
+          <button
+            onClick={handleUndo}
+            className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white/70 transition-colors hover:text-white"
+            title="Undo changes"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+            <span>Undo</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 
-  const friendConversation = (
-    <div className="flex h-full flex-col gap-4">
-      {socialView.kind === 'settings' && (
-        <div className="modern-scrollbar flex flex-1 flex-col gap-4 overflow-auto pr-1">
+  const friendHeaderLabel = (() => {
+    if (socialView.kind === 'dm') return activePeerLabel ?? 'Direct messages';
+    if (socialView.kind === 'group') return activeGroupSummary?.name ?? 'Group chat';
+    if (socialView.kind === 'auto') return groupState.autoRoom?.chat?.name ?? 'Auto room';
+    return 'Friends';
+  })();
+
+  const friendBody = (() => {
+    if (socialView.kind === 'settings') {
+      return (
+        <div className="modern-scrollbar h-full overflow-auto pr-1 space-y-4">
           <div className="flex flex-col gap-2">
             <div className="text-xs text-white/70">Profile</div>
             <div className="flex items-center gap-2">
@@ -686,56 +664,36 @@ export default function AIAgentBar() {
             )}
           </div>
         </div>
-      )}
+      );
+    }
 
-      {socialView.kind === 'dm' && (
-        <div className="flex flex-1 flex-col gap-2">
-          <div className="flex items-center justify-between text-xs text-white/70">
-            <span>{activePeerLabel ?? 'Direct message'}</span>
-          </div>
-          <div className="flex-1 min-h-0">
-            <FriendMessagesPane
-              messages={friendsState.dmMessages || []}
-              activePeerId={socialView.peerId}
-              currentUserId={myUserId ?? undefined}
-              meLabel={meDisplayName}
-              peerLabel={activePeerLabel || 'Friend'}
-            />
-          </div>
-        </div>
-      )}
+    if (socialView.kind === 'dm') {
+      return (
+        <FriendMessagesPane
+          messages={friendsState.dmMessages || []}
+          activePeerId={socialView.peerId}
+          currentUserId={myUserId ?? undefined}
+          meLabel={meDisplayName}
+          peerLabel={activePeerLabel || 'Friend'}
+        />
+      );
+    }
 
-      {socialView.kind === 'group' && (
-        <div className="flex flex-1 flex-col gap-2">
-          <div className="flex items-center justify-between text-xs text-white/70">
-            <span>{activeGroupSummary ? activeGroupSummary.name : 'Select a group to start chatting.'}</span>
-            {activeGroupSummary && (
-              <button
-                className="rounded border border-red-400/60 px-2 py-1 text-red-200 hover:bg-red-500/20"
-                onClick={() => {
-                  void groupState.leaveGroup(activeGroupSummary.id).then(() => {
-                    openFriendsSettings();
-                  });
-                }}
-              >
-                Leave group
-              </button>
-            )}
-          </div>
-          <div className="flex-1 min-h-0">
-            <GroupMessagesPane
-              active={Boolean(activeGroupSummary)}
-              emptyLabel="Select a group to view messages."
-              messages={groupState.groupMessages}
-              members={groupState.groupMembers}
-              currentUserId={myUserId ?? undefined}
-            />
-          </div>
-        </div>
-      )}
+    if (socialView.kind === 'group') {
+      return (
+        <GroupMessagesPane
+          active={Boolean(activeGroupSummary)}
+          emptyLabel="Select a group to view messages."
+          messages={groupState.groupMessages}
+          members={groupState.groupMembers}
+          currentUserId={myUserId ?? undefined}
+        />
+      );
+    }
 
-      {socialView.kind === 'auto' && (
-        <div className="flex flex-1 flex-col gap-2">
+    if (socialView.kind === 'auto') {
+      return (
+        <div className="flex h-full flex-col gap-2">
           <div className="flex items-center justify-between text-xs text-white/70">
             <span>{groupState.autoRoom?.chat ? groupState.autoRoom.chat.name : 'Auto group lobby'}</span>
             {groupState.autoRoom?.chat && (
@@ -761,10 +719,96 @@ export default function AIAgentBar() {
             </button>
           )}
         </div>
-      )}
+      );
+    }
+
+    return (
+      <div className="h-full text-sm text-white/60">Select a conversation to get started.</div>
+    );
+  })();
+
+  const friendConversation = (
+    <div className="flex h-full flex-col px-4 py-4 text-white">
+      <div className="mb-3 flex items-center gap-2 text-sm text-white/70">
+        <button
+          type="button"
+          onClick={handleBackToHistory}
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 hover:bg-white/10"
+          aria-label="Back to chats"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <span className="text-base font-semibold text-white">{friendHeaderLabel}</span>
+      </div>
+      <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 p-3">
+        {friendBody}
+      </div>
     </div>
   );
 
+  const chatPane = chatSurface === 'history'
+    ? historyView
+    : chatSurface === 'agent'
+      ? agentConversation
+      : friendConversation;
+
+  const bottomBar = (
+    <div className="border-t border-white/10 bg-black/35 px-4 py-4 backdrop-blur-md">
+      <div className="mb-3 flex items-center gap-2">
+        {navItems.map(({ key, label, active, onClick, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={onClick}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${active ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}
+            aria-pressed={active}
+            aria-label={label}
+          >
+            <Icon className="h-4 w-4" />
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+      {chatSurface === 'agent' && (
+        <ChatComposer
+          input={input}
+          setInput={setInput}
+          status={agentStatus}
+          attachments={attachments}
+          removeAttachment={removeAttachment}
+          onSubmit={handleAgentSubmit}
+          onFileSelect={handleUploadFiles}
+          onStop={() => stopAgent()}
+          onFocus={() => setMode('chat')}
+          uploadBusy={busyFlags.uploadBusy}
+        />
+      )}
+      {chatSurface === 'friend' && socialView.kind !== 'settings' && (
+        <ChatComposer
+          input={input}
+          setInput={setInput}
+          status={socialComposerStatus}
+          attachments={[]}
+          removeAttachment={() => {}}
+          onSubmit={handleSocialSubmit}
+          onFileSelect={() => {}}
+          onStop={() => {}}
+          onFocus={() => setMode('friends')}
+          uploadBusy={false}
+        />
+      )}
+      {chatSurface === 'friend' && socialView.kind === 'settings' && (
+        <div className="rounded-md border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60">
+          Select a chat to start messaging.
+        </div>
+      )}
+      {chatSurface === 'history' && (
+        <div className="rounded-md border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60">
+          Choose a conversation to begin.
+        </div>
+      )}
+    </div>
+  );
   const visitPane = (
     <div className="modern-scrollbar h-full overflow-auto px-4 py-4 text-white">
       <div className="mb-3 text-sm font-medium uppercase tracking-wide text-white/60">Visit Desktops</div>
@@ -810,18 +854,11 @@ export default function AIAgentBar() {
     </div>
   );
 
-  const chatPane = (
-    <div className="flex h-full gap-4 px-4 py-4">
-      <aside className="w-60 shrink-0 border-r border-white/10 pr-2">
-        {conversationList}
-      </aside>
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {leftPane === 'agent' ? agentConversation : friendConversation}
-      </div>
-    </div>
-  );
-
-
+  const mainContent = mode === 'media'
+    ? mediaPane
+    : mode === 'visit'
+      ? visitPane
+      : chatPane;
 
   return (
     <AgentBarShell
@@ -834,31 +871,17 @@ export default function AIAgentBar() {
       bottomBar={bottomBar}
     >
       <div className="flex h-full flex-col text-white">
-        <div className="border-b border-white/10 px-4 py-3">
-          <div className="flex items-center gap-2">
-            {navItems.map(({ key, label, active, onClick, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={onClick}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${active ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}
-                aria-pressed={active}
-                aria-label={label}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
         <div className="flex-1 min-h-0 overflow-hidden">
-          {mode === 'media'
-            ? mediaPane
-            : mode === 'visit'
-              ? visitPane
-              : chatPane}
+          {mainContent}
         </div>
       </div>
+      <style jsx global>{`
+        .modern-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(56,189,248,0.45) transparent; }
+        .modern-scrollbar::-webkit-scrollbar { width: 9px; height: 9px; }
+        .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .modern-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(56,189,248,0.45); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
+        .modern-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(56,189,248,0.65); }
+      `}</style>
     </AgentBarShell>
   );
 }
