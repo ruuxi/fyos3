@@ -758,7 +758,7 @@ export default function AgentDashboardPage() {
     const model = sessionSource?.model ?? (sessionDoc?.model as string | undefined);
     const costBreakdown = usage ? getUsageCostBreakdown(usage, model ?? undefined) : null;
 
-    const events = Array.isArray(timeline?.events) ? timeline.events : [];
+    const events = timeline && Array.isArray(timeline.events) ? timeline.events : [];
 
     let earliestUser: number | null = null;
     let latestAssistant: number | null = null;
