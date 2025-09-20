@@ -20,6 +20,15 @@ export const WebFsReadInput = z.object({
   path: z.string().describe('Exact file path to read. Read only what you need.'),
   encoding: z.enum(['utf-8', 'base64']).default('utf-8').describe('Decoding for contents.'),
   responseFormat: ResponseFormat.optional().describe('concise (default) may truncate large files; detailed returns full content.'),
+  range: z
+    .object({
+      offset: z.number().int().min(0).optional().describe('Character offset to start from.'),
+      length: z.number().int().min(1).max(200_000).optional().describe('Number of characters to include from offset (cap at 200k).'),
+      lineStart: z.number().int().min(1).optional().describe('1-based line number to start from.'),
+      lineEnd: z.number().int().min(1).optional().describe('1-based line number to end at (inclusive).'),
+    })
+    .optional()
+    .describe('Optional slice controls. Prefer requesting focused windows instead of entire files.'),
 });
 
 export const WebFsWriteInput = z.object({

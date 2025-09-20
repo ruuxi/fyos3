@@ -330,7 +330,7 @@ export default function AgentDashboardPage() {
   const [newTagDraftValue, setNewTagDraftValue] = useState('');
   const newTagInputRef = useRef<HTMLInputElement | null>(null);
   const [pendingTagRemovalKeys, setPendingTagRemovalKeys] = useState<Record<string, number>>({});
-  const tagRemovalTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const tagRemovalTimersRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (editingTitleSessionId && titleInputRef.current) {

@@ -57,11 +57,25 @@ export function sanitizeToolInput(toolName: string, input: Record<string, unknow
         contentPreview: contentString ? `${contentString.slice(0, 100)}${contentString.length > 100 ? '...' : ''}` : undefined,
       };
     }
-    if (toolName === 'web_fs_read') {
-      return {
-        path: typeof input?.['path'] === 'string' ? (input['path'] as string) : undefined,
-        encoding: typeof input?.['encoding'] === 'string' ? (input['encoding'] as string) : undefined,
-      } as Record<string, unknown>;
+    if (toolName === 'web_fs_read' && input) {
+      const sanitized: Record<string, unknown> = {
+        path: typeof input['path'] === 'string' ? (input['path'] as string) : undefined,
+        encoding: typeof input['encoding'] === 'string' ? (input['encoding'] as string) : undefined,
+      };
+      if (typeof input['responseFormat'] === 'string') {
+        sanitized.responseFormat = input['responseFormat'];
+      }
+      const rangeRaw = input['range'];
+      if (rangeRaw && typeof rangeRaw === 'object') {
+        const range = rangeRaw as Record<string, unknown>;
+        const summary: Record<string, number> = {};
+        if (typeof range.offset === 'number') summary.offset = range.offset;
+        if (typeof range.length === 'number') summary.length = range.length;
+        if (typeof range.lineStart === 'number') summary.lineStart = range.lineStart;
+        if (typeof range.lineEnd === 'number') summary.lineEnd = range.lineEnd;
+        sanitized.range = summary;
+      }
+      return sanitized;
     }
     return input ?? {};
   } catch {

@@ -6,7 +6,7 @@ import { agentLogger } from '@/lib/agentLogger';
 import { persistAssetsFromAIResult, extractOriginalMediaUrlsFromResult, type MediaScope } from '@/utils/ai-media';
 import { autoIngestInputs } from '@/utils/auto-ingest';
 import { guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
-import type { TCodeEditAstInput } from '@/lib/agentTools';
+import type { TCodeEditAstInput, TWebFsReadInput } from '@/lib/agentTools';
 
 type WebContainerFns = {
   mkdir: (path: string, recursive?: boolean) => Promise<void>;
@@ -64,6 +64,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => {
 
 // Use shared tool input type to ensure selector/payload are correctly typed
 type CodeEditAstInput = TCodeEditAstInput;
+type WebFsReadInput = TWebFsReadInput;
 
 const isTextPart = (part: UIMessage['parts'][number]): part is TextUIPart => part.type === 'text';
 
@@ -76,6 +77,81 @@ const getMutableWindow = (): MutableWindow | null => {
   return window as MutableWindow;
 };
 
+type SchedulerTask<T> = () => Promise<T>;
+
+class ToolScheduler {
+  private readonly safeQueue: Array<{
+    run: SchedulerTask<unknown>;
+    resolve: (value: unknown) => void;
+    reject: (reason?: unknown) => void;
+  }> = [];
+
+  private readonly destructiveQueue: Array<{
+    run: SchedulerTask<unknown>;
+    resolve: (value: unknown) => void;
+    reject: (reason?: unknown) => void;
+  }> = [];
+
+  private safeActive = 0;
+  private destructiveActive = false;
+
+  constructor(private readonly safeConcurrency: number = 3) {}
+
+  run<T>(toolName: string, task: SchedulerTask<T>): Promise<T> {
+    if (SAFE_TOOL_NAMES.has(toolName)) {
+      return this.enqueueSafe(task) as Promise<T>;
+    }
+    return this.enqueueDestructive(task) as Promise<T>;
+  }
+
+  private enqueueSafe<T>(task: SchedulerTask<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.safeQueue.push({ run: task as SchedulerTask<unknown>, resolve, reject });
+      this.tickSafe();
+    });
+  }
+
+  private enqueueDestructive<T>(task: SchedulerTask<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.destructiveQueue.push({ run: task as SchedulerTask<unknown>, resolve, reject });
+      this.tickDestructive();
+    });
+  }
+
+  private tickSafe(): void {
+    while (this.safeActive < this.safeConcurrency && this.safeQueue.length > 0) {
+      const next = this.safeQueue.shift();
+      if (!next) break;
+      this.safeActive += 1;
+      next.run()
+        .then(next.resolve)
+        .catch(next.reject)
+        .finally(() => {
+          this.safeActive = Math.max(0, this.safeActive - 1);
+          this.tickSafe();
+        });
+    }
+  }
+
+  private async tickDestructive(): Promise<void> {
+    if (this.destructiveActive) return;
+    this.destructiveActive = true;
+    while (this.destructiveQueue.length > 0) {
+      const next = this.destructiveQueue.shift();
+      if (!next) continue;
+      try {
+        const result = await next.run();
+        next.resolve(result);
+      } catch (error) {
+        next.reject(error);
+      }
+    }
+    this.destructiveActive = false;
+  }
+}
+
+const SAFE_TOOL_NAMES = new Set<string>(['web_fs_find', 'web_fs_read', 'media_list']);
+
 export function useAgentChat(opts: UseAgentChatOptions) {
   const { id, initialMessages, activeThreadId, wc, runValidation, attachmentsProvider } = opts;
   const mutableWindow = getMutableWindow();
@@ -83,6 +159,13 @@ export function useAgentChat(opts: UseAgentChatOptions) {
   if (mutableWindow) {
     mutableWindow.__FYOS_FIRST_TOOL_CALLED_REF = firstToolCalledRef;
   }
+
+  const schedulerRef = useRef<ToolScheduler | null>(null);
+  if (!schedulerRef.current) {
+    schedulerRef.current = new ToolScheduler();
+  }
+
+  const dirListingCacheRef = useRef<Map<string, string[] | null>>(new Map());
 
   const activeThreadIdRef = useRef<string | null>(activeThreadId);
   useEffect(() => { activeThreadIdRef.current = activeThreadId; }, [activeThreadId]);
@@ -177,55 +260,263 @@ export function useAgentChat(opts: UseAgentChatOptions) {
       type AgentToolCall = { toolName: string; toolCallId: string; input: unknown };
       const tc: AgentToolCall = toolCall;
 
-      const startTime = Date.now();
-      const logAndAddResult = async (output: unknown) => {
-        const duration = Date.now() - startTime;
-        addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output });
-        try {
-          await agentLogger.logToolCall('client', tc.toolName, tc.toolCallId, tc.input, output, duration);
-        } catch {}
-      };
+      const scheduler = schedulerRef.current;
+      if (!scheduler) {
+        addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { error: 'Tool scheduler unavailable' } });
+        return;
+      }
 
-      try {
-        switch (tc.toolName) {
-          case 'web_fs_find': {
-            const findInput = isPlainObject(tc.input) ? (tc.input as Partial<WebFsFindInput>) : {};
-            const { root = '.', maxDepth = 10, glob, prefix, limit = 200, offset = 0 } = findInput;
-            const results = await fnsRef.current.readdirRecursive(root, maxDepth);
-            const paths = results.map(r => r.path);
-            const filterByPrefix = (p: string) => (prefix ? p.startsWith(prefix) : true);
-            const globToRegExp = (pattern: string) => {
-              let re = '^';
-              for (let i = 0; i < pattern.length; i++) {
-                const ch = pattern[i];
-                if (ch === '*') {
-                  if (pattern[i + 1] === '*') { re += '.*'; i++; } else { re += '[^/]*'; }
-                } else if (ch === '?') {
-                  re += '.';
-                } else {
-                  re += /[\\.^$+()|{}\[\]\-]/.test(ch) ? `\\${ch}` : ch;
-                }
+      await scheduler.run(tc.toolName, async () => {
+        const startTime = Date.now();
+        const logAndAddResult = async (output: unknown) => {
+          const duration = Date.now() - startTime;
+          addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output });
+          try {
+            await agentLogger.logToolCall('client', tc.toolName, tc.toolCallId, tc.input, output, duration);
+          } catch {}
+        };
+
+        try {
+          switch (tc.toolName) {
+            case 'web_fs_find': {
+              const findInput = isPlainObject(tc.input) ? (tc.input as Partial<WebFsFindInput>) : {};
+              const { root = '.', maxDepth = 10, glob, prefix, limit = 200, offset = 0 } = findInput;
+              const instance = instanceRef.current;
+              if (!instance) {
+                await logAndAddResult({ error: 'WebContainer is not ready for file search.' });
+                break;
               }
-              re += '$';
-              return new RegExp(re);
-            };
-            const regex = glob ? globToRegExp(glob) : null;
-            const filterByGlob = (p: string) => (regex ? regex.test(p) : true);
-            const filtered = paths.filter((p: string) => filterByPrefix(p) && filterByGlob(p));
-            const start = Math.max(0, offset || 0);
-            const end = Math.min(filtered.length, start + Math.max(1, Math.min(limit || 200, 5000)));
-            const page = filtered.slice(start, end);
-            const nextOffset = end < filtered.length ? end : null;
-            await logAndAddResult({ files: page, count: page.length, total: filtered.length, root, offset: start, nextOffset, hasMore: end < filtered.length, applied: { glob: !!glob, prefix: !!prefix } });
-            break;
-          }
-          case 'web_fs_read': {
-            const { path, encoding = 'utf-8' } = tc.input as { path: string; encoding?: 'utf-8' | 'base64' };
-            const content = await fnsRef.current.readFile(path, encoding);
-            const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
-            await logAndAddResult({ content, path, size: `${sizeKB}KB` });
-            break;
-          }
+
+              const normalizePath = (value: string | undefined): string | undefined => {
+                if (!value) return undefined;
+                const trimmed = value.trim();
+                if (trimmed === '' || trimmed === '.' || trimmed === './') return '.';
+                const withoutLeading = trimmed.replace(/^\.\/+/, '').replace(/^\/+/, '');
+                const withoutTrailing = withoutLeading.replace(/\/$/, '');
+                return withoutTrailing === '' ? '.' : withoutTrailing;
+              };
+
+              const globToRegExp = (pattern: string) => {
+                let re = '^';
+                for (let i = 0; i < pattern.length; i++) {
+                  const ch = pattern[i];
+                  if (ch === '*') {
+                    if (pattern[i + 1] === '*') { re += '.*'; i++; } else { re += '[^/]*'; }
+                  } else if (ch === '?') {
+                    re += '.';
+                  } else {
+                    re += /[\\.^$+()|{}\[\]\-]/.test(ch) ? `\\${ch}` : ch;
+                  }
+                }
+                re += '$';
+                return new RegExp(re);
+              };
+
+              const normalizedRoot = normalizePath(root) ?? '.';
+              const normalizedPrefix = normalizePath(prefix);
+              const effectiveDepth = Math.max(0, Math.min(maxDepth ?? 10, 20));
+              const effectiveLimit = Math.max(1, Math.min(limit ?? 200, 5000));
+              const startIndex = Math.max(0, offset ?? 0);
+              const globRegex = typeof glob === 'string' && glob.length > 0 ? globToRegExp(glob) : null;
+
+              const matchesPrefix = (candidate: string): boolean => {
+                if (!normalizedPrefix || normalizedPrefix === '.') return true;
+                if (candidate === normalizedPrefix) return true;
+                return candidate.startsWith(`${normalizedPrefix}/`);
+              };
+
+              const prefixMayBeInside = (candidate: string): boolean => {
+                if (!normalizedPrefix || normalizedPrefix === '.') return true;
+                if (candidate === '.') return true;
+                return normalizedPrefix.startsWith(`${candidate}/`);
+              };
+
+              const EXCLUDED_DIRS = new Set(['node_modules', '.pnpm', '.vite', '.git', 'dist', 'build', '.next', 'out', 'coverage']);
+              const listingCache = dirListingCacheRef.current;
+
+              const readDir = async (dirPath: string): Promise<string[] | null> => {
+                const key = dirPath === '' ? '.' : dirPath;
+                if (listingCache.has(key)) {
+                  return listingCache.get(key) ?? null;
+                }
+                try {
+                  const entries = await instance.fs.readdir(key);
+                  listingCache.set(key, entries);
+                  return entries;
+                } catch {
+                  listingCache.set(key, null);
+                  return null;
+                }
+              };
+
+              const collected: string[] = [];
+              let matchCount = 0;
+              let truncated = false;
+
+              const visit = async (dirPath: string, depth: number): Promise<void> => {
+                if (truncated || depth > effectiveDepth) return;
+                const entries = await readDir(dirPath);
+                if (!entries) return;
+
+                for (const name of entries) {
+                  if (truncated) break;
+                  if (EXCLUDED_DIRS.has(name)) continue;
+
+                  const childPath = dirPath === '.' ? name : `${dirPath}/${name}`;
+                  const passesPrefix = matchesPrefix(childPath);
+                  const passesGlob = globRegex ? globRegex.test(childPath) : true;
+
+                  if (passesPrefix && passesGlob) {
+                    matchCount += 1;
+                    if (matchCount > startIndex) {
+                      collected.push(childPath);
+                    }
+                    if (collected.length >= effectiveLimit + 1) {
+                      truncated = true;
+                    }
+                  }
+
+                  const shouldDescend = !truncated
+                    && depth < effectiveDepth
+                    && (!normalizedPrefix || normalizedPrefix === '.' || prefixMayBeInside(childPath) || passesPrefix);
+
+                  if (shouldDescend) {
+                    const childEntries = await readDir(childPath);
+                    if (childEntries) {
+                      await visit(childPath, depth + 1);
+                    }
+                  }
+                }
+              };
+
+              const rootEntries = await readDir(normalizedRoot);
+              if (!rootEntries) {
+                await logAndAddResult({ error: `Directory not found: ${normalizedRoot}` });
+                break;
+              }
+              listingCache.set(normalizedRoot, rootEntries);
+              await visit(normalizedRoot, 0);
+
+              let hasMore = false;
+              if (collected.length > effectiveLimit) {
+                hasMore = true;
+                collected.length = effectiveLimit;
+              }
+
+              const count = collected.length;
+              const nextOffset = hasMore ? startIndex + count : null;
+              const approximateTotal = hasMore ? (nextOffset ?? 0) + 1 : startIndex + count;
+
+              await logAndAddResult({
+                files: collected,
+                count,
+                total: approximateTotal,
+                root: normalizedRoot,
+                offset: startIndex,
+                nextOffset,
+                hasMore,
+                complete: !hasMore,
+                applied: { glob: !!glob, prefix: !!prefix },
+              });
+              break;
+            }
+            case 'web_fs_read': {
+              const readInput = isPlainObject(tc.input) ? (tc.input as Partial<WebFsReadInput>) : {};
+              const path = typeof readInput.path === 'string' ? readInput.path : '';
+              const encoding = readInput.encoding ?? 'utf-8';
+              const responseFormat = readInput.responseFormat ?? 'concise';
+              const rangeInput = isPlainObject(readInput.range) ? (readInput.range as Record<string, unknown>) : undefined;
+
+              if (!path) {
+                await logAndAddResult({ error: 'web_fs_read requires a path.' });
+                break;
+              }
+
+              try {
+                const content = await fnsRef.current.readFile(path, encoding);
+
+                if (encoding === 'base64') {
+                  const approxBytes = Math.floor((content.length * 3) / 4);
+                  await logAndAddResult({
+                    path,
+                    encoding,
+                    content,
+                    size: `${(approxBytes / 1024).toFixed(1)}KB`,
+                    truncated: false,
+                    format: 'detailed',
+                  });
+                  break;
+                }
+
+                const encoder = new TextEncoder();
+                const bytes = encoder.encode(content);
+                const totalBytes = bytes.length;
+                const totalLines = content.split(/\r?\n/).length;
+                let excerpt = content;
+                const appliedRange: Record<string, number> = {};
+                let rangeApplied = false;
+
+                if (rangeInput) {
+                  const rawOffset = typeof rangeInput.offset === 'number' ? rangeInput.offset : undefined;
+                  const rawLength = typeof rangeInput.length === 'number' ? rangeInput.length : undefined;
+                  const rawLineStart = typeof rangeInput.lineStart === 'number' ? rangeInput.lineStart : undefined;
+                  const rawLineEnd = typeof rangeInput.lineEnd === 'number' ? rangeInput.lineEnd : undefined;
+                  const maxRangeChars = 8000;
+                  const maxLineWindow = 200;
+
+                  if (rawLineStart !== undefined || rawLineEnd !== undefined) {
+                    const lines = content.split(/\r?\n/);
+                    const startLine = Math.max(1, rawLineStart ?? 1);
+                    let endLine = rawLineEnd ?? Math.min(lines.length, startLine + maxLineWindow - 1);
+                    endLine = Math.min(lines.length, Math.max(endLine, startLine));
+                    excerpt = lines.slice(startLine - 1, endLine).join('\n');
+                    appliedRange.lineStart = startLine;
+                    appliedRange.lineEnd = endLine;
+                    rangeApplied = true;
+                  } else if (rawOffset !== undefined || rawLength !== undefined) {
+                    const start = Math.max(0, rawOffset ?? 0);
+                    const desiredLength = rawLength ? Math.max(1, rawLength) : maxRangeChars;
+                    const cappedLength = Math.min(desiredLength, maxRangeChars);
+                    const end = Math.min(content.length, start + cappedLength);
+                    excerpt = content.slice(start, end);
+                    appliedRange.offset = start;
+                    appliedRange.length = end - start;
+                    if (desiredLength > cappedLength) {
+                      appliedRange.capped = cappedLength;
+                    }
+                    rangeApplied = true;
+                  }
+                }
+
+                let truncated = false;
+                if (!rangeApplied && responseFormat !== 'detailed') {
+                  const maxChars = 4000;
+                  if (excerpt.length > maxChars) {
+                    const head = excerpt.slice(0, Math.floor(maxChars * 0.65));
+                    const tail = excerpt.slice(-Math.floor(maxChars * 0.25));
+                    excerpt = `${head}\n...\n${tail}`;
+                    truncated = true;
+                  }
+                }
+
+                await logAndAddResult({
+                  path,
+                  encoding,
+                  content: excerpt,
+                  format: responseFormat,
+                  truncated: rangeApplied ? Boolean(appliedRange.capped) : truncated,
+                  partial: rangeApplied || undefined,
+                  size: `${(totalBytes / 1024).toFixed(1)}KB`,
+                  totalBytes,
+                  totalLines,
+                  range: rangeApplied ? appliedRange : undefined,
+                });
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                await logAndAddResult({ error: message, path });
+              }
+              break;
+            }
           case 'web_fs_write': {
             const { path, content, createDirs = true } = tc.input as { path: string; content: string; createDirs?: boolean };
             const sizeKB = (new TextEncoder().encode(content).length / 1024).toFixed(1);
@@ -493,6 +784,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
         const message = err instanceof Error ? err.message : String(err);
         await logAndAddResult({ error: message });
       }
+      });
     },
   });
 
