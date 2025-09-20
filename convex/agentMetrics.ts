@@ -135,13 +135,9 @@ const serializeSessionTagStorage = (title: string | null, tags: string[]): strin
   return result.length > 0 ? result : undefined;
 };
 
-const selectTimestamp = (...candidates: Array<number | null | undefined>): number | undefined => {
-  for (const candidate of candidates) {
-    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-      return candidate;
-    }
-  }
-  return undefined;
+const normalizeTimestamp = (value: number | null | undefined): number | undefined => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return value;
 };
 
 const deriveEndToEndTiming = (
@@ -149,8 +145,20 @@ const deriveEndToEndTiming = (
     Partial<Pick<Doc<'agent_sessions'>, 'firstEventAt' | 'lastEventAt' | 'firstUserMessageAt' | 'lastAssistantMessageAt'>>
     & Partial<Pick<Doc<'agent_sessions'>, 'endToEndStartedAt' | 'endToEndFinishedAt' | 'endToEndDurationMs'>>,
 ) => {
-  const startedAt = selectTimestamp(session.firstUserMessageAt, session.sessionStartedAt, session.firstEventAt);
-  const finishedAt = selectTimestamp(session.lastAssistantMessageAt, session.sessionFinishedAt, session.lastEventAt);
+  const startCandidates = [
+    normalizeTimestamp(session.firstUserMessageAt),
+    normalizeTimestamp(session.sessionStartedAt),
+    normalizeTimestamp(session.firstEventAt),
+  ].filter((value): value is number => typeof value === 'number');
+
+  const finishCandidates = [
+    normalizeTimestamp(session.lastAssistantMessageAt),
+    normalizeTimestamp(session.sessionFinishedAt),
+    normalizeTimestamp(session.lastEventAt),
+  ].filter((value): value is number => typeof value === 'number');
+
+  const startedAt = startCandidates.length > 0 ? Math.min(...startCandidates) : undefined;
+  const finishedAt = finishCandidates.length > 0 ? Math.max(...finishCandidates) : undefined;
 
   if (typeof startedAt === 'number' && typeof finishedAt === 'number' && finishedAt >= startedAt) {
     return {

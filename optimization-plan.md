@@ -58,7 +58,9 @@
 - Short-circuit traversal when limits reached
 
 ### Step 3: Implement Smart File Reading
-**Target Files**:
+**Target Files**:the latency column so the tool call summary table now only shows call name, token usage, and cost.
+
+
 - `src/components/agent/AIAgentBar/hooks/useAgentChat.ts`
 - `src/lib/agentTools.ts`
 

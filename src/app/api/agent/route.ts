@@ -202,6 +202,7 @@ const collectToolResultMessages = (response: unknown): Map<string, ToolResultMes
 };
 
 export async function POST(req: Request) {
+  const requestReceivedAt = Date.now();
   let userIdentifier: string | undefined;
   try {
     const authResult = await auth();
@@ -393,7 +394,7 @@ export async function POST(req: Request) {
       : `user_${Date.now()}`;
     await agentLogger.logMessage(sessionId, messageId, 'user', content);
     appendMessageToThread('user', content, personaMode ? 'persona' : 'agent');
-    pendingMessageEvents.push({ role: 'user', messageId, content, timestamp: Date.now() });
+    pendingMessageEvents.push({ role: 'user', messageId, content, timestamp: requestReceivedAt });
   }
   if (personaMode) {
     const personaSystem = PERSONA_PROMPT;
@@ -517,7 +518,7 @@ export async function POST(req: Request) {
   const modelId = 'openai/gpt-5';
   const availableToolNames = Object.keys(tools);
 
-  const sessionStartTimestamp = Date.now();
+  const sessionStartTimestamp = requestReceivedAt;
   sessionStartedAt = sessionStartTimestamp;
 
   const sequenceBase = requestSequence * 10000;

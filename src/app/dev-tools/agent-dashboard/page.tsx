@@ -1575,7 +1575,9 @@ export default function AgentDashboardPage() {
               <Card className="min-w-0">
                 <CardHeader className="pb-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <CardTitle className="text-base">Session Summary</CardTitle>
+                    <h2 className="text-xl font-semibold">
+                      {`Session Summary${selectedSessionTitle ? `: ${selectedSessionTitle}` : ''}`}
+                    </h2>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -1661,9 +1663,7 @@ export default function AgentDashboardPage() {
             ) : null}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="text-xl font-semibold">
-                  Session Timeline{selectedSessionTitle ? `: ${selectedSessionTitle}` : ''}
-                </h2>
+                <h2 className="text-xl font-semibold">Session Timeline</h2>
                 <p className="text-sm text-muted-foreground">Audit every API call, tool action, and stream emitted by the agent.</p>
               </div>
               {selectedSession && (
