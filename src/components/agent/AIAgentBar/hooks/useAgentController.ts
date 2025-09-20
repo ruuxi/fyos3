@@ -114,6 +114,18 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
   const activeThreadIdImmediateRef = useRef<string | null>(activeThreadId);
   useEffect(() => { activeThreadIdImmediateRef.current = activeThreadId; }, [activeThreadId]);
 
+  const runStateRef = useRef<{ id: string | null }>({ id: null });
+  const getRunId = useCallback(() => runStateRef.current.id, []);
+  const ensureRunId = useCallback(() => {
+    if (runStateRef.current.id) return runStateRef.current.id;
+    const generated = `agent-run_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    runStateRef.current.id = generated;
+    return generated;
+  }, []);
+  const clearRunId = useCallback(() => {
+    runStateRef.current.id = null;
+  }, []);
+
   useEffect(() => {
     if (skipOptimisticClearRef.current) {
       skipOptimisticClearRef.current = false;
@@ -147,6 +159,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     initialMessages: initialChatMessages,
     activeThreadId,
     getActiveThreadId: () => activeThreadIdImmediateRef.current,
+    getRunId,
     wc: { instanceRef, fnsRef },
     media: { loadMedia },
     runValidation,
@@ -274,6 +287,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     const finished = (prev === 'submitted' || prev === 'streaming') && now === 'ready';
 
     if (started) {
+      ensureRunId();
       setAgentActive(true);
       try {
         const globalWin = getMutableWindow();
@@ -291,6 +305,10 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     }
 
     const runFinishedWithGate = finished && hmrGateActiveRef.current;
+    if (finished) {
+      clearRunId();
+    }
+
     if (runFinishedWithGate) {
       try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
       hmrGateActiveRef.current = false;
@@ -324,7 +342,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     }
 
     agentStatusPrevRef.current = now;
-  }, [readRegistry, status]);
+  }, [clearRunId, ensureRunId, readRegistry, status]);
 
   const sendMessage = useCallback((args: { text: string }) => sendMessageRaw(args), [sendMessageRaw]);
 
@@ -393,6 +411,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
 
         let sendPromise: Promise<void> | void;
         try {
+          ensureRunId();
           sendPromise = sendMessage({ text: userText });
         } catch (error) {
           pendingAttachmentsRef.current = null;
@@ -424,7 +443,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
         skipOptimisticClearRef.current = false;
       }
     })();
-  }, [attachments, ensureActiveThread, forceFollow, input, isChatAuthenticated, projectAttachmentsToDurable, sendMessage, setAttachments, setInput]);
+  }, [attachments, ensureActiveThread, ensureRunId, forceFollow, input, isChatAuthenticated, projectAttachmentsToDurable, sendMessage, setAttachments, setInput]);
 
   const threadsState = useMemo<AgentThreadsState>(() => ({
     openThreads,

@@ -22,6 +22,7 @@ type UseAgentChatOptions = {
   initialMessages?: UIMessage[];
   activeThreadId: string | null;
   getActiveThreadId?: () => string | null;
+  getRunId?: () => string | null;
   wc: {
     instanceRef: React.MutableRefObject<WebContainerAPI | null>;
     fnsRef: React.MutableRefObject<WebContainerFns>;
@@ -86,6 +87,8 @@ export function useAgentChat(opts: UseAgentChatOptions) {
   const activeThreadIdRef = useRef<string | null>(activeThreadId);
   useEffect(() => { activeThreadIdRef.current = activeThreadId; }, [activeThreadId]);
 
+  const runDispatchRef = useRef<{ runId: string | null; nextSequence: number }>({ runId: null, nextSequence: 0 });
+
   const { messages, sendMessage, status, stop, addToolResult, setMessages } = useChat<UIMessage>({
     id,
     messages: initialMessages,
@@ -97,6 +100,8 @@ export function useAgentChat(opts: UseAgentChatOptions) {
           messages: UIMessage[];
           threadId?: string;
           attachmentHints?: Array<{ contentType: string; url: string }>;
+          sessionId?: string;
+          requestSequence?: number;
         } = { id, messages };
         const threadForRequest = typeof opts.getActiveThreadId === 'function'
           ? opts.getActiveThreadId()
@@ -109,6 +114,26 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             if (hints.length > 0) body.attachmentHints = hints;
           }
         } catch {}
+
+        try {
+          if (typeof opts.getRunId === 'function') {
+            const runId = opts.getRunId();
+            if (runId) {
+              if (runDispatchRef.current.runId !== runId) {
+                runDispatchRef.current = { runId, nextSequence: 0 };
+              }
+              body.sessionId = runId;
+              body.requestSequence = runDispatchRef.current.nextSequence;
+              runDispatchRef.current.nextSequence += 1;
+            } else if (runDispatchRef.current.runId) {
+              runDispatchRef.current = { runId: null, nextSequence: 0 };
+            }
+          } else {
+            runDispatchRef.current = { runId: null, nextSequence: 0 };
+          }
+        } catch {
+          // Swallow run tracking errors to avoid breaking requests
+        }
         return { body };
       },
     }),

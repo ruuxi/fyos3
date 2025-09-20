@@ -8,6 +8,7 @@ import {
   estimateCostUSD,
   mergeUsageEstimates,
   toUsageEstimates,
+  getUsageCostBreakdown,
 } from '@/lib/agent/metrics/tokenEstimation';
 
 test('estimateTokensFromText enforces minimum token count', () => {
@@ -38,6 +39,17 @@ test('estimateCostUSD uses pricing map', () => {
   const usage = toUsageEstimates(1000, 500);
   const cost = estimateCostUSD(usage);
   assert.equal(Number(cost.toFixed(6)), Number((((1000 + 500) / 1_000_000) * 2).toFixed(6)));
+});
+
+test('getUsageCostBreakdown exposes prompt and completion costs', () => {
+  const usage = toUsageEstimates(2000, 1000);
+  const breakdown = getUsageCostBreakdown(usage, 'openai/gpt-5');
+  const expectedPrompt = (2000 / 1_000_000) * 5;
+  const expectedCompletion = (1000 / 1_000_000) * 15;
+
+  assert.equal(breakdown.promptCostUSD, expectedPrompt);
+  assert.equal(breakdown.completionCostUSD, expectedCompletion);
+  assert.equal(breakdown.totalCostUSD, expectedPrompt + expectedCompletion);
 });
 
 test('mergeUsageEstimates accumulates token fields', () => {

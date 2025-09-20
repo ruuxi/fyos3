@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api as convexApi } from '../../../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { getUsageCostBreakdown } from '@/lib/agent/metrics/tokenEstimation';
 import { cn } from '@/lib/utils';
 import type { AgentEventKind, AgentMessagePreview } from '@/lib/agent/metrics/types';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil } from 'lucide-react';
 
 type UsageRecord = {
   promptTokens?: number;
@@ -37,6 +38,7 @@ type SessionListItem = {
   durationMs?: number;
   attachmentsCount: number;
   messagePreviews: AgentMessagePreview[] | null | undefined;
+  tags: string[];
   status: 'active' | 'completed';
   updatedAt: number;
   createdAt: number;
@@ -97,6 +99,11 @@ const formatCost = (value: number | undefined | null): string => {
   return `$${safe.toFixed(4)}`;
 };
 
+const formatCostExact = (value: number | undefined | null): string => {
+  if (value === undefined || value === null || Number.isNaN(value)) return '—';
+  return `$${value.toFixed(4)}`;
+};
+
 const formatDuration = (ms?: number | null): string => {
   if (!ms || ms < 0) return '—';
   if (ms < 1000) return `${ms} ms`;
@@ -135,7 +142,7 @@ const usageSummary = (usage: Nullable<UsageRecord>): string => {
   return `${formatNumber(total)} tokens (prompt ${formatNumber(prompt)}, completion ${formatNumber(completion)})`;
 };
 
-type TimelineEntryKind = AgentEventKind | 'session_summary';
+type TimelineEntryKind = AgentEventKind;
 
 type TimelineEntry = {
   id: string;
@@ -164,8 +171,6 @@ const getEventAccent = (kind: TimelineEntryKind, status: TimelineEntry['status']
   if (status === 'error') return 'bg-destructive/70';
   if (status === 'success') return 'bg-emerald-500/80';
   switch (kind) {
-    case 'session_summary':
-      return 'bg-primary/70';
     case 'session_started':
       return 'bg-emerald-500/80';
     case 'session_finished':
@@ -182,7 +187,6 @@ const getEventAccent = (kind: TimelineEntryKind, status: TimelineEntry['status']
       return 'bg-sky-500/70';
     case 'message_logged':
       return 'bg-purple-500/70';
-    case 'raw_log':
     default:
       return 'bg-muted-foreground/60';
   }
@@ -190,8 +194,6 @@ const getEventAccent = (kind: TimelineEntryKind, status: TimelineEntry['status']
 
 const describeEventKind = (kind: TimelineEntryKind): string => {
   switch (kind) {
-    case 'session_summary':
-      return 'Session Overview';
     case 'session_started':
       return 'Session Started';
     case 'session_finished':
@@ -208,8 +210,6 @@ const describeEventKind = (kind: TimelineEntryKind): string => {
       return 'Tool Call Inbound';
     case 'message_logged':
       return 'Message Logged';
-    case 'raw_log':
-      return 'Log Event';
     default:
       return 'Event';
   }
@@ -234,6 +234,7 @@ export default function AgentDashboardPage() {
   const searchParamsString = useMemo(() => searchParams?.toString() ?? '', [searchParams]);
   const sessionIdFromQuery = searchParams?.get('sessionId') ?? null;
   const sessions = useQuery(convexApi.agentMetrics.listSessions, { limit: 25 }) as SessionListItem[] | undefined;
+  const sessionsLoading = sessions === undefined;
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(sessionIdFromQuery);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -259,6 +260,9 @@ export default function AgentDashboardPage() {
     convexApi.agentMetrics.getSessionTimeline,
     selectedSessionId ? { sessionId: selectedSessionId } : 'skip',
   ) as TimelineData | null | undefined;
+  const timelineLoading = Boolean(selectedSessionId && timeline === undefined);
+
+  const setSessionTagMutation = useMutation(convexApi.agentMetrics.setSessionTag);
 
   const handleSessionSelect = (sessionId: string) => {
     if (sessionId === selectedSessionId) return;
@@ -275,89 +279,354 @@ export default function AgentDashboardPage() {
     }
   };
 
+
   const selectedSession = useMemo(
     () => sessions?.find((session) => session.sessionId === selectedSessionId) ?? null,
     [sessions, selectedSessionId],
   );
 
+  const [sessionTags, setSessionTags] = useState<Record<string, string>>({});
+
   const selectedSessionTitle = useMemo(() => {
     if (!selectedSession) return null;
+    const override = sessionTags[selectedSession.sessionId]?.trim();
+    if (override) return override;
     return getSessionTitle(selectedSession).title;
-  }, [selectedSession]);
+  }, [selectedSession, sessionTags]);
 
   const [expandedEntries, setExpandedEntries] = useState<Record<string, boolean>>({});
   const [expandedPayloads, setExpandedPayloads] = useState<Record<string, boolean>>({});
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
+  const [editingTagSessionId, setEditingTagSessionId] = useState<string | null>(null);
+  const [tagDraftValue, setTagDraftValue] = useState('');
+  const tagInputRef = useRef<HTMLInputElement | null>(null);
+  const skipTagCommitRef = useRef(false);
+  const pendingTagMutationsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (editingTagSessionId && tagInputRef.current) {
+      tagInputRef.current.focus();
+      tagInputRef.current.select();
+    }
+  }, [editingTagSessionId]);
+
+  useEffect(() => {
+    if (!sessions) return;
+    setSessionTags((prev) => {
+      const next = { ...prev };
+      let didChange = false;
+      const activeIds = new Set(sessions.map((session) => session.sessionId));
+
+      for (const session of sessions) {
+        const sessionId = session.sessionId;
+        if (pendingTagMutationsRef.current.has(sessionId)) {
+          continue;
+        }
+        const serverTag = Array.isArray(session.tags)
+          ? session.tags.find((tag) => typeof tag === 'string' && tag.trim().length > 0)
+          : undefined;
+        if (serverTag) {
+          const trimmed = serverTag.trim();
+          if (next[sessionId] !== trimmed) {
+            next[sessionId] = trimmed;
+            didChange = true;
+          }
+        } else if (next[sessionId] !== undefined) {
+          delete next[sessionId];
+          didChange = true;
+        }
+      }
+
+      for (const sessionId of Object.keys(next)) {
+        if (!activeIds.has(sessionId) && !pendingTagMutationsRef.current.has(sessionId)) {
+          delete next[sessionId];
+          didChange = true;
+        }
+      }
+
+      return didChange ? next : prev;
+    });
+  }, [sessions]);
+
+  useEffect(() => {
+    if (!sessions) return;
+    if (editingTagSessionId && !sessions.some((session) => session.sessionId === editingTagSessionId)) {
+      setEditingTagSessionId(null);
+      setTagDraftValue('');
+    }
+  }, [editingTagSessionId, sessions]);
+
+  const persistTag = (sessionId: string, value: string | null) => {
+    const normalizedInput = typeof value === 'string' ? value.trim() : '';
+    const finalValue = normalizedInput.length > 0 ? normalizedInput : null;
+    const previousValue = sessionTags[sessionId];
+    const previousNormalized = typeof previousValue === 'string' && previousValue.trim().length > 0 ? previousValue : null;
+
+    if (previousNormalized === finalValue) {
+      return;
+    }
+
+    pendingTagMutationsRef.current.add(sessionId);
+
+    setSessionTags((prev) => {
+      if (finalValue) {
+        if (prev[sessionId] === finalValue) {
+          return prev;
+        }
+        return { ...prev, [sessionId]: finalValue };
+      }
+      if (prev[sessionId] === undefined) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[sessionId];
+      return next;
+    });
+
+    void setSessionTagMutation({ sessionId, tag: finalValue })
+      .catch((error) => {
+        console.error('Failed to update session tag', error);
+        setSessionTags((prev) => {
+          if (previousNormalized) {
+            if (prev[sessionId] === previousNormalized) {
+              return prev;
+            }
+            return { ...prev, [sessionId]: previousNormalized };
+          }
+          if (prev[sessionId] === undefined) {
+            return prev;
+          }
+          const next = { ...prev };
+          delete next[sessionId];
+          return next;
+        });
+      })
+      .finally(() => {
+        pendingTagMutationsRef.current.delete(sessionId);
+      });
+  };
+
+  const commitTagEdit = (sessionId: string) => {
+    persistTag(sessionId, tagDraftValue);
+    setEditingTagSessionId(null);
+    setTagDraftValue('');
+  };
+
+  const cancelTagEdit = () => {
+    skipTagCommitRef.current = true;
+    setEditingTagSessionId(null);
+    setTagDraftValue('');
+    setTimeout(() => {
+      skipTagCommitRef.current = false;
+    }, 0);
+  };
+
+  const handleTagInputBlur = (_event: FocusEvent<HTMLInputElement>, sessionId: string) => {
+    if (skipTagCommitRef.current) {
+      skipTagCommitRef.current = false;
+      return;
+    }
+    commitTagEdit(sessionId);
+  };
+
+  const handleTagInputKeyDown = (event: KeyboardEvent<HTMLInputElement>, sessionId: string) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitTagEdit(sessionId);
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelTagEdit();
+    }
+  };
+
+  const beginTagEdit = (sessionId: string) => {
+    skipTagCommitRef.current = false;
+    setEditingTagSessionId(sessionId);
+    setTagDraftValue(sessionTags[sessionId] ?? '');
+  };
+
+  const clearSessionName = (sessionId: string) => {
+    skipTagCommitRef.current = true;
+    setEditingTagSessionId((current) => (current === sessionId ? null : current));
+    setTagDraftValue('');
+    persistTag(sessionId, null);
+    setTimeout(() => {
+      skipTagCommitRef.current = false;
+    }, 0);
+  };
+
+  const sessionSummary = useMemo(() => {
+    const sessionSource = (selectedSession ?? (timeline?.session as SessionListItem | null | undefined) ?? null) as
+      | SessionListItem
+      | null;
+
+    const sessionDoc = (timeline?.session as (SessionListItem & DocId) | null | undefined) ?? null;
+
+    const actualUsage =
+      ((sessionSource?.actualUsage ?? null) as Nullable<UsageRecord>) ??
+      ((sessionDoc?.actualUsage ?? null) as Nullable<UsageRecord>) ??
+      null;
+    const estimatedUsage =
+      ((sessionSource?.estimatedUsage ?? null) as Nullable<UsageRecord>) ??
+      ((sessionDoc?.estimatedUsage ?? null) as Nullable<UsageRecord>) ??
+      null;
+
+    const usage = actualUsage ?? estimatedUsage;
+    const usageKind: 'actual' | 'estimated' | null = actualUsage ? 'actual' : estimatedUsage ? 'estimated' : null;
+
+    const promptTokens = usage ? tokensFromUsage(usage, 'promptTokens') : null;
+    const completionTokens = usage ? tokensFromUsage(usage, 'completionTokens') : null;
+    let totalTokens: number | null = null;
+    if (usage) {
+      const totalCandidate = tokensFromUsage(usage, 'totalTokens');
+      totalTokens = Number.isFinite(totalCandidate) && totalCandidate > 0 ? totalCandidate : (promptTokens ?? 0) + (completionTokens ?? 0);
+    }
+
+    const model = sessionSource?.model ?? (sessionDoc?.model as string | undefined);
+    const costBreakdown = usage ? getUsageCostBreakdown(usage, model ?? undefined) : null;
+
+    const events = Array.isArray(timeline?.events) ? timeline.events : [];
+
+    let earliestUser: number | null = null;
+    let latestAssistant: number | null = null;
+
+    for (const event of events) {
+      if (event.kind !== 'message_logged') continue;
+      const payload = (event.payload ?? {}) as Record<string, unknown>;
+      const role = typeof payload.role === 'string' ? (payload.role as string) : null;
+      if (!role) continue;
+      const ts = typeof event.timestamp === 'number' ? event.timestamp : null;
+      if (ts === null) continue;
+
+      if (role === 'user') {
+        if (earliestUser === null || ts < earliestUser) {
+          earliestUser = ts;
+        }
+      } else if (role === 'assistant') {
+        if (latestAssistant === null || ts > latestAssistant) {
+          latestAssistant = ts;
+        }
+      }
+    }
+
+    const sessionStart =
+      typeof sessionSource?.sessionStartedAt === 'number'
+        ? sessionSource.sessionStartedAt
+        : typeof sessionDoc?.sessionStartedAt === 'number'
+          ? sessionDoc.sessionStartedAt
+          : null;
+
+    const sessionFinish =
+      typeof sessionSource?.sessionFinishedAt === 'number'
+        ? sessionSource.sessionFinishedAt
+        : typeof sessionDoc?.sessionFinishedAt === 'number'
+          ? sessionDoc.sessionFinishedAt
+          : null;
+
+    const fallbackEarliest = events.reduce<number | null>((acc, event) => {
+      const ts = typeof event.timestamp === 'number' ? event.timestamp : null;
+      if (ts === null) return acc;
+      if (acc === null || ts < acc) return ts;
+      return acc;
+    }, null);
+
+    const fallbackLatest = events.reduce<number | null>((acc, event) => {
+      const ts = typeof event.timestamp === 'number' ? event.timestamp : null;
+      if (ts === null) return acc;
+      if (acc === null || ts > acc) return ts;
+      return acc;
+    }, null);
+
+    const startTimestamp = earliestUser ?? sessionStart ?? fallbackEarliest;
+    const endTimestamp = latestAssistant ?? sessionFinish ?? fallbackLatest;
+
+    const durationMs =
+      typeof startTimestamp === 'number' &&
+      typeof endTimestamp === 'number' &&
+      endTimestamp >= startTimestamp
+        ? endTimestamp - startTimestamp
+        : null;
+
+    return {
+      usageKind,
+      tokens: usage
+        ? {
+            prompt: promptTokens ?? 0,
+            completion: completionTokens ?? 0,
+            total: totalTokens ?? (promptTokens ?? 0) + (completionTokens ?? 0),
+          }
+        : null,
+      costs: costBreakdown,
+      durationMs,
+    };
+  }, [selectedSession, timeline]);
+
+  const sessionStatus = selectedSession?.status ?? null;
+  const summaryTokensPlaceholder = sessionsLoading ? 'Loading…' : '—';
+  const summaryCostPlaceholder = summaryTokensPlaceholder;
+  const summaryDurationPlaceholder = timelineLoading
+    ? 'Loading…'
+    : sessionStatus === 'active'
+      ? 'In progress'
+      : '—';
+
+  const summaryRows = [
+    {
+      key: 'input',
+      label: 'Input',
+      value: sessionSummary.tokens
+        ? `${formatNumber(sessionSummary.tokens.prompt)} tokens`
+        : summaryTokensPlaceholder,
+      secondary: sessionSummary.costs
+        ? formatCostExact(sessionSummary.costs.promptCostUSD)
+        : summaryCostPlaceholder,
+    },
+    {
+      key: 'output',
+      label: 'Output',
+      value: sessionSummary.tokens
+        ? `${formatNumber(sessionSummary.tokens.completion)} tokens`
+        : summaryTokensPlaceholder,
+      secondary: sessionSummary.costs
+        ? formatCostExact(sessionSummary.costs.completionCostUSD)
+        : summaryCostPlaceholder,
+    },
+    {
+      key: 'total',
+      label: 'Total',
+      value: sessionSummary.tokens
+        ? `${formatNumber(sessionSummary.tokens.total)} tokens`
+        : summaryTokensPlaceholder,
+      secondary: sessionSummary.costs
+        ? formatCostExact(sessionSummary.costs.totalCostUSD)
+        : summaryCostPlaceholder,
+    },
+    {
+      key: 'duration',
+      label: 'End to End',
+      value:
+        sessionSummary.durationMs !== null
+          ? formatDuration(sessionSummary.durationMs)
+          : summaryDurationPlaceholder,
+      secondary: '—',
+    },
+  ];
+
+  const usageSummaryRows = summaryRows.filter((row) => row.key !== 'duration');
+  const auxiliarySummaryRows = summaryRows.filter((row) => row.key === 'duration');
+
+  const summaryUsageLabel = sessionSummary.usageKind === 'actual'
+    ? 'Actual usage'
+    : sessionSummary.usageKind === 'estimated'
+      ? 'Estimated usage'
+      : null;
 
   const timelineEntries = useMemo(() => {
     if (!timeline) return [] as TimelineEntry[];
 
     const entries: TimelineEntry[] = [];
     const session = timeline.session;
-
-    if (session) {
-      const estimatedTokens = usageSummary(session.estimatedUsage);
-      const actualTokens = session.actualUsage ? usageSummary(session.actualUsage) : null;
-      const summaryMeta: Array<{ label: string; value: string }> = [
-        { label: 'Model', value: session.model ?? '—' },
-        { label: 'Persona', value: session.personaMode ? 'Enabled' : 'Disabled' },
-        { label: 'User', value: session.userIdentifier ?? '—' },
-        { label: 'Steps', value: formatNumber(session.stepCount) },
-        { label: 'Tool Calls', value: formatNumber(session.toolCallCount) },
-        { label: 'Estimated Tokens', value: estimatedTokens },
-        { label: 'Estimated Cost', value: formatCost(session.estimatedCostUSD) },
-      ];
-
-      if (actualTokens) {
-        summaryMeta.push({ label: 'Actual Tokens', value: actualTokens });
-      }
-      if (session.actualCostUSD !== null) {
-        summaryMeta.push({ label: 'Actual Cost', value: formatCost(session.actualCostUSD) });
-      }
-      if (session.durationMs) {
-        summaryMeta.push({ label: 'Duration', value: formatDuration(session.durationMs) });
-      }
-
-      entries.push({
-        id: 'session-summary',
-        kind: 'session_summary',
-        title: `Session ${shortId(session.sessionId)}`,
-        subtitle: session.model ? `Model ${session.model}` : undefined,
-        timestamp: session.sessionStartedAt,
-        accent: getEventAccent('session_summary'),
-        meta: summaryMeta,
-        payload: {
-          sessionId: session.sessionId,
-          requestId: session.requestId,
-          model: session.model,
-          personaMode: session.personaMode,
-          toolCallCount: session.toolCallCount,
-          stepCount: session.stepCount,
-          estimatedUsage: session.estimatedUsage,
-          actualUsage: session.actualUsage,
-          estimatedCostUSD: session.estimatedCostUSD,
-          actualCostUSD: session.actualCostUSD,
-          sessionStartedAt: session.sessionStartedAt,
-          sessionFinishedAt: session.sessionFinishedAt,
-          userIdentifier: session.userIdentifier,
-        },
-        payloadString: safeJsonStringify({
-          sessionId: session.sessionId,
-          requestId: session.requestId,
-          model: session.model,
-          personaMode: session.personaMode,
-          toolCallCount: session.toolCallCount,
-          stepCount: session.stepCount,
-          estimatedUsage: session.estimatedUsage,
-          actualUsage: session.actualUsage,
-          estimatedCostUSD: session.estimatedCostUSD,
-          actualCostUSD: session.actualCostUSD,
-          sessionStartedAt: session.sessionStartedAt,
-          sessionFinishedAt: session.sessionFinishedAt,
-          userIdentifier: session.userIdentifier,
-        }),
-      });
-    }
 
     const events = Array.isArray(timeline.events) ? [...timeline.events] : [];
     // Sort chronologically by timestamp to reflect the real emission order; fall back to
@@ -371,7 +640,7 @@ export default function AgentDashboardPage() {
     });
 
     for (const event of events) {
-      const kind = (event.kind as AgentEventKind) ?? 'raw_log';
+      const kind = (event.kind as AgentEventKind) ?? 'message_logged';
       let status: TimelineEntry['status'] = 'default';
       const payload = event.payload ?? {};
       const meta: Array<{ label: string; value: string }> = [];
@@ -584,17 +853,6 @@ export default function AgentDashboardPage() {
           break;
         }
 
-        case 'raw_log': {
-          if (typeof payload.level === 'string') {
-            subtitle = `Level: ${capitalize(payload.level as string)}`;
-          }
-          const messageCandidate = (payload.message ?? payload.text ?? payload.event ?? '') as string;
-          if (typeof messageCandidate === 'string' && messageCandidate) {
-            preview = truncateText(messageCandidate, 260);
-          }
-          break;
-        }
-
         default: {
           preview = truncateText(safeJsonStringify(payload, 0), 260);
           break;
@@ -737,6 +995,10 @@ export default function AgentDashboardPage() {
                       const completedStatusClasses = 'bg-green-100 text-green-800 border-green-200';
                       const { title: sessionTitle, subtitle: sessionSubtitle } = getSessionTitle(session);
                       const isSessionDetailsExpanded = Boolean(expandedSessions[session.sessionId]);
+                      const sessionTag = sessionTags[session.sessionId]?.trim();
+                      const isTagEditing = editingTagSessionId === session.sessionId;
+                      const hasCustomTitle = Boolean(sessionTag);
+                      const displayTitle = sessionTag && sessionTag.length > 0 ? sessionTag : sessionTitle;
 
                       return (
                         <div
@@ -752,13 +1014,57 @@ export default function AgentDashboardPage() {
                           )}
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex min-w-0 flex-col">
-                              <span className="font-medium text-sm text-foreground line-clamp-2" title={sessionTitle}>
-                                {sessionTitle}
-                              </span>
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <div className="group inline-flex max-w-full items-center gap-2">
+                                {isTagEditing ? (
+                                  <input
+                                    ref={tagInputRef}
+                                    value={tagDraftValue}
+                                    onChange={(event) => setTagDraftValue(event.target.value)}
+                                    onBlur={(event) => handleTagInputBlur(event, session.sessionId)}
+                                    onKeyDown={(event) => handleTagInputKeyDown(event, session.sessionId)}
+                                    onClick={(event) => event.stopPropagation()}
+                                    placeholder="Name this session"
+                                    className="h-7 w-full max-w-xs bg-transparent px-0 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-0"
+                                  />
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="group inline-flex max-w-full items-center gap-2 text-left text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        beginTagEdit(session.sessionId);
+                                      }}
+                                    >
+                                      <span className="line-clamp-2" title={displayTitle}>
+                                        {displayTitle}
+                                      </span>
+                                      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-80" />
+                                    </button>
+                                    {hasCustomTitle ? (
+                                      <button
+                                        type="button"
+                                        className="text-[11px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          clearSessionName(session.sessionId);
+                                        }}
+                                      >
+                                        Reset
+                                      </button>
+                                    ) : null}
+                                  </>
+                                )}
+                              </div>
                               <span className="text-xs text-muted-foreground" title={sessionSubtitle}>
                                 {sessionSubtitle}
                               </span>
+                              {hasCustomTitle ? (
+                                <span className="text-[11px] text-muted-foreground/80 line-clamp-1" title={sessionTitle}>
+                                  Based on: {sessionTitle}
+                                </span>
+                              ) : null}
                             </div>
                             <div className="flex items-center gap-1">
                               {session.status === 'completed' && (
@@ -821,6 +1127,66 @@ export default function AgentDashboardPage() {
 
         <main className="flex-1 min-w-0 space-y-6">
           <section className="space-y-4">
+            {selectedSessionId ? (
+              <Card className="min-w-0">
+                <CardHeader className="pb-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <CardTitle className="text-base">Session Summary</CardTitle>
+                    {summaryUsageLabel ? (
+                      <Badge variant="outline" className="text-[11px] uppercase tracking-wide">
+                        {summaryUsageLabel}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No usage data yet</span>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-sm">
+                    {usageSummaryRows.length > 0 && (
+                      <>
+                        <div className="px-4 pb-1 pt-3 text-xs uppercase tracking-wide text-muted-foreground">
+                          <div className="ml-auto flex gap-3 sm:justify-end">
+                            <span className="min-w-[6rem] text-right">Tokens</span>
+                            <span className="min-w-[6rem] text-right">Cost</span>
+                          </div>
+                        </div>
+                        <div className="divide-y">
+                          {usageSummaryRows.map((row) => (
+                            <div
+                              key={row.key}
+                              className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                              <span className="text-sm font-medium text-foreground">{row.label}</span>
+                              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground sm:justify-end">
+                                <span className="tabular-nums text-foreground min-w-[6rem] text-right">{row.value}</span>
+                                <span className="tabular-nums min-w-[6rem] text-right">{row.secondary}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {auxiliarySummaryRows.length > 0 && (
+                      <div className={cn('divide-y', usageSummaryRows.length > 0 ? 'mt-4' : '')}>
+                        {auxiliarySummaryRows.map((row) => (
+                          <div
+                            key={row.key}
+                            className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <span className="text-sm font-medium text-foreground">{row.label}</span>
+                            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                              <span className="tabular-nums text-foreground">{row.value}</span>
+                              <span className="tabular-nums">{row.secondary}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="text-xl font-semibold">
@@ -882,7 +1248,6 @@ export default function AgentDashboardPage() {
                         const hasPayload = Boolean(entry.payloadString && entry.payloadString.trim().length > 2);
                         const timestampLabel = entry.timestamp ? formatTimestamp(entry.timestamp) : '—';
                         const statusBadge = (() => {
-                          if (entry.kind === 'session_summary') return null;
                           if (entry.status === 'error') return <Badge variant="destructive" className="text-[10px]">Error</Badge>;
                           if (entry.status === 'success') return <Badge variant="outline" className="text-[10px]">Success</Badge>;
                           return null;
@@ -896,8 +1261,9 @@ export default function AgentDashboardPage() {
                           >
                             <button
                               type="button"
-                              className="flex w-full items-start justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-primary/40"
+                              className="flex w-full items-start justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                               onClick={() => handleRowToggle(entry.id)}
+                              onMouseDown={(event) => event.preventDefault()}
                               aria-expanded={isExpanded}
                             >
                               <div className="flex min-w-0 flex-1 items-start gap-2">

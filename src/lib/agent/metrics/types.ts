@@ -6,8 +6,7 @@ export type AgentEventKind =
   | 'tool_call_finished'
   | 'tool_call_outbound'
   | 'tool_call_inbound'
-  | 'message_logged'
-  | 'raw_log';
+  | 'message_logged';
 
 export interface AgentUsageEstimates {
   promptTokens?: number;
@@ -16,6 +15,12 @@ export interface AgentUsageEstimates {
   reasoningTokens?: number;
   cachedInputTokens?: number;
   charCount?: number;
+}
+
+export interface AgentUsageCostBreakdown {
+  promptCostUSD: number;
+  completionCostUSD: number;
+  totalCostUSD: number;
 }
 
 export interface AgentEventBase {
@@ -126,6 +131,8 @@ export interface AgentToolCallFinishedEvent extends AgentEventBase {
     };
     tokenUsage: AgentUsageEstimates;
     costUSD: number;
+    modelMessage?: Record<string, unknown>;
+    modelMessageJson?: string;
   };
 }
 
@@ -145,6 +152,8 @@ export interface AgentToolCallInboundEvent extends AgentEventBase {
     };
     tokenUsage?: AgentUsageEstimates;
     costUSD?: number;
+    modelMessage?: Record<string, unknown>;
+    modelMessageJson?: string;
   };
 }
 
@@ -162,11 +171,6 @@ export interface AgentSessionFinishedEvent extends AgentEventBase {
   };
 }
 
-export interface AgentRawLogEvent extends AgentEventBase {
-  kind: 'raw_log';
-  payload: Record<string, unknown>;
-}
-
 export type AgentIngestEvent =
   | AgentSessionStartedEvent
   | AgentSessionFinishedEvent
@@ -175,8 +179,7 @@ export type AgentIngestEvent =
   | AgentToolCallFinishedEvent
   | AgentToolCallOutboundEvent
   | AgentToolCallInboundEvent
-  | AgentMessageLoggedEvent
-  | AgentRawLogEvent;
+  | AgentMessageLoggedEvent;
 
 export interface AgentSessionMeta {
   sessionId: string;

@@ -209,6 +209,7 @@ export default defineSchema({
     toolNames: v.optional(v.array(v.string())),
     attachmentsCount: v.optional(v.number()),
     messagePreviews: v.optional(v.any()),
+    tags: v.optional(v.array(v.string())),
     sessionStartedAt: v.number(),
     sessionFinishedAt: v.optional(v.number()),
     stepCount: v.optional(v.number()),

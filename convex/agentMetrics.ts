@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 
 type IncomingEvent = {
   sessionId: string;
@@ -64,13 +64,35 @@ const getSessionBySessionId = async (ctx: MutationCtx, sessionId: string): Promi
     .first();
 };
 
+const getSessionByRequestId = async (ctx: MutationCtx, requestId: string): Promise<Doc<'agent_sessions'> | null> => {
+  return await ctx.db
+    .query('agent_sessions')
+    .withIndex('by_requestId', (q) => q.eq('requestId', requestId))
+    .first();
+};
+
 const ensureSessionRecord = async (
   ctx: MutationCtx,
   event: IncomingEvent,
   defaults: Partial<Doc<'agent_sessions'>> = {}
 ): Promise<Doc<'agent_sessions'>> => {
   const existing = await getSessionBySessionId(ctx, event.sessionId);
-  if (existing) return existing;
+  if (existing) {
+    if (existing.requestId !== event.requestId) {
+      await ctx.db.patch(existing._id, pickDefined({ requestId: event.requestId, updatedAt: event.timestamp }));
+      return { ...existing, requestId: event.requestId, updatedAt: event.timestamp };
+    }
+    return existing;
+  }
+
+  const byRequest = await getSessionByRequestId(ctx, event.requestId);
+  if (byRequest) {
+    if (byRequest.sessionId !== event.sessionId) {
+      await ctx.db.patch(byRequest._id, pickDefined({ sessionId: event.sessionId, updatedAt: event.timestamp }));
+      return { ...byRequest, sessionId: event.sessionId, updatedAt: event.timestamp };
+    }
+    return byRequest;
+  }
 
   const insertBase = {
     sessionId: event.sessionId,
@@ -215,7 +237,7 @@ const handleToolCallStarted = async (ctx: MutationCtx, event: IncomingEvent) => 
   const toolName = typeof payload.toolName === 'string' ? (payload.toolName as string) : 'unknown';
   const stepIndex = typeof payload.stepIndex === 'number' ? (payload.stepIndex as number) : 0;
 
-  const session = await ensureSessionRecord(ctx, event);
+  await ensureSessionRecord(ctx, event);
 
   const existing = await ctx.db
     .query('agent_tool_calls')
@@ -536,6 +558,11 @@ export const listSessions = query({
       const durationMs = typeof session.sessionFinishedAt === 'number'
         ? session.sessionFinishedAt - session.sessionStartedAt
         : undefined;
+      const tags = Array.isArray(session.tags)
+        ? session.tags
+            .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+            .map((tag) => tag.trim())
+        : [];
 
       return {
         sessionId: session.sessionId,
@@ -554,6 +581,7 @@ export const listSessions = query({
         durationMs,
         attachmentsCount: session.attachmentsCount ?? 0,
         messagePreviews: session.messagePreviews ?? null,
+        tags,
         status: session.sessionFinishedAt ? 'completed' : 'active',
         updatedAt: session.updatedAt,
         createdAt: session.createdAt,
@@ -596,6 +624,35 @@ export const getSessionTimeline = query({
       toolCalls,
       events,
     };
+  },
+});
+
+export const setSessionTag = mutation({
+  args: {
+    sessionId: v.string(),
+    tag: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query('agent_sessions')
+      .withIndex('by_sessionId', (q) => q.eq('sessionId', args.sessionId))
+      .first();
+
+    if (!session) {
+      return { ok: false as const, error: 'not_found' as const };
+    }
+
+    const normalized = typeof args.tag === 'string' ? args.tag.trim() : '';
+    const hasTag = normalized.length > 0;
+
+    const patch = {
+      tags: hasTag ? [normalized] : undefined,
+      updatedAt: Date.now(),
+    } as Partial<Doc<'agent_sessions'>>;
+
+    await ctx.db.patch(session._id, patch);
+
+    return { ok: true as const, tag: hasTag ? normalized : null };
   },
 });
 

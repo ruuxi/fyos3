@@ -1,4 +1,4 @@
-import type { AgentUsageEstimates } from './types';
+import type { AgentUsageCostBreakdown, AgentUsageEstimates } from './types';
 
 type ModelEstimationConfig = {
   charsPerToken?: number;
@@ -94,13 +94,25 @@ export function estimateToolCallUsage(
   };
 }
 
-export function estimateCostUSD(usage: AgentUsageEstimates, model?: string): number {
+export function getUsageCostBreakdown(
+  usage: AgentUsageEstimates | null | undefined,
+  model?: string,
+): AgentUsageCostBreakdown {
   const config = getConfigForModel(model);
-  const promptTokens = usage.promptTokens ?? 0;
-  const completionTokens = usage.completionTokens ?? 0;
-  const promptCost = (promptTokens / 1_000_000) * config.promptCostPerMillion;
-  const completionCost = (completionTokens / 1_000_000) * config.completionCostPerMillion;
-  return Number((promptCost + completionCost).toFixed(6));
+  const promptTokens = usage?.promptTokens ?? 0;
+  const completionTokens = usage?.completionTokens ?? 0;
+  const promptCostUSD = (promptTokens / 1_000_000) * config.promptCostPerMillion;
+  const completionCostUSD = (completionTokens / 1_000_000) * config.completionCostPerMillion;
+  return {
+    promptCostUSD,
+    completionCostUSD,
+    totalCostUSD: promptCostUSD + completionCostUSD,
+  };
+}
+
+export function estimateCostUSD(usage: AgentUsageEstimates, model?: string): number {
+  const { totalCostUSD } = getUsageCostBreakdown(usage, model);
+  return Number(totalCostUSD.toFixed(6));
 }
 
 export function mergeUsageEstimates(base: AgentUsageEstimates, next: AgentUsageEstimates): AgentUsageEstimates {

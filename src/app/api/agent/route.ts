@@ -53,6 +53,8 @@ type AgentPostPayload = {
   messages: UIMessage[];
   threadId?: string;
   attachmentHints?: AttachmentHint[];
+  sessionId?: string;
+  requestSequence?: number;
 };
 type SanitizedMessage = Omit<UIMessage, 'id'>;
 type MessageEnvelope = (UIMessage | SanitizedMessage) & { content?: string; toolCalls?: unknown[] };
@@ -86,6 +88,11 @@ interface StepEventSummary {
   toolResults?: ToolResultSummary[];
   finishReason?: string;
   usage?: TokenUsageSummary;
+  response?: {
+    messages?: unknown;
+    [key: string]: unknown;
+  };
+  request?: Record<string, unknown>;
 }
 
 type StreamFinishEvent = StepEventSummary & { steps?: StepEventSummary[] };
@@ -143,6 +150,55 @@ const countToolCalls = (message: MessageEnvelope): number => {
 
 const hasErrorField = (value: unknown): value is { error: unknown } => {
   return typeof value === 'object' && value !== null && 'error' in value;
+};
+
+type ToolResultMessageCapture = {
+  messageObject?: Record<string, unknown>;
+  messageJson?: string;
+};
+
+const trySerializeToolMessage = (value: unknown): ToolResultMessageCapture => {
+  try {
+    const json = JSON.stringify(value);
+    if (typeof json !== 'string') return {};
+    return {
+      messageJson: json,
+      messageObject: JSON.parse(json) as Record<string, unknown>,
+    };
+  } catch {
+    return {};
+  }
+};
+
+const collectToolResultMessages = (response: unknown): Map<string, ToolResultMessageCapture> => {
+  const map = new Map<string, ToolResultMessageCapture>();
+  if (!response || typeof response !== 'object') return map;
+  const candidates = (response as { messages?: unknown }).messages;
+  const messages = Array.isArray(candidates) ? (candidates as unknown[]) : [];
+
+  for (const message of messages) {
+    if (!message || typeof message !== 'object') continue;
+    const role = (message as { role?: unknown }).role;
+    if (role !== 'tool') continue;
+
+    const content = (message as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+
+    let serialized: ToolResultMessageCapture | null = null;
+    for (const part of content) {
+      if (!part || typeof part !== 'object') continue;
+      const partType = (part as { type?: unknown }).type;
+      if (partType !== 'tool-result') continue;
+      const toolCallId = (part as { toolCallId?: unknown }).toolCallId;
+      if (typeof toolCallId !== 'string' || toolCallId.length === 0) continue;
+      if (serialized === null) {
+        serialized = trySerializeToolMessage(message);
+      }
+      map.set(toolCallId, serialized ?? {});
+    }
+  }
+
+  return map;
 };
 
 export async function POST(req: Request) {
@@ -216,8 +272,15 @@ export async function POST(req: Request) {
     }
   }
 
+  const sessionIdFromClient = typeof payload.sessionId === 'string' ? payload.sessionId.trim() : undefined;
+  const normalizedSessionId = sessionIdFromClient && sessionIdFromClient.length > 0 ? sessionIdFromClient : undefined;
+  const requestSequenceRaw = typeof payload.requestSequence === 'number' && Number.isFinite(payload.requestSequence)
+    ? Math.max(0, Math.floor(payload.requestSequence))
+    : 0;
+  const requestSequence = normalizedSessionId ? requestSequenceRaw : 0;
+
   // Generate session ID for this conversation
-  const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const sessionId = normalizedSessionId ?? `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   let sessionStartedAt: number | null = null;
 
   // Sanitize/dedupe messages to avoid downstream gateway duplicate-id issues
@@ -248,7 +311,9 @@ export async function POST(req: Request) {
     };
   });
 
-  const requestId = computeRequestId(sanitizedMessages, sessionId);
+  const requestId = normalizedSessionId
+    ? `${normalizedSessionId}:attempt:${requestSequence.toString().padStart(3, '0')}`
+    : computeRequestId(sanitizedMessages, sessionId);
 
   const pendingMessageEvents: Array<{
     role: 'user' | 'assistant' | 'system';
@@ -268,25 +333,26 @@ export async function POST(req: Request) {
     };
   }));
 
-  const appendMessageToThread = async (
+  const appendMessageToThread = (
     role: 'user' | 'assistant',
     content: string,
     mode: 'agent' | 'persona'
   ) => {
     if (!threadIdRaw) return;
-    try {
-      const client = await getConvexClientOptional();
-      if (client) {
+    void (async () => {
+      try {
+        const client = await getConvexClientOptional();
+        if (!client) return;
         await client.mutation(convexApi.chat.appendMessage, {
           threadId: threadIdRaw as Id<'chat_threads'>,
           role,
           content,
           mode,
         });
+      } catch (error) {
+        console.warn('⚠️ [AGENT] Failed to append message to thread', error);
       }
-    } catch (error) {
-      console.warn('⚠️ [AGENT] Failed to append message to thread', error);
-    }
+    })();
   };
 
 
@@ -326,7 +392,7 @@ export async function POST(req: Request) {
       ? lastMessage.id
       : `user_${Date.now()}`;
     await agentLogger.logMessage(sessionId, messageId, 'user', content);
-    await appendMessageToThread('user', content, personaMode ? 'persona' : 'agent');
+    appendMessageToThread('user', content, personaMode ? 'persona' : 'agent');
     pendingMessageEvents.push({ role: 'user', messageId, content, timestamp: Date.now() });
   }
   if (personaMode) {
@@ -454,6 +520,8 @@ export async function POST(req: Request) {
   const sessionStartTimestamp = Date.now();
   sessionStartedAt = sessionStartTimestamp;
 
+  const sequenceBase = requestSequence * 10000;
+
   const eventEmitter = new AgentEventEmitter({
     sessionId,
     requestId,
@@ -463,7 +531,7 @@ export async function POST(req: Request) {
     userIdentifier,
     toolNames: availableToolNames,
     sessionStartedAt: sessionStartTimestamp,
-  });
+  }, sequenceBase);
 
   void eventEmitter.emit('session_started', {
     personaMode,
@@ -525,9 +593,10 @@ export async function POST(req: Request) {
     model: openrouter('openai/gpt-5'),
     messages: convertToModelMessages(sanitizedMessages),
     stopWhen: stepCountIs(15),
-    onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }: StepEventSummary) => {
+    onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage, response }: StepEventSummary) => {
       const currentStepIndex = stepIndex;
       const now = Date.now();
+      const toolResultMessages = collectToolResultMessages(response);
 
       console.log('📊 [USAGE-STEP] Step finished:', {
         finishReason,
@@ -617,6 +686,7 @@ export async function POST(req: Request) {
           const tracked = inflightToolCalls.get(toolCallId);
           const startTime = tracked?.startedAt ?? now;
           const duration = Math.max(0, Date.now() - startTime);
+          const capturedMessage = toolResultMessages.get(toolCallId);
           const rawInputValue = tracked?.rawInput ?? (result.args ?? result.input ?? {});
           const rawInputObject = typeof rawInputValue === 'object' && rawInputValue !== null
             ? rawInputValue as Record<string, unknown>
@@ -657,6 +727,8 @@ export async function POST(req: Request) {
             },
             tokenUsage: usageEstimate,
             costUSD,
+            modelMessage: capturedMessage?.messageObject,
+            modelMessageJson: capturedMessage?.messageJson,
           }, { dedupeKey: `${toolCallId}:inbound` });
 
           await agentLogger.logToolCall(
@@ -692,6 +764,8 @@ export async function POST(req: Request) {
             },
             tokenUsage: usageEstimate,
             costUSD,
+            modelMessage: capturedMessage?.messageObject,
+            modelMessageJson: capturedMessage?.messageJson,
           }, { dedupeKey: `${toolCallId}:finished` });
 
           inflightToolCalls.delete(toolCallId);
@@ -728,7 +802,7 @@ export async function POST(req: Request) {
       if (event.text) {
         const assistantMessageId = `assistant_${Date.now()}`;
         await agentLogger.logMessage(sessionId, assistantMessageId, 'assistant', event.text);
-        await appendMessageToThread('assistant', event.text, 'agent');
+        appendMessageToThread('assistant', event.text, 'agent');
         emitMessageEvent('assistant', assistantMessageId, event.text, stepIndex, finishedAt);
       }
 
@@ -791,6 +865,10 @@ export async function POST(req: Request) {
         })));
       }
 
+      const finishReasonIsToolCall = (reason: string | undefined) => reason === 'tool_calls' || reason === 'tool-calls';
+      const finalStepFinishReason = event.steps?.[event.steps.length - 1]?.finishReason;
+      const waitingOnToolResults = finishReasonIsToolCall(event.finishReason) || finishReasonIsToolCall(finalStepFinishReason);
+
       if (inflightToolCalls.size > 0) {
         for (const [toolCallId, tracked] of inflightToolCalls.entries()) {
           const duration = Math.max(0, finishedAt - tracked.startedAt);
@@ -802,10 +880,21 @@ export async function POST(req: Request) {
           totalEstimatedCostUSD = Number((totalEstimatedCostUSD + costUSD).toFixed(6));
           totalToolCalls += 1;
 
-          const incompleteSummary = {
-            valueType: 'incomplete',
-            message: 'Tool call ended without emitted result',
-          } as Record<string, unknown>;
+          const summaryLabel = waitingOnToolResults
+            ? {
+                valueType: 'pending',
+                message: 'Tool call awaiting client result',
+              }
+            : {
+                valueType: 'incomplete',
+                message: 'Tool call ended without emitted result',
+              };
+          const summaryRecord = summaryLabel as Record<string, unknown>;
+          const stateRecord = waitingOnToolResults ? { pending: true } : { incomplete: true };
+          const isError = !waitingOnToolResults;
+          const errorMessage = waitingOnToolResults
+            ? undefined
+            : 'Tool call ended without result before session finished';
 
           void eventEmitter.emit('tool_call_inbound', {
             stepIndex: tracked.stepIndex,
@@ -813,11 +902,11 @@ export async function POST(req: Request) {
             toolName: tracked.toolName,
             durationMs: duration,
             resultSummary: {
-              sanitized: incompleteSummary,
+              sanitized: summaryRecord,
               charCount: 0,
               tokenEstimate: 0,
-              isError: true,
-              errorMessage: 'Tool call ended without result before session finished',
+              isError,
+              errorMessage,
             },
             tokenUsage: usageEstimate,
             costUSD,
@@ -830,9 +919,9 @@ export async function POST(req: Request) {
             tracked.sanitizedInput,
             {
               result: null,
-              state: { incomplete: true },
-              isError: true,
-              errorMessage: 'Tool call ended without result before session finished',
+              state: stateRecord,
+              isError,
+              errorMessage,
             },
             duration
           );
@@ -848,15 +937,16 @@ export async function POST(req: Request) {
               tokenEstimate: tracked.promptTokens,
             },
             resultSummary: {
-              sanitized: incompleteSummary,
+              sanitized: summaryRecord,
               charCount: 0,
               tokenEstimate: 0,
-              isError: true,
-              errorMessage: 'Tool call ended without result before session finished',
+              isError,
+              errorMessage,
             },
             tokenUsage: usageEstimate,
             costUSD,
           }, { dedupeKey: `${toolCallId}:finished` });
+
         }
         inflightToolCalls.clear();
       }
@@ -874,7 +964,8 @@ export async function POST(req: Request) {
         actualCostUSD: totalActualCostUSD > 0 ? totalActualCostUSD : undefined,
       }, { dedupeKey: `${sessionId}:session_finished` });
 
-      await eventEmitter.flush();
+      // Flush diagnostics best-effort without blocking the response lifecycle
+      void eventEmitter.flush({ timeoutMs: 500 });
     },
     system: systemPrompt,
     tools,

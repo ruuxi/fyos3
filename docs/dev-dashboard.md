@@ -15,7 +15,7 @@ Every event includes the base fields below; kind-specific payloads refine the de
 | `requestId` | Hash of sanitised messages (dedupe across retries) |
 | `sequence` | Monotonic counter emitted from the server |
 | `timestamp` | Milliseconds since epoch when the event was produced |
-| `kind` | One of `session_started`, `message_logged`, `step_finished`, `tool_call_started`, `tool_call_finished`, `session_finished`, `raw_log` |
+| `kind` | One of `session_started`, `message_logged`, `step_finished`, `tool_call_started`, `tool_call_finished`, `session_finished` |
 | `payload` | Kind-specific data (see `src/lib/agent/metrics/types.ts`) |
 
 Key payload fields:
