@@ -1,7 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react'
 
 // Shared constants
-const DEFAULT_WINDOW_POS = { left: 90, top: 90 }
+// Host reserves ~400px on the left for the agent sidebar; include a small gutter.
+const SIDEBAR_WIDTH = 416
+const ICON_LAYOUT_VERSION = 'right-aligned-v1'
+const ICON_LAYOUT_VERSION_KEY = 'desktop.iconLayoutVersion'
+const ICON_RIGHT_MARGIN = 32
+const ICON_WIDTH = 64
+
+const DEFAULT_WINDOW_POS = { left: SIDEBAR_WIDTH + 90, top: 90 }
 const DEFAULT_WINDOW_SIZE = { width: 720, height: 720 }
 const MIN_WINDOW_SIZE = { width: 280, height: 160 }
 
@@ -22,10 +29,7 @@ const THEME_KEY = 'fyos.desktop.theme'
 const EVT_SET_THEME = 'FYOS_SET_THEME'
 const EVT_USER_MODE = 'FYOS_USER_MODE'
 
-const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: 16, startY: 52, maxPerCol: 6 }
-
-// Reserved sidebar width for the new left app list (disabled)
-const SIDEBAR_WIDTH = 0
+const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: SIDEBAR_WIDTH + 16, startY: 52, maxPerCol: 6 }
 
 type DialOption = 'expand' | 'close' | 'move' | 'chat'
 
@@ -167,13 +171,20 @@ function bounceIcon(setLaunching: React.Dispatch<React.SetStateAction<string | n
 
 function loadIconPositions(): Record<string, { left: number; top: number }>{
   try{
+    const version = localStorage.getItem(ICON_LAYOUT_VERSION_KEY)
+    if (version !== ICON_LAYOUT_VERSION) {
+      return {}
+    }
     const raw = localStorage.getItem(LS_ICON_POS_KEY)
     return raw ? JSON.parse(raw) : {}
   } catch { return {} }
 }
 
 function saveIconPositions(pos: Record<string, { left: number; top: number }>): void{
-  try{ localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(pos)) } catch{}
+  try{
+    localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(pos))
+    localStorage.setItem(ICON_LAYOUT_VERSION_KEY, ICON_LAYOUT_VERSION)
+  } catch{}
 }
 
 function loadWindowGeometries(): Record<string, { left: number; top: number; width: number; height: number }>{
@@ -724,7 +735,10 @@ export default function Desktop(){
 
   // Helper function to find next available icon position
   const findNextIconPosition = (currentPositions: Record<string,{left:number;top:number}>, _existingApps: App[]) => {
-    const { spacingX, spacingY, startX, startY, maxPerCol } = DESKTOP_GRID
+    const { spacingX, spacingY, startY, maxPerCol } = DESKTOP_GRID
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1440
+    const workspaceRight = viewportWidth - ICON_RIGHT_MARGIN
+    const firstColumnLeft = Math.max(SIDEBAR_WIDTH + ICON_RIGHT_MARGIN, workspaceRight - ICON_WIDTH)
     
     // Get all occupied positions
     const occupiedPositions = new Set<string>()
@@ -736,7 +750,7 @@ export default function Desktop(){
     for (let i = 0; i < 50; i++) { // limit search to prevent infinite loop
       const col = Math.floor(i / maxPerCol)
       const row = i % maxPerCol
-      const left = startX + col * spacingX
+      const left = Math.max(SIDEBAR_WIDTH + ICON_RIGHT_MARGIN, firstColumnLeft - col * spacingX)
       const top = startY + row * spacingY
       const posKey = `${left},${top}`
       
@@ -746,7 +760,14 @@ export default function Desktop(){
     }
     
     // Fallback: place at end of first column
-    return { left: startX, top: startY + maxPerCol * spacingY }
+    return { left: firstColumnLeft, top: startY + maxPerCol * spacingY }
+  }
+
+  const getRightAlignedFallback = () => {
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1440
+    const workspaceRight = viewportWidth - ICON_RIGHT_MARGIN
+    const left = Math.max(SIDEBAR_WIDTH + ICON_RIGHT_MARGIN, workspaceRight - ICON_WIDTH)
+    return { left, top: DESKTOP_GRID.startY }
   }
 
   useEffect(()=>{
@@ -773,6 +794,9 @@ export default function Desktop(){
             })
             
             setIconPositions(newPositions)
+            if (userMode === 'auth') {
+              try { saveIconPositions(newPositions) } catch {}
+            }
             
             const geoms = userMode === 'auth' ? loadWindowGeometries() : {}
             if (geoms && Object.keys(geoms).length > 0){
@@ -1382,6 +1406,11 @@ export default function Desktop(){
     ? { background: theme.value }
     : { backgroundImage: `url(${theme?.value || '/2.webp'})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }
 
+  const brandStyle: React.CSSProperties = {
+    left: `calc(50% + ${SIDEBAR_WIDTH / 2}px)`,
+    top: '50%',
+  }
+
   return (
     <div
       className="desktop"
@@ -1404,8 +1433,8 @@ export default function Desktop(){
       {/* Sidebar removed */}
 
 
-      {/* Center brand (offset upward to account for bottom agent bar) */}
-      <div className="center-brand" aria-hidden={open.length > 0}>
+      {/* Center brand adjusted for host sidebar width */}
+      <div className="center-brand" style={brandStyle} aria-hidden={open.length > 0}>
         <div className="brand-text">fromyou</div>
       </div>
 
@@ -1417,7 +1446,7 @@ export default function Desktop(){
         {(appOrder.length ? appOrder : apps.map(a=>a.id)).map(id => {
           const a = appsByIdRef.current[id]
           if (!a) return null
-          const p = iconPositions[id] || { left: 16, top: 52 }
+          const p = iconPositions[id] || getRightAlignedFallback()
           return (
             <div
               key={id}
@@ -1426,7 +1455,7 @@ export default function Desktop(){
               onMouseDown={(e)=>{
                 if (e.button !== 0) return
                 e.preventDefault()
-                const cur = iconPositions[id] || { left: 16, top: 52 }
+                const cur = iconPositions[id] || getRightAlignedFallback()
                 dragIconRef.current = { id, startX: e.clientX, startY: e.clientY, startLeft: cur.left, startTop: cur.top, dragging: false }
               }}
               onClick={()=>{

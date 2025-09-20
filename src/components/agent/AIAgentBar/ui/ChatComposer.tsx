@@ -27,7 +27,7 @@ export default function ChatComposer(props: ChatComposerProps) {
       <div className="flex items-center gap-2">
         <div className="flex-1 relative">
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2 px-16">
+            <div className="mb-2 flex flex-wrap gap-2 px-4">
               {attachments.map((a, index) => {
                 const ct = (a.contentType || '').toLowerCase();
                 const isImage = ct.startsWith('image/');
@@ -72,7 +72,7 @@ export default function ChatComposer(props: ChatComposerProps) {
             onFocus={onFocus}
             onChange={e => setInput(e.target.value)}
             placeholder="'Create a Notes app, Change my background!'"
-            className="pl-24 pr-12 h-10 min-h-0 py-2 resize-none rounded-none bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none text-white placeholder:text-white/60 caret-sky-300 text-base leading-6"
+            className="h-10 min-h-0 resize-none rounded-none bg-transparent px-4 py-2 pr-12 font-medium text-white placeholder:text-white/60 caret-sky-300 focus-visible:ring-0 focus-visible:ring-offset-0"
             rows={1}
             disabled={false}
             onKeyDown={e => {
@@ -137,4 +137,3 @@ export default function ChatComposer(props: ChatComposerProps) {
     </form>
   );
 }
-

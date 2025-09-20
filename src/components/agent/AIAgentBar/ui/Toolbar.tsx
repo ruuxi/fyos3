@@ -11,6 +11,7 @@ export type ToolbarProps = {
 };
 
 export default function Toolbar({ activeIndex, onToggleHomeStore, onVisit, onMedia, onFriends }: ToolbarProps) {
+  const showFriends = typeof onFriends === 'function';
   return (
     <TooltipProvider>
       <div className="flex items-center gap-1">
@@ -41,14 +42,16 @@ export default function Toolbar({ activeIndex, onToggleHomeStore, onVisit, onMed
           </TooltipTrigger>
           <TooltipContent className="rounded-none">Visit Desktops</TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none text-white hover:bg-white/10" onClick={onFriends}>
-              <Users className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent className="rounded-none">Friends</TooltipContent>
-        </Tooltip>
+        {showFriends && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none text-white hover:bg-white/10" onClick={onFriends}>
+                <Users className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="rounded-none">Friends</TooltipContent>
+          </Tooltip>
+        )}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none text-white hover:bg-white/10" onClick={onMedia}>
@@ -61,5 +64,4 @@ export default function Toolbar({ activeIndex, onToggleHomeStore, onVisit, onMed
     </TooltipProvider>
   );
 }
-
 

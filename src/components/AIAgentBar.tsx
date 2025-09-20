@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Search, Undo2 } from 'lucide-react';
+import { Monitor, Store, Image as ImageIcon, MessageCircle, UserPlus, Users, Undo2 } from 'lucide-react';
 import { useWebContainer } from './WebContainerProvider';
 import { useScreens } from './ScreensProvider';
 import { formatBytes } from '@/lib/agent/agentUtils';
@@ -11,7 +11,6 @@ import { useDesktopUndo } from '@/components/agent/AIAgentBar/hooks/useDesktopUn
 import { useAgentController } from '@/components/agent/AIAgentBar/hooks/useAgentController';
 import { useMediaController } from '@/components/agent/AIAgentBar/hooks/useMediaController';
 import AgentBarShell from '@/components/agent/AIAgentBar/ui/AgentBarShell';
-import Toolbar from '@/components/agent/AIAgentBar/ui/Toolbar';
 import ChatTabs from '@/components/agent/AIAgentBar/ui/ChatTabs';
 import MessagesPane from '@/components/agent/AIAgentBar/ui/MessagesPane';
 import ChatComposer from '@/components/agent/AIAgentBar/ui/ChatComposer';
@@ -304,48 +303,520 @@ export default function AIAgentBar() {
   // Drag overlay
   // Bottom bar
   const bottomBar = (
-    <div className="rounded-none px-4 py-3 bg-transparent">
-      <div className="flex items-center gap-2">
-        <Toolbar
-          activeIndex={activeIndex}
-          onToggleHomeStore={() => goTo(activeIndex === 0 ? 1 : 0)}
-          onVisit={() => setMode('visit')}
-          onMedia={() => setMode('media')}
-          onFriends={() => openFriendsSettings()}
+    <div className="border-t border-white/10 bg-black/35 px-4 py-4 backdrop-blur-md">
+      {leftPane === 'agent' && (
+        <ChatComposer
+          input={input}
+          setInput={setInput}
+          status={agentStatus}
+          attachments={attachments}
+          removeAttachment={removeAttachment}
+          onSubmit={handleAgentSubmit}
+          onFileSelect={handleUploadFiles}
+          onStop={() => stopAgent()}
+          onFocus={() => setMode('chat')}
+          uploadBusy={busyFlags.uploadBusy}
         />
-        {/* Left Undo removed */}
-        <div className="flex-1 relative">
-          <Search className="absolute left-16 top-1/2 -translate-y-1/2 h-4 w-4 text-white" />
-          {leftPane === 'agent' && (
-            <ChatComposer
-              input={input}
-              setInput={setInput}
-              status={agentStatus}
-              attachments={attachments}
-              removeAttachment={removeAttachment}
-              onSubmit={handleAgentSubmit}
-              onFileSelect={handleUploadFiles}
-              onStop={() => stopAgent()}
-              onFocus={() => setMode('chat')}
-              uploadBusy={busyFlags.uploadBusy}
+      )}
+      {leftPane === 'friend' && socialView.kind !== 'settings' && (
+        <ChatComposer
+          input={input}
+          setInput={setInput}
+          status={socialComposerStatus}
+          attachments={[]}
+          removeAttachment={() => {}}
+          onSubmit={handleSocialSubmit}
+          onFileSelect={() => {}}
+          onStop={() => {}}
+          onFocus={() => setMode('friends')}
+          uploadBusy={false}
+        />
+      )}
+      {leftPane === 'friend' && socialView.kind === 'settings' && (
+        <div className="rounded-md border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60">
+          Select a chat to start messaging.
+        </div>
+      )}
+    </div>
+  );
 
+  const handleSelectAgent = useCallback(() => {
+    setLeftPane('agent');
+    setMode('chat');
+  }, [setLeftPane, setMode]);
+
+  const handleOpenFriendsPanel = useCallback(() => {
+    setLeftPane('friend');
+    setMode('friends');
+    openFriendsSettings();
+  }, [openFriendsSettings, setLeftPane, setMode]);
+
+  const handleStartGroup = useCallback(() => {
+    setLeftPane('friend');
+    setMode('friends');
+    openFriendsSettings();
+    setShowCreateGroupForm(true);
+  }, [openFriendsSettings, setLeftPane, setMode, setShowCreateGroupForm]);
+
+  const handleSelectChatItem = useCallback((item: typeof chatItems[number]) => {
+    setLeftPane('friend');
+    setMode('friends');
+    if (item.kind === 'dm' && item.peerId) {
+      openDmChat(item.peerId);
+      return;
+    }
+    if (item.kind === 'group' && item.groupId) {
+      openGroupChat(item.groupId);
+      return;
+    }
+    if (item.kind === 'auto') {
+      openAutoChat();
+    }
+  }, [openAutoChat, openDmChat, openGroupChat, setLeftPane, setMode]);
+
+  const baseChatMode = leftPane === 'friend' ? 'friends' : 'chat';
+
+  const navItems = [
+    {
+      key: 'store',
+      label: 'App Store',
+      active: activeIndex === 0,
+      onClick: () => {
+        setMode(baseChatMode);
+        goTo(0);
+      },
+      icon: Store,
+    },
+    {
+      key: 'desktop',
+      label: 'Desktop',
+      active: activeIndex === 1,
+      onClick: () => {
+        setMode(baseChatMode);
+        goTo(1);
+      },
+      icon: Monitor,
+    },
+    {
+      key: 'media',
+      label: 'Media',
+      active: mode === 'media',
+      onClick: () => setMode('media'),
+      icon: ImageIcon,
+    },
+  ] as const;
+
+  const conversationList = (
+    <div className="flex h-full flex-col">
+      <button
+        type="button"
+        onClick={handleSelectAgent}
+        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${leftPane === 'agent' ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}
+      >
+        <MessageCircle className="h-4 w-4" />
+        <span>Assistant</span>
+      </button>
+
+      <div className="mt-4 flex-1 overflow-y-auto pr-1">
+        {chatItems.length === 0 && !friendsState.friendsLoading && !groupState.groupsLoading && (
+          <div className="rounded-lg bg-white/5 px-3 py-4 text-xs text-white/60">
+            Your chats will show up here. Start one from the buttons below.
+          </div>
+        )}
+        <div className="flex flex-col gap-1">
+          {chatItems.map((item) => {
+            const isActive = leftPane === 'friend' && item.key === activeChatKey;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => handleSelectChatItem(item)}
+                className={`flex flex-col rounded-lg px-3 py-2 text-left text-xs transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}
+              >
+                <span className="font-medium">{item.label}</span>
+                {item.description && <span className="text-[10px] text-white/50">{item.description}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-4 border-t border-white/10 pt-4">
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={handleOpenFriendsPanel}
+            className="flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-xs text-white/80 transition-colors hover:bg-white/10"
+          >
+            <UserPlus className="h-4 w-4" />
+            <span>Add friend</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleStartGroup}
+            className="flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-xs text-white/80 transition-colors hover:bg-white/10"
+          >
+            <Users className="h-4 w-4" />
+            <span>New group chat</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const agentConversation = (
+    <div className="relative flex h-full flex-col gap-3">
+      <ChatTabs
+        openThreads={openThreads}
+        historyThreads={historyThreads}
+        threadsLoading={threadsLoading}
+        threadsError={threadsError}
+        activeThreadId={activeThreadId}
+        setActiveThreadId={setActiveThreadId}
+        showHistory={showThreadHistory}
+        setShowHistory={(next) => {
+          if (typeof next === 'function') {
+            setShowThreadHistory((prev) => (next as (prev: boolean) => boolean)(prev));
+            return;
+          }
+          setShowThreadHistory(next);
+        }}
+        onRefresh={() => { void refreshThreads(); }}
+        onNewConversation={() => {
+          activeThreadIdImmediateRef.current = null;
+          startBlankThread();
+        }}
+        onClose={(id) => {
+          if (activeThreadIdImmediateRef.current === id) {
+            activeThreadIdImmediateRef.current = null;
+          }
+          closeThread(id);
+        }}
+        onOpenFromHistory={(id) => {
+          activeThreadIdImmediateRef.current = id;
+          setActiveThreadId(id);
+        }}
+      />
+      <div className="flex-1 min-h-0">
+        <MessagesPane
+          messages={agentMessages}
+          optimisticMessages={agentOptimisticMessages}
+          status={agentStatus}
+          messagesContainerRef={messagesContainerRef}
+          messagesInnerRef={messagesInnerRef}
+          containerHeight={containerHeight}
+          didAnimateWelcome={didAnimateWelcome}
+          bubbleAnimatingIds={bubbleAnimatingIds}
+          lastSentAttachments={lastSentAttachments || undefined}
+          activeThreadId={activeThreadId || undefined}
+          agentActive={agentActive}
+          onSuggestionSelect={(text) => {
+            setInput(text);
+          }}
+        />
+      </div>
+
+      {agentStatus === 'ready' && undoDepth > 1 && (
+        <button
+          onClick={handleUndo}
+          className="absolute right-4 top-2 flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white/70 transition-colors hover:text-white"
+          title="Undo changes"
+        >
+          <Undo2 className="h-3.5 w-3.5" />
+          <span>Undo</span>
+        </button>
+      )}
+
+      <style jsx>{`
+        .ios-pop { animation: iosPop 420ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: bottom left; }
+        @keyframes iosPop {
+          0% { transform: scale(0.92); opacity: 0; }
+          60% { transform: scale(1.02); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .ios-pop { animation-duration: 1ms; }
+        }
+      `}</style>
+      <style jsx global>{`
+        .modern-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(56,189,248,0.45) transparent; }
+        .modern-scrollbar::-webkit-scrollbar { width: 9px; height: 9px; }
+        .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .modern-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(56,189,248,0.45); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
+        .modern-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(56,189,248,0.65); }
+      `}</style>
+    </div>
+  );
+
+  const friendConversation = (
+    <div className="flex h-full flex-col gap-4">
+      {socialView.kind === 'settings' && (
+        <div className="modern-scrollbar flex flex-1 flex-col gap-4 overflow-auto pr-1">
+          <div className="flex flex-col gap-2">
+            <div className="text-xs text-white/70">Profile</div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                className="flex-1 rounded-md border border-white/10 bg-white/90 px-2 py-1 text-xs text-black"
+                placeholder="Nickname"
+                defaultValue={friendsState.me?.nickname || ''}
+                onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  if (v && v !== (friendsState.me?.nickname || '')) void friendsState.setNickname(v);
+                }}
+                disabled={!friendsState.isAuthenticated}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="text-xs text-white/70">Add friend</div>
+            <AddFriendForm onAdd={(nickname) => friendsState.addFriend(nickname)} disabled={!friendsState.isAuthenticated} />
+          </div>
+
+          <div className="flex flex-col gap-2 text-xs text-white/70">
+            <div className="flex items-center justify-between">
+              <span>Groups</span>
+              <button
+                className="rounded-lg border border-white/15 px-2 py-1 text-white/80 transition-colors hover:bg-white/10"
+                onClick={() => {
+                  setShowCreateGroupForm((prev) => {
+                    const next = !prev;
+                    if (!next) resetGroupForm();
+                    return next;
+                  });
+                }}
+                disabled={groupFormBusy}
+              >
+                {showCreateGroupForm ? 'Cancel' : 'New group'}
+              </button>
+            </div>
+
+            {showCreateGroupForm && (
+              <form onSubmit={handleCreateGroup} className="flex flex-col gap-2 rounded-lg border border-white/15 bg-white/5 p-2">
+                <input
+                  type="text"
+                  className="rounded border border-white/10 px-2 py-1 text-xs text-black"
+                  placeholder="Group name"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  disabled={groupFormBusy}
+                />
+                <div className="modern-scrollbar max-h-28 space-y-1 overflow-auto">
+                  {friendsState.friends.map((friend) => {
+                    const label = friend.nickname || friend.email || friend.ownerId.slice(0, 8);
+                    const checked = newGroupMemberIds.includes(friend.ownerId);
+                    return (
+                      <label key={friend.ownerId} className="flex items-center gap-2 text-white/80">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleNewGroupMember(friend.ownerId)}
+                          disabled={groupFormBusy}
+                        />
+                        <span>{label}</span>
+                      </label>
+                    );
+                  })}
+                  {friendsState.friends.length === 0 && (
+                    <div className="text-white/60">Add friends to invite them to a group.</div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded border border-white/20 px-2 py-1 text-white/70 hover:bg-white/10"
+                    onClick={() => {
+                      resetGroupForm();
+                      setShowCreateGroupForm(false);
+                    }}
+                    disabled={groupFormBusy}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded border border-sky-300/60 bg-sky-500/40 px-2 py-1 text-white transition-colors hover:bg-sky-500/60 disabled:opacity-50"
+                    disabled={groupFormBusy || !newGroupName.trim()}
+                  >
+                    Create
+                  </button>
+                </div>
+              </form>
+            )}
+            {groupState.groups.length > 0 && (
+              <div className="flex flex-wrap gap-2 text-white/70">
+                {groupState.groups.map((group) => (
+                  <button
+                    key={group.id}
+                    className="rounded border border-white/15 px-2 py-1 hover:bg-white/10"
+                    onClick={() => openGroupChat(group.id)}
+                  >
+                    {group.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {groupState.groups.length === 0 && !showCreateGroupForm && (
+              <div className="text-white/60">You have no groups yet.</div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 text-xs text-white/70">
+            <span>Auto group</span>
+            {groupState.autoRoom?.chat ? (
+              <div className="flex items-center justify-between">
+                <span className="text-white/90">{groupState.autoRoom.chat.name}</span>
+                <button
+                  className="rounded border border-white/15 px-2 py-1 text-white/80 hover:bg-white/10"
+                  onClick={() => void handleLeaveAutoRoom()}
+                  disabled={groupFormBusy}
+                >
+                  Leave
+                </button>
+              </div>
+            ) : (
+              <button
+                className="self-start rounded border border-white/15 px-2 py-1 text-white/80 hover:bg-white/10"
+                onClick={() => void handleJoinAutoRoom()}
+                disabled={!friendsState.isAuthenticated || groupFormBusy}
+              >
+                Join auto room
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {socialView.kind === 'dm' && (
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="flex items-center justify-between text-xs text-white/70">
+            <span>{activePeerLabel ?? 'Direct message'}</span>
+          </div>
+          <div className="flex-1 min-h-0">
+            <FriendMessagesPane
+              messages={friendsState.dmMessages || []}
+              activePeerId={socialView.peerId}
+              currentUserId={myUserId ?? undefined}
+              meLabel={meDisplayName}
+              peerLabel={activePeerLabel || 'Friend'}
             />
-          )}
-          {leftPane === 'friend' && socialView.kind !== 'settings' && (
-            <ChatComposer
-              input={input}
-              setInput={setInput}
-              status={socialComposerStatus}
-              attachments={[]}
-              removeAttachment={() => {}}
-              onSubmit={handleSocialSubmit}
-              onFileSelect={()=>{}}
-              onStop={()=>{}}
-              onFocus={() => setMode('friends')}
-              uploadBusy={false}
+          </div>
+        </div>
+      )}
+
+      {socialView.kind === 'group' && (
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="flex items-center justify-between text-xs text-white/70">
+            <span>{activeGroupSummary ? activeGroupSummary.name : 'Select a group to start chatting.'}</span>
+            {activeGroupSummary && (
+              <button
+                className="rounded border border-red-400/60 px-2 py-1 text-red-200 hover:bg-red-500/20"
+                onClick={() => {
+                  void groupState.leaveGroup(activeGroupSummary.id).then(() => {
+                    openFriendsSettings();
+                  });
+                }}
+              >
+                Leave group
+              </button>
+            )}
+          </div>
+          <div className="flex-1 min-h-0">
+            <GroupMessagesPane
+              active={Boolean(activeGroupSummary)}
+              emptyLabel="Select a group to view messages."
+              messages={groupState.groupMessages}
+              members={groupState.groupMembers}
+              currentUserId={myUserId ?? undefined}
             />
+          </div>
+        </div>
+      )}
+
+      {socialView.kind === 'auto' && (
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="flex items-center justify-between text-xs text-white/70">
+            <span>{groupState.autoRoom?.chat ? groupState.autoRoom.chat.name : 'Auto group lobby'}</span>
+            {groupState.autoRoom?.chat && (
+              <span className="text-[10px] text-white/50">{autoRoomMembers.length} people</span>
+            )}
+          </div>
+          <div className="flex-1 min-h-0">
+            <GroupMessagesPane
+              active={Boolean(groupState.autoRoom?.chat)}
+              emptyLabel="Join the auto room to start chatting."
+              messages={autoRoomMessages}
+              members={autoRoomMembers}
+              currentUserId={myUserId ?? undefined}
+            />
+          </div>
+          {!groupState.autoRoom?.chat && (
+            <button
+              className="self-start rounded border border-sky-300/60 px-2 py-1 text-white hover:bg-sky-500/40 disabled:opacity-60"
+              onClick={() => void handleJoinAutoRoom()}
+              disabled={!friendsState.isAuthenticated || !groupState.isAuthenticated}
+            >
+              Join auto room
+            </button>
           )}
         </div>
+      )}
+    </div>
+  );
+
+  const visitPane = (
+    <div className="modern-scrollbar h-full overflow-auto px-4 py-4 text-white">
+      <div className="mb-3 text-sm font-medium uppercase tracking-wide text-white/60">Visit Desktops</div>
+      {desktopsLoading && <div className="text-sm text-white/70">Loading…</div>}
+      {desktopsError && <div className="text-sm text-red-300">{desktopsError}</div>}
+      {!desktopsLoading && !desktopsError && (
+        <div className="grid grid-cols-1 gap-3">
+          {desktopsListing.map((d) => (
+            <div key={d._id} className="rounded-lg border border-white/15 bg-white/10 p-3 text-sm">
+              <div className="flex items-center gap-2 text-white">
+                <div>{d.icon || '🖥️'}</div>
+                <div className="font-medium" title={d.title}>{d.title}</div>
+              </div>
+              {d.description && <div className="mt-2 text-xs text-white/70">{d.description}</div>}
+              <div className="mt-3 flex items-center gap-2 text-xs">
+                <a href={`/d/${d._id}`} className="rounded border border-white/30 px-2 py-1 text-white hover:bg-white/10">Open</a>
+                <a href={`/api/visit/desktops/${d._id}/snapshot`} target="_blank" className="rounded border border-white/30 px-2 py-1 text-white hover:bg-white/10">Download</a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const mediaPane = (
+    <div className="h-full overflow-hidden px-4 py-4">
+      <MediaPane
+        mediaType={mediaType}
+        setMediaType={setMediaType}
+        loadMedia={loadMedia}
+        loading={busyFlags.loading}
+        error={mediaError}
+        uploadError={uploadError}
+        onFiles={handleUploadFiles}
+        ingestUrl={ingestUrl}
+        setIngestUrl={setIngestUrl}
+        onIngest={handleIngestFromUrl}
+        items={mediaItems}
+        disabled={busyFlags.uploadBusy}
+        formatBytes={formatBytes}
+      />
+    </div>
+  );
+
+  const chatPane = (
+    <div className="flex h-full gap-4 px-4 py-4">
+      <aside className="w-60 shrink-0 border-r border-white/10 pr-2">
+        {conversationList}
+      </aside>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {leftPane === 'agent' ? agentConversation : friendConversation}
       </div>
     </div>
   );
@@ -362,430 +833,31 @@ export default function AIAgentBar() {
       dragOverlay={dragOverlay}
       bottomBar={bottomBar}
     >
-      <div className="bg-transparent text-white">
-        {(mode === 'chat' || mode === 'friends') && (
-          <div className="relative pb-3">
-            <div className="border border-white/15 bg-white/5 overflow-hidden">
-              <div className="grid grid-cols-[220px_minmax(0,1fr)]">
-                {/* Left switcher: Agent vs Friends */}
-                <div className="min-h-[420px] border-r border-white/15">
-                  <div className="px-3 pt-3 pb-3 flex flex-col gap-2">
-                    <div className="text-xs text-white/70 mb-1">Chats</div>
-                    <div className="flex flex-col gap-1">
-                      <button
-                        className={`text-left text-sm px-2 py-1 rounded ${leftPane==='agent' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                        onClick={()=>{ setLeftPane('agent'); setMode('chat'); }}
-                      >
-                        Agent
-                      </button>
-                      <button
-                        className={`text-left text-sm px-2 py-1 rounded ${leftPane==='friend' ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                        onClick={() => { openFriendsSettings(); }}
-                      >
-                        Friends
-                      </button>
-                    </div>
-
-                    {leftPane==='friend' && (
-                      <div className="mt-2 flex flex-col gap-2">
-                        {friendsState.friendsLoading && (<div className="text-xs text-white/60">Loading friends…</div>)}
-                        {friendsState.friendsError && (<div className="text-xs text-red-300">{friendsState.friendsError}</div>)}
-                        {groupState.groupsLoading && (<div className="text-xs text-white/60">Loading groups…</div>)}
-                        <div className="flex flex-col gap-1 max-h-[260px] overflow-auto">
-                          {chatItems.map((item) => {
-                            const isActive = item.key === activeChatKey;
-                            const buttonClasses = isActive ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10';
-                            return (
-                              <button
-                                key={item.key}
-                                className={`text-left text-xs px-2 py-1 rounded ${buttonClasses}`}
-                                onClick={() => {
-                                  if (item.kind === 'dm' && item.peerId) {
-                                    openDmChat(item.peerId);
-                                    return;
-                                  }
-                                  if (item.kind === 'group' && item.groupId) {
-                                    openGroupChat(item.groupId);
-                                    return;
-                                  }
-                                  if (item.kind === 'auto') {
-                                    openAutoChat();
-                                  }
-                                }}
-                              >
-                                <div className="flex flex-col gap-0.5">
-                                  <span>{item.label}</span>
-                                  {item.description && (
-                                    <span className="text-[10px] text-white/50">{item.description}</span>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          })}
-                          {chatItems.length === 0 && !friendsState.friendsLoading && !groupState.groupsLoading && (
-                            <div className="text-xs text-white/60">No chats yet. Use the Friends panel to start one.</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="min-h-[420px] flex flex-col">
-                  <div className="flex flex-col gap-3 h-full px-3 pt-3 pb-3">
-                    {leftPane==='agent' && (
-                      <>
-                        <ChatTabs
-                          openThreads={openThreads}
-                          historyThreads={historyThreads}
-                          threadsLoading={threadsLoading}
-                          threadsError={threadsError}
-                          activeThreadId={activeThreadId}
-                          setActiveThreadId={setActiveThreadId}
-                          showHistory={showThreadHistory}
-                          setShowHistory={(next) => {
-                            if (typeof next === 'function') {
-                              setShowThreadHistory((prev) => (next as (prev: boolean) => boolean)(prev));
-                              return;
-                            }
-                            setShowThreadHistory(next);
-                          }}
-                          onRefresh={() => { void refreshThreads(); }}
-                          onNewConversation={() => {
-                            activeThreadIdImmediateRef.current = null;
-                            startBlankThread();
-                          }}
-                          onClose={(id) => {
-                            if (activeThreadIdImmediateRef.current === id) {
-                              activeThreadIdImmediateRef.current = null;
-                            }
-                            closeThread(id);
-                          }}
-                          onOpenFromHistory={(id) => {
-                            activeThreadIdImmediateRef.current = id;
-                            setActiveThreadId(id);
-                          }}
-                        />
-                        <div className="flex-1 min-h-0">
-                          <MessagesPane
-                            messages={agentMessages}
-                            optimisticMessages={agentOptimisticMessages}
-                            status={agentStatus}
-                            messagesContainerRef={messagesContainerRef}
-                            messagesInnerRef={messagesInnerRef}
-                            containerHeight={containerHeight}
-                            didAnimateWelcome={didAnimateWelcome}
-                            bubbleAnimatingIds={bubbleAnimatingIds}
-                            lastSentAttachments={lastSentAttachments || undefined}
-                            activeThreadId={activeThreadId || undefined}
-                            agentActive={agentActive}
-                            onSuggestionSelect={(text) => {
-                              setInput(text);
-                            }}
-                          />
-                        </div>
-                      </>
-                    )}
-                    {leftPane==='friend' && (
-                      <div className="flex flex-col gap-3 flex-1 min-h-0">
-                        {socialView.kind === 'settings' && (
-                          <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-auto pr-1">
-                            <div className="flex flex-col gap-2">
-                              <div className="text-xs text-white/70">Profile</div>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  className="rounded-none text-black px-2 py-1 text-xs flex-1"
-                                  placeholder="Nickname"
-                                  defaultValue={friendsState.me?.nickname || ''}
-                                  onBlur={(e)=>{ const v = e.target.value.trim(); if (v && v !== (friendsState.me?.nickname||'')) void friendsState.setNickname(v); }}
-                                  disabled={!friendsState.isAuthenticated}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="flex flex-col gap-2">
-                              <div className="text-xs text-white/70 mb-1">Add friend</div>
-                              <AddFriendForm onAdd={(nickname)=> friendsState.addFriend(nickname)} disabled={!friendsState.isAuthenticated} />
-                            </div>
-
-                            <div className="flex flex-col gap-2 text-xs text-white/70">
-                              <div className="flex items-center justify-between">
-                                <span>Groups</span>
-                                <button
-                                  className="px-2 py-1 rounded border border-white/20 text-white/80 hover:bg-white/10"
-                                  onClick={() => {
-                                    setShowCreateGroupForm((prev) => {
-                                      const next = !prev;
-                                      if (!next) resetGroupForm();
-                                      return next;
-                                    });
-                                  }}
-                                >
-                                  {showCreateGroupForm ? 'Close' : 'Create group'}
-                                </button>
-                              </div>
-                              {showCreateGroupForm && (
-                                <form onSubmit={handleCreateGroup} className="flex flex-col gap-2 border border-white/15 bg-white/5 p-2 rounded">
-                                  <input
-                                    type="text"
-                                    className="rounded-none text-black px-2 py-1 text-xs"
-                                    placeholder="Group name"
-                                    value={newGroupName}
-                                    onChange={(e)=> setNewGroupName(e.target.value)}
-                                    disabled={groupFormBusy}
-                                  />
-                                  <div className="flex flex-col gap-1 max-h-28 overflow-auto">
-                                    {friendsState.friends.map((friend) => {
-                                      const label = friend.nickname || friend.email || friend.ownerId.slice(0, 8);
-                                      const checked = newGroupMemberIds.includes(friend.ownerId);
-                                      return (
-                                        <label key={friend.ownerId} className="flex items-center gap-2 text-white/80">
-                                          <input
-                                            type="checkbox"
-                                            checked={checked}
-                                            onChange={() => toggleNewGroupMember(friend.ownerId)}
-                                            disabled={groupFormBusy}
-                                          />
-                                          <span>{label}</span>
-                                        </label>
-                                      );
-                                    })}
-                                    {friendsState.friends.length === 0 && (
-                                      <div className="text-white/60">Add friends to invite them to a group.</div>
-                                    )}
-                                  </div>
-                                  <div className="flex justify-end gap-2">
-                                    <button
-                                      type="button"
-                                      className="px-2 py-1 border border-white/20 rounded text-white/70 hover:bg-white/10"
-                                      onClick={() => {
-                                        resetGroupForm();
-                                        setShowCreateGroupForm(false);
-                                      }}
-                                      disabled={groupFormBusy}
-                                    >
-                                      Cancel
-                                    </button>
-                                    <button
-                                      type="submit"
-                                      className="px-2 py-1 border border-sky-300/60 rounded text-white bg-sky-500/40 hover:bg-sky-500/60 disabled:opacity-50"
-                                      disabled={groupFormBusy || !newGroupName.trim()}
-                                    >
-                                      Create
-                                    </button>
-                                  </div>
-                                </form>
-                              )}
-                              {groupState.groups.length > 0 && (
-                                <div className="flex flex-wrap gap-2 text-white/60">
-                                  {groupState.groups.map((group) => (
-                                    <button
-                                      key={group.id}
-                                      className="px-2 py-1 rounded border border-white/20 text-white/80 hover:bg-white/10"
-                                      onClick={() => openGroupChat(group.id)}
-                                    >
-                                      {group.name}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                              {groupState.groups.length === 0 && !showCreateGroupForm && (
-                                <div className="text-white/60">You have no groups yet.</div>
-                              )}
-                            </div>
-
-                            <div className="flex flex-col gap-2 text-xs text-white/70">
-                              <span>Auto group</span>
-                              {groupState.autoRoom?.chat ? (
-                                <div className="flex flex-col gap-2 text-white/80">
-                                  <div>{groupState.autoRoom.chat.name} · {autoRoomMembers.length} people</div>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      className="px-2 py-1 rounded border border-white/20 hover:bg-white/10"
-                                      onClick={() => openAutoChat()}
-                                    >
-                                      Open chat
-                                    </button>
-                                    <button
-                                      className="px-2 py-1 rounded border border-red-400/60 text-red-200 hover:bg-red-500/20"
-                                      onClick={() => void handleLeaveAutoRoom()}
-                                    >
-                                      Leave
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex flex-col gap-2 text-white/80">
-                                  <div>Join a pre-made room with up to 20 creators.</div>
-                                  <button
-                                    className="px-2 py-1 rounded border border-sky-300/60 text-white hover:bg-sky-500/40 disabled:opacity-60"
-                                    onClick={() => void handleJoinAutoRoom()}
-                                    disabled={!friendsState.isAuthenticated || !groupState.isAuthenticated}
-                                  >
-                                    Join auto room
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {socialView.kind === 'dm' && (
-                          <div className="flex flex-col gap-2 flex-1 min-h-0">
-                            <div className="text-xs text-white/70 flex items-center justify-between">
-                              <span>{activePeerLabel ?? 'Direct message'}</span>
-                            </div>
-                            <div className="flex-1 min-h-0">
-                              <FriendMessagesPane
-                                messages={friendsState.dmMessages || []}
-                                activePeerId={socialView.peerId}
-                                currentUserId={myUserId ?? undefined}
-                                meLabel={meDisplayName}
-                                peerLabel={activePeerLabel || 'Friend'}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {socialView.kind === 'group' && (
-                          <div className="flex flex-col gap-2 flex-1 min-h-0">
-                            <div className="flex items-center justify-between text-xs text-white/70">
-                              <span>{activeGroupSummary ? activeGroupSummary.name : 'Select a group to start chatting.'}</span>
-                              {activeGroupSummary && (
-                                <button
-                                  className="px-2 py-1 rounded border border-red-400/60 text-red-200 hover:bg-red-500/20"
-                                  onClick={() => {
-                                    void groupState.leaveGroup(activeGroupSummary.id).then(() => {
-                                      openFriendsSettings();
-                                    });
-                                  }}
-                                >
-                                  Leave group
-                                </button>
-                              )}
-                            </div>
-                            <div className="flex-1 min-h-0">
-                              <GroupMessagesPane
-                                active={Boolean(activeGroupSummary)}
-                                emptyLabel="Select a group to view messages."
-                                messages={groupState.groupMessages}
-                                members={groupState.groupMembers}
-                                currentUserId={myUserId ?? undefined}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {socialView.kind === 'auto' && (
-                          <div className="flex flex-col gap-2 flex-1 min-h-0">
-                            <div className="text-xs text-white/70 flex items-center justify-between">
-                              <span>{groupState.autoRoom?.chat ? groupState.autoRoom.chat.name : 'Auto group lobby'}</span>
-                              {groupState.autoRoom?.chat && (
-                                <span className="text-white/50 text-[10px]">{autoRoomMembers.length} people</span>
-                              )}
-                            </div>
-                            <div className="flex-1 min-h-0">
-                              <GroupMessagesPane
-                                active={Boolean(groupState.autoRoom?.chat)}
-                                emptyLabel="Join the auto room to start chatting."
-                                messages={autoRoomMessages}
-                                members={autoRoomMembers}
-                                currentUserId={myUserId ?? undefined}
-                              />
-                            </div>
-                            {!groupState.autoRoom?.chat && (
-                              <button
-                                className="self-start px-2 py-1 rounded border border-sky-300/60 text-white hover:bg-sky-500/40 disabled:opacity-60"
-                                onClick={() => void handleJoinAutoRoom()}
-                                disabled={!friendsState.isAuthenticated || !groupState.isAuthenticated}
-                              >
-                                Join auto room
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {agentStatus === 'ready' && undoDepth > 1 && (
+      <div className="flex h-full flex-col text-white">
+        <div className="border-b border-white/10 px-4 py-3">
+          <div className="flex items-center gap-2">
+            {navItems.map(({ key, label, active, onClick, icon: Icon }) => (
               <button
-                onClick={handleUndo}
-                className="absolute right-6 bottom-2 z-40 p-3 text-white/70 hover:text-white transition-colors flex items-center gap-2"
-                title="Undo changes"
+                key={key}
+                type="button"
+                onClick={onClick}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${active ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}
+                aria-pressed={active}
+                aria-label={label}
               >
-                <Undo2 className="h-4 w-4" />
-                <span className="text-sm">undo</span>
+                <Icon className="h-4 w-4" />
+                <span>{label}</span>
               </button>
-            )}
-
-            <style jsx>{`
-              .ios-pop { animation: iosPop 420ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: bottom left; }
-              @keyframes iosPop {
-                0% { transform: scale(0.92); opacity: 0; }
-                60% { transform: scale(1.02); opacity: 1; }
-                100% { transform: scale(1); opacity: 1; }
-              }
-              @media (prefers-reduced-motion: reduce) {
-                .ios-pop { animation-duration: 1ms; }
-              }
-            `}</style>
-            <style jsx global>{`
-              .modern-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(56,189,248,0.45) transparent; }
-              .modern-scrollbar::-webkit-scrollbar { width: 9px; height: 9px; }
-              .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
-              .modern-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(56,189,248,0.45); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
-              .modern-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(56,189,248,0.65); }
-            `}</style>
+            ))}
           </div>
-        )}
-
-        {mode === 'visit' && (
-          <div className="px-4 py-3">
-            <div className="font-medium mb-2">Visit Desktops</div>
-            {desktopsLoading && <div className="text-sm text-gray-500">Loading…</div>}
-            {desktopsError && <div className="text-sm text-red-600">{desktopsError}</div>}
-            {!desktopsLoading && !desktopsError && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {desktopsListing.map((d) => (
-                  <div key={d._id} className="border border-white/10 dark:border-white/10 p-2 bg-white text-black hover:bg-white/90 transition-colors">
-                    <div className="flex items-center gap-2">
-                      <div>{d.icon || '🖥️'}</div>
-                      <div className="font-medium truncate" title={d.title}>{d.title}</div>
-                    </div>
-                    {d.description && <div className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 mt-1">{d.description}</div>}
-                    <div className="mt-2 flex items-center gap-2">
-                      <a href={`/d/${d._id}`} className="text-xs px-2 py-1 bg-black text-white">Open</a>
-                      <a href={`/api/visit/desktops/${d._id}/snapshot`} target="_blank" className="text-xs px-2 py-1 border">Download</a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {mode === 'media' && (
-          <MediaPane
-            mediaType={mediaType}
-            setMediaType={setMediaType}
-            loadMedia={loadMedia}
-            loading={busyFlags.loading}
-            error={mediaError}
-            uploadError={uploadError}
-            onFiles={handleUploadFiles}
-            ingestUrl={ingestUrl}
-            setIngestUrl={setIngestUrl}
-            onIngest={handleIngestFromUrl}
-            items={mediaItems}
-            disabled={busyFlags.uploadBusy}
-            formatBytes={formatBytes}
-          />
-        )}
+        </div>
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {mode === 'media'
+            ? mediaPane
+            : mode === 'visit'
+              ? visitPane
+              : chatPane}
+        </div>
       </div>
     </AgentBarShell>
   );

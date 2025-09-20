@@ -13,7 +13,7 @@ export default function Home() {
   return (
     <WebContainerProvider>
       <ScreensProvider defaultIndex={1} screenCount={2}>
-        <main className="h-screen w-screen relative">
+        <main className="relative h-screen w-screen">
           <ScreenCarousel>
             {/* Screen 0: App Store */}
             <AppStoreScreen />
@@ -39,11 +39,9 @@ export default function Home() {
               </SignInButton>
             </Unauthenticated>
           </div>
-          
-          {/* AI Agent Bar - always visible across all screens */}
-          <div className="absolute bottom-2 left-0 right-0 z-50">
-            <AIAgentBar />
-          </div>
+
+          {/* AI Agent Bar - fixed vertical sidebar */}
+          <AIAgentBar />
         </main>
       </ScreensProvider>
     </WebContainerProvider>
