@@ -306,10 +306,10 @@ export async function POST(req: Request) {
   const toolCallTimings = new Map<string, number>();
 
   const result = streamText({
-    model: 'alibaba/qwen3-coder',
+    model: 'moonshotai/kimi-k2-0905',
     providerOptions: {
       gateway: {
-        order: ['cerebras', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
+        order: ['groq', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
       },
       openai: {
         reasoningEffort: 'high',

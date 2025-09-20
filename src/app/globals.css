@@ -129,9 +129,9 @@
 /* Glass and gradient utilities (inspired by fromyou story AppShell aesthetics) */
 @layer utilities {
   .glass-primary {
-    /* Darker, denser glass (collapsed surfaces) */
-    background: color-mix(in oklab, black 72%, white 0%);
-    background: rgba(8, 12, 24, 0.58);
+    /* Even brighter, denser glass (collapsed surfaces) */
+    background: color-mix(in oklab, black 45%, white 0%);
+    background: rgba(16, 24, 40, 0.32);
     border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow:
       0 0 0 1px rgba(56,189,248,0.35),
