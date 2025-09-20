@@ -360,9 +360,14 @@ export default function AgentDashboardPage() {
     }
 
     const events = Array.isArray(timeline.events) ? [...timeline.events] : [];
+    // Sort chronologically by timestamp to reflect the real emission order; fall back to
+    // sequence/_id when timestamps collide or are missing.
     events.sort((a, b) => {
+      const aTimestamp = typeof a.timestamp === 'number' ? a.timestamp : Number.MIN_SAFE_INTEGER;
+      const bTimestamp = typeof b.timestamp === 'number' ? b.timestamp : Number.MIN_SAFE_INTEGER;
+      if (aTimestamp !== bTimestamp) return aTimestamp - bTimestamp;
       if (a.sequence !== b.sequence) return a.sequence - b.sequence;
-      return a.timestamp - b.timestamp;
+      return a._id.localeCompare(b._id);
     });
 
     for (const event of events) {
