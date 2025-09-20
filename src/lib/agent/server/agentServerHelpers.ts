@@ -70,6 +70,42 @@ export function sanitizeToolInput(toolName: string, input: Record<string, unknow
   }
 }
 
+const MAX_SUMMARY_CHARS = 800;
+
+export function summarizeToolResult(toolName: string, value: unknown): Record<string, unknown> {
+  if (value === undefined) return { value: undefined };
+  if (value === null) return { value: null };
+  if (typeof value === 'string') {
+    return {
+      valueType: 'string',
+      preview: value.slice(0, MAX_SUMMARY_CHARS),
+      charCount: value.length,
+      truncated: value.length > MAX_SUMMARY_CHARS,
+    };
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return { valueType: typeof value, value };
+  }
+
+  try {
+    const serialized = JSON.stringify(value);
+    return {
+      valueType: 'json',
+      preview: serialized.slice(0, MAX_SUMMARY_CHARS),
+      charCount: serialized.length,
+      truncated: serialized.length > MAX_SUMMARY_CHARS,
+      keys: typeof value === 'object' && value !== null ? Object.keys(value as Record<string, unknown>) : undefined,
+      toolName,
+    };
+  } catch (error) {
+    return {
+      valueType: 'unknown',
+      error: error instanceof Error ? error.message : 'Failed to serialize tool result',
+      toolName,
+    };
+  }
+}
+
 export async function getConvexClientOptional() {
   try {
     const url = process.env.NEXT_PUBLIC_CONVEX_URL;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
+import type { MutableRefObject, Dispatch, SetStateAction, FormEvent } from 'react';
 import type { UIMessage } from 'ai';
 import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
 import { useThreads } from './useThreads';
@@ -23,7 +23,11 @@ export type AppRegistryEntry = {
 };
 
 type WebContainerFns = {
+  mkdir: (path: string, recursive?: boolean) => Promise<void>;
+  writeFile: (path: string, content: string) => Promise<void>;
   readFile: (path: string, encoding?: 'utf-8' | 'base64') => Promise<string>;
+  readdirRecursive: (path?: string, maxDepth?: number) => Promise<{ path: string; type: 'file' | 'dir' }[]>;
+  remove: (path: string, opts?: { recursive?: boolean }) => Promise<void>;
   spawn: (command: string, args?: string[], opts?: { cwd?: string }) => Promise<{ exitCode: number; output: string }>;
 };
 
@@ -35,13 +39,13 @@ type UseAgentControllerArgs = {
   forceFollow: () => void;
   projectAttachmentsToDurable: (attachments: Attachment[]) => Attachment[];
   busyUpload: boolean;
-  loadMedia: (args: { limit?: number }) => Promise<void> | void;
+  loadMedia: () => Promise<void>;
   instanceRef: MutableRefObject<WebContainerAPI | null>;
-  fnsRef: MutableRefObject<WebContainerFns & Record<string, unknown>>;
+  fnsRef: MutableRefObject<WebContainerFns>;
 };
 
 type AgentComposerHandlers = {
-  handleSubmit: (event: React.FormEvent) => Promise<void>;
+  handleSubmit: (event: FormEvent<Element>) => void;
 };
 
 type AgentThreadsState = ReturnType<typeof useThreads> & {
@@ -95,6 +99,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     startBlankThread,
     ensureActiveThread,
     closeThread,
+    deleteThread,
     isAuthenticated: isChatAuthenticated,
   } = useThreads();
 
@@ -323,100 +328,102 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
 
   const sendMessage = useCallback((args: { text: string }) => sendMessageRaw(args), [sendMessageRaw]);
 
-  const handleSubmit = useCallback(async (event: React.FormEvent) => {
+  const handleSubmit = useCallback((event: FormEvent<Element>) => {
     event.preventDefault();
-    const trimmedInput = input.trim();
-    if (!trimmedInput) return;
+    void (async () => {
+      const trimmedInput = input.trim();
+      if (!trimmedInput) return;
 
-    const attachmentsForDisplay = (attachmentsRef.current || attachments).map((a) => ({ ...a }));
-    const optimisticId = `optimistic_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const optimisticEntry: OptimisticChatMessage = {
-      id: optimisticId,
-      role: 'user',
-      parts: [{ type: 'text', text: trimmedInput }],
-      metadata: { optimistic: true, optimisticAttachments: attachmentsForDisplay },
-    };
-    setOptimisticMessages((prev) => [...prev, optimisticEntry]);
-    forceFollow();
+      const attachmentsForDisplay = (attachmentsRef.current || attachments).map((a) => ({ ...a }));
+      const optimisticId = `optimistic_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const optimisticEntry: OptimisticChatMessage = {
+        id: optimisticId,
+        role: 'user',
+        parts: [{ type: 'text', text: trimmedInput }],
+        metadata: { optimistic: true, optimisticAttachments: attachmentsForDisplay },
+      };
+      setOptimisticMessages((prev) => [...prev, optimisticEntry]);
+      forceFollow();
 
-    const removeOptimistic = () => {
-      setOptimisticMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-    };
-
-    let userText = trimmedInput;
-
-    const waitForDurable = async (timeoutMs = 6000, intervalMs = 80) => {
-      const started = Date.now();
-      while (Date.now() - started < timeoutMs) {
-        const curr = attachmentsRef.current || [];
-        const hasDurable = curr.some(a => /^https?:\/\//i.test(a.publicUrl));
-        const hasBlobOnly = curr.length > 0 && curr.every(a => /^blob:/i.test(a.publicUrl));
-        const stillUploading = uploadBusyRef.current;
-        if (hasDurable || (!hasBlobOnly && !stillUploading)) break;
-        await new Promise(r => setTimeout(r, intervalMs));
-      }
-    };
-
-    try {
-      if (!activeThreadIdImmediateRef.current && isChatAuthenticated) {
-        skipOptimisticClearRef.current = true;
-        const ensured = await ensureActiveThread({ titleHint: trimmedInput });
-        if (ensured) {
-          activeThreadIdImmediateRef.current = ensured;
-          await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
-        } else {
-          skipOptimisticClearRef.current = false;
-        }
-      }
-
-      await waitForDurable();
-      const snapshot = projectAttachmentsToDurable((attachmentsRef.current || attachments).map((a) => ({ ...a })));
-
-      if (snapshot.length > 0) {
-        const durable = snapshot.filter(a => /^https?:\/\//i.test(a.publicUrl));
-        if (durable.length > 0) {
-          const lines = durable.map(a => `Attached ${a.contentType || 'file'}: ${a.publicUrl}`);
-          userText += '\n' + lines.join('\n');
-        }
-      }
-
-      console.log('📤 [CHAT] Sending with attachments snapshot:', snapshot);
-
-      pendingAttachmentsRef.current = snapshot;
-      setLastSentAttachments(snapshot);
-
-      let sendPromise: Promise<void> | void;
-      try {
-        sendPromise = sendMessage({ text: userText });
-      } catch (error) {
-        pendingAttachmentsRef.current = null;
-        removeOptimistic();
-        throw error;
-      }
-
-      setInput('');
-      setAttachments([]);
-      const finalize = () => {
-        removeOptimistic();
-        setTimeout(() => { pendingAttachmentsRef.current = null; }, 1500);
+      const removeOptimistic = () => {
+        setOptimisticMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       };
 
-      if (sendPromise && typeof sendPromise.then === 'function') {
-        sendPromise
-          .then(() => finalize())
-          .catch((error) => {
-            console.error('[CHAT] sendMessage failed', error);
-            finalize();
-          });
-      } else {
-        finalize();
+      let userText = trimmedInput;
+
+      const waitForDurable = async (timeoutMs = 6000, intervalMs = 80) => {
+        const started = Date.now();
+        while (Date.now() - started < timeoutMs) {
+          const curr = attachmentsRef.current || [];
+          const hasDurable = curr.some(a => /^https?:\/\//i.test(a.publicUrl));
+          const hasBlobOnly = curr.length > 0 && curr.every(a => /^blob:/i.test(a.publicUrl));
+          const stillUploading = uploadBusyRef.current;
+          if (hasDurable || (!hasBlobOnly && !stillUploading)) break;
+          await new Promise(r => setTimeout(r, intervalMs));
+        }
+      };
+
+      try {
+        if (!activeThreadIdImmediateRef.current && isChatAuthenticated) {
+          skipOptimisticClearRef.current = true;
+          const ensured = await ensureActiveThread({ titleHint: trimmedInput });
+          if (ensured) {
+            activeThreadIdImmediateRef.current = ensured;
+            await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+          } else {
+            skipOptimisticClearRef.current = false;
+          }
+        }
+
+        await waitForDurable();
+        const snapshot = projectAttachmentsToDurable((attachmentsRef.current || attachments).map((a) => ({ ...a })));
+
+        if (snapshot.length > 0) {
+          const durable = snapshot.filter(a => /^https?:\/\//i.test(a.publicUrl));
+          if (durable.length > 0) {
+            const lines = durable.map(a => `Attached ${a.contentType || 'file'}: ${a.publicUrl}`);
+            userText += '\n' + lines.join('\n');
+          }
+        }
+
+        console.log('📤 [CHAT] Sending with attachments snapshot:', snapshot);
+
+        pendingAttachmentsRef.current = snapshot;
+        setLastSentAttachments(snapshot);
+
+        let sendPromise: Promise<void> | void;
+        try {
+          sendPromise = sendMessage({ text: userText });
+        } catch (error) {
+          pendingAttachmentsRef.current = null;
+          removeOptimistic();
+          throw error;
+        }
+
+        setInput('');
+        setAttachments([]);
+        const finalize = () => {
+          removeOptimistic();
+          setTimeout(() => { pendingAttachmentsRef.current = null; }, 1500);
+        };
+
+        if (sendPromise && typeof sendPromise.then === 'function') {
+          sendPromise
+            .then(() => finalize())
+            .catch((error) => {
+              console.error('[CHAT] sendMessage failed', error);
+              finalize();
+            });
+        } else {
+          finalize();
+        }
+      } catch (error) {
+        console.error('[CHAT] Failed to prepare message', error);
+        removeOptimistic();
+        pendingAttachmentsRef.current = null;
+        skipOptimisticClearRef.current = false;
       }
-    } catch (error) {
-      console.error('[CHAT] Failed to prepare message', error);
-      removeOptimistic();
-      pendingAttachmentsRef.current = null;
-      skipOptimisticClearRef.current = false;
-    }
+    })();
   }, [attachments, ensureActiveThread, forceFollow, input, isChatAuthenticated, projectAttachmentsToDurable, sendMessage, setAttachments, setInput]);
 
   const threadsState = useMemo<AgentThreadsState>(() => ({
@@ -432,6 +439,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     startBlankThread,
     ensureActiveThread,
     closeThread,
+    deleteThread,
     isAuthenticated: isChatAuthenticated,
     showThreadHistory,
     setShowThreadHistory,
@@ -449,6 +457,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     startBlankThread,
     ensureActiveThread,
     closeThread,
+    deleteThread,
     isChatAuthenticated,
     showThreadHistory,
   ]);

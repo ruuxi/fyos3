@@ -1,4 +1,7 @@
 import { convertToModelMessages, streamText, UIMessage, stepCountIs, generateText } from 'ai';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { createHash } from 'crypto';
+import { auth } from '@clerk/nextjs/server';
 // z is used in tool schemas but not directly here
 import {
   TOOL_NAMES,
@@ -22,8 +25,25 @@ import {
 } from '@/lib/prompts';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { api as convexApi } from '../../../../convex/_generated/api';
-import { getInstalledAppNames, sanitizeToolInput, getConvexClientOptional } from '@/lib/agent/server/agentServerHelpers';
+import { getInstalledAppNames, sanitizeToolInput, getConvexClientOptional, summarizeToolResult } from '@/lib/agent/server/agentServerHelpers';
 import { buildServerTools } from '@/lib/agent/server/agentServerTools';
+import { AgentEventEmitter } from '@/lib/agent/server/agentEventEmitter';
+import type { AgentUsageEstimates, AgentMessagePreview } from '@/lib/agent/metrics/types';
+import {
+  estimateTokensFromText,
+  estimateCostUSD,
+  mergeUsageEstimates,
+  toUsageEstimates,
+  estimateTokensFromJson,
+} from '@/lib/agent/metrics/tokenEstimation';
+
+const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY ?? '',
+  headers: {
+    'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER ?? process.env.NEXT_PUBLIC_APP_URL ?? 'https://fromyou.studio',
+    'X-Title': process.env.OPENROUTER_APP_TITLE ?? 'FromYou Desktop',
+  },
+});
 
 // Some tool actions (like package installs) may take longer than 30s
 export const maxDuration = 300;
@@ -69,6 +89,16 @@ interface StepEventSummary {
 }
 
 type StreamFinishEvent = StepEventSummary & { steps?: StepEventSummary[] };
+
+const computeRequestId = (messages: SanitizedMessage[], fallback: string): string => {
+  try {
+    const serialized = JSON.stringify(messages);
+    const hash = createHash('sha1').update(serialized).digest('hex');
+    return `req_${hash.slice(0, 16)}`;
+  } catch {
+    return fallback;
+  }
+};
 
 const isAttachmentHint = (value: AttachmentHint | unknown): value is AttachmentHint => {
   if (!value || typeof value !== 'object') return false;
@@ -116,6 +146,12 @@ const hasErrorField = (value: unknown): value is { error: unknown } => {
 };
 
 export async function POST(req: Request) {
+  let userIdentifier: string | undefined;
+  try {
+    const authResult = await auth();
+    userIdentifier = authResult?.userId ?? undefined;
+  } catch {}
+
   const body: unknown = await req.json();
   const payload = body as Partial<AgentPostPayload>;
   const messages: UIMessage[] = Array.isArray(payload.messages) ? payload.messages : [];
@@ -182,6 +218,7 @@ export async function POST(req: Request) {
 
   // Generate session ID for this conversation
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  let sessionStartedAt: number | null = null;
 
   // Sanitize/dedupe messages to avoid downstream gateway duplicate-id issues
   const seenHashes = new Set<string>();
@@ -198,6 +235,28 @@ export async function POST(req: Request) {
       sanitizedMessages.push(message);
     }
   }
+
+  const messagePreviews: AgentMessagePreview[] = sanitizedMessages.map((message) => {
+    const text = extractTextFromMessage(message as MessageEnvelope);
+    const charCount = text.length;
+    const textPreview = charCount > 200 ? `${text.slice(0, 200)}...` : (text || '[non-text content]');
+    return {
+      role: message.role,
+      textPreview,
+      charCount,
+      toolCallCount: countToolCalls(message as MessageEnvelope),
+    };
+  });
+
+  const requestId = computeRequestId(sanitizedMessages, sessionId);
+
+  const pendingMessageEvents: Array<{
+    role: 'user' | 'assistant' | 'system';
+    messageId: string;
+    content: string;
+    stepIndex?: number;
+    timestamp: number;
+  }> = [];
 
   console.log('🔵 [AGENT] Incoming request with messages:', sanitizedMessages.map(message => {
     const text = extractTextFromMessage(message);
@@ -268,6 +327,7 @@ export async function POST(req: Request) {
       : `user_${Date.now()}`;
     await agentLogger.logMessage(sessionId, messageId, 'user', content);
     await appendMessageToThread('user', content, personaMode ? 'persona' : 'agent');
+    pendingMessageEvents.push({ role: 'user', messageId, content, timestamp: Date.now() });
   }
   if (personaMode) {
     const personaSystem = PERSONA_PROMPT;
@@ -388,23 +448,87 @@ export async function POST(req: Request) {
 
   // Use all available tools
   const tools = allTools;
+  const modelId = 'openai/gpt-5';
+  const availableToolNames = Object.keys(tools);
 
-  // Track tool call timings to avoid duplicate logging
-  const toolCallTimings = new Map<string, number>();
+  const sessionStartTimestamp = Date.now();
+  sessionStartedAt = sessionStartTimestamp;
+
+  const eventEmitter = new AgentEventEmitter({
+    sessionId,
+    requestId,
+    model: modelId,
+    threadId: threadIdRaw,
+    personaMode,
+    userIdentifier,
+    toolNames: availableToolNames,
+    sessionStartedAt: sessionStartTimestamp,
+  });
+
+  void eventEmitter.emit('session_started', {
+    personaMode,
+    attachmentsCount: hints.length,
+    messagePreviews,
+    toolNames: availableToolNames,
+    userIdentifier,
+    sessionStartedAt: sessionStartTimestamp,
+  }, { dedupeKey: `${sessionId}:session_started`, timestamp: sessionStartTimestamp });
+
+  const emitMessageEvent = (
+    role: 'user' | 'assistant' | 'system',
+    messageId: string,
+    content: string,
+    step?: number,
+    timestamp?: number,
+  ) => {
+    const preview = content.length > 600 ? `${content.slice(0, 600)}...` : content;
+    const estimate = estimateTokensFromText(content, modelId);
+    const options = typeof timestamp === 'number' ? { timestamp } : undefined;
+    void eventEmitter.emit('message_logged', {
+      role,
+      messageId,
+      textPreview: preview,
+      charCount: content.length,
+      tokenEstimate: estimate.tokens,
+      stepIndex: step,
+    }, options);
+  };
+
+  if (pendingMessageEvents.length > 0) {
+    for (const entry of pendingMessageEvents) {
+      emitMessageEvent(entry.role, entry.messageId, entry.content, entry.stepIndex, entry.timestamp);
+    }
+    pendingMessageEvents.length = 0;
+  }
+
+  let stepIndex = 0;
+  let sessionUsageActual: AgentUsageEstimates = {};
+  let sessionUsageEstimated: AgentUsageEstimates = {};
+  let totalEstimatedCostUSD = 0;
+  let totalActualCostUSD = 0;
+  let totalToolCalls = 0;
+
+  type InflightToolCall = {
+    toolName: string;
+    stepIndex: number;
+    startedAt: number;
+    promptTokens: number;
+    inputCharCount: number;
+    sanitizedInput: Record<string, unknown>;
+    rawInput: unknown;
+  };
+
+  const inflightToolCalls = new Map<string, InflightToolCall>();
+  const processedToolResults = new Set<string>();
 
   const result = streamText({
-    model: 'alibaba/qwen3-coder',
-    providerOptions: {
-      gateway: {
-        order: ['cerebras', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
-      },
-      openai: {
-        reasoningEffort: 'high',
-      },
-    },
+    model: openrouter('openai/gpt-5'),
     messages: convertToModelMessages(sanitizedMessages),
     stopWhen: stepCountIs(15),
     onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }: StepEventSummary) => {
+      const currentStepIndex = stepIndex;
+      const now = Date.now();
+
       console.log('📊 [USAGE-STEP] Step finished:', {
         finishReason,
         textLength: text?.length || 0,
@@ -418,36 +542,126 @@ export async function POST(req: Request) {
           cachedInputTokens: usage.cachedInputTokens,
         } : null,
       });
-      
-      // Track start times for tool calls (for timing)
+
+      let stepUsage: AgentUsageEstimates | undefined;
+      if (usage && (
+        usage.inputTokens ||
+        usage.outputTokens ||
+        usage.totalTokens ||
+        usage.reasoningTokens ||
+        usage.cachedInputTokens
+      )) {
+        stepUsage = {
+          promptTokens: usage.inputTokens,
+          completionTokens: usage.outputTokens,
+          totalTokens: usage.totalTokens,
+          reasoningTokens: usage.reasoningTokens,
+          cachedInputTokens: usage.cachedInputTokens,
+        };
+        sessionUsageActual = mergeUsageEstimates(sessionUsageActual, stepUsage);
+      }
+
       if (toolCalls?.length) {
         console.log('🔧 [USAGE-STEP] Tool calls:', toolCalls.map((tc) => ({
           name: tc.toolName,
           id: tc.toolCallId ? tc.toolCallId.slice(0, 8) : 'unknown',
         })));
 
-        // Record start times for duration tracking
         for (const tc of toolCalls) {
-          if (tc.toolCallId) {
-            toolCallTimings.set(tc.toolCallId, Date.now());
-          }
+          const toolName = tc.toolName || 'unknown';
+          const toolCallId = tc.toolCallId ?? `tool_${currentStepIndex}_${Date.now()}`;
+          const rawInput = (tc.args ?? tc.input ?? {}) as Record<string, unknown>;
+          const sanitizedInput = sanitizeToolInput(toolName, rawInput);
+          const inputEstimate = estimateTokensFromJson(rawInput, modelId);
+          inflightToolCalls.set(toolCallId, {
+            toolName,
+            stepIndex: currentStepIndex,
+            startedAt: now,
+            promptTokens: inputEstimate.tokens,
+            inputCharCount: inputEstimate.charCount,
+            sanitizedInput,
+            rawInput,
+          });
+
+          void eventEmitter.emit('tool_call_outbound', {
+            stepIndex: currentStepIndex,
+            toolCallId,
+            toolName,
+            argsSummary: {
+              sanitized: sanitizedInput,
+              charCount: inputEstimate.charCount,
+              tokenEstimate: inputEstimate.tokens,
+            },
+          }, { dedupeKey: `${toolCallId}:outbound` });
+
+          void eventEmitter.emit('tool_call_started', {
+            stepIndex: currentStepIndex,
+            toolCallId,
+            toolName,
+            inputSummary: {
+              sanitized: sanitizedInput,
+              charCount: inputEstimate.charCount,
+              tokenEstimate: inputEstimate.tokens,
+            },
+          }, { dedupeKey: `${toolCallId}:started` });
         }
       }
 
-      // Log completed tool calls with results and timing
       if (toolResults?.length) {
         for (const result of toolResults) {
-          const toolCallId = result.toolCallId ?? `tool_${Date.now()}`;
-          const startTime = toolCallTimings.get(toolCallId) ?? Date.now();
-          const duration = Date.now() - startTime;
-          
-          // Sanitize large content from tool inputs before logging
-          const rawInput = (result.args ?? result.input ?? {}) as Record<string, unknown>;
-          const sanitizedInput = sanitizeToolInput(result.toolName || 'unknown', rawInput);
+          const toolName = result.toolName || 'unknown';
+          const toolCallId = result.toolCallId ?? `tool_${currentStepIndex}_${Date.now()}`;
+          if (processedToolResults.has(toolCallId)) continue;
+          processedToolResults.add(toolCallId);
+
+          const tracked = inflightToolCalls.get(toolCallId);
+          const startTime = tracked?.startedAt ?? now;
+          const duration = Math.max(0, Date.now() - startTime);
+          const rawInputValue = tracked?.rawInput ?? (result.args ?? result.input ?? {});
+          const rawInputObject = typeof rawInputValue === 'object' && rawInputValue !== null
+            ? rawInputValue as Record<string, unknown>
+            : {};
+          const sanitizedInput = tracked?.sanitizedInput ?? sanitizeToolInput(toolName, rawInputObject);
+          const inputEstimate = tracked
+            ? { tokens: tracked.promptTokens, charCount: tracked.inputCharCount }
+            : estimateTokensFromJson(rawInputValue, modelId);
+
+          const outputEstimate = estimateTokensFromJson(result.result, modelId);
+          const usageEstimate = toUsageEstimates(
+            inputEstimate.tokens,
+            outputEstimate.tokens,
+            { charCount: inputEstimate.charCount + outputEstimate.charCount },
+          );
+
+          sessionUsageEstimated = mergeUsageEstimates(sessionUsageEstimated, usageEstimate);
+          const costUSD = estimateCostUSD(usageEstimate, modelId);
+          totalEstimatedCostUSD = Number((totalEstimatedCostUSD + costUSD).toFixed(6));
+          totalToolCalls += 1;
+
+          const sanitizedResult = summarizeToolResult(toolName, result.result);
+          if (result.state !== undefined) {
+            sanitizedResult.state = summarizeToolResult(`${toolName}:state`, result.state);
+          }
+
+          void eventEmitter.emit('tool_call_inbound', {
+            stepIndex: tracked?.stepIndex ?? currentStepIndex,
+            toolCallId,
+            toolName,
+            durationMs: duration,
+            resultSummary: {
+              sanitized: sanitizedResult,
+              charCount: outputEstimate.charCount,
+              tokenEstimate: outputEstimate.tokens,
+              isError: result.isError ?? false,
+              errorMessage: result.errorMessage,
+            },
+            tokenUsage: usageEstimate,
+            costUSD,
+          }, { dedupeKey: `${toolCallId}:inbound` });
 
           await agentLogger.logToolCall(
             sessionId,
-            result.toolName || 'unknown',
+            toolName,
             toolCallId,
             sanitizedInput,
             {
@@ -458,14 +672,51 @@ export async function POST(req: Request) {
             },
             duration
           );
-          
-          // Clean up timing tracking
-          toolCallTimings.delete(toolCallId);
+
+          void eventEmitter.emit('tool_call_finished', {
+            stepIndex: tracked?.stepIndex ?? currentStepIndex,
+            toolCallId,
+            toolName,
+            durationMs: duration,
+            inputSummary: {
+              sanitized: sanitizedInput,
+              charCount: inputEstimate.charCount,
+              tokenEstimate: inputEstimate.tokens,
+            },
+            resultSummary: {
+              sanitized: sanitizedResult,
+              charCount: outputEstimate.charCount,
+              tokenEstimate: outputEstimate.tokens,
+              isError: result.isError ?? false,
+              errorMessage: result.errorMessage,
+            },
+            tokenUsage: usageEstimate,
+            costUSD,
+          }, { dedupeKey: `${toolCallId}:finished` });
+
+          inflightToolCalls.delete(toolCallId);
         }
       }
+
+      const textPreview = text && text.length > 600 ? `${text.slice(0, 600)}...` : text ?? undefined;
+
+      void eventEmitter.emit('step_finished', {
+        stepIndex: currentStepIndex,
+        finishReason,
+        textLength: text?.length || 0,
+        toolCallsCount: toolCalls?.length || 0,
+        toolResultsCount: toolResults?.length || 0,
+        usage: stepUsage,
+        generatedTextPreview: textPreview,
+      }, { dedupeKey: `${sessionId}:step:${currentStepIndex}` });
+
+      stepIndex += 1;
     },
     onFinish: async (event: StreamFinishEvent) => {
-      // Enhanced usage logging
+      const finishedAt = Date.now();
+      const sessionStart = sessionStartedAt ?? finishedAt;
+      const sessionDurationMs = finishedAt - sessionStart;
+
       console.log('🎯 [AI] Response finished:', {
         finishReason: event.finishReason,
         textLength: event.text?.length || 0,
@@ -474,16 +725,13 @@ export async function POST(req: Request) {
         stepCount: event.steps?.length || 0,
       });
 
-      // Log the complete assistant response including tool calls
       if (event.text) {
-        await agentLogger.logMessage(sessionId, `assistant_${Date.now()}`, 'assistant', event.text);
+        const assistantMessageId = `assistant_${Date.now()}`;
+        await agentLogger.logMessage(sessionId, assistantMessageId, 'assistant', event.text);
         await appendMessageToThread('assistant', event.text, 'agent');
+        emitMessageEvent('assistant', assistantMessageId, event.text, stepIndex, finishedAt);
       }
 
-      // Tool calls are now logged in onStepFinish with proper timing and results
-      // No need to duplicate logging here
-
-      // Detailed token usage logging
       if (event.usage) {
         console.log('📊 [USAGE-TOTAL] Token consumption:', {
           inputTokens: event.usage.inputTokens || 0,
@@ -493,28 +741,33 @@ export async function POST(req: Request) {
           cachedInputTokens: event.usage.cachedInputTokens || 0,
         });
 
-        // Calculate cost estimates based on model pricing
-        // qwen3-coder: $2.00 per million tokens (input and output)
-        const inputCostPerMillion = 2.00; // $2.00 per 1M input tokens
-        const outputCostPerMillion = 2.00; // $2.00 per 1M output tokens
-        const estimatedCost = 
-          ((event.usage.inputTokens || 0) / 1000000) * inputCostPerMillion +
-          ((event.usage.outputTokens || 0) / 1000000) * outputCostPerMillion;
-        
-        console.log('💰 [USAGE-COST] qwen3-coder estimated cost: $' + estimatedCost.toFixed(6));
-        
-        // Log token usage and cost to file
+        const finalUsage: AgentUsageEstimates = {
+          promptTokens: event.usage.inputTokens ?? undefined,
+          completionTokens: event.usage.outputTokens ?? undefined,
+          totalTokens: event.usage.totalTokens ?? undefined,
+          reasoningTokens: event.usage.reasoningTokens ?? undefined,
+          cachedInputTokens: event.usage.cachedInputTokens ?? undefined,
+        };
+
+        sessionUsageActual = finalUsage;
+        const actualCost = estimateCostUSD(finalUsage, modelId);
+        totalActualCostUSD = Number(actualCost.toFixed(6));
+
+        console.log('💰 [USAGE-COST] Estimated cost:', {
+          modelId,
+          costUSD: actualCost.toFixed(6),
+        });
+
         await agentLogger.logTokenUsage(
           sessionId,
           event.usage.inputTokens || 0,
           event.usage.outputTokens || 0,
           event.usage.totalTokens || 0,
-          'qwen3-coder',
-          estimatedCost
+          modelId,
+          actualCost
         );
       }
 
-      // Log step-by-step breakdown if multiple steps
       if (event.steps && event.steps.length > 1) {
         console.log('📈 [USAGE-STEPS] Step breakdown:');
         event.steps.forEach((step, index) => {
@@ -522,7 +775,6 @@ export async function POST(req: Request) {
         });
       }
 
-      // Console logging for development (tool calls already logged in onStepFinish)
       if (event.toolCalls?.length) {
         console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc) => ({
           name: tc.toolName,
@@ -538,6 +790,91 @@ export async function POST(req: Request) {
           id: tr.toolCallId ? tr.toolCallId.slice(0, 8) : 'unknown',
         })));
       }
+
+      if (inflightToolCalls.size > 0) {
+        for (const [toolCallId, tracked] of inflightToolCalls.entries()) {
+          const duration = Math.max(0, finishedAt - tracked.startedAt);
+          const usageEstimate = toUsageEstimates(tracked.promptTokens, 0, {
+            charCount: tracked.inputCharCount,
+          });
+          sessionUsageEstimated = mergeUsageEstimates(sessionUsageEstimated, usageEstimate);
+          const costUSD = estimateCostUSD(usageEstimate, modelId);
+          totalEstimatedCostUSD = Number((totalEstimatedCostUSD + costUSD).toFixed(6));
+          totalToolCalls += 1;
+
+          const incompleteSummary = {
+            valueType: 'incomplete',
+            message: 'Tool call ended without emitted result',
+          } as Record<string, unknown>;
+
+          void eventEmitter.emit('tool_call_inbound', {
+            stepIndex: tracked.stepIndex,
+            toolCallId,
+            toolName: tracked.toolName,
+            durationMs: duration,
+            resultSummary: {
+              sanitized: incompleteSummary,
+              charCount: 0,
+              tokenEstimate: 0,
+              isError: true,
+              errorMessage: 'Tool call ended without result before session finished',
+            },
+            tokenUsage: usageEstimate,
+            costUSD,
+          }, { dedupeKey: `${toolCallId}:inbound` });
+
+          await agentLogger.logToolCall(
+            sessionId,
+            tracked.toolName,
+            toolCallId,
+            tracked.sanitizedInput,
+            {
+              result: null,
+              state: { incomplete: true },
+              isError: true,
+              errorMessage: 'Tool call ended without result before session finished',
+            },
+            duration
+          );
+
+          void eventEmitter.emit('tool_call_finished', {
+            stepIndex: tracked.stepIndex,
+            toolCallId,
+            toolName: tracked.toolName,
+            durationMs: duration,
+            inputSummary: {
+              sanitized: tracked.sanitizedInput,
+              charCount: tracked.inputCharCount,
+              tokenEstimate: tracked.promptTokens,
+            },
+            resultSummary: {
+              sanitized: incompleteSummary,
+              charCount: 0,
+              tokenEstimate: 0,
+              isError: true,
+              errorMessage: 'Tool call ended without result before session finished',
+            },
+            tokenUsage: usageEstimate,
+            costUSD,
+          }, { dedupeKey: `${toolCallId}:finished` });
+        }
+        inflightToolCalls.clear();
+      }
+
+      const hasActualUsage = Object.values(sessionUsageActual).some((value) => typeof value === 'number' && value > 0);
+
+      void eventEmitter.emit('session_finished', {
+        finishReason: event.finishReason,
+        stepCount: stepIndex,
+        toolCallCount: totalToolCalls,
+        sessionDurationMs,
+        estimatedUsage: sessionUsageEstimated,
+        actualUsage: hasActualUsage ? sessionUsageActual : undefined,
+        estimatedCostUSD: Number(totalEstimatedCostUSD.toFixed(6)),
+        actualCostUSD: totalActualCostUSD > 0 ? totalActualCostUSD : undefined,
+      }, { dedupeKey: `${sessionId}:session_finished` });
+
+      await eventEmitter.flush();
     },
     system: systemPrompt,
     tools,

@@ -198,4 +198,95 @@ export default defineSchema({
   })
     .index("by_chat", ["chatId"]) 
     .index("by_chat_createdAt", ["chatId", "createdAt"]),
+
+  agent_sessions: defineTable({
+    sessionId: v.string(),
+    requestId: v.string(),
+    userIdentifier: v.optional(v.string()),
+    threadId: v.optional(v.string()),
+    model: v.optional(v.string()),
+    personaMode: v.optional(v.boolean()),
+    toolNames: v.optional(v.array(v.string())),
+    attachmentsCount: v.optional(v.number()),
+    messagePreviews: v.optional(v.any()),
+    sessionStartedAt: v.number(),
+    sessionFinishedAt: v.optional(v.number()),
+    stepCount: v.optional(v.number()),
+    toolCallCount: v.optional(v.number()),
+    estimatedUsage: v.optional(v.any()),
+    actualUsage: v.optional(v.any()),
+    estimatedCostUSD: v.optional(v.number()),
+    actualCostUSD: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_sessionId", ["sessionId"]) 
+    .index("by_requestId", ["requestId"]) 
+    .index("by_createdAt", ["createdAt"]) 
+    .index("by_user", ["userIdentifier", "createdAt"]),
+
+  agent_steps: defineTable({
+    sessionId: v.string(),
+    requestId: v.string(),
+    stepIndex: v.number(),
+    timestamp: v.number(),
+    finishReason: v.optional(v.string()),
+    textLength: v.number(),
+    toolCallsCount: v.number(),
+    toolResultsCount: v.number(),
+    usage: v.optional(v.any()),
+    generatedTextPreview: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_session_step", ["sessionId", "stepIndex"]) 
+    .index("by_session", ["sessionId"]) 
+    .index("by_timestamp", ["timestamp"]),
+
+  agent_tool_calls: defineTable({
+    sessionId: v.string(),
+    requestId: v.string(),
+    toolCallId: v.string(),
+    toolName: v.string(),
+    stepIndex: v.number(),
+    status: v.string(),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+    inputSummary: v.optional(v.any()),
+    resultSummary: v.optional(v.any()),
+    tokenUsage: v.optional(v.any()),
+    costUSD: v.optional(v.number()),
+    isError: v.optional(v.boolean()),
+    outboundSequence: v.optional(v.number()),
+    outboundAt: v.optional(v.number()),
+    outboundPayload: v.optional(v.any()),
+    inboundSequence: v.optional(v.number()),
+    inboundAt: v.optional(v.number()),
+    inboundPayload: v.optional(v.any()),
+    dedupeKey: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_session_tool", ["sessionId", "toolCallId"]) 
+    .index("by_session", ["sessionId"]) 
+    .index("by_completed", ["completedAt"]),
+
+  agent_events: defineTable({
+    sessionId: v.string(),
+    requestId: v.string(),
+    sequence: v.number(),
+    timestamp: v.number(),
+    kind: v.string(),
+    payload: v.any(),
+    source: v.optional(v.string()),
+    model: v.optional(v.string()),
+    threadId: v.optional(v.string()),
+    personaMode: v.optional(v.boolean()),
+    userIdentifier: v.optional(v.string()),
+    dedupeKey: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_session_sequence", ["sessionId", "sequence"]) 
+    .index("by_session", ["sessionId"]) 
+    .index("by_createdAt", ["createdAt"]),
 });

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as agentMetrics from "../agentMetrics.js";
 import type * as apps from "../apps.js";
 import type * as chat from "../chat.js";
 import type * as desktops from "../desktops.js";
@@ -34,6 +35,7 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  agentMetrics: typeof agentMetrics;
   apps: typeof apps;
   chat: typeof chat;
   desktops: typeof desktops;
