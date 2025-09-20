@@ -163,7 +163,7 @@ export default function WebContainer() {
   const [error, setError] = useState<string | null>(null);
   const [serverReady, setServerReady] = useState(false);
   const [shouldExitBoot, setShouldExitBoot] = useState(false);
-  const { setInstance } = useWebContainer();
+  const { setInstance, setDepsReady } = useWebContainer();
   const setInstanceRef = useRef(setInstance);
   useEffect(() => { setInstanceRef.current = setInstance; }, [setInstance]);
   const devProcRef = useRef<WebContainerProcess | null>(null);
@@ -194,6 +194,7 @@ export default function WebContainer() {
         setError(null);
         setLoadingStage('Waking up…');
         setTargetProgress((p) => Math.max(p, 8));
+        setDepsReady(false);
 
         // Boot WebContainer
         const bootOptions: Parameters<typeof WebContainerAPI.boot>[0] & { forwardPreviewErrors?: boolean } = {
@@ -389,6 +390,9 @@ export default function WebContainer() {
           console.log('[WebContainer] Mounted default snapshot');
         }
 
+        // Expose the WebContainer instance as soon as the filesystem is ready
+        setInstanceRef.current?.(instance);
+
 
         // Add a small normalization stylesheet to guarantee full-bleed preview sizing
         const normalizeCss = `html,body,#root{height:100%;width:100%;margin:0;padding:0}
@@ -479,7 +483,7 @@ export default function Document() {
         setTargetProgress((p) => Math.max(p, 42));
         // Use pnpm for faster dependency installation
         const installProcess = await instance.spawn('pnpm', ['install']);
-        
+
         // Consume installation output without noisy logging to avoid jank
         try {
           installProcess.output.pipeTo(new WritableStream({
@@ -492,9 +496,7 @@ export default function Document() {
         if (installExitCode !== 0) {
           throw new Error('Failed to install dependencies');
         }
-
-        // Expose the instance to tools only after dependencies are installed
-        setInstanceRef.current?.(instance);
+        setDepsReady(true);
 
         // Removed periodic autosave; persist on visibility/unload only
 
@@ -844,6 +846,7 @@ export default function Document() {
           console.error('Initialization error:', err);
           setError(err instanceof Error ? err.message : 'Failed to initialize sandbox');
           setIsLoading(false);
+          setDepsReady(false);
         }
       }
     };
@@ -853,6 +856,7 @@ export default function Document() {
     return () => {
       mounted = false;
       setInstanceRef.current?.(null);
+      setDepsReady(false);
       if (cleanupMessageListener) cleanupMessageListener();
       if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
       if (beforeUnloadHandler) window.removeEventListener('beforeunload', beforeUnloadHandler);
@@ -863,7 +867,7 @@ export default function Document() {
         }
       } catch {}
     };
-  }, []);
+  }, [setDepsReady]);
 
   // Keep a ref in sync with the latest target for stable reads inside rAF loop
   useEffect(() => {

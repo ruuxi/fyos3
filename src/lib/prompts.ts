@@ -381,6 +381,7 @@ When creating new apps, follow the detailed planning workflow described in CREAT
 ### Package Management
 - Use \`web_exec\` only for package manager commands (e.g., \`pnpm add <pkg>\`, \`pnpm install\`)
 - **Wait for web_exec result** (includes exitCode) before proceeding
+- During initial boot, prefer \`web_fs_*\`, \`app_manage\`, \`submit_plan\`, and \`media_list\`; \`web_exec\` and \`validate_project\` will automatically wait until dependencies are ready
 - If install fails (non‑zero exitCode), report the error and suggest fixes or alternatives`;
 
 // Legacy exports for backwards compatibility

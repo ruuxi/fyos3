@@ -15,6 +15,7 @@ type WebContainerFns = {
   readdirRecursive: (path?: string, maxDepth?: number) => Promise<{ path: string; type: 'file' | 'dir' }[]>;
   remove: (path: string, opts?: { recursive?: boolean }) => Promise<void>;
   spawn: (command: string, args?: string[], opts?: { cwd?: string }) => Promise<{ exitCode: number; output: string }>;
+  waitForDepsReady: (timeoutMs?: number, intervalMs?: number) => Promise<boolean>;
 };
 
 type UseAgentChatOptions = {
@@ -150,7 +151,16 @@ class ToolScheduler {
   }
 }
 
-const SAFE_TOOL_NAMES = new Set<string>(['web_fs_find', 'web_fs_read', 'media_list']);
+const SAFE_TOOL_NAMES = new Set<string>([
+  'web_fs_find',
+  'web_fs_read',
+  'web_fs_write',
+  'media_list',
+  'app_manage',
+  'submit_plan',
+]);
+
+const EXEC_GATED_TOOL_NAMES = new Set<string>(['web_exec', 'validate_project']);
 
 export function useAgentChat(opts: UseAgentChatOptions) {
   const { id, initialMessages, activeThreadId, wc, runValidation, attachmentsProvider } = opts;
@@ -274,7 +284,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
       }
 
       await scheduler.run(tc.toolName, async () => {
-        const startTime = Date.now();
+        let startTime = Date.now();
         const logAndAddResult = async (output: unknown) => {
           const duration = Date.now() - startTime;
           addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output });
@@ -284,6 +294,21 @@ export function useAgentChat(opts: UseAgentChatOptions) {
         };
 
         try {
+          if (EXEC_GATED_TOOL_NAMES.has(tc.toolName)) {
+            try {
+              const ready = await fnsRef.current.waitForDepsReady?.(60000, 150);
+              if (!ready) {
+                await logAndAddResult({ error: 'Dependencies are still installing. Try again shortly.' });
+                return;
+              }
+            } catch (waitError: unknown) {
+              const message = waitError instanceof Error ? waitError.message : 'Unable to confirm dependency install status.';
+              await logAndAddResult({ error: message });
+              return;
+            }
+          }
+
+          startTime = Date.now();
           switch (tc.toolName) {
             case 'web_fs_find': {
               const findInput = isPlainObject(tc.input) ? (tc.input as Partial<WebFsFindInput>) : {};
@@ -895,5 +920,5 @@ export function useAgentChat(opts: UseAgentChatOptions) {
     setMessages(initialMessages);
   }, [initialMessages, setMessages]);
 
-  return { messages, sendMessage, status, stop, addToolResult } as const;
+  return { messages, sendMessage, status, stop, addToolResult, setMessages } as const;
 }
