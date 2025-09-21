@@ -297,4 +297,25 @@ export default defineSchema({
     .index("by_session_sequence", ["sessionId", "sequence"]) 
     .index("by_session", ["sessionId"]) 
     .index("by_createdAt", ["createdAt"]),
+
+  agent_batch_runs: defineTable({
+    name: v.optional(v.string()),
+    batchId: v.string(),
+    prompts: v.array(v.string()),
+    promptCount: v.number(),
+    totalRuns: v.number(),
+    runsPerPrompt: v.number(),
+    delayMs: v.number(),
+    restoreBaseline: v.boolean(),
+    tags: v.optional(v.array(v.string())),
+    startedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+    successCount: v.optional(v.number()),
+    failureCount: v.optional(v.number()),
+    status: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_batchId", ["batchId"]) 
+    .index("by_startedAt", ["startedAt"]),
 });

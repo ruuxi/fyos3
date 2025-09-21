@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { WebContainer as WebContainerAPI, type WebContainerProcess } from '@webcontainer/api';
 // Binary snapshot approach for faster mounting
 import { useWebContainer } from './WebContainerProvider';
@@ -17,6 +17,8 @@ declare global {
     __FYOS_HMR_PAUSED?: boolean;
     __FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL?: number;
     __FYOS_WC_BOOTING?: boolean;
+    __FYOS_WC_BOOT_PROMISE?: Promise<WebContainerAPI> | null;
+    __FYOS_WC_DEPS_READY?: boolean;
   }
 }
 
@@ -164,9 +166,15 @@ export default function WebContainer() {
   const [error, setError] = useState<string | null>(null);
   const [serverReady, setServerReady] = useState(false);
   const [shouldExitBoot, setShouldExitBoot] = useState(false);
-  const { setInstance } = useWebContainer();
+  const { setInstance, setDepsReady } = useWebContainer();
   const setInstanceRef = useRef(setInstance);
   useEffect(() => { setInstanceRef.current = setInstance; }, [setInstance]);
+  const markDepsReady = useCallback((ready: boolean) => {
+    setDepsReady(ready);
+    if (typeof window !== 'undefined') {
+      window.__FYOS_WC_DEPS_READY = ready;
+    }
+  }, [setDepsReady]);
   const devProcRef = useRef<WebContainerProcess | null>(null);
   const devUrlRef = useRef<string | null>(null);
   const pendingOpenAppsRef = useRef<OpenAppPayload[]>([]);
@@ -195,54 +203,60 @@ export default function WebContainer() {
         setError(null);
         setLoadingStage('Waking up…');
         setTargetProgress((p) => Math.max(p, 8));
+        markDepsReady(false);
+        if (typeof window !== 'undefined') {
+          window.__FYOS_WC_DEPS_READY = false;
+        }
+
+        const depsReadyFromGlobal = () => (typeof window !== 'undefined' ? window.__FYOS_WC_DEPS_READY === true : false);
+
+        const adoptExistingInstance = (instance: WebContainerAPI) => {
+          if (!mounted) return;
+          setWebcontainerInstance(instance);
+          setInstanceRef.current?.(instance);
+          setTargetProgress((p) => Math.max(p, 18));
+          setLoadingStage('Checking dependencies…');
+          setTargetProgress((p) => Math.max(p, 42));
+          const depsReadyGlobal = depsReadyFromGlobal();
+          if (depsReadyGlobal) {
+            markDepsReady(true);
+            setLoadingStage('Almost there…');
+            setTargetProgress((p) => Math.max(p, 78));
+          } else {
+            markDepsReady(false);
+          }
+          setServerReady(true);
+        };
 
         // Check if we already have a global instance or if another boot is in progress
         if (typeof window !== 'undefined') {
-          if (window.__FYOS_WC_BOOTING) {
-            console.log('[WebContainer] Boot already in progress, waiting...');
-            // Wait for existing boot to complete
-            let attempts = 0;
-            while (window.__FYOS_WC_BOOTING && attempts < 50) {
-              await new Promise(resolve => setTimeout(resolve, 100));
-              attempts++;
-            }
-            if (window.webcontainerInstance) {
-              console.log('[WebContainer] Using existing instance');
-              const instance = window.webcontainerInstance;
-              if (!mounted) return;
-              setWebcontainerInstance(instance);
-              setInstanceRef.current?.(instance);
-              setTargetProgress((p) => Math.max(p, 18));
-              // Skip to dependency check since instance already exists
-              setLoadingStage('Checking dependencies…');
-              setTargetProgress((p) => Math.max(p, 42));
-              setDepsReady(true);
-              setLoadingStage('Almost there…');
-              setTargetProgress((p) => Math.max(p, 78));
-              setServerReady(true);
-              return;
-            }
-          }
-
-          if (window.webcontainerInstance) {
+          const existingInstance = window.webcontainerInstance;
+          if (existingInstance) {
             console.log('[WebContainer] Reusing existing instance');
-            const instance = window.webcontainerInstance;
-            if (!mounted) return;
-            setWebcontainerInstance(instance);
-            setInstanceRef.current?.(instance);
-            setTargetProgress((p) => Math.max(p, 18));
-            // Skip to dependency check since instance already exists
-            setLoadingStage('Checking dependencies…');
-            setTargetProgress((p) => Math.max(p, 42));
-            setDepsReady(true);
-            setLoadingStage('Almost there…');
-            setTargetProgress((p) => Math.max(p, 78));
-            setServerReady(true);
+            adoptExistingInstance(existingInstance);
             return;
           }
 
-          // Mark that we're starting a boot process
+          const pendingBoot = window.__FYOS_WC_BOOT_PROMISE;
+          if (pendingBoot) {
+            console.log('[WebContainer] Awaiting existing boot promise');
+            setLoadingStage('Connecting to workspace…');
+            setTargetProgress((p) => Math.max(p, 16));
+            try {
+              const instance = await pendingBoot;
+              adoptExistingInstance(instance);
+              return;
+            } catch (error) {
+              console.warn('[WebContainer] Existing boot promise rejected, starting fresh', error);
+            }
+          }
+
           window.__FYOS_WC_BOOTING = true;
+        }
+
+        markDepsReady(false);
+        if (typeof window !== 'undefined') {
+          window.__FYOS_WC_DEPS_READY = false;
         }
 
         // Boot WebContainer
@@ -255,13 +269,21 @@ export default function WebContainer() {
         };
         
         console.log('[WebContainer] Booting new instance...');
-        const instance = await WebContainerAPI.boot(bootOptions);
-        
-        // Clear the booting flag
+        let bootPromise: Promise<WebContainerAPI>;
         if (typeof window !== 'undefined') {
+          bootPromise = WebContainerAPI.boot(bootOptions);
+          window.__FYOS_WC_BOOT_PROMISE = bootPromise;
+        } else {
+          bootPromise = WebContainerAPI.boot(bootOptions);
+        }
+
+        const instance = await bootPromise;
+
+        if (typeof window !== 'undefined') {
+          window.__FYOS_WC_BOOT_PROMISE = null;
           window.__FYOS_WC_BOOTING = false;
         }
-        
+
         if (!mounted) return;
         setWebcontainerInstance(instance);
         setTargetProgress((p) => Math.max(p, 18));
@@ -446,6 +468,9 @@ export default function WebContainer() {
           console.log('[WebContainer] Mounted default snapshot');
         }
 
+        // Expose the WebContainer to tools as soon as the filesystem is ready
+        setInstanceRef.current?.(instance);
+
 
         // Add a small normalization stylesheet to guarantee full-bleed preview sizing
         const normalizeCss = `html,body,#root{height:100%;width:100%;margin:0;padding:0}
@@ -549,9 +574,7 @@ export default function Document() {
         if (installExitCode !== 0) {
           throw new Error('Failed to install dependencies');
         }
-
-        // Expose the instance to tools only after dependencies are installed
-        setInstanceRef.current?.(instance);
+        markDepsReady(true);
 
         // Removed periodic autosave; persist on visibility/unload only
 
@@ -905,6 +928,7 @@ export default function Document() {
           console.error('Initialization error:', err);
           setError(err instanceof Error ? err.message : 'Failed to initialize sandbox');
           setIsLoading(false);
+          markDepsReady(false);
         }
       }
     };
@@ -914,6 +938,7 @@ export default function Document() {
     return () => {
       mounted = false;
       setInstanceRef.current?.(null);
+      markDepsReady(false);
       if (cleanupMessageListener) cleanupMessageListener();
       if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
       if (beforeUnloadHandler) window.removeEventListener('beforeunload', beforeUnloadHandler);
@@ -930,7 +955,7 @@ export default function Document() {
         }
       } catch {}
     };
-  }, []);
+  }, [markDepsReady]);
 
   // Keep a ref in sync with the latest target for stable reads inside rAF loop
   useEffect(() => {

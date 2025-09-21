@@ -297,21 +297,14 @@ export async function POST(req: Request) {
   const sessionId = normalizedSessionId ?? `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   let sessionStartedAt: number | null = null;
 
-  // Sanitize/dedupe messages to avoid downstream gateway duplicate-id issues
-  const seenHashes = new Set<string>();
-  const sanitizedMessages: SanitizedMessage[] = [];
-  for (const message of messagesWithHints) {
-    const text = extractTextFromMessage(message);
-    const key = `${message.role}|${text}`;
-    if (seenHashes.has(key)) continue;
-    seenHashes.add(key);
+  // Sanitize messages (strip ids) without deduplication so tool results are preserved
+  const sanitizedMessages: SanitizedMessage[] = messagesWithHints.map((message) => {
     if ('id' in message) {
-      const { id: _omit, ...rest } = message;
-      sanitizedMessages.push(rest);
-    } else {
-      sanitizedMessages.push(message);
+      const { id: _omit, ...rest } = message as MessageEnvelope & { id?: unknown };
+      return rest as SanitizedMessage;
     }
-  }
+    return message as SanitizedMessage;
+  });
 
   const messagePreviews: AgentMessagePreview[] = sanitizedMessages.map((message) => {
     const text = extractTextFromMessage(message as MessageEnvelope);

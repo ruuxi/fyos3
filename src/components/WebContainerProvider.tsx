@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
 
 type SpawnResult = {
@@ -11,6 +11,9 @@ type SpawnResult = {
 type WebContainerCtx = {
   instance: WebContainerAPI | null;
   setInstance: (inst: WebContainerAPI | null) => void;
+  depsReady: boolean;
+  setDepsReady: (ready: boolean) => void;
+  waitForDepsReady: (timeoutMs?: number, intervalMs?: number) => Promise<boolean>;
   // FS helpers
   writeFile: (path: string, content: string) => Promise<void>;
   readFile: (path: string, encoding?: 'utf-8' | 'base64') => Promise<string>;
@@ -26,6 +29,21 @@ const Ctx = createContext<WebContainerCtx | null>(null);
 
 export function WebContainerProvider({ children }: { children: React.ReactNode }) {
   const [instance, setInstance] = useState<WebContainerAPI | null>(null);
+  const [depsReady, setDepsReady] = useState(false);
+  const depsReadyRef = useRef(depsReady);
+
+  useEffect(() => {
+    depsReadyRef.current = depsReady;
+  }, [depsReady]);
+
+  const waitForDepsReady = useCallback(async (timeoutMs = 45000, intervalMs = 120) => {
+    if (depsReadyRef.current) return true;
+    const start = Date.now();
+    while (!depsReadyRef.current && Date.now() - start < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+    return depsReadyRef.current;
+  }, []);
 
   const writeFile = useCallback(async (path: string, content: string) => {
     if (!instance) throw new Error('WebContainer not ready');
@@ -161,8 +179,21 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
     const startTime = Date.now();
     const fullCommand = `${command} ${args.join(' ')}`.trim();
     const cwd = opts?.cwd || '.';
-    
+
     try {
+      if (!depsReadyRef.current) {
+        const shouldGate = (() => {
+          const cmdLower = (command || '').toLowerCase();
+          if (!cmdLower) return false;
+          return /^(pnpm|npm|yarn|bun|node|npx|tsc|eslint|next|vite|vitest)$/.test(cmdLower);
+        })();
+        if (shouldGate) {
+          const ready = await waitForDepsReady();
+          if (!ready) {
+            throw new Error('WebContainer dependencies are still installing. Try again shortly.');
+          }
+        }
+      }
       if (process.env.NODE_ENV === 'development') {
         console.debug?.(`⚡ [FileOp] SPAWN: ${fullCommand} (cwd: ${cwd})`);
       }
@@ -208,11 +239,14 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
       console.error(`❌ [FileOp] SPAWN FAILED: ${fullCommand} (${duration}ms)`, error);
       throw error;
     }
-  }, [instance]);
+  }, [instance, waitForDepsReady]);
 
   const value = useMemo<WebContainerCtx>(() => ({
     instance,
     setInstance,
+    depsReady,
+    setDepsReady,
+    waitForDepsReady,
     writeFile,
     readFile,
     mkdir,
@@ -220,7 +254,7 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
     exists,
     remove,
     spawn,
-  }), [instance, writeFile, readFile, mkdir, readdirRecursive, exists, remove, spawn]);
+  }), [instance, depsReady, writeFile, readFile, mkdir, readdirRecursive, exists, remove, spawn, waitForDepsReady]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

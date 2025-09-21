@@ -10,6 +10,8 @@ import type { UIMessage } from 'ai';
 import { buildDesktopSnapshot, restoreDesktopSnapshot } from '@/utils/desktop-snapshot';
 import { useConvexClient } from '@/lib/useConvexClient';
 import { api as convexApi } from '../../../../convex/_generated/api';
+import { Button } from '@/components/ui/button';
+import type { Id } from '../../../../convex/_generated/dataModel';
 
 type BatchJob = {
   id: string;
@@ -33,6 +35,25 @@ type RunRecord = {
   finishedAt: number;
   durationMs: number;
   error?: string | null;
+};
+
+type BatchHistoryEntry = {
+  batchRunId: Id<'agent_batch_runs'>;
+  name?: string;
+  batchId: string;
+  prompts: string[];
+  promptCount: number;
+  totalRuns: number;
+  runsPerPrompt: number;
+  delayMs: number;
+  restoreBaseline: boolean;
+  tags: string[];
+  startedAt: number;
+  finishedAt: number | null;
+  successCount: number;
+  failureCount: number;
+  status: string;
+  updatedAt: number;
 };
 
 function useHeadlessBatchRunner() {
@@ -61,6 +82,7 @@ function useHeadlessBatchRunner() {
     status,
     stop,
     setMessages,
+    error: chatError,
   } = useAgentChat({
     id: 'dev-batch-runner',
     initialMessages: [] as UIMessage[],
@@ -77,11 +99,13 @@ function useHeadlessBatchRunner() {
 
   useEffect(() => { statusRef.current = status; }, [status]);
   useEffect(() => { sendMessageRef.current = (content: string) => sendMessageRaw({ text: content }); }, [sendMessageRaw]);
+  const chatErrorRef = useRef<Error | undefined>(chatError ?? undefined);
+  useEffect(() => { chatErrorRef.current = chatError ?? undefined; }, [chatError]);
 
   const [runner, setRunner] = useState<RunnerState>({ kind: 'idle' });
   const [records, setRecords] = useState<RunRecord[]>([]);
   const [baseline, setBaseline] = useState<{ gz: Uint8Array; size: number; fileCount: number; contentSha256: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [runnerError, setRunnerError] = useState<string | null>(null);
   const stopFlagRef = useRef(false);
 
   const captureBaseline = useCallback(async () => {
@@ -105,6 +129,10 @@ function useHeadlessBatchRunner() {
     const timeoutMs = 5 * 60 * 1000;
     while (Date.now() - start < timeoutMs) {
       if (stopFlagRef.current) throw new Error('Stopped');
+      if (statusRef.current === 'error') {
+        const err = chatErrorRef.current;
+        throw err ?? new Error('Run failed');
+      }
       if (statusRef.current === 'ready') {
         if (lastReadyAt === 0) lastReadyAt = Date.now();
         if (Date.now() - lastReadyAt > idleWindowMs) return;
@@ -117,7 +145,7 @@ function useHeadlessBatchRunner() {
   }, []);
 
   const start = useCallback(async (jobs: BatchJob[], opts: { restoreBaseline: boolean; delayMs: number; tags: string[] }) => {
-    setError(null);
+    setRunnerError(null);
     stopFlagRef.current = false;
     setRunner({ kind: 'preparing' });
     const deps = await waitForDepsReady(45000, 120);
@@ -128,7 +156,8 @@ function useHeadlessBatchRunner() {
 
     setRunner({ kind: 'running', currentIndex: 0, total: jobs.length });
 
-    const results: RunRecord[] = [];
+    const collected: RunRecord[] = [];
+
     for (let i = 0; i < jobs.length; i++) {
       const job = jobs[i];
       if (stopFlagRef.current) break;
@@ -149,7 +178,7 @@ function useHeadlessBatchRunner() {
         errorMsg = e instanceof Error ? e.message : String(e);
       }
       const finishedAt = Date.now();
-      results.push({
+      const record: RunRecord = {
         jobId: job.id,
         sessionId: job.sessionId,
         prompt: job.prompt,
@@ -157,15 +186,20 @@ function useHeadlessBatchRunner() {
         finishedAt,
         durationMs: finishedAt - startedAt,
         error: errorMsg,
-      });
+      };
+      setRecords((prev) => [...prev, record]);
+      collected.push(record);
+      if (errorMsg) {
+        setRunnerError((prev) => prev ?? errorMsg);
+      }
 
       if (opts.delayMs > 0 && i < jobs.length - 1) {
         await new Promise((r) => setTimeout(r, opts.delayMs));
       }
     }
-
-    setRecords((prev) => [...prev, ...results]);
-    setRunner(stopFlagRef.current ? { kind: 'stopped' } : { kind: 'finished' });
+    const stopped = stopFlagRef.current;
+    setRunner(stopped ? { kind: 'stopped' } : { kind: 'finished' });
+    return { records: collected, stopped };
   }, [baseline, captureBaseline, restoreBaselineIfNeeded, sendMessageRaw, setMessages, waitForCompletion, waitForDepsReady]);
 
   const stopRunner = useCallback(() => {
@@ -177,17 +211,36 @@ function useHeadlessBatchRunner() {
     messages,
     runner,
     records,
-    error,
+    error: runnerError,
     baseline,
     captureBaseline,
     start,
     stop: stopRunner,
-    clear: () => { setRecords([]); setRunner({ kind: 'idle' }); },
+    clear: () => { setRecords([]); setRunner({ kind: 'idle' }); setRunnerError(null); },
   } as const;
 }
 
 function formatTs(ts: number) {
   try { return new Date(ts).toLocaleTimeString(); } catch { return String(ts); }
+}
+
+function formatDateTime(ts?: number | null) {
+  if (typeof ts !== 'number' || Number.isNaN(ts)) return '—';
+  try {
+    return new Date(ts).toLocaleString();
+  } catch {
+    return String(ts);
+  }
+}
+
+function formatDurationMs(ms?: number | null) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '—';
+  if (ms < 1000) return `${ms} ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)} s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.round(seconds % 60);
+  return `${minutes}m ${remainingSeconds}s`;
 }
 
 function AgentBatchInner() {
@@ -199,7 +252,12 @@ function AgentBatchInner() {
   const [restoreBaseline, setRestoreBaseline] = useState(true);
   const [delayMs, setDelayMs] = useState(250);
   const [customTags, setCustomTags] = useState('batch');
+  const [batchName, setBatchName] = useState('');
   const [batchId, setBatchId] = useState(() => `batch_${Date.now().toString(36)}`);
+  const [history, setHistory] = useState<BatchHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [activeBatchRunId, setActiveBatchRunId] = useState<Id<'agent_batch_runs'> | null>(null);
 
   const prompts = useMemo(() => {
     return promptsText
@@ -222,6 +280,27 @@ function AgentBatchInner() {
     return out;
   }, [batchId, prompts, runsPerPrompt]);
 
+  const fetchHistory = useCallback(async () => {
+    if (!convex || !convexReady) return;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const result = await convex.query(convexApi.agentBatches.listRecent, { limit: 20 });
+      setHistory(Array.isArray(result) ? (result as BatchHistoryEntry[]) : []);
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [convex, convexReady]);
+
+  useEffect(() => {
+    if (!convex || !convexReady) {
+      return;
+    }
+    void fetchHistory();
+  }, [convex, convexReady, fetchHistory]);
+
   const start = useCallback(async () => {
     if (jobs.length === 0) return;
     const tags = [
@@ -230,13 +309,71 @@ function AgentBatchInner() {
       ...customTags.split(',').map((t) => t.trim()).filter(Boolean),
     ];
 
-    // Clear previous
-    runner.clear();
-    await runner.start(jobs, { restoreBaseline, delayMs, tags });
+    const startedAt = Date.now();
+    let batchRunId: Id<'agent_batch_runs'> | null = null;
 
-    // After completion, tag sessions best-effort
+    if (convex && convexReady) {
+      try {
+        const response = await convex.mutation(convexApi.agentBatches.recordBatchStart, {
+          name: batchName || undefined,
+          batchId,
+          prompts,
+          runsPerPrompt,
+          requestedRuns: jobs.length,
+          delayMs,
+          restoreBaseline,
+          tags,
+          startedAt,
+        });
+        if (response && typeof response === 'object' && 'ok' in response && response.ok && 'batchRunId' in response) {
+          batchRunId = response.batchRunId as Id<'agent_batch_runs'>;
+          setActiveBatchRunId(batchRunId);
+          void fetchHistory();
+        } else {
+          setActiveBatchRunId(null);
+        }
+      } catch {
+        setActiveBatchRunId(null);
+      }
+    } else {
+      setActiveBatchRunId(null);
+    }
+
+    runner.clear();
+
+    let outcome: { records: RunRecord[]; stopped: boolean } | null = null;
+    let startError: unknown = null;
+
     try {
-      if (convex && convexReady) {
+      outcome = await runner.start(jobs, { restoreBaseline, delayMs, tags });
+    } catch (error) {
+      startError = error;
+    }
+
+    const finishedAt = Date.now();
+    const records = outcome?.records ?? [];
+    const successCount = records.filter((rec) => !rec.error).length;
+    const failureCount = records.filter((rec) => Boolean(rec.error)).length;
+    const status = startError
+      ? 'error'
+      : outcome?.stopped
+        ? 'stopped'
+        : 'finished';
+
+    if (batchRunId && convex && convexReady) {
+      try {
+        await convex.mutation(convexApi.agentBatches.recordBatchResult, {
+          batchRunId,
+          finishedAt,
+          successCount,
+          failureCount,
+          status,
+        });
+      } catch {}
+    }
+
+    if (convex && convexReady && !startError) {
+      try {
         for (const job of jobs) {
           for (const tag of tags) {
             try {
@@ -245,17 +382,26 @@ function AgentBatchInner() {
             } catch {}
           }
         }
-      }
-    } catch {}
-  }, [batchId, convex, convexReady, customTags, delayMs, jobs, restoreBaseline, runner]);
+      } catch {}
+    }
+
+    setActiveBatchRunId(null);
+    void fetchHistory();
+
+    if (startError) {
+      throw startError;
+    }
+  }, [batchId, convex, convexReady, customTags, delayMs, fetchHistory, jobs, prompts, restoreBaseline, runner, runsPerPrompt]);
 
   const running = runner.runner.kind === 'running' || runner.runner.kind === 'preparing';
 
   return (
     <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold">Agent Batch Runner (Dev)</h1>
-        <Link className="text-blue-600 underline" href="/dev-tools/agent-dashboard">Diagnostics</Link>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/dev-tools/agent-dashboard">Back to Diagnostics</Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -269,6 +415,16 @@ function AgentBatchInner() {
           />
         </div>
         <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium">Batch name (optional)</label>
+            <input
+              className="w-full border p-1 text-sm"
+              value={batchName}
+              onChange={(e) => setBatchName(e.target.value)}
+              placeholder="e.g. prompt sweep 2025-09-21"
+              disabled={running}
+            />
+          </div>
           <label className="block text-sm font-medium">Runs per prompt</label>
           <input
             type="number"
@@ -334,24 +490,95 @@ function AgentBatchInner() {
         )}
       </div>
 
-      <div className="space-y-2">
-        <div className="font-medium">Results</div>
-        {runner.records.length === 0 && <div className="text-sm text-gray-600">No results yet.</div>}
-        {runner.records.length > 0 && (
-          <div className="text-sm">
-            {runner.records.map((rec) => (
-              <div key={rec.jobId} className="border p-2 mb-2">
-                <div className="flex items-center justify-between">
-                  <div className="font-mono text-xs">{rec.sessionId}</div>
-                  <Link className="text-blue-600 underline text-xs" href={`/dev-tools/agent-dashboard?sessionId=${rec.sessionId}`}>Open diagnostics</Link>
+      <div className="flex flex-col lg:flex-row lg:items-start lg:gap-4">
+        <div className="flex-1 space-y-2">
+          <div className="font-medium">Results</div>
+          {runner.records.length === 0 && <div className="text-sm text-gray-600">No results yet.</div>}
+          {runner.records.length > 0 && (
+            <div className="text-sm">
+              {runner.records.map((rec) => (
+                <div key={rec.jobId} className="border p-2 mb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-mono text-xs">{rec.sessionId}</div>
+                    <Link className="text-blue-600 underline text-xs" href={`/dev-tools/agent-dashboard?sessionId=${rec.sessionId}`}>Open diagnostics</Link>
+                  </div>
+                  <div className="text-xs text-gray-700">{rec.prompt}</div>
+                  <div className="text-xs">{formatTs(rec.startedAt)} → {formatTs(rec.finishedAt)} ({rec.durationMs} ms)</div>
+                  {rec.error && <div className="text-xs text-red-600">Error: {rec.error}</div>}
                 </div>
-                <div className="text-xs text-gray-700">{rec.prompt}</div>
-                <div className="text-xs">{formatTs(rec.startedAt)} → {formatTs(rec.finishedAt)} ({rec.durationMs} ms)</div>
-                {rec.error && <div className="text-xs text-red-600">Error: {rec.error}</div>}
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 lg:mt-0 lg:w-80 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium">Recent batches</span>
+            <button
+              type="button"
+              className="text-xs text-blue-600 hover:underline disabled:opacity-50 disabled:pointer-events-none"
+              onClick={() => void fetchHistory()}
+              disabled={historyLoading || !convexReady}
+            >
+              Refresh
+            </button>
           </div>
-        )}
+          {historyLoading && <div className="text-xs text-gray-500">Loading history...</div>}
+          {historyError && <div className="text-xs text-red-600">Failed to load history: {historyError}</div>}
+          {history.length === 0 && !historyLoading ? (
+            <div className="text-xs text-gray-600 border border-dashed rounded px-3 py-2">No batch runs recorded yet.</div>
+          ) : (
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              {history.map((entry) => {
+                const isOngoing = entry.status === 'running' || entry.finishedAt === null;
+                const isActive = activeBatchRunId && entry.batchRunId === activeBatchRunId;
+                const borderClass = isOngoing ? 'border-blue-500' : 'border-gray-200';
+                const highlightClass = isActive ? 'ring-1 ring-blue-500' : '';
+                const durationLabel = entry.finishedAt
+                  ? formatDurationMs(Math.max(0, entry.finishedAt - entry.startedAt))
+                  : isOngoing
+                    ? 'running...'
+                    : '—';
+
+                return (
+                  <details
+                    key={entry.batchRunId}
+                    className={`border rounded px-3 py-2 text-xs bg-white ${borderClass} ${highlightClass}`}
+                  >
+                    <summary className="flex items-center justify-between gap-2 cursor-pointer list-none">
+                      <span className="min-w-0">
+                        {entry.name && (
+                          <span className="block text-[11px] font-medium truncate" title={entry.name}>{entry.name}</span>
+                        )}
+                        <span className="block font-mono text-[11px] text-gray-700 truncate" title={entry.batchId}>{entry.batchId}</span>
+                      </span>
+                      <span className="text-[11px] text-gray-600">{entry.promptCount} prompts</span>
+                    </summary>
+                    <div className="mt-2 space-y-1 text-[11px] text-gray-700">
+                      <div>Status: <span className="font-semibold text-gray-900">{entry.status}</span></div>
+                      <div>Started: {formatDateTime(entry.startedAt)}</div>
+                      <div>Finished: {formatDateTime(entry.finishedAt)}</div>
+                      <div>Duration: {durationLabel}</div>
+                      <div>Runs per prompt: {entry.runsPerPrompt} · Total runs: {entry.totalRuns}</div>
+                      <div>Delay between runs: {entry.delayMs} ms</div>
+                      <div>Restore baseline: {entry.restoreBaseline ? 'yes' : 'no'}</div>
+                      <div>
+                        Success: <span className="text-green-600 font-semibold">{entry.successCount}</span>{' '}
+                        / Failure: <span className="text-red-600 font-semibold">{entry.failureCount}</span>
+                      </div>
+                      {entry.tags.length > 0 && (
+                        <div>Tags: {entry.tags.join(', ')}</div>
+                      )}
+                      <div className="pt-2 border-t border-dashed border-gray-200" />
+                      <div className="text-gray-500 uppercase tracking-wide">Prompts</div>
+                      <pre className="whitespace-pre-wrap bg-gray-50 border border-gray-100 rounded p-2 font-mono text-[11px]">{entry.prompts.join('\n')}</pre>
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

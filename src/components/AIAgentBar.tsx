@@ -16,6 +16,7 @@ import ChatTabs from '@/components/agent/AIAgentBar/ui/ChatTabs';
 import MessagesPane from '@/components/agent/AIAgentBar/ui/MessagesPane';
 import ChatComposer from '@/components/agent/AIAgentBar/ui/ChatComposer';
 import MediaPane from '@/components/agent/AIAgentBar/ui/MediaPane';
+import ModelSelector from '@/components/agent/AIAgentBar/ui/ModelSelector';
 import AddFriendForm from '@/components/agent/AIAgentBar/ui/AddFriendForm';
 import FriendMessagesPane from '@/components/agent/AIAgentBar/ui/FriendMessagesPane';
 import GroupMessagesPane from '@/components/agent/AIAgentBar/ui/GroupMessagesPane';
@@ -29,7 +30,7 @@ export default function AIAgentBar() {
   const [leftPane, setLeftPane] = useState<'agent' | 'friend'>('agent');
   
   const { goTo, activeIndex } = useScreens();
-  const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
+  const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady } = useWebContainer();
   
   // Visit desktops state
   const [desktopsListing, setDesktopsListing] = useState<Array<{ _id: string; title: string; description?: string; icon?: string }>>([]);
@@ -103,10 +104,10 @@ export default function AIAgentBar() {
 
   // Keep latest instance and fs helpers in refs so tool callbacks don't capture stale closures
   const instanceRef = useRef(instance);
-  const baseFnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
-  const fnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
+  const baseFnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady });
+  const fnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady });
   useEffect(() => { instanceRef.current = instance; }, [instance]);
-  useEffect(() => { baseFnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
+  useEffect(() => { baseFnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady]);
 
   const agent = useAgentController({
     input,
@@ -184,9 +185,10 @@ export default function AIAgentBar() {
         }
         return base.spawn(command, args, opts);
       },
+      waitForDepsReady: base.waitForDepsReady,
     } as typeof fnsRef.current;
     fnsRef.current = tracked;
-  }, [markFsChanged, mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
+  }, [markFsChanged, mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady]);
 
 
   const handleUndo = useCallback(async () => {
@@ -223,6 +225,7 @@ export default function AIAgentBar() {
   const isClosing = !isOpen && prevOpenRef.current;
   useEffect(() => { prevOpenRef.current = isOpen; }, [isOpen]);
   const barAreaRef = useRef<HTMLDivElement | null>(null);
+  const [showModelSelector, setShowModelSelector] = useState(false);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -235,6 +238,13 @@ export default function AIAgentBar() {
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
+  }, []);
+
+  // Listen for global request to open model selector
+  useEffect(() => {
+    const open = () => setShowModelSelector(true);
+    window.addEventListener('open-model-selector', open as EventListener);
+    return () => window.removeEventListener('open-model-selector', open as EventListener);
   }, []);
 
   // One-time welcome animation flag
@@ -280,14 +290,19 @@ export default function AIAgentBar() {
     };
   }, [mode]);
 
-  // Keyboard shortcuts: Cmd/Ctrl+K to open chat, Esc to close overlay
+  // Keyboard shortcuts: Cmd/Ctrl+K to open chat, Esc to close overlay, Cmd/Ctrl+Alt+M for model selector
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const key = (e.key ?? '').toLowerCase();
       const isK = key === 'k';
+      const isM = key === 'm';
       if ((e.metaKey || e.ctrlKey) && isK) {
         e.preventDefault();
         setMode('chat');
+      }
+      if ((e.metaKey || e.ctrlKey) && e.altKey && isM) {
+        e.preventDefault();
+        setShowModelSelector(true);
       }
       if (key === 'escape' && mode !== 'compact') {
         e.preventDefault();
@@ -353,6 +368,7 @@ export default function AIAgentBar() {
 
 
   return (
+    <>
     <AgentBarShell
       isOpen={isOpen}
       isOpening={isOpening}
@@ -788,5 +804,9 @@ export default function AIAgentBar() {
         )}
       </div>
     </AgentBarShell>
+    {showModelSelector && (
+      <ModelSelector open={showModelSelector} onClose={() => setShowModelSelector(false)} />
+    )}
+    </>
   );
 }

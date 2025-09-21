@@ -15,6 +15,7 @@ type WebContainerFns = {
   readdirRecursive: (path?: string, maxDepth?: number) => Promise<{ path: string; type: 'file' | 'dir' }[]>;
   remove: (path: string, opts?: { recursive?: boolean }) => Promise<void>;
   spawn: (command: string, args?: string[], opts?: { cwd?: string }) => Promise<{ exitCode: number; output: string }>;
+  waitForDepsReady: (timeoutMs?: number, intervalMs?: number) => Promise<boolean>;
 };
 
 type UseAgentChatOptions = {
@@ -158,7 +159,15 @@ class ToolScheduler {
   }
 }
 
-const SAFE_TOOL_NAMES = new Set<string>(['web_fs_find', 'web_fs_read', 'media_list']);
+const SAFE_TOOL_NAMES = new Set<string>([
+  'web_fs_find',
+  'web_fs_read',
+  'web_fs_write',
+  'media_list',
+  'app_manage',
+]);
+
+const EXEC_GATED_TOOL_NAMES = new Set<string>(['web_exec', 'validate_project']);
 
 export function useAgentChat(opts: UseAgentChatOptions) {
   const { id, initialMessages, activeThreadId, wc, runValidation, attachmentsProvider } = opts;
@@ -283,7 +292,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
       }
 
       await scheduler.run(tc.toolName, async () => {
-        const startTime = Date.now();
+        let startTime = Date.now();
         const logAndAddResult = async (output: unknown) => {
           const duration = Date.now() - startTime;
           addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output });
@@ -293,6 +302,21 @@ export function useAgentChat(opts: UseAgentChatOptions) {
         };
 
         try {
+          if (EXEC_GATED_TOOL_NAMES.has(tc.toolName)) {
+            try {
+              const ready = await fnsRef.current.waitForDepsReady?.(60000, 150);
+              if (!ready) {
+                await logAndAddResult({ error: 'Dependencies are still installing. Try again shortly.' });
+                return;
+              }
+            } catch (waitError: unknown) {
+              const message = waitError instanceof Error ? waitError.message : 'Unable to confirm dependency install status.';
+              await logAndAddResult({ error: message });
+              return;
+            }
+          }
+
+          startTime = Date.now();
           switch (tc.toolName) {
             case 'web_fs_find': {
               const findInput = isPlainObject(tc.input) ? (tc.input as Partial<WebFsFindInput>) : {};
@@ -695,20 +719,6 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : String(err);
               addToolResult({ tool: 'media_list', toolCallId: tc.toolCallId, output: { error: message } });
-            }
-            break;
-          }
-          case 'submit_plan': {
-            const { appId, planText } = tc.input as { appId: string; planText: string };
-            try {
-              const base = `src/apps/${appId}`;
-              await fnsRef.current.mkdir(base, true);
-              const path = `${base}/plan.md`;
-              await fnsRef.current.writeFile(path, planText);
-              addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, path, bytes: planText.length } });
-            } catch (err: unknown) {
-              const message = err instanceof Error ? err.message : String(err);
-              addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: false, error: message } });
             }
             break;
           }

@@ -30,6 +30,7 @@ type WebContainerFns = {
   readdirRecursive: (path?: string, maxDepth?: number) => Promise<{ path: string; type: 'file' | 'dir' }[]>;
   remove: (path: string, opts?: { recursive?: boolean }) => Promise<void>;
   spawn: (command: string, args?: string[], opts?: { cwd?: string }) => Promise<{ exitCode: number; output: string }>;
+  waitForDepsReady: (timeoutMs?: number, intervalMs?: number) => Promise<boolean>;
 };
 
 type UseAgentControllerArgs = {

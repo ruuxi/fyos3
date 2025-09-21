@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from 'convex/react';
 import { api as convexApi } from '../../../../convex/_generated/api';
@@ -70,6 +71,7 @@ type TimelineData = {
     stepIndex: number;
     status: string;
     startedAt?: number;
+    inboundAt?: number;
     completedAt?: number;
     durationMs?: number;
     inputSummary?: Record<string, unknown>;
@@ -182,6 +184,26 @@ type ToolCallSummaryRow = {
   accentClass: string;
 };
 
+type ToolCallTimelineEntry = {
+  id: string;
+  toolCallId: string;
+  toolName: string;
+  status: 'success' | 'error' | 'pending';
+  statusLabel: string;
+  stepIndex?: number;
+  startedAt?: number;
+  inboundAt?: number;
+  completedAt?: number;
+  durationMs?: number | null;
+  durationLabel: string;
+  tokensLabel: string;
+  costLabel: string;
+  meta: Array<{ label: string; value: string }>;
+  inputSummary?: string | null;
+  resultSummary?: string | null;
+  rawEvents: TimelineEntry[];
+};
+
 type SessionSidebarMetrics = {
   totalTokens: number | null;
   totalCostUSD: number | null;
@@ -195,6 +217,13 @@ const safeJsonStringify = (value: unknown, spacing = 2): string => {
   } catch (error) {
     return `Unable to serialize payload: ${(error as Error).message}`;
   }
+};
+
+const stringifySummaryObject = (value: unknown): string | null => {
+  if (!value || typeof value !== 'object') return null;
+  if (Array.isArray(value) && value.length === 0) return null;
+  if (!Array.isArray(value) && Object.keys(value as Record<string, unknown>).length === 0) return null;
+  return safeJsonStringify(value, 2);
 };
 
 const getEventAccent = (kind: TimelineEntryKind, status: TimelineEntry['status'] = 'default'): string => {
@@ -217,6 +246,8 @@ const getEventAccent = (kind: TimelineEntryKind, status: TimelineEntry['status']
       return 'bg-sky-500/70';
     case 'message_logged':
       return 'bg-purple-500/70';
+    case 'classification_decided':
+      return 'bg-teal-500/70';
     default:
       return 'bg-muted-foreground/60';
   }
@@ -240,6 +271,8 @@ const describeEventKind = (kind: TimelineEntryKind): string => {
       return 'Tool Call Inbound';
     case 'message_logged':
       return 'Message Logged';
+    case 'classification_decided':
+      return 'Routing Decision';
     default:
       return 'Event';
   }
@@ -248,13 +281,6 @@ const describeEventKind = (kind: TimelineEntryKind): string => {
 const capitalize = (value: string | undefined | null): string => {
   if (!value) return '';
   return value.charAt(0).toUpperCase() + value.slice(1);
-};
-
-const formatList = (items: string[], max = 3): string => {
-  if (items.length === 0) return '—';
-  if (items.length <= max) return items.join(', ');
-  const visible = items.slice(0, max).join(', ');
-  return `${visible} +${items.length - max} more`;
 };
 
 export default function AgentDashboardPage() {
@@ -341,6 +367,8 @@ export default function AgentDashboardPage() {
   const [expandedEntries, setExpandedEntries] = useState<Record<string, boolean>>({});
   const [expandedPayloads, setExpandedPayloads] = useState<Record<string, boolean>>({});
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
+  const [timelineView, setTimelineView] = useState<'toolCalls' | 'rawEvents'>('toolCalls');
+  const [expandedToolCallEvents, setExpandedToolCallEvents] = useState<Record<string, boolean>>({});
   const [editingTitleSessionId, setEditingTitleSessionId] = useState<string | null>(null);
   const [titleDraftValue, setTitleDraftValue] = useState('');
   const titleInputRef = useRef<HTMLInputElement | null>(null);
@@ -473,6 +501,12 @@ export default function AgentDashboardPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    setExpandedEntries({});
+    setExpandedPayloads({});
+    setExpandedToolCallEvents({});
+  }, [timelineView]);
 
   const persistTitle = (sessionId: string, value: string | null) => {
     const normalizedInput = typeof value === 'string' ? value.trim() : '';
@@ -876,56 +910,69 @@ export default function AgentDashboardPage() {
       ? 'In progress'
       : '—';
 
-  const summaryRows = [
+  const headlineToolCallCount = (() => {
+    if (Array.isArray(activeTimeline?.toolCalls)) {
+      return activeTimeline?.toolCalls.length;
+    }
+    if (typeof selectedSession?.toolCallCount === 'number') {
+      return selectedSession.toolCallCount;
+    }
+    return 0;
+  })();
+
+  const totalTokensValue = sessionSummary.tokens?.total ?? null;
+  const totalCostValue = sessionSummary.costs?.totalCostUSD ?? null;
+  const durationValue = sessionSummary.durationMs;
+  const usageDescriptor = sessionSummary.usageKind === 'actual'
+    ? 'Actual'
+    : sessionSummary.usageKind === 'estimated'
+      ? 'Estimated'
+      : null;
+
+  const tokensDisplay = totalTokensValue !== null
+    ? `${formatNumber(totalTokensValue)} tokens`
+    : summaryTokensPlaceholder;
+  const costDisplay = totalCostValue !== null
+    ? formatCostExact(totalCostValue)
+    : summaryCostPlaceholder;
+  const durationDisplay = durationValue !== null
+    ? formatDuration(durationValue)
+    : summaryDurationPlaceholder;
+
+  const sessionHeadlineMetrics = [
     {
-      key: 'input',
-      label: 'Input',
-      value: sessionSummary.tokens
-        ? `${formatNumber(sessionSummary.tokens.prompt)} tokens`
-        : summaryTokensPlaceholder,
-      secondary: sessionSummary.costs
-        ? formatCostExact(sessionSummary.costs.promptCostUSD)
-        : summaryCostPlaceholder,
+      key: 'toolCalls',
+      label: 'Tool Calls',
+      value: formatNumber(headlineToolCallCount),
     },
     {
-      key: 'output',
-      label: 'Output',
-      value: sessionSummary.tokens
-        ? `${formatNumber(sessionSummary.tokens.completion)} tokens`
-        : summaryTokensPlaceholder,
-      secondary: sessionSummary.costs
-        ? formatCostExact(sessionSummary.costs.completionCostUSD)
-        : summaryCostPlaceholder,
+      key: 'tokens',
+      label: 'Total Tokens',
+      value: tokensDisplay,
+      caption: usageDescriptor ?? undefined,
     },
     {
-      key: 'total',
-      label: 'Total',
-      value: sessionSummary.tokens
-        ? `${formatNumber(sessionSummary.tokens.total)} tokens`
-        : summaryTokensPlaceholder,
-      secondary: sessionSummary.costs
-        ? formatCostExact(sessionSummary.costs.totalCostUSD)
-        : summaryCostPlaceholder,
+      key: 'cost',
+      label: 'Total Cost',
+      value: costDisplay,
+      caption: usageDescriptor ?? undefined,
     },
     {
       key: 'duration',
-      label: 'End to End',
-      value:
-        sessionSummary.durationMs !== null
-          ? formatDuration(sessionSummary.durationMs)
-          : summaryDurationPlaceholder,
-      secondary: '—',
+      label: 'Duration',
+      value: durationDisplay,
     },
   ];
 
-  const usageSummaryRows = summaryRows.filter((row) => row.key !== 'duration');
-  const auxiliarySummaryRows = summaryRows.filter((row) => row.key === 'duration');
-
-  const toolCallSummaryRows = useMemo(() => {
-    if (!activeTimeline?.toolCalls || activeTimeline.toolCalls.length === 0) return [] as ToolCallSummaryRow[];
+  const toolCallSummary = useMemo((): { rows: ToolCallSummaryRow[]; totalCount: number } => {
+    if (!activeTimeline?.toolCalls || activeTimeline.toolCalls.length === 0) {
+      return { rows: [] as ToolCallSummaryRow[], totalCount: 0 };
+    }
 
     const completedCalls = activeTimeline.toolCalls.filter((call) => call.status === 'completed');
-    if (completedCalls.length === 0) return [] as ToolCallSummaryRow[];
+    if (completedCalls.length === 0) {
+      return { rows: [] as ToolCallSummaryRow[], totalCount: 0 };
+    }
 
     const compareMaybeNumber = (a?: number, b?: number) => {
       const aHas = typeof a === 'number';
@@ -966,10 +1013,19 @@ export default function AgentDashboardPage() {
       'border-l-2 border-l-indigo-500/60 bg-indigo-500/10 dark:border-l-indigo-300/50 dark:bg-indigo-500/15',
     ];
 
-    const assignment = new Map<string, string>();
-    let paletteIndex = 0;
+    type Aggregate = {
+      key: string;
+      name: string;
+      count: number;
+      totalTokens: number;
+      totalCostUSD: number;
+      hasCost: boolean;
+      firstIndex: number;
+    };
 
-    return sortedCalls.map((call) => {
+    const aggregates = new Map<string, Aggregate>();
+
+    sortedCalls.forEach((call, index) => {
       const usage = call.tokenUsage as Nullable<UsageRecord>;
       let totalTokens = usage ? tokensFromUsage(usage, 'totalTokens') : 0;
       if (totalTokens === 0 && usage) {
@@ -977,28 +1033,55 @@ export default function AgentDashboardPage() {
       }
 
       const costUSD = typeof call.costUSD === 'number' && Number.isFinite(call.costUSD) ? call.costUSD : null;
-
       const name = call.toolName || call.toolCallId || 'Tool call';
-      const id = call._id ?? call.toolCallId ?? `${name}-${call.stepIndex}`;
+      const key = name.toLowerCase();
 
-      const assignmentKey = name.toLowerCase();
-      if (!assignment.has(assignmentKey)) {
-        const paletteClass = palette[paletteIndex % palette.length];
-        assignment.set(assignmentKey, paletteClass);
-        paletteIndex += 1;
+      if (!aggregates.has(key)) {
+        aggregates.set(key, {
+          key,
+          name,
+          count: 0,
+          totalTokens: 0,
+          totalCostUSD: 0,
+          hasCost: false,
+          firstIndex: index,
+        });
       }
 
-      const accentClass = assignment.get(assignmentKey) ?? palette[0];
-
-      return {
-        id,
-        name,
-        tokensLabel: `${formatNumber(totalTokens)} tokens`,
-        costLabel: formatCostExact(costUSD),
-        accentClass,
-      } satisfies ToolCallSummaryRow;
+      const aggregate = aggregates.get(key)!;
+      aggregate.count += 1;
+      aggregate.totalTokens += totalTokens;
+      if (costUSD !== null) {
+        aggregate.totalCostUSD += costUSD;
+        aggregate.hasCost = true;
+      }
     });
+
+    const rows = Array.from(aggregates.values())
+      .sort((a, b) => {
+        if (a.firstIndex !== b.firstIndex) return a.firstIndex - b.firstIndex;
+        return a.name.localeCompare(b.name);
+      })
+      .map((aggregate, index) => {
+        const displayName = aggregate.count > 1
+          ? `${aggregate.name} (${formatNumber(aggregate.count)})`
+          : aggregate.name;
+        const costLabel = formatCostExact(aggregate.hasCost ? aggregate.totalCostUSD : null);
+
+        return {
+          id: `${aggregate.key}-${aggregate.firstIndex}`,
+          name: displayName,
+          tokensLabel: `${formatNumber(aggregate.totalTokens)} tokens`,
+          costLabel,
+          accentClass: palette[index % palette.length],
+        } satisfies ToolCallSummaryRow;
+      });
+
+    return { rows, totalCount: completedCalls.length };
   }, [activeTimeline]);
+
+  const toolCallSummaryRows = toolCallSummary.rows;
+  const toolCallSummaryTotalCount = toolCallSummary.totalCount;
 
   const selectedSessionSidebarMetrics = useMemo((): SessionSidebarMetrics | null => {
     if (!selectedSession) return null;
@@ -1007,8 +1090,8 @@ export default function AgentDashboardPage() {
     const totalCostUSD = sessionSummary.costs?.totalCostUSD ?? null;
     const durationMs = sessionSummary.durationMs ?? null;
     const toolCallCount =
-      toolCallSummaryRows.length > 0
-        ? toolCallSummaryRows.length
+      toolCallSummaryTotalCount > 0
+        ? toolCallSummaryTotalCount
         : typeof selectedSession.toolCallCount === 'number'
           ? selectedSession.toolCallCount
           : null;
@@ -1028,17 +1111,12 @@ export default function AgentDashboardPage() {
       durationMs,
       toolCallCount,
     };
-  }, [selectedSession, sessionSummary, toolCallSummaryRows]);
+  }, [selectedSession, sessionSummary, toolCallSummaryTotalCount]);
 
-  const timelineEntries = useMemo(() => {
+  const rawTimelineEntries = useMemo(() => {
     if (!activeTimeline) return [] as TimelineEntry[];
 
-    const entries: TimelineEntry[] = [];
-    const session = activeTimeline.session;
-
     const events = Array.isArray(activeTimeline.events) ? [...activeTimeline.events] : [];
-    // Sort chronologically by timestamp to reflect the real emission order; fall back to
-    // sequence/_id when timestamps collide or are missing.
     events.sort((a, b) => {
       const aTimestamp = typeof a.timestamp === 'number' ? a.timestamp : Number.MIN_SAFE_INTEGER;
       const bTimestamp = typeof b.timestamp === 'number' ? b.timestamp : Number.MIN_SAFE_INTEGER;
@@ -1047,8 +1125,13 @@ export default function AgentDashboardPage() {
       return a._id.localeCompare(b._id);
     });
 
+    const entries: TimelineEntry[] = [];
+
     for (const event of events) {
       const kind = (event.kind as AgentEventKind) ?? 'message_logged';
+      if (kind === 'session_started' || kind === 'session_finished') {
+        continue;
+      }
       let status: TimelineEntry['status'] = 'default';
       const payload = event.payload ?? {};
       const meta: Array<{ label: string; value: string }> = [];
@@ -1058,34 +1141,6 @@ export default function AgentDashboardPage() {
       let durationMs: number | undefined;
 
       switch (kind) {
-        case 'session_started': {
-          const personaMode = typeof payload.personaMode === 'boolean' ? payload.personaMode : session?.personaMode;
-          const attachments = typeof payload.attachmentsCount === 'number' ? payload.attachmentsCount : session?.attachmentsCount;
-          const toolNames = Array.isArray(payload.toolNames)
-            ? (payload.toolNames as string[])
-            : session && Array.isArray((session as unknown as { toolNames?: string[] }).toolNames)
-              ? (((session as unknown as { toolNames?: string[] }).toolNames) ?? [])
-              : [];
-          const messagePreviews = Array.isArray(payload.messagePreviews)
-            ? (payload.messagePreviews as AgentMessagePreview[])
-            : [];
-          meta.push(
-            { label: 'Persona Mode', value: personaMode ? 'Enabled' : 'Disabled' },
-            { label: 'Attachments', value: attachments ? formatNumber(attachments) : '0' },
-            { label: 'Tools', value: toolNames.length ? formatList(toolNames) : '—' },
-          );
-          if (payload.userIdentifier || session?.userIdentifier) {
-            meta.push({ label: 'User', value: (payload.userIdentifier as string) ?? session?.userIdentifier ?? '—' });
-          }
-          if (messagePreviews.length > 0) {
-            preview = messagePreviews
-              .map((previewItem) => `${capitalize(previewItem.role)}: ${truncateText(previewItem.textPreview, 80)}`)
-              .join(' • ');
-          }
-          subtitle = toolNames.length ? `Tools: ${formatList(toolNames)}` : undefined;
-          break;
-        }
-
         case 'message_logged': {
           const role = typeof payload.role === 'string' ? capitalize(payload.role) : 'Message';
           const stepIndex = typeof payload.stepIndex === 'number' ? payload.stepIndex : undefined;
@@ -1095,6 +1150,46 @@ export default function AgentDashboardPage() {
           if (typeof payload.tokenEstimate === 'number') meta.push({ label: 'Tokens (est)', value: formatNumber(payload.tokenEstimate) });
           if (typeof payload.textPreview === 'string') {
             preview = truncateText(payload.textPreview, 260);
+          }
+          break;
+        }
+
+        case 'classification_decided': {
+          const resultRaw = typeof payload.result === 'string' ? payload.result : selectedSession?.personaMode ? 'persona' : 'agent';
+          const resultLabel = capitalize(resultRaw === 'persona' ? 'persona' : 'agent');
+          title = `Routing Decision: ${resultLabel}`;
+          const duration = typeof payload.durationMs === 'number' ? payload.durationMs : undefined;
+          if (duration !== undefined) {
+            subtitle = `Duration ${formatDuration(duration)}`;
+            meta.push({ label: 'Duration', value: formatDuration(duration) });
+          }
+          const model = typeof payload.model === 'string' ? payload.model : selectedSession?.model;
+          if (model) {
+            meta.push({ label: 'Model', value: model });
+          }
+          const inputChars = typeof payload.inputCharCount === 'number' ? payload.inputCharCount : undefined;
+          if (inputChars !== undefined) {
+            meta.push({ label: 'Input chars', value: formatNumber(inputChars) });
+          }
+          const attachmentsCount = typeof payload.attachmentsCount === 'number' ? payload.attachmentsCount : undefined;
+          if (attachmentsCount !== undefined) {
+            meta.push({ label: 'Attachments', value: formatNumber(attachmentsCount) });
+          }
+          const usage = payload.usage as Nullable<UsageRecord>;
+          if (usage) {
+            meta.push({ label: 'Tokens', value: usageSummary(usage) });
+          }
+          if (typeof payload.estimatedCostUSD === 'number') {
+            meta.push({ label: 'Cost est.', value: formatCost(payload.estimatedCostUSD as number) });
+          }
+          const errorMessage = typeof payload.error === 'string' ? payload.error : undefined;
+          if (errorMessage) {
+            status = 'warning';
+            meta.push({ label: 'Error', value: truncateText(errorMessage, 160) });
+          }
+          const previewCandidate = typeof payload.rawOutputPreview === 'string' ? payload.rawOutputPreview : undefined;
+          if (previewCandidate) {
+            preview = truncateText(previewCandidate, 260);
           }
           break;
         }
@@ -1243,29 +1338,6 @@ export default function AgentDashboardPage() {
           break;
         }
 
-        case 'session_finished': {
-          const finishReason = typeof payload.finishReason === 'string' ? payload.finishReason : undefined;
-          title = finishReason ? `Session finished: ${finishReason}` : 'Session finished';
-          if (typeof payload.sessionDurationMs === 'number') {
-            meta.push({ label: 'Duration', value: formatDuration(payload.sessionDurationMs) });
-          }
-          if (typeof payload.stepCount === 'number') meta.push({ label: 'Steps', value: formatNumber(payload.stepCount) });
-          if (typeof payload.toolCallCount === 'number') meta.push({ label: 'Tool Calls', value: formatNumber(payload.toolCallCount) });
-          if (payload.estimatedUsage) {
-            meta.push({ label: 'Estimated Tokens', value: usageSummary(payload.estimatedUsage as UsageRecord) });
-          }
-          if (payload.actualUsage) {
-            meta.push({ label: 'Actual Tokens', value: usageSummary(payload.actualUsage as UsageRecord) });
-          }
-          if (typeof payload.estimatedCostUSD === 'number') {
-            meta.push({ label: 'Estimated Cost', value: formatCost(payload.estimatedCostUSD) });
-          }
-          if (typeof payload.actualCostUSD === 'number') {
-            meta.push({ label: 'Actual Cost', value: formatCost(payload.actualCostUSD) });
-          }
-          break;
-        }
-
         default: {
           preview = truncateText(safeJsonStringify(payload, 0), 260);
           break;
@@ -1294,6 +1366,115 @@ export default function AgentDashboardPage() {
     return entries;
   }, [activeTimeline]);
 
+  const toolCallTimelineEntries = useMemo(() => {
+    if (!activeTimeline) return [] as ToolCallTimelineEntry[];
+
+    const toolCalls = Array.isArray(activeTimeline.toolCalls) ? [...activeTimeline.toolCalls] : [];
+    if (toolCalls.length === 0) return [] as ToolCallTimelineEntry[];
+
+    const eventsByToolCall = new Map<string, TimelineEntry[]>();
+    for (const event of rawTimelineEntries) {
+      const payload = event.payload ?? {};
+      const toolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : undefined;
+      if (!toolCallId) continue;
+      if (!eventsByToolCall.has(toolCallId)) {
+        eventsByToolCall.set(toolCallId, []);
+      }
+      eventsByToolCall.get(toolCallId)!.push(event);
+    }
+
+    const sortedCalls = toolCalls.sort((a, b) => {
+      const aStart = typeof a.startedAt === 'number' ? a.startedAt : Number.MAX_SAFE_INTEGER;
+      const bStart = typeof b.startedAt === 'number' ? b.startedAt : Number.MAX_SAFE_INTEGER;
+      if (aStart !== bStart) return aStart - bStart;
+      const aId = typeof a.toolCallId === 'string' ? a.toolCallId : (typeof a._id === 'string' ? a._id : '');
+      const bId = typeof b.toolCallId === 'string' ? b.toolCallId : (typeof b._id === 'string' ? b._id : '');
+      return aId.localeCompare(bId);
+    });
+
+    return sortedCalls.map((call) => {
+      const defaultId = typeof call._id === 'string' ? call._id : `${call.toolName ?? 'tool'}-${call.stepIndex ?? '0'}`;
+      const toolCallId = typeof call.toolCallId === 'string' && call.toolCallId.length > 0 ? call.toolCallId : defaultId;
+      const usage = call.tokenUsage as Nullable<UsageRecord>;
+      let totalTokens = usage ? tokensFromUsage(usage, 'totalTokens') : 0;
+      if (usage && (!Number.isFinite(totalTokens) || totalTokens === 0)) {
+        totalTokens = tokensFromUsage(usage, 'promptTokens') + tokensFromUsage(usage, 'completionTokens');
+      }
+      const tokensLabel = usage ? `${formatNumber(totalTokens > 0 ? totalTokens : 0)} tokens` : '—';
+      const costLabel = typeof call.costUSD === 'number' ? formatCostExact(call.costUSD) : '—';
+      const startedAt = typeof call.startedAt === 'number' ? call.startedAt : undefined;
+      const inboundAt = typeof call.inboundAt === 'number' ? call.inboundAt : undefined;
+      const completedAt = typeof call.completedAt === 'number' ? call.completedAt : undefined;
+      const durationMs = typeof call.durationMs === 'number'
+        ? call.durationMs
+        : startedAt !== undefined && completedAt !== undefined && completedAt >= startedAt
+          ? completedAt - startedAt
+          : null;
+      const durationLabel = durationMs !== null && typeof durationMs === 'number'
+        ? formatDuration(durationMs)
+        : '—';
+
+      const resultSummary = (call.resultSummary ?? {}) as Record<string, unknown>;
+      const isError = Boolean(call.isError ?? (resultSummary.isError as boolean | undefined));
+      const statusInfo = (() => {
+        if (call.status === 'completed') {
+          return isError
+            ? { status: 'error' as const, statusLabel: 'Error' }
+            : { status: 'success' as const, statusLabel: 'Completed' };
+        }
+        if (call.status === 'inbound_received') {
+          return { status: 'pending' as const, statusLabel: 'Inbound received' };
+        }
+        if (call.status === 'outbound') {
+          return { status: 'pending' as const, statusLabel: 'Waiting on result' };
+        }
+        return { status: 'pending' as const, statusLabel: 'Started' };
+      })();
+
+      const meta: Array<{ label: string; value: string }> = [];
+      if (typeof call.stepIndex === 'number') {
+        meta.push({ label: 'Step', value: formatNumber(call.stepIndex) });
+      }
+      if (statusInfo.statusLabel !== 'Completed') {
+        meta.push({ label: 'Status', value: statusInfo.statusLabel });
+      }
+      if (startedAt !== undefined) {
+        meta.push({ label: 'Started', value: formatTimestamp(startedAt) });
+      }
+      if (inboundAt !== undefined) {
+        meta.push({ label: 'Inbound', value: formatTimestamp(inboundAt) });
+      }
+      if (completedAt !== undefined && statusInfo.statusLabel !== 'Completed') {
+        meta.push({ label: 'Completed', value: formatTimestamp(completedAt) });
+      }
+
+      const inputSummary = stringifySummaryObject(call.inputSummary);
+      const resultSummaryString = stringifySummaryObject(call.resultSummary);
+
+      const rawEventsForCall = eventsByToolCall.get(toolCallId) ?? [];
+
+      return {
+        id: defaultId,
+        toolCallId,
+        toolName: call.toolName || 'Tool call',
+        status: statusInfo.status,
+        statusLabel: statusInfo.statusLabel,
+        stepIndex: typeof call.stepIndex === 'number' ? call.stepIndex : undefined,
+        startedAt,
+        inboundAt,
+        completedAt,
+        durationMs,
+        durationLabel,
+        tokensLabel,
+        costLabel,
+        meta,
+        inputSummary,
+        resultSummary: resultSummaryString,
+        rawEvents: rawEventsForCall,
+      } satisfies ToolCallTimelineEntry;
+    });
+  }, [activeTimeline, rawTimelineEntries]);
+
   const handleRowToggle = (entryId: string) => {
     setExpandedEntries((prev) => {
       const isExpanded = Boolean(prev[entryId]);
@@ -1304,6 +1485,11 @@ export default function AgentDashboardPage() {
           if (!(entryId in payloadPrev)) return payloadPrev;
           const { [entryId]: _removed, ...rest } = payloadPrev;
           return rest;
+        });
+        setExpandedToolCallEvents((toolPrev) => {
+          if (!(entryId in toolPrev)) return toolPrev;
+          const { [entryId]: _toolRemoved, ...toolRest } = toolPrev;
+          return toolRest;
         });
       } else {
         next[entryId] = true;
@@ -1317,6 +1503,13 @@ export default function AgentDashboardPage() {
     setExpandedPayloads((prev) => ({
       ...prev,
       [entryId]: !prev[entryId],
+    }));
+  };
+
+  const handleToolCallEventsToggle = (eventId: string) => {
+    setExpandedToolCallEvents((prev) => ({
+      ...prev,
+      [eventId]: !prev[eventId],
     }));
   };
 
@@ -1364,6 +1557,7 @@ export default function AgentDashboardPage() {
     };
   }
 
+
   return (
     <div className="container mx-auto px-6 py-8 space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -1371,10 +1565,17 @@ export default function AgentDashboardPage() {
           <h1 className="text-3xl font-semibold">Agent Diagnostics Dashboard</h1>
           <p className="text-muted-foreground text-sm">Live metrics for tool usage, token spend, and session timelines.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setIsSidebarOpen((open) => !open)}>
-          {isSidebarOpen ? 'Hide Session History' : 'Show Session History'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild size="sm">
+            <Link href="/dev-tools/agent-batch">Open Batch Runner</Link>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setIsSidebarOpen((open) => !open)}>
+            {isSidebarOpen ? 'Hide Session History' : 'Show Session History'}
+          </Button>
+        </div>
       </header>
+
+      
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {isSidebarOpen && (
@@ -1437,7 +1638,6 @@ export default function AgentDashboardPage() {
                         }
                         return session.status === 'active' ? 'In progress' : 'Duration —';
                       })();
-                      const completedStatusClasses = 'bg-green-100 text-green-800 border-green-200';
                       const { title: sessionTitle, subtitle: sessionSubtitle } = getSessionTitle(session);
                       const isSessionDetailsExpanded = Boolean(expandedSessions[session.sessionId]);
                       const sessionTitleOverride = sessionTitles[session.sessionId]?.trim();
@@ -1446,13 +1646,6 @@ export default function AgentDashboardPage() {
                       const displayTitle = hasCustomTitle ? sessionTitleOverride : sessionTitle;
                       const tagValues = sessionTagLists[session.sessionId] ?? [];
                       const isAddingTag = activeTagInputSessionId === session.sessionId;
-                      const sessionDurationMs =
-                        typeof session.endToEndDurationMs === 'number'
-                          ? session.endToEndDurationMs
-                          : typeof session.durationMs === 'number'
-                            ? session.durationMs
-                            : null;
-
                       return (
                         <div
                           key={session.sessionId}
@@ -1575,11 +1768,6 @@ export default function AgentDashboardPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-1">
-                              {session.status === 'completed' && (
-                                <Badge variant="outline" className={completedStatusClasses}>
-                                  {session.status.toUpperCase()}
-                                </Badge>
-                              )}
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -1645,56 +1833,26 @@ export default function AgentDashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="text-sm">
-                    {usageSummaryRows.length > 0 && (
-                      <>
-                        <div className="px-4 pb-1 pt-3 text-xs uppercase tracking-wide text-muted-foreground">
-                          <div className="ml-auto flex gap-3 sm:justify-end">
-                            <span className="min-w-[6rem] text-right">Tokens</span>
-                            <span className="min-w-[6rem] text-right">Cost</span>
+                  <div className="space-y-4 pt-3">
+                    <div className="grid gap-3 px-4 sm:grid-cols-2 xl:grid-cols-4">
+                      {sessionHeadlineMetrics.map((metric) => (
+                        <div
+                          key={metric.key}
+                          className="rounded-md border border-border/60 bg-background/80 p-3 shadow-sm"
+                        >
+                          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {metric.label}
                           </div>
+                          <div className="mt-1 text-lg font-semibold text-foreground">{metric.value}</div>
+                          {metric.caption ? (
+                            <div className="text-xs text-muted-foreground">{metric.caption}</div>
+                          ) : null}
                         </div>
-                        <div className="divide-y">
-                          {usageSummaryRows.map((row) => (
-                            <div
-                              key={row.key}
-                              className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                            >
-                              <span className="text-sm font-medium text-foreground">{row.label}</span>
-                              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground sm:justify-end">
-                                <span className="tabular-nums text-foreground min-w-[6rem] text-right">{row.value}</span>
-                                <span className="tabular-nums min-w-[6rem] text-right">{row.secondary}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                    {auxiliarySummaryRows.length > 0 && (
-                      <div className={cn('divide-y', usageSummaryRows.length > 0 ? 'mt-4' : '')}>
-                        {auxiliarySummaryRows.map((row) => (
-                          <div
-                            key={row.key}
-                            className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <span className="text-sm font-medium text-foreground">{row.label}</span>
-                            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                              <span className="tabular-nums text-foreground">{row.value}</span>
-                              <span className="tabular-nums">{row.secondary}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                      ))}
+                    </div>
+
                     {toolCallSummaryRows.length > 0 && (
-                      <div
-                        className={cn(
-                          'mt-4',
-                          usageSummaryRows.length > 0 || auxiliarySummaryRows.length > 0
-                            ? 'border-t border-border/60 pt-4'
-                            : ''
-                        )}
-                      >
+                      <div className="px-4">
                         <div className="rounded-md border border-border">
                           <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3 px-4 py-2 text-xs uppercase tracking-wide text-muted-foreground">
                             <span>Tool Call</span>
@@ -1730,19 +1888,28 @@ export default function AgentDashboardPage() {
                 <h2 className="text-xl font-semibold">Session Timeline</h2>
                 <p className="text-sm text-muted-foreground">Audit every API call, tool action, and stream emitted by the agent.</p>
               </div>
-              {selectedSession && (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'text-xs',
-                    selectedSession.status === 'completed'
-                      ? 'bg-green-100 text-green-800 border-green-200'
-                      : 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                  )}
-                >
-                  {selectedSession.status.toUpperCase()}
-                </Badge>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-md border border-border/60 p-0.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={timelineView === 'toolCalls' ? 'default' : 'ghost'}
+                    onClick={() => setTimelineView('toolCalls')}
+                    aria-pressed={timelineView === 'toolCalls'}
+                  >
+                    Tool Calls
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={timelineView === 'rawEvents' ? 'default' : 'ghost'}
+                    onClick={() => setTimelineView('rawEvents')}
+                    aria-pressed={timelineView === 'rawEvents'}
+                  >
+                    Raw Events
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {!selectedSessionId && (
@@ -1772,13 +1939,175 @@ export default function AgentDashboardPage() {
             {selectedSessionId && activeTimeline && (
               <Card className="min-w-0">
                 <CardContent>
-                  {timelineEntries.length === 0 ? (
+                  {timelineView === 'toolCalls' ? (
+                    toolCallTimelineEntries.length === 0 ? (
+                      <div className="py-10 text-center text-sm text-muted-foreground">
+                        No tool calls recorded for this session yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-2 py-3">
+                        {toolCallTimelineEntries.map((entry) => {
+                          const isExpanded = Boolean(expandedEntries[entry.id]);
+                          const showRawEvents = Boolean(expandedToolCallEvents[entry.id]);
+                          const accentClass =
+                            entry.status === 'error'
+                              ? 'bg-destructive/80'
+                              : entry.status === 'success'
+                                ? 'bg-emerald-500/80'
+                                : 'bg-blue-500/70';
+                          const statusBadgeClass =
+                            entry.status === 'error'
+                              ? 'bg-destructive text-destructive-foreground'
+                              : entry.status === 'success'
+                                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-200'
+                                : 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200';
+                          const subtitleParts: string[] = [];
+                          if (entry.stepIndex !== undefined) subtitleParts.push(`Step ${formatNumber(entry.stepIndex)}`);
+                          subtitleParts.push(shortId(entry.toolCallId));
+                          const summaryPills = [
+                            { label: 'Tokens', value: entry.tokensLabel },
+                            { label: 'Cost', value: entry.costLabel },
+                            { label: 'Duration', value: entry.durationLabel },
+                          ];
+
+                          return (
+                            <div
+                              key={entry.id}
+                              className="rounded-md border border-border bg-background/80 p-3 shadow-sm"
+                              onClick={(event) => handleEntryContainerClick(event, entry.id, isExpanded)}
+                            >
+                              <button
+                                type="button"
+                                className="flex w-full items-start justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                onClick={() => handleRowToggle(entry.id)}
+                                onMouseDown={(event) => event.preventDefault()}
+                                aria-expanded={isExpanded}
+                              >
+                                <div className="flex min-w-0 flex-1 items-start gap-2">
+                                  <div className="mt-1 flex h-5 w-5 flex-shrink-0 items-center justify-center">
+                                    <span className={cn('h-2.5 w-2.5 rounded-full', accentClass)} />
+                                  </div>
+                                  <div className="min-w-0 space-y-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="text-sm font-semibold text-foreground">{entry.toolName}</span>
+                                      {entry.status !== 'success' && (
+                                        <Badge
+                                          variant="outline"
+                                          className={cn('text-[10px]', statusBadgeClass)}
+                                        >
+                                          {entry.statusLabel}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {subtitleParts.length > 0 && (
+                                      <div className="text-xs text-muted-foreground">{subtitleParts.join(' • ')}</div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-muted-foreground">
+                                  {summaryPills.map((pill) => (
+                                    <span
+                                      key={`${entry.id}-${pill.label}`}
+                                      className="rounded-full bg-muted px-2 py-0.5 text-foreground"
+                                    >
+                                      {pill.label}: <span className="tabular-nums">{pill.value}</span>
+                                    </span>
+                                  ))}
+                                  <span className="text-base leading-none text-muted-foreground">{isExpanded ? '-' : '+'}</span>
+                                </div>
+                              </button>
+
+                              {isExpanded && (
+                                <div className="mt-3 space-y-3">
+                                  {entry.meta.length > 0 && (
+                                    <dl className="grid gap-2 text-xs md:grid-cols-2">
+                                      {entry.meta.map((item) => (
+                                        <div key={`${entry.id}-${item.label}`} className="flex justify-between gap-3">
+                                          <dt className="text-muted-foreground">{item.label}</dt>
+                                          <dd className="text-right font-medium text-foreground">{item.value}</dd>
+                                        </div>
+                                      ))}
+                                    </dl>
+                                  )}
+
+                                  {entry.inputSummary && (
+                                    <div className="space-y-1 text-xs">
+                                      <div className="font-medium text-foreground">Input</div>
+                                      <pre className="whitespace-pre-wrap break-words rounded-md bg-muted/70 px-3 py-2 text-[11px] text-muted-foreground">
+                                        {entry.inputSummary}
+                                      </pre>
+                                    </div>
+                                  )}
+
+                                  {entry.resultSummary && (
+                                    <div className="space-y-1 text-xs">
+                                      <div className="font-medium text-foreground">Result</div>
+                                      <pre className="whitespace-pre-wrap break-words rounded-md bg-muted/70 px-3 py-2 text-[11px] text-muted-foreground">
+                                        {entry.resultSummary}
+                                      </pre>
+                                    </div>
+                                  )}
+
+                                  {entry.rawEvents.length > 0 && (
+                                    <div className="space-y-2 text-xs">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          handleToolCallEventsToggle(entry.id);
+                                        }}
+                                      >
+                                        {showRawEvents ? 'Hide raw events' : 'Show raw events'}
+                                      </Button>
+                                      {showRawEvents && (
+                                        <div className="space-y-2">
+                                          {entry.rawEvents.map((raw) => {
+                                            const rawTimestamp = typeof raw.timestamp === 'number' ? formatTimeOfDay(raw.timestamp) : undefined;
+                                            return (
+                                              <div key={raw.id} className="rounded-md border border-border/60 bg-muted/40 px-3 py-2">
+                                                <div className="flex items-center justify-between gap-2">
+                                                  <span className="text-xs font-medium text-foreground">{raw.title}</span>
+                                                  {rawTimestamp ? (
+                                                    <span className="text-[11px] text-muted-foreground">{rawTimestamp}</span>
+                                                  ) : null}
+                                                </div>
+                                                {raw.meta && raw.meta.length > 0 && (
+                                                  <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                                                    {raw.meta.map((m) => (
+                                                      <span key={`${raw.id}-${m.label}`}>
+                                                        {m.label}: <span className="text-foreground">{m.value}</span>
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                                {raw.preview && (
+                                                  <div className="mt-1 whitespace-pre-wrap break-words text-[11px] text-muted-foreground">
+                                                    {raw.preview}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )
+                  ) : rawTimelineEntries.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">
                       No events recorded for this session yet.
                     </div>
                   ) : (
                     <div className="space-y-2 py-3">
-                      {timelineEntries.map((entry) => {
+                      {rawTimelineEntries.map((entry) => {
                         const isExpanded = Boolean(expandedEntries[entry.id]);
                         const isPayloadExpanded = Boolean(expandedPayloads[entry.id]);
                         const hasPayload = Boolean(entry.payloadString && entry.payloadString.trim().length > 2);

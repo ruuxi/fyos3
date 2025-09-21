@@ -10,6 +10,7 @@ import type {
   AgentToolCallFinishedEvent,
   AgentToolCallStartedEvent,
   AgentMessageLoggedEvent,
+  AgentClassificationDecidedEvent,
 } from '@/lib/agent/metrics/types';
 
 interface EmitOptions {
@@ -44,6 +45,7 @@ export class AgentEventEmitter {
   emit(kind: 'tool_call_outbound', payload: PayloadFor<'tool_call_outbound'>, options?: EmitOptions): Promise<void>;
   emit(kind: 'tool_call_inbound', payload: PayloadFor<'tool_call_inbound'>, options?: EmitOptions): Promise<void>;
   emit(kind: 'message_logged', payload: PayloadFor<'message_logged'>, options?: EmitOptions): Promise<void>;
+  emit(kind: 'classification_decided', payload: PayloadFor<'classification_decided'>, options?: EmitOptions): Promise<void>;
   emit(kind: AgentEventKind, payload: PayloadFor<AgentEventKind>, options?: EmitOptions): Promise<void> {
     const timestamp = options?.timestamp ?? Date.now();
     const source = options?.source ?? 'api/agent';
@@ -116,4 +118,5 @@ export type {
   AgentToolCallFinishedEvent,
   AgentToolCallStartedEvent,
   AgentMessageLoggedEvent,
+  AgentClassificationDecidedEvent,
 };

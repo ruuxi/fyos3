@@ -6,7 +6,8 @@ export type AgentEventKind =
   | 'tool_call_finished'
   | 'tool_call_outbound'
   | 'tool_call_inbound'
-  | 'message_logged';
+  | 'message_logged'
+  | 'classification_decided';
 
 export interface AgentUsageEstimates {
   promptTokens?: number;
@@ -171,6 +172,23 @@ export interface AgentSessionFinishedEvent extends AgentEventBase {
   };
 }
 
+export interface AgentClassificationDecidedEvent extends AgentEventBase {
+  kind: 'classification_decided';
+  payload: {
+    model: string;
+    result: 'agent' | 'persona';
+    durationMs: number;
+    startedAt: number;
+    finishedAt: number;
+    inputCharCount: number;
+    attachmentsCount: number;
+    usage?: AgentUsageEstimates;
+    estimatedCostUSD?: number;
+    rawOutputPreview?: string;
+    error?: string;
+  };
+}
+
 export type AgentIngestEvent =
   | AgentSessionStartedEvent
   | AgentSessionFinishedEvent
@@ -179,7 +197,8 @@ export type AgentIngestEvent =
   | AgentToolCallFinishedEvent
   | AgentToolCallOutboundEvent
   | AgentToolCallInboundEvent
-  | AgentMessageLoggedEvent;
+  | AgentMessageLoggedEvent
+  | AgentClassificationDecidedEvent;
 
 export interface AgentSessionMeta {
   sessionId: string;

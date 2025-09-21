@@ -1021,3 +1021,8 @@ export const getSummary = query({
     };
   },
 });
+
+// Compare metrics before/after a cutoff timestamp using existing stored data.
+// Returns per-session E2E duration medians/P90s, token/cost aggregates,
+// tool-level duration/usage/cost stats, and a concurrency overlap ratio
+// computed from tool call time overlap within sessions.
