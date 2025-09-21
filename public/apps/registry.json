@@ -10,5 +10,41 @@
     "name": "Food Tracker",
     "icon": "🥗",
     "path": "/src/apps/food-tracker/index.tsx"
+  },
+  {
+    "id": "food-tracker-1",
+    "name": "Food Tracker (1)",
+    "icon": "🍎",
+    "path": "/src/apps/food-tracker-1/index.tsx"
+  },
+  {
+    "id": "feedback-form",
+    "name": "Feedback Form",
+    "icon": "📝",
+    "path": "/src/apps/feedback-form/index.tsx"
+  },
+  {
+    "id": "reminder-app",
+    "name": "Reminder App",
+    "icon": "📋",
+    "path": "/src/apps/reminder-app/index.tsx"
+  },
+  {
+    "id": "dream-journal",
+    "name": "Dream Journal",
+    "icon": "🌙",
+    "path": "/src/apps/dream-journal/index.tsx"
+  },
+  {
+    "id": "gift-tracker",
+    "name": "Christmas Gift Tracker",
+    "icon": "🎁",
+    "path": "/src/apps/gift-tracker/index.tsx"
+  },
+  {
+    "id": "ideas-app",
+    "name": "Ideas App",
+    "icon": "💡",
+    "path": "/src/apps/ideas-app/index.tsx"
   }
 ]

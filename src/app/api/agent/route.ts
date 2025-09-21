@@ -1,5 +1,4 @@
 import { convertToModelMessages, streamText, UIMessage, stepCountIs, generateText } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createHash } from 'crypto';
 import { auth } from '@clerk/nextjs/server';
 // z is used in tool schemas but not directly here
@@ -15,6 +14,7 @@ import {
   AiGenerateInput,
   MediaListInput,
   CodeEditAstInput,
+  FastAppCreateInput,
 } from '@/lib/agentTools';
 import { agentLogger } from '@/lib/agentLogger';
 import { 
@@ -35,14 +35,6 @@ import {
   toUsageEstimates,
   estimateTokensFromJson,
 } from '@/lib/agent/metrics/tokenEstimation';
-
-const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY ?? '',
-  headers: {
-    'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER ?? process.env.NEXT_PUBLIC_APP_URL ?? 'https://fromyou.studio',
-    'X-Title': process.env.OPENROUTER_APP_TITLE ?? 'FromYou Desktop',
-  },
-});
 
 // Some tool actions (like package installs) may take longer than 30s
 export const maxDuration = 300;
@@ -597,8 +589,12 @@ export async function POST(req: Request) {
       description: 'Validate the project: typecheck + lint (changed files); full also runs production build.',
       inputSchema: ValidateProjectInput,
     },
-    // Server-side tools (web search, fast scaffolds, ...)
+    // Server-side tools (web search) + dynamic fast-path scaffolding
     ...serverTools,
+    [TOOL_NAMES.fast_app_create]: {
+      description: 'Create a new app by batching metadata/registry updates and optional file writes. Executes inside the client WebContainer for instant feedback.',
+      inputSchema: FastAppCreateInput,
+    },
     // AI Media Tools (unified)
     [TOOL_NAMES.ai_generate]: {
       description: 'Generate media using provider=fal|eleven with input only. Model selection happens behind the scenes; outputs are auto‑ingested and returned with durable URLs.',
@@ -625,8 +621,8 @@ export async function POST(req: Request) {
         [TOOL_NAMES.app_manage]: allTools[TOOL_NAMES.app_manage],
         [TOOL_NAMES.media_list]: allTools[TOOL_NAMES.media_list],
         // Keep search + fast scaffolding available for intent classification; omit exec/validation/code-edit for speed
-        [TOOL_NAMES.fast_app_create]: serverTools[TOOL_NAMES.fast_app_create],
-        [TOOL_NAMES.web_search]: serverTools[TOOL_NAMES.web_search],
+        [TOOL_NAMES.fast_app_create]: allTools[TOOL_NAMES.fast_app_create],
+        [TOOL_NAMES.web_search]: allTools[TOOL_NAMES.web_search],
       }
     : allTools;
   const modelId = 'alibaba/qwen3-coder';

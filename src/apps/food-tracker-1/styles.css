@@ -1,0 +1,75 @@
+:root {
+  --app-accent: #10b981; /* green-500 */
+  --app-background: #f0fdf4; /* green-50 */
+  --app-text: #065f46; /* green-800 */
+  --app-secondary: #03665e;
+  --app-border: #d1fae5; /* green-100 */
+  --app-hover: #059669; /* green-600 */
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+.app-header {
+  background: linear-gradient(90deg, #10b981, #0ea5e9);
+  color: white;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.app-card {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.app-button {
+  background-color: var(--app-accent);
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.app-button:hover {
+  background-color: var(--app-hover);
+  transform: translateY(-1px);
+}
+
+.app-input {
+  padding: 0.75rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.app-input:focus {
+  outline: none;
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+}
+
+.nutrition-summary-card {
+  background-color: #f3f4f6;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.food-entry-item {
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.food-entry-item:hover {
+  background-color: #f0fdf4;
+}

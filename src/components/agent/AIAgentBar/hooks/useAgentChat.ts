@@ -7,6 +7,7 @@ import { persistAssetsFromAIResult, extractOriginalMediaUrlsFromResult, type Med
 import { autoIngestInputs } from '@/utils/auto-ingest';
 import { guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 import type { TCodeEditAstInput, TWebFsReadInput } from '@/lib/agentTools';
+import { performFastAppCreate, type FastAppCreateRequest } from '@/lib/apps/fastAppCreate';
 
 type WebContainerFns = {
   mkdir: (path: string, recursive?: boolean) => Promise<void>;
@@ -35,12 +36,6 @@ type UseAgentChatOptions = {
   attachmentsProvider?: () => Array<{ name: string; publicUrl: string; contentType: string }>;
   onFirstToolCall?: () => void;
   onToolProgress?: (toolName: string) => void;
-};
-
-type FastAppCreateMirrorPayload = {
-  base: string;
-  registry?: string;
-  files: Array<{ path: string; content: string }>;
 };
 
 type WebFsFindInput = {
@@ -211,6 +206,10 @@ const SAFE_TOOL_NAMES = new Set<string>([
 
 const EXEC_GATED_TOOL_NAMES = new Set<string>(['web_exec', 'validate_project']);
 
+// Tools that can proceed without an initialized WebContainer instance because
+// they only require the fs bridge exposed via fnsRef (e.g., fast_app_create).
+const INSTANCE_OPTIONAL_TOOL_NAMES = new Set<string>(['fast_app_create']);
+
 export function useAgentChat(opts: UseAgentChatOptions) {
   const { id, initialMessages, activeThreadId, wc, runValidation, attachmentsProvider } = opts;
   const mutableWindow = getMutableWindow();
@@ -225,82 +224,6 @@ export function useAgentChat(opts: UseAgentChatOptions) {
   }
 
   const dirListingCacheRef = useRef<Map<string, string[] | null>>(new Map());
-  const mirroredFastCreateIdsRef = useRef<Set<string>>(new Set());
-
-  const extractFastAppCreateMirror = (output: unknown): FastAppCreateMirrorPayload | null => {
-    if (!output || typeof output !== 'object') {
-      return null;
-    }
-    const asRecord = output as Record<string, unknown>;
-    const resultCandidate = asRecord.result;
-    const result =
-      resultCandidate && typeof resultCandidate === 'object' && resultCandidate !== null
-        ? (resultCandidate as Record<string, unknown>)
-        : asRecord;
-
-    const base = typeof result.base === 'string' ? result.base : undefined;
-    const mirrorRaw = result.mirror;
-    if (!base || !mirrorRaw || typeof mirrorRaw !== 'object' || mirrorRaw === null) {
-      return null;
-    }
-
-    const mirrorObj = mirrorRaw as Record<string, unknown>;
-    const registryRaw = mirrorObj.registry;
-    const filesRaw = Array.isArray(mirrorObj.files) ? mirrorObj.files : [];
-
-    const files: Array<{ path: string; content: string }> = [];
-    for (const entry of filesRaw) {
-      if (!entry || typeof entry !== 'object') continue;
-      const cursor = entry as Record<string, unknown>;
-      const entryPath = typeof cursor.path === 'string' ? cursor.path : undefined;
-      const entryContent = typeof cursor.content === 'string' ? cursor.content : undefined;
-      if (!entryPath || entryContent === undefined) continue;
-      files.push({ path: entryPath, content: entryContent });
-    }
-
-    const registry = typeof registryRaw === 'string' ? registryRaw : undefined;
-    if (!registry && files.length === 0) {
-      return null;
-    }
-
-    return { base, registry, files };
-  };
-
-  const applyFastAppCreateMirror = async (payload: FastAppCreateMirrorPayload) => {
-    const fns = wc.fnsRef.current;
-    if (!fns) return;
-    try {
-      await fns.mkdir(payload.base, true);
-    } catch {}
-
-    for (const file of payload.files) {
-      const targetPath = `${payload.base}/${file.path}`.replace(/\/+/g, '/');
-      const dir = targetPath.split('/').slice(0, -1).join('/');
-      if (dir) {
-        try {
-          await fns.mkdir(dir, true);
-        } catch {}
-      }
-      try {
-        await fns.writeFile(targetPath, file.content);
-      } catch (error) {
-        console.warn('[AGENT] Failed to mirror fast_app_create file', { targetPath, error });
-      }
-    }
-
-    if (typeof payload.registry === 'string') {
-      try {
-        await fns.writeFile('public/apps/registry.json', payload.registry);
-      } catch (error) {
-        console.warn('[AGENT] Failed to mirror registry.json', error);
-      }
-    }
-
-    try {
-      dirListingCacheRef.current.clear();
-    } catch {}
-  };
-
   const activeThreadIdRef = useRef<string | null>(activeThreadId);
   useEffect(() => { activeThreadIdRef.current = activeThreadId; }, [activeThreadId]);
 
@@ -370,35 +293,6 @@ export function useAgentChat(opts: UseAgentChatOptions) {
         return { body };
       },
     }),
-    onData(chunk) {
-      try {
-        if (!chunk || typeof chunk !== 'object') return;
-        const typedChunk = chunk as { type?: string; toolName?: string; providerExecuted?: boolean; output?: unknown; toolCallId?: string };
-        if (typedChunk.type !== 'tool-result') return;
-        if (typedChunk.toolName !== 'fast_app_create') return;
-        if (typedChunk.providerExecuted === false) return;
-
-        const payload = extractFastAppCreateMirror(typedChunk.output);
-        if (!payload) return;
-
-        const toolCallId = typeof typedChunk.toolCallId === 'string' ? typedChunk.toolCallId : undefined;
-        if (toolCallId && mirroredFastCreateIdsRef.current.has(toolCallId)) {
-          return;
-        }
-        if (toolCallId) {
-          mirroredFastCreateIdsRef.current.add(toolCallId);
-          if (mirroredFastCreateIdsRef.current.size > 32) {
-            const latest = Array.from(mirroredFastCreateIdsRef.current).slice(-32);
-            mirroredFastCreateIdsRef.current.clear();
-            latest.forEach((idValue) => mirroredFastCreateIdsRef.current.add(idValue));
-          }
-        }
-
-        void applyFastAppCreateMirror(payload);
-      } catch (error) {
-        console.warn('[AGENT] Failed processing fast_app_create mirror payload', error);
-      }
-    },
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     async onToolCall({ toolCall }) {
       if (toolCall.dynamic) return;
@@ -428,10 +322,12 @@ export function useAgentChat(opts: UseAgentChatOptions) {
         return instanceRef.current;
       };
 
-      if (!instanceRef.current) {
+      const shouldRequireInstance = !INSTANCE_OPTIONAL_TOOL_NAMES.has(toolCall.toolName);
+
+      if (shouldRequireInstance && !instanceRef.current) {
         await waitForInstance();
       }
-      if (!instanceRef.current) {
+      if (shouldRequireInstance && !instanceRef.current) {
         addToolResult({ tool: toolCall.toolName, toolCallId: toolCall.toolCallId, output: { error: 'WebContainer is not ready yet. Still initializing, try again in a moment.' } });
         return;
       }
@@ -889,6 +785,35 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : String(err);
               addToolResult({ tool: 'code_edit_ast', toolCallId: tc.toolCallId, output: { ok: false, error: message, path: input.path } });
+            }
+            break;
+          }
+          case 'fast_app_create': {
+            const input = tc.input as FastAppCreateRequest;
+            try {
+              const fs = fnsRef.current;
+              if (!fs) {
+                await logAndAddResult({ ok: false, error: 'WebContainer file system unavailable.' });
+                break;
+              }
+
+              const result = await performFastAppCreate({
+                input,
+                fs: {
+                  mkdirp: async (path) => { await fs.mkdir(path, true); },
+                  writeFile: (path, content) => fs.writeFile(path, content),
+                  readFile: (path) => fs.readFile(path, 'utf-8'),
+                },
+              });
+
+              if (result.ok) {
+                try { dirListingCacheRef.current.clear(); } catch {}
+              }
+
+              await logAndAddResult(result);
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              await logAndAddResult({ ok: false, error: message });
             }
             break;
           }

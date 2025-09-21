@@ -1,0 +1,38 @@
+:root {
+  --app-accent: #6366f1;
+  --app-background: #e0e7ff;
+  --app-text: #4f46e5;
+  --app-border: #c7d2fe;
+  --app-hover: #818cf8;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+.dream-entry-card {
+  transition: all 0.3s ease;
+}
+
+.dream-entry-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.1);
+}
+
+.tag {
+  background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+  transition: all 0.2s ease;
+}
+
+.tag:hover {
+  background: linear-gradient(135deg, #ddd6fe, #c4b5fd);
+}
+
+.search-input, .dream-input, .dream-textarea {
+  border-width: 2px;
+}
+
+.search-input:focus, .dream-input:focus, .dream-textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}

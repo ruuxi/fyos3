@@ -1,0 +1,21 @@
+:root {
+  --app-accent: #9d4edd;
+  --app-background: #f8f0fc;
+  --app-text: #212529;
+  --app-border: #c77dff;
+  --app-hover: #7b2cbf;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.app-fade-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+body {
+  background-color: var(--app-background);
+  color: var(--app-text);
+}

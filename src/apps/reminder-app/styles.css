@@ -1,0 +1,52 @@
+:root {
+  --app-accent: #3b82f6;
+  --app-background: #f9fafb;
+  --app-text: #1f2937;
+  --app-border: #e5e7eb;
+  --app-hover: #2563eb;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+.reminder-input {
+  border: 1px solid var(--app-border);
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.reminder-input:focus {
+  outline: none;
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.reminder-card {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  transition: all 0.2s ease;
+}
+
+.reminder-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.add-button {
+  background: var(--app-accent);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.add-button:hover {
+  background: var(--app-hover);
+}

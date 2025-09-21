@@ -1,0 +1,71 @@
+:root {
+  --app-accent: #dc2626; /* Red for Christmas theme */
+  --app-secondary: #059669; /* Green for Christmas theme */
+  --app-background: #fef2f2; /* Light red background */
+  --app-text: #1f2937; /* Default text color */
+  --app-border: #fca5a5; /* Light border color */
+  --app-hover: #b91c1c; /* Darker red for hover */
+}
+
+.gift-tracker-button {
+  background: linear-gradient(to right, var(--app-accent), var(--app-secondary));
+  color: white;
+  font-weight: 600;
+  border: none;
+}
+
+.gift-tracker-button:hover {
+  background: linear-gradient(to right, #b91c1c, #047857);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.gift-tracker-button:active {
+  transform: translateY(0);
+}
+
+.gift-tracker-header {
+  background: linear-gradient(to right, var(--app-accent), var(--app-secondary));
+  color: white;
+  padding: 1rem;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.gift-item {
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.gift-item:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.status-planned {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-purchased {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-received {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.filter-button {
+  transition: all 0.2s ease;
+}
+
+.filter-button:hover {
+  transform: scale(1.05);
+}
+
+.filter-button:active {
+  transform: scale(0.98);
+}
