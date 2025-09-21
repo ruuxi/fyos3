@@ -88,6 +88,8 @@ const isLikelyAppBuildMessage = (message: UIMessage | undefined): boolean => {
   const newAppPattern = /\bnew\s+app\b/;
   return createAppPattern.test(text) || newAppPattern.test(text);
 };
+// Gating only applies when the last user message matches the create‑app regex; all other 
+// requests keep the full toolset and 15‑step budget, so edits are unaffected.
 
 type MutableWindow = Window & {
   __FYOS_FIRST_TOOL_CALLED_REF?: { current: boolean };
