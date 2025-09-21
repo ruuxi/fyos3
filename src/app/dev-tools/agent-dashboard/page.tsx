@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { getUsageCostBreakdown } from '@/lib/agent/metrics/tokenEstimation';
 import { cn } from '@/lib/utils';
 import type { AgentEventKind, AgentMessagePreview } from '@/lib/agent/metrics/types';
-import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, Pencil, Trash2 } from 'lucide-react';
 
 type UsageRecord = {
   promptTokens?: number;
@@ -2256,9 +2256,27 @@ export default function AgentDashboardPage() {
                                       {isPayloadExpanded ? 'Hide payload' : 'Show payload'}
                                     </Button>
                                     {isPayloadExpanded && (
-                                      <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted/70 px-3 py-2 text-xs text-muted-foreground">
-                                        {entry.payloadString}
-                                      </pre>
+                                      <div className="relative mt-2">
+                                        <pre className="max-h-64 overflow-auto rounded-md bg-muted/70 px-3 pb-7 pr-9 pt-2 text-xs text-muted-foreground">
+                                          {entry.payloadString}
+                                        </pre>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="absolute bottom-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
+                                          aria-label="Copy payload"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            event.preventDefault();
+                                            if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+                                              void navigator.clipboard.writeText(entry.payloadString ?? '');
+                                            }
+                                          }}
+                                        >
+                                          <Copy className="h-4 w-4" />
+                                        </Button>
+                                      </div>
                                     )}
                                   </div>
                                 )}
