@@ -263,7 +263,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
   const {
     messages,
     optimisticMessages = [],
-    status: _status,
+    status,
     messagesContainerRef,
     messagesInnerRef,
     didAnimateWelcome,
@@ -335,30 +335,45 @@ export default function MessagesPane(props: MessagesPaneProps) {
               }
             }
           }
-          const showVerbAnimation = isAgentAssistant && isFinalAgentReply && agentActive;
 
           // Build content and collect any attachments referenced in text
-          const textNodes: ReactNode[] = [];
+          const textSegments: string[] = [];
           let collectedFromText: AttachmentPreview[] = [];
-          (m.parts || []).forEach((part, index: number) => {
+          (m.parts || []).forEach((part) => {
             if (isTextPart(part)) {
               const { cleanedText, items } = extractAttachmentsFromText(part.text || '');
               if (cleanedText) {
-                textNodes.push(<span key={`t-${index}`}>{cleanedText}</span>);
+                textSegments.push(cleanedText);
               }
               if (items.length) {
                 collectedFromText = collectedFromText.concat(items);
               }
             }
           });
+          const effectiveSegments = isAgentAssistant && textSegments.length > 0
+            ? [textSegments[textSegments.length - 1]]
+            : textSegments;
+          const textNodes: ReactNode[] = effectiveSegments.map((segment, index) => (
+            <span key={`t-${index}`}>{segment}</span>
+          ));
           const isLastUser = m.role === 'user' && m.id === lastUserMessageId;
           const optimisticAttachmentOverride = getOptimisticAttachments(metadata);
-          const previewItems = collectedFromText.length > 0
-            ? collectedFromText
-            : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
+          const previewItems = isAgentAssistant
+            ? []
+            : collectedFromText.length > 0
+              ? collectedFromText
+              : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
+
+          const runActive = status === 'streaming' || status === 'submitted' || agentActive;
+          const isStreamingAgentMessage = isAgentAssistant && idx === displayMessages.length - 1 && runActive;
+          const showVerbAnimation = isStreamingAgentMessage && textNodes.length === 0;
 
           // Hide non-final agent replies to avoid intermediate output flashes
           if (isAssistant && mode === 'agent' && !isFinalAgentReply) {
+            return null;
+          }
+
+          if (isAgentAssistant && !showVerbAnimation && textNodes.length === 0) {
             return null;
           }
 
@@ -408,10 +423,9 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   {/* Render agent-friendly content or original text */}
                   {textContent}
                   {/* Render tool results and media blocks */}
-                  {(m.parts || []).map((part, index: number) => {
+                  {(!isAgentAssistant) && (m.parts || []).map((part, index: number) => {
                     if (!isToolResultPart(part)) return null;
                     const payload = getToolResultPayload(part);
-                    // Ephemeral assets from provider (surface immediately)
                     if (payload && payload.ephemeralAssets && payload.ephemeralAssets.length > 0) {
                       const assets = toMediaAssetArray(payload.ephemeralAssets);
                       return (
@@ -490,7 +504,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   )}
 
                   {/* Reactive media: if authenticated and thread-bound media exists, show new thumbnails below last assistant message */}
-                  {isFinalAgentReply && liveMediaList.length > 0 && (
+                  {!isAgentAssistant && isFinalAgentReply && liveMediaList.length > 0 && (
                     <div className="mt-2 space-y-2">
                       {liveMediaList.map((asset, assetIndex) => {
                         const publicUrl = asset.publicUrl || '';
