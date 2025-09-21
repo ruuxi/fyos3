@@ -29,7 +29,7 @@ export default function AIAgentBar() {
   const [leftPane, setLeftPane] = useState<'agent' | 'friend'>('agent');
   
   const { goTo, activeIndex } = useScreens();
-  const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady } = useWebContainer();
+  const { instance, mkdir, writeFile, readFile, readdirRecursive, remove, spawn } = useWebContainer();
   
   // Visit desktops state
   const [desktopsListing, setDesktopsListing] = useState<Array<{ _id: string; title: string; description?: string; icon?: string }>>([]);
@@ -103,10 +103,10 @@ export default function AIAgentBar() {
 
   // Keep latest instance and fs helpers in refs so tool callbacks don't capture stale closures
   const instanceRef = useRef(instance);
-  const baseFnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady });
-  const fnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady });
+  const baseFnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
+  const fnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
   useEffect(() => { instanceRef.current = instance; }, [instance]);
-  useEffect(() => { baseFnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady]);
+  useEffect(() => { baseFnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
 
   const agent = useAgentController({
     input,
@@ -184,10 +184,9 @@ export default function AIAgentBar() {
         }
         return base.spawn(command, args, opts);
       },
-      waitForDepsReady: base.waitForDepsReady,
     } as typeof fnsRef.current;
     fnsRef.current = tracked;
-  }, [markFsChanged, mkdir, writeFile, readFile, readdirRecursive, remove, spawn, waitForDepsReady]);
+  }, [markFsChanged, mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
 
 
   const handleUndo = useCallback(async () => {
