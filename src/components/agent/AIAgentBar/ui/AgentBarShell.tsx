@@ -8,20 +8,17 @@ export type AgentBarShellProps = {
   barAreaRef?: RefObject<HTMLDivElement | null>;
   dragOverlay?: ReactNode;
   bottomBar?: ReactNode;
+  navBar?: ReactNode;
   children: ReactNode;
 };
 
 export default function AgentBarShell(props: AgentBarShellProps) {
-  const { isOpen, isOpening, isClosing, onBackdropClick, barAreaRef, dragOverlay, bottomBar, children } = props;
+  const { isOpen, isOpening, isClosing, onBackdropClick, barAreaRef, dragOverlay, bottomBar, navBar, children } = props;
 
   return (
     <>
       {dragOverlay}
-      <div
-        className={`fixed inset-0 z-40 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
-        onClick={onBackdropClick}
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0 z-40 pointer-events-none" aria-hidden="true" />
       <div className="fixed inset-y-0 left-0 z-50 flex">
         <div className="relative h-full w-[400px]" ref={barAreaRef}>
           <div className={`flex h-full flex-col overflow-hidden text-white ${isOpen ? 'glass-secondary' : 'glass-primary'} transition-shadow`}>
@@ -34,6 +31,9 @@ export default function AgentBarShell(props: AgentBarShellProps) {
                   {children}
                 </div>
               </div>
+            </div>
+            <div className="shrink-0">
+              {navBar}
             </div>
             <div className="shrink-0">
               {bottomBar}

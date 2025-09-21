@@ -374,14 +374,14 @@ export default function AIAgentBar() {
   ] as const;
 
   const historyView = (
-    <div className="flex h-full flex-col px-4 py-4 text-white">
+    <div className="flex h-full flex-col px-4 py-3 text-white">
       <div className="mb-3 flex items-center justify-between text-sm text-white/70">
         <span className="text-base font-semibold text-white">Chats</span>
         {(friendsState.friendsLoading || groupState.groupsLoading) && (
           <span className="text-[11px] text-white/50">Syncing…</span>
         )}
       </div>
-      <div className="flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+      <div className="flex-1 overflow-hidden">
         <div className="flex h-full flex-col gap-3 p-3">
           <button
             type="button"
@@ -391,7 +391,7 @@ export default function AIAgentBar() {
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/40 text-white">
               <MessageCircle className="h-4 w-4" />
             </span>
-            <span className="font-medium">Assistant</span>
+            <span className="font-medium">Start new chat</span>
           </button>
           <div className="flex-1 overflow-y-auto modern-scrollbar space-y-2 pr-1">
             {chatItems.length === 0 && !friendsState.friendsLoading && !groupState.groupsLoading ? (
@@ -441,7 +441,7 @@ export default function AIAgentBar() {
   );
 
   const agentConversation = (
-    <div className="flex h-full flex-col px-4 py-4 text-white">
+      <div className="flex h-full flex-col px-4 py-3 text-white">
       <div className="mb-3 flex items-center gap-2 text-sm text-white/70">
         <button
           type="button"
@@ -453,7 +453,7 @@ export default function AIAgentBar() {
         </button>
         <span className="text-base font-semibold text-white">Assistant</span>
       </div>
-      <div className="relative flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5 p-3">
+      <div className="relative flex-1 overflow-hidden p-3">
         <div className="flex h-full flex-col gap-3">
           <ChatTabs
             openThreads={openThreads}
@@ -728,7 +728,7 @@ export default function AIAgentBar() {
   })();
 
   const friendConversation = (
-    <div className="flex h-full flex-col px-4 py-4 text-white">
+      <div className="flex h-full flex-col px-4 py-3 text-white">
       <div className="mb-3 flex items-center gap-2 text-sm text-white/70">
         <button
           type="button"
@@ -740,7 +740,7 @@ export default function AIAgentBar() {
         </button>
         <span className="text-base font-semibold text-white">{friendHeaderLabel}</span>
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 p-3">
+      <div className="flex-1 min-h-0 overflow-hidden p-3">
         {friendBody}
       </div>
     </div>
@@ -753,22 +753,8 @@ export default function AIAgentBar() {
       : friendConversation;
 
   const bottomBar = (
-    <div className="border-t border-white/10 bg-white/5 px-4 py-4">
-      <div className="mb-3 flex items-center gap-2">
-        {navItems.map(({ key, label, active, onClick, icon: Icon }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={onClick}
-            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${active ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}
-            aria-pressed={active}
-            aria-label={label}
-          >
-            <Icon className="h-4 w-4" />
-            <span>{label}</span>
-          </button>
-        ))}
-      </div>
+    <div className="px-4 py-0 bg-white/5 border-t border-white/10">
+      <div className="px-4 py-3">
       {chatSurface === 'agent' && (
         <ChatComposer
           input={input}
@@ -798,19 +784,41 @@ export default function AIAgentBar() {
         />
       )}
       {chatSurface === 'friend' && socialView.kind === 'settings' && (
-        <div className="rounded-md border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60">
+        <div className="px-4 py-3 text-sm text-white/60 flex items-center h-[100px]">
           Select a chat to start messaging.
         </div>
       )}
       {chatSurface === 'history' && (
-        <div className="rounded-md border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60">
+        <div className="px-4 py-3 text-sm text-white/60 flex items-center h-[100px]">
           Choose a conversation to begin.
         </div>
       )}
+      </div>
     </div>
   );
+
+  const navBar = (
+    <div className="px-4 bg-white/5 border-b border-white/10">
+      <div className="mx-auto flex w-full max-w-md items-center justify-start gap-2 px-2 py-2">
+        {navItems.map(({ key, label, active, onClick, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={onClick}
+            className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${active ? 'bg-white/25 text-white' : 'text-white/70 hover:bg-white/10'}`}
+            aria-pressed={active}
+            aria-label={label}
+          >
+            <Icon className="h-4 w-4" />
+            <span className="sr-only">{label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   const visitPane = (
-    <div className="modern-scrollbar h-full overflow-auto px-4 py-4 text-white">
+    <div className="modern-scrollbar h-full overflow-auto px-4 py-3 text-white">
       <div className="mb-3 text-sm font-medium uppercase tracking-wide text-white/60">Visit Desktops</div>
       {desktopsLoading && <div className="text-sm text-white/70">Loading…</div>}
       {desktopsError && <div className="text-sm text-red-300">{desktopsError}</div>}
@@ -835,7 +843,7 @@ export default function AIAgentBar() {
   );
 
   const mediaPane = (
-    <div className="h-full overflow-hidden px-4 py-4">
+    <div className="h-full overflow-hidden px-4 py-3">
       <MediaPane
         mediaType={mediaType}
         setMediaType={setMediaType}
@@ -869,8 +877,9 @@ export default function AIAgentBar() {
       barAreaRef={barAreaRef}
       dragOverlay={dragOverlay}
       bottomBar={bottomBar}
+      navBar={navBar}
     >
-      <div className="flex h-full flex-col text-white">
+      <div className="flex h-full flex-col text-white bg-white/5">
         <div className="flex-1 min-h-0 overflow-hidden">
           {mainContent}
         </div>

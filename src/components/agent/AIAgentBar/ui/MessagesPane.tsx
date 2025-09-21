@@ -266,7 +266,6 @@ export default function MessagesPane(props: MessagesPaneProps) {
     status: _status,
     messagesContainerRef,
     messagesInnerRef,
-    containerHeight,
     didAnimateWelcome,
     bubbleAnimatingIds,
     lastSentAttachments,
@@ -286,10 +285,8 @@ export default function MessagesPane(props: MessagesPaneProps) {
   return (
     <div
       ref={messagesContainerRef}
-      className="overflow-auto pt-0 pb-1 modern-scrollbar pr-0"
+      className="h-full overflow-auto pt-0 pb-1 modern-scrollbar pr-0"
       style={{
-        height: containerHeight > 0 ? `${containerHeight}px` : undefined,
-        maxHeight: '60vh',
         transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
         willChange: 'height',
         scrollBehavior: 'auto',
@@ -299,18 +296,18 @@ export default function MessagesPane(props: MessagesPaneProps) {
     >
       <div ref={messagesInnerRef} className="space-y-3 px-1">
         {displayMessages.length === 0 && (
-          <div className="text-sm flex justify-start" aria-label="Welcome message">
-            <div className="max-w-full flex-1">
-              <div className="text-xs mb-1 text-white/60 pl-1">AI Agent</div>
-              <div className={`inline-block max-w-[80%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words bg-white/10 border border-white/15 text-white ${!didAnimateWelcome ? 'ios-pop' : ''}`}>
+          <div className="text-base flex items-center justify-center min-h-[60vh] py-10" aria-label="Welcome message">
+            <div className="w-full max-w-3xl text-center px-3">
+              <div className="text-sm mb-3 text-white/60">AI Agent</div>
+              <div className={`mx-auto inline-block max-w-[880px] px-6 py-4 whitespace-pre-wrap break-words bg-white/10 border border-white/15 text-white ${!didAnimateWelcome ? 'ios-pop' : ''}`}>
                 {"Hello! What can I do for you?"}
               </div>
-              <div className="flex flex-wrap gap-2 mt-3 pl-1" aria-label="Suggested prompts">
+              <div className="flex flex-wrap items-center justify-center gap-3 mt-5" aria-label="Suggested prompts">
                 {welcomeSuggestions.map((suggestion) => (
                   <button
                     key={suggestion}
                     type="button"
-                    className="rounded-2xl border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                    className="rounded-2xl border border-white/20 bg-white/5 px-4 py-1.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-colors"
                     onClick={() => onSuggestionSelect?.(suggestion)}
                   >
                     {suggestion}

@@ -306,7 +306,7 @@ export async function POST(req: Request) {
   const toolCallTimings = new Map<string, number>();
 
   const result = streamText({
-    model: 'openai/gpt-5',
+    model: 'alibaba/qwen3-coder',
     providerOptions: {
       gateway: {
         order: ['cerebras', 'groq'], // Try Amazon Bedrock first, then Anthropic

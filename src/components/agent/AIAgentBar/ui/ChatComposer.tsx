@@ -54,6 +54,7 @@ export default function ChatComposer(props: ChatComposerProps) {
                   {a.name}
                 </div>
                 <button
+                  type="button"
                   onClick={() => removeAttachment(index)}
                   className="absolute right-1 top-1 rounded bg-black/60 p-0.5 text-white hover:bg-black/80"
                   aria-label="Remove attachment"
@@ -65,76 +66,78 @@ export default function ChatComposer(props: ChatComposerProps) {
           })}
         </div>
       )}
-      <div className="relative rounded-xl bg-white/10">
-        <Textarea
-          value={input}
-          onFocus={onFocus}
-          onChange={e => setInput(e.target.value)}
-          placeholder="Change my background."
-          className="h-12 min-h-0 w-full resize-none border-0 bg-transparent py-3 pl-4 pr-28 font-medium text-white placeholder:text-white/60 caret-sky-300 focus-visible:ring-0 focus-visible:ring-offset-0"
-          rows={1}
-          disabled={false}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              if (input.trim() && status === 'ready' && !uploadBusy) {
-                e.currentTarget.form?.requestSubmit();
+      <div className="bg-transparent p-2">
+        <div className="grid grid-cols-[1fr_auto] items-end gap-2">
+          <Textarea
+            value={input}
+            onFocus={onFocus}
+            onChange={e => setInput(e.target.value)}
+            placeholder="Change my background."
+            className="min-h-[72px] w-full resize-none border-0 bg-transparent py-3 pl-0 text-[17px] font-medium text-white placeholder:text-white/60 caret-sky-300 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none outline-none"
+            rows={3}
+            disabled={false}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (input.trim() && status === 'ready' && !uploadBusy) {
+                  e.currentTarget.form?.requestSubmit();
+                }
               }
-            }
-          }}
-        />
-        <div className="absolute inset-y-0 right-2 flex items-center gap-2">
-          {(status === 'submitted' || status === 'streaming') && (
+            }}
+          />
+          <div className="flex items-center gap-2">
+            {(status === 'submitted' || status === 'streaming') && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full text-white hover:bg-white/10"
+                onClick={onStop}
+                title="Stop"
+                aria-label="Stop"
+              >
+                <Square className="h-4 w-4" />
+              </Button>
+            )}
+            {canUndo && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full text-white hover:bg-white/10"
+                onClick={onUndo}
+                disabled={status !== 'ready'}
+                aria-label="Undo last agent changes"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            )}
+            <div className="relative">
+              <input
+                type="file"
+                accept="image/*,video/*,audio/*,.txt,.md,.json,.csv"
+                multiple
+                onChange={(e) => { if (e.target.files) { onFileSelect(e.target.files); e.target.value = ''; } }}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                id="file-upload"
+              />
+              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" asChild>
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  <Paperclip className="h-4 w-4" />
+                </label>
+              </Button>
+            </div>
             <Button
-              type="button"
-              variant="ghost"
+              type="submit"
+              disabled={!input.trim() || status !== 'ready' || !!uploadBusy}
               size="icon"
-              className="h-9 w-9 rounded-full text-white hover:bg-white/10"
-              onClick={onStop}
-              title="Stop"
-              aria-label="Stop"
-            >
-              <Square className="h-4 w-4" />
-            </Button>
-          )}
-          {canUndo && (
-            <Button
-              type="button"
               variant="ghost"
-              size="icon"
               className="h-9 w-9 rounded-full text-white hover:bg-white/10"
-              onClick={onUndo}
-              disabled={status !== 'ready'}
-              aria-label="Undo last agent changes"
+              aria-label="Send"
             >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          )}
-          <div className="relative">
-            <input
-              type="file"
-              accept="image/*,video/*,audio/*,.txt,.md,.json,.csv"
-              multiple
-              onChange={(e) => { if (e.target.files) { onFileSelect(e.target.files); e.target.value = ''; } }}
-              className="absolute inset-0 cursor-pointer opacity-0"
-              id="file-upload"
-            />
-            <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" asChild>
-              <label htmlFor="file-upload" className="cursor-pointer">
-                <Paperclip className="h-4 w-4" />
-              </label>
+              <Send className="h-4 w-4" />
             </Button>
           </div>
-          <Button
-            type="submit"
-            disabled={!input.trim() || status !== 'ready' || !!uploadBusy}
-            size="icon"
-            variant="ghost"
-            className="h-9 w-9 rounded-full text-white hover:bg-white/10"
-            aria-label="Send"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
         </div>
       </div>
     </form>
