@@ -1,41 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { WebContainerProvider, useWebContainer } from '@/components/WebContainerProvider';
-import WebContainer from '@/components/WebContainer';
-import { useAgentChat } from '@/components/agent/AIAgentBar/hooks/useAgentChat';
-import { useValidationDiagnostics } from '@/components/agent/AIAgentBar/hooks/useValidationDiagnostics';
-import type { UIMessage } from 'ai';
-import { buildDesktopSnapshot, restoreDesktopSnapshot } from '@/utils/desktop-snapshot';
+import { useBatchRunner, type BatchJob } from '@/components/dev-tools/BatchRunnerContext';
 import { useConvexClient } from '@/lib/useConvexClient';
 import { api as convexApi } from '../../../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import type { Id } from '../../../../convex/_generated/dataModel';
-
-type BatchJob = {
-  id: string;
-  sessionId: string;
-  prompt: string;
-  index: number;
-};
-
-type RunnerState =
-  | { kind: 'idle' }
-  | { kind: 'preparing' }
-  | { kind: 'running'; currentIndex: number; total: number; currentSessionId?: string }
-  | { kind: 'stopped' }
-  | { kind: 'finished' };
-
-type RunRecord = {
-  jobId: string;
-  sessionId: string;
-  prompt: string;
-  startedAt: number;
-  finishedAt: number;
-  durationMs: number;
-  error?: string | null;
-};
 
 type BatchHistoryEntry = {
   batchRunId: Id<'agent_batch_runs'>;
@@ -55,170 +26,6 @@ type BatchHistoryEntry = {
   status: string;
   updatedAt: number;
 };
-
-function useHeadlessBatchRunner() {
-  const { instance, waitForDepsReady, spawn, writeFile, readFile, readdirRecursive, remove, mkdir } = useWebContainer();
-  const instanceRef = useRef(instance);
-  useEffect(() => { instanceRef.current = instance; }, [instance]);
-
-  const fnsRef = useRef({ spawn, writeFile, readFile, readdirRecursive, remove, mkdir, waitForDepsReady });
-  useEffect(() => { fnsRef.current = { spawn, writeFile, readFile, readdirRecursive, remove, mkdir, waitForDepsReady }; }, [spawn, writeFile, readFile, readdirRecursive, remove, mkdir, waitForDepsReady]);
-
-  const statusRef = useRef<string>('ready');
-  const sendMessageRef = useRef<(content: string) => Promise<void>>(async () => {});
-  const currentRunIdRef = useRef<string | null>(null);
-
-  const { runValidation } = useValidationDiagnostics({
-    spawn: (command, args, opts) => fnsRef.current.spawn(command, args, opts),
-    sendMessage: (content) => sendMessageRef.current(content),
-    getStatus: () => statusRef.current,
-  });
-
-  const noopLoadMedia = useCallback(async () => {}, []);
-
-  const {
-    messages,
-    sendMessage: sendMessageRaw,
-    status,
-    stop,
-    setMessages,
-    error: chatError,
-  } = useAgentChat({
-    id: 'dev-batch-runner',
-    initialMessages: [] as UIMessage[],
-    activeThreadId: null,
-    getActiveThreadId: () => null,
-    getRunId: () => currentRunIdRef.current,
-    wc: { instanceRef, fnsRef },
-    media: { loadMedia: noopLoadMedia },
-    runValidation,
-    attachmentsProvider: () => [],
-    onFirstToolCall: () => {},
-    onToolProgress: () => {},
-  });
-
-  useEffect(() => { statusRef.current = status; }, [status]);
-  useEffect(() => { sendMessageRef.current = (content: string) => sendMessageRaw({ text: content }); }, [sendMessageRaw]);
-  const chatErrorRef = useRef<Error | undefined>(chatError ?? undefined);
-  useEffect(() => { chatErrorRef.current = chatError ?? undefined; }, [chatError]);
-
-  const [runner, setRunner] = useState<RunnerState>({ kind: 'idle' });
-  const [records, setRecords] = useState<RunRecord[]>([]);
-  const [baseline, setBaseline] = useState<{ gz: Uint8Array; size: number; fileCount: number; contentSha256: string } | null>(null);
-  const [runnerError, setRunnerError] = useState<string | null>(null);
-  const stopFlagRef = useRef(false);
-
-  const captureBaseline = useCallback(async () => {
-    if (!instanceRef.current) throw new Error('WebContainer not ready');
-    const snap = await buildDesktopSnapshot(instanceRef.current);
-    setBaseline(snap);
-    return snap;
-  }, []);
-
-  const restoreBaselineIfNeeded = useCallback(async () => {
-    if (!baseline || !instanceRef.current) return;
-    await restoreDesktopSnapshot(instanceRef.current, baseline.gz);
-  }, [baseline]);
-
-  const waitForCompletion = useCallback(async () => {
-    // Poll status until it returns to 'ready' and stays stable briefly
-    const idleWindowMs = 200;
-    let lastReadyAt = 0;
-    const start = Date.now();
-    // safety timeout: 5 minutes
-    const timeoutMs = 5 * 60 * 1000;
-    while (Date.now() - start < timeoutMs) {
-      if (stopFlagRef.current) throw new Error('Stopped');
-      if (statusRef.current === 'error') {
-        const err = chatErrorRef.current;
-        throw err ?? new Error('Run failed');
-      }
-      if (statusRef.current === 'ready') {
-        if (lastReadyAt === 0) lastReadyAt = Date.now();
-        if (Date.now() - lastReadyAt > idleWindowMs) return;
-      } else {
-        lastReadyAt = 0;
-      }
-      await new Promise((r) => setTimeout(r, 60));
-    }
-    throw new Error('Run timed out');
-  }, []);
-
-  const start = useCallback(async (jobs: BatchJob[], opts: { restoreBaseline: boolean; delayMs: number; tags: string[] }) => {
-    setRunnerError(null);
-    stopFlagRef.current = false;
-    setRunner({ kind: 'preparing' });
-    const deps = await waitForDepsReady(45000, 120);
-    if (!deps) throw new Error('WebContainer dependencies not ready');
-    if (opts.restoreBaseline && !baseline) {
-      await captureBaseline();
-    }
-
-    setRunner({ kind: 'running', currentIndex: 0, total: jobs.length });
-
-    const collected: RunRecord[] = [];
-
-    for (let i = 0; i < jobs.length; i++) {
-      const job = jobs[i];
-      if (stopFlagRef.current) break;
-
-      if (opts.restoreBaseline) {
-        try { await restoreBaselineIfNeeded(); } catch {}
-      }
-
-      setMessages([]);
-      currentRunIdRef.current = job.sessionId;
-      setRunner({ kind: 'running', currentIndex: i + 1, total: jobs.length, currentSessionId: job.sessionId });
-      const startedAt = Date.now();
-      let errorMsg: string | null = null;
-      try {
-        await sendMessageRaw({ text: job.prompt });
-        await waitForCompletion();
-      } catch (e: unknown) {
-        errorMsg = e instanceof Error ? e.message : String(e);
-      }
-      const finishedAt = Date.now();
-      const record: RunRecord = {
-        jobId: job.id,
-        sessionId: job.sessionId,
-        prompt: job.prompt,
-        startedAt,
-        finishedAt,
-        durationMs: finishedAt - startedAt,
-        error: errorMsg,
-      };
-      setRecords((prev) => [...prev, record]);
-      collected.push(record);
-      if (errorMsg) {
-        setRunnerError((prev) => prev ?? errorMsg);
-      }
-
-      if (opts.delayMs > 0 && i < jobs.length - 1) {
-        await new Promise((r) => setTimeout(r, opts.delayMs));
-      }
-    }
-    const stopped = stopFlagRef.current;
-    setRunner(stopped ? { kind: 'stopped' } : { kind: 'finished' });
-    return { records: collected, stopped };
-  }, [baseline, captureBaseline, restoreBaselineIfNeeded, sendMessageRaw, setMessages, waitForCompletion, waitForDepsReady]);
-
-  const stopRunner = useCallback(() => {
-    stopFlagRef.current = true;
-    try { stop(); } catch {}
-  }, [stop]);
-
-  return {
-    messages,
-    runner,
-    records,
-    error: runnerError,
-    baseline,
-    captureBaseline,
-    start,
-    stop: stopRunner,
-    clear: () => { setRecords([]); setRunner({ kind: 'idle' }); setRunnerError(null); },
-  } as const;
-}
 
 function formatTs(ts: number) {
   try { return new Date(ts).toLocaleTimeString(); } catch { return String(ts); }
@@ -245,7 +52,7 @@ function formatDurationMs(ms?: number | null) {
 
 function AgentBatchInner() {
   const { client: convex, ready: convexReady } = useConvexClient();
-  const runner = useHeadlessBatchRunner();
+  const runner = useBatchRunner();
 
   const [promptsText, setPromptsText] = useState('create a paint app\ncreate a todo app');
   const [runsPerPrompt, setRunsPerPrompt] = useState(1);
@@ -298,8 +105,7 @@ function AgentBatchInner() {
     setHistory((prev) => prev.filter((h) => h.batchRunId !== batchRunId));
     try {
       if (convex && convexReady) {
-        // Using any cast to avoid local typegen mismatch if not regenerated yet
-        await convex.mutation((convexApi as any).agentBatches.deleteRun, { batchRunId });
+        await convex.mutation(convexApi.agentBatches.deleteRun, { batchRunId });
       }
     } catch {
       // If delete fails, refresh to reflect server truth
@@ -354,7 +160,7 @@ function AgentBatchInner() {
 
     runner.clear();
 
-    let outcome: { records: RunRecord[]; stopped: boolean } | null = null;
+    let outcome: Awaited<ReturnType<typeof runner.start>> | null = null;
     let startError: unknown = null;
 
     try {
@@ -390,7 +196,6 @@ function AgentBatchInner() {
         for (const job of jobs) {
           for (const tag of tags) {
             try {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-call
               await convex.mutation(convexApi.agentMetrics.addSessionTag, { sessionId: job.sessionId, tag });
             } catch {}
           }
@@ -404,7 +209,7 @@ function AgentBatchInner() {
     if (startError) {
       throw startError;
     }
-  }, [batchId, convex, convexReady, customTags, delayMs, fetchHistory, jobs, prompts, restoreBaseline, runner, runsPerPrompt]);
+  }, [batchId, batchName, convex, convexReady, customTags, delayMs, fetchHistory, jobs, prompts, restoreBaseline, runner, runsPerPrompt]);
 
   const running = runner.runner.kind === 'running' || runner.runner.kind === 'preparing';
 
@@ -492,7 +297,7 @@ function AgentBatchInner() {
         <div>State: {runner.runner.kind}
           {runner.runner.kind === 'running' && (
             <>
-              {' '}— {runner.runner.currentIndex}/{(runner.runner as any).total}
+              {' '}— {runner.runner.currentIndex}/{runner.runner.total}
               {runner.runner.currentSessionId ? ` (session ${runner.runner.currentSessionId})` : ''}
             </>
           )}
@@ -614,13 +419,5 @@ function AgentBatchInner() {
 }
 
 export default function AgentBatchPage() {
-  return (
-    <WebContainerProvider>
-      {/* Hidden desktop initializer to boot WebContainer headlessly */}
-      <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }} aria-hidden>
-        <WebContainer />
-      </div>
-      <AgentBatchInner />
-    </WebContainerProvider>
-  );
+  return <AgentBatchInner />;
 }

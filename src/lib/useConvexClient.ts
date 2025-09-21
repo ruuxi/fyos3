@@ -5,7 +5,7 @@ import { ConvexHttpClient } from 'convex/browser';
 import { useAuth } from '@clerk/nextjs';
 
 export function useConvexClient() {
-  const { getToken, isLoaded } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [client, setClient] = useState<ConvexHttpClient | null>(null);
   const [ready, setReady] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -20,8 +20,13 @@ export function useConvexClient() {
       try {
         if (isLoaded) {
           const token = await getToken({ template: 'convex' }).catch(() => null);
-          if (token) { c.setAuth(token); setIsAuthenticated(true); }
-          else { setIsAuthenticated(false); }
+          if (token) {
+            c.setAuth(token);
+            setIsAuthenticated(true);
+          } else {
+            c.clearAuth();
+            setIsAuthenticated(false);
+          }
         }
       } catch {}
       if (!cancelled) {
@@ -31,8 +36,7 @@ export function useConvexClient() {
     }
     init();
     return () => { cancelled = true; };
-  }, [convexUrl, getToken, isLoaded]);
+  }, [convexUrl, getToken, isLoaded, isSignedIn]);
 
   return { client, ready, isAuthenticated } as const;
 }
-

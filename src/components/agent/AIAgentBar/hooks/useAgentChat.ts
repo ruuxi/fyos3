@@ -9,6 +9,9 @@ import { guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 import type { TCodeEditAstInput, TWebFsReadInput } from '@/lib/agentTools';
 import { performFastAppCreate, type FastAppCreateRequest } from '@/lib/apps/fastAppCreate';
 
+const DEPS_READY_TIMEOUT_MS = 120_000;
+const DEPS_READY_INTERVAL_MS = 150;
+
 type WebContainerFns = {
   mkdir: (path: string, recursive?: boolean) => Promise<void>;
   writeFile: (path: string, content: string) => Promise<void>;
@@ -223,6 +226,9 @@ export function useAgentChat(opts: UseAgentChatOptions) {
     schedulerRef.current = new ToolScheduler();
   }
 
+  const fastAppCreatesRef = useRef<Set<string>>(new Set());
+  const lastClearedUserMessageRef = useRef<string | null>(null);
+
   const dirListingCacheRef = useRef<Map<string, string[] | null>>(new Map());
   const activeThreadIdRef = useRef<string | null>(activeThreadId);
   useEffect(() => { activeThreadIdRef.current = activeThreadId; }, [activeThreadId]);
@@ -286,6 +292,13 @@ export function useAgentChat(opts: UseAgentChatOptions) {
         }
 
         const lastUserMessage = [...messages].reverse().find((message) => message?.role === 'user');
+        if (lastUserMessage) {
+          const lastUserKey = `${(lastUserMessage as { id?: string }).id ?? 'no-id'}::${extractTextFromUiMessage(lastUserMessage)}`;
+          if (lastUserKey !== lastClearedUserMessageRef.current) {
+            fastAppCreatesRef.current.clear();
+            lastClearedUserMessageRef.current = lastUserKey;
+          }
+        }
         if (isLikelyAppBuildMessage(lastUserMessage)) {
           body.intent = 'create-app';
           body.forceAgentMode = true;
@@ -354,9 +367,9 @@ export function useAgentChat(opts: UseAgentChatOptions) {
         try {
           if (EXEC_GATED_TOOL_NAMES.has(tc.toolName)) {
             try {
-              const ready = await fnsRef.current.waitForDepsReady?.(60000, 150);
+              const ready = await fnsRef.current.waitForDepsReady?.(DEPS_READY_TIMEOUT_MS, DEPS_READY_INTERVAL_MS);
               if (!ready) {
-                await logAndAddResult({ error: 'Dependencies are still installing. Try again shortly.' });
+                await logAndAddResult({ error: 'WebContainer dependencies are still installing. Try again shortly.' });
                 return;
               }
             } catch (waitError: unknown) {
@@ -791,6 +804,11 @@ export function useAgentChat(opts: UseAgentChatOptions) {
           case 'fast_app_create': {
             const input = tc.input as FastAppCreateRequest;
             try {
+              if (fastAppCreatesRef.current.has(input.id)) {
+                await logAndAddResult({ ok: false, error: 'App already scaffolded in this run; use write tools to modify it.' });
+                break;
+              }
+
               const fs = fnsRef.current;
               if (!fs) {
                 await logAndAddResult({ ok: false, error: 'WebContainer file system unavailable.' });
@@ -808,6 +826,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
 
               if (result.ok) {
                 try { dirListingCacheRef.current.clear(); } catch {}
+                fastAppCreatesRef.current.add(result.id);
               }
 
               await logAndAddResult(result);

@@ -214,10 +214,18 @@ export async function performFastAppCreate(options: FastAppCreateOptions): Promi
     const metadataContent = `${JSON.stringify(metadata, null, 2)}\n`;
 
     const requestedFiles = Array.isArray(input.files) ? [...input.files] : [];
-    const normalizedFiles = requestedFiles.map((file) => ({
-      path: normalizeRelativePath(file.path),
-      content: file.content,
-    }));
+    const normalizedFiles = requestedFiles
+      .map((file) => ({
+        path: normalizeRelativePath(file.path),
+        content: file.content,
+      }))
+      .filter((file) => {
+        if (file.path === 'metadata.json') {
+          console.info('[fastAppCreate] Ignoring user-provided metadata.json entry.');
+          return false;
+        }
+        return true;
+      });
 
     const hasIndex = normalizedFiles.some((file) => file.path === 'index.tsx');
     const hasStyles = normalizedFiles.some((file) => file.path === 'styles.css');
@@ -235,7 +243,8 @@ export async function performFastAppCreate(options: FastAppCreateOptions): Promi
     const writeAppFile = async (relativePath: string, content: string) => {
       const normalized = normalizeRelativePath(relativePath);
       if (normalized === 'metadata.json') {
-        throw new Error('metadata.json is reserved for internal use.');
+        console.info('[fastAppCreate] Skipped writing metadata.json from user input.');
+        return;
       }
       const fullPath = normalizeRelativePath(joinPaths(appBase, normalized));
       const dir = getDirname(fullPath);

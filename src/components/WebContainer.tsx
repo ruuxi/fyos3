@@ -181,11 +181,13 @@ export default function WebContainer() {
   const desktopReadyRef = useRef<boolean>(false);
   const lastRemoteSaveRef = useRef<number>(0);
   const remoteSaveInFlightRef = useRef<boolean>(false);
-  const { client: convexClient, ready: convexReady } = useConvexClient();
+  const { client: convexClient, ready: convexReady, isAuthenticated: convexAuthenticated } = useConvexClient();
   const convexClientRef = useRef(convexClient);
   useEffect(() => { convexClientRef.current = convexClient; }, [convexClient]);
   const convexReadyRef = useRef(convexReady);
   useEffect(() => { convexReadyRef.current = convexReady; }, [convexReady]);
+  const convexAuthRef = useRef(convexAuthenticated);
+  useEffect(() => { convexAuthRef.current = convexAuthenticated; }, [convexAuthenticated]);
   const [userMode, setUserMode] = useState<'auth'|'anon'>('auth');
   const userModeRef = useRef(userMode);
   useEffect(() => { userModeRef.current = userMode; }, [userMode]);
@@ -417,7 +419,7 @@ export default function WebContainer() {
         let restored = false;
         try {
           const convexClientCurrent = convexClientRef.current;
-          if (userModeRef.current === 'auth' && convexReadyRef.current && convexClientCurrent) {
+          if (userModeRef.current === 'auth' && convexReadyRef.current && convexAuthRef.current && convexClientCurrent) {
             setLoadingStage('Checking cloud snapshot…');
             setTargetProgress((p) => Math.max(p, 30));
             const record = await convexClientCurrent.query(convexApi.desktops_private.getLatestDesktop, {});
@@ -635,7 +637,7 @@ export default function Document() {
               }
             }
             const convexClientCurrent = convexClientRef.current;
-            if (userModeRef.current === 'auth' && convexReadyRef.current && convexClientCurrent) {
+            if (userModeRef.current === 'auth' && convexReadyRef.current && convexAuthRef.current && convexClientCurrent) {
               const { buildDesktopSnapshot } = await import('@/utils/desktop-snapshot');
               const snap = await buildDesktopSnapshot(instance);
               const start = await convexClientCurrent.mutation(convexApi.desktops_private.saveDesktopStart, {

@@ -57,6 +57,55 @@ const hasUsage = (usage?: UsageRecord): boolean => {
   return usageKeys.some((key) => typeof usage[key] === 'number' && (usage[key] as number) > 0);
 };
 
+const deepEqual = (a: unknown, b: unknown): boolean => {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const aKeys = Object.keys(a as Record<string, unknown>);
+    const bKeys = Object.keys(b as Record<string, unknown>);
+    if (aKeys.length !== bKeys.length) return false;
+    for (const key of aKeys) {
+      if (!deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
+};
+
+const applySessionPatch = async (
+  ctx: MutationCtx,
+  session: Doc<'agent_sessions'>,
+  updates: Partial<Doc<'agent_sessions'>>,
+): Promise<Doc<'agent_sessions'>> => {
+  const filtered = pickDefined(updates);
+  const patch: Partial<Doc<'agent_sessions'>> = {};
+  let changed = false;
+
+  for (const [key, value] of Object.entries(filtered) as Array<
+    [keyof Doc<'agent_sessions'>, Doc<'agent_sessions'>[keyof Doc<'agent_sessions'>]]
+  >) {
+    if (!deepEqual(session[key], value)) {
+      patch[key] = value;
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    return session;
+  }
+
+  await ctx.db.patch(session._id, patch);
+  return { ...session, ...patch };
+};
+
 const TITLE_TAG_PREFIX = 'title:';
 const SESSION_TAG_PREFIX = 'tag:';
 
@@ -197,8 +246,10 @@ const ensureSessionRecord = async (
   const existing = await getSessionBySessionId(ctx, event.sessionId);
   if (existing) {
     if (existing.requestId !== event.requestId) {
-      await ctx.db.patch(existing._id, pickDefined({ requestId: event.requestId, updatedAt: event.timestamp }));
-      return { ...existing, requestId: event.requestId, updatedAt: event.timestamp };
+      return await applySessionPatch(ctx, existing, {
+        requestId: event.requestId,
+        updatedAt: event.timestamp,
+      });
     }
     return existing;
   }
@@ -206,8 +257,10 @@ const ensureSessionRecord = async (
   const byRequest = await getSessionByRequestId(ctx, event.requestId);
   if (byRequest) {
     if (byRequest.sessionId !== event.sessionId) {
-      await ctx.db.patch(byRequest._id, pickDefined({ sessionId: event.sessionId, updatedAt: event.timestamp }));
-      return { ...byRequest, sessionId: event.sessionId, updatedAt: event.timestamp };
+      return await applySessionPatch(ctx, byRequest, {
+        sessionId: event.sessionId,
+        updatedAt: event.timestamp,
+      });
     }
     return byRequest;
   }
@@ -324,7 +377,7 @@ const updateSessionTiming = async (ctx: MutationCtx, event: IncomingEvent) => {
     const nextUpdatedAt = session.updatedAt > timestamp ? session.updatedAt : timestamp;
     patch.updatedAt = nextUpdatedAt;
 
-    await ctx.db.patch(session._id, pickDefined(patch));
+    await applySessionPatch(ctx, session, patch);
   } else {
     const hasExistingTiming =
       typeof session.endToEndStartedAt === 'number' &&
@@ -338,12 +391,12 @@ const updateSessionTiming = async (ctx: MutationCtx, event: IncomingEvent) => {
         timing.finishedAt !== session.endToEndFinishedAt ||
         timing.durationMs !== session.endToEndDurationMs
       ) {
-        await ctx.db.patch(session._id, pickDefined({
+        await applySessionPatch(ctx, session, {
           endToEndStartedAt: timing.startedAt,
           endToEndFinishedAt: timing.finishedAt,
           endToEndDurationMs: timing.durationMs,
           updatedAt: session.updatedAt > timestamp ? session.updatedAt : timestamp,
-        }));
+        });
       }
     }
   }
@@ -365,7 +418,7 @@ const handleSessionStarted = async (ctx: MutationCtx, event: IncomingEvent) => {
   };
 
   const session = await ensureSessionRecord(ctx, event, defaults);
-  await ctx.db.patch(session._id, pickDefined({
+  await applySessionPatch(ctx, session, {
     userIdentifier: defaults.userIdentifier,
     threadId: event.threadId ?? session.threadId,
     model: event.model ?? session.model,
@@ -375,7 +428,7 @@ const handleSessionStarted = async (ctx: MutationCtx, event: IncomingEvent) => {
     messagePreviews: defaults.messagePreviews,
     sessionStartedAt: defaults.sessionStartedAt,
     updatedAt: event.timestamp,
-  }));
+  });
 };
 
 const handleStepFinished = async (ctx: MutationCtx, event: IncomingEvent) => {
@@ -419,10 +472,10 @@ const handleStepFinished = async (ctx: MutationCtx, event: IncomingEvent) => {
 
   const currentStepCount = session.stepCount ?? 0;
   const desiredStepCount = Math.max(currentStepCount, stepIndex + 1);
-  await ctx.db.patch(session._id, pickDefined({
+  await applySessionPatch(ctx, session, {
     stepCount: desiredStepCount,
     updatedAt: event.timestamp,
-  }));
+  });
 };
 
 const handleToolCallStarted = async (ctx: MutationCtx, event: IncomingEvent) => {
@@ -516,7 +569,7 @@ const handleToolCallOutbound = async (ctx: MutationCtx, event: IncomingEvent) =>
     await ctx.db.insert('agent_tool_calls', { ...insertBase, ...optionalFields });
   }
 
-  await ctx.db.patch(session._id, pickDefined({ updatedAt: event.timestamp }));
+  await applySessionPatch(ctx, session, { updatedAt: event.timestamp });
 };
 
 const handleToolCallFinished = async (ctx: MutationCtx, event: IncomingEvent) => {
@@ -584,14 +637,14 @@ const handleToolCallFinished = async (ctx: MutationCtx, event: IncomingEvent) =>
       ? Number(((session.estimatedCostUSD ?? 0) + costUSD).toFixed(6))
       : session.estimatedCostUSD;
 
-    await ctx.db.patch(session._id, pickDefined({
+    await applySessionPatch(ctx, session, {
       toolCallCount: (session.toolCallCount ?? 0) + 1,
       estimatedUsage,
       estimatedCostUSD: newEstimatedCost,
       updatedAt: event.timestamp,
-    }));
+    });
   } else {
-    await ctx.db.patch(session._id, pickDefined({ updatedAt: event.timestamp }));
+    await applySessionPatch(ctx, session, { updatedAt: event.timestamp });
   }
 };
 
@@ -657,7 +710,7 @@ const handleToolCallInbound = async (ctx: MutationCtx, event: IncomingEvent) => 
     await ctx.db.insert('agent_tool_calls', { ...insertBase, ...optionalFields });
   }
 
-  await ctx.db.patch(session._id, pickDefined({ updatedAt: event.timestamp }));
+  await applySessionPatch(ctx, session, { updatedAt: event.timestamp });
 };
 
 const handleSessionFinished = async (ctx: MutationCtx, event: IncomingEvent) => {
@@ -673,7 +726,7 @@ const handleSessionFinished = async (ctx: MutationCtx, event: IncomingEvent) => 
     ? Number((payload.actualCostUSD as number).toFixed(6))
     : session.actualCostUSD;
 
-  await ctx.db.patch(session._id, pickDefined({
+  await applySessionPatch(ctx, session, {
     sessionFinishedAt: event.timestamp,
     stepCount: typeof payload.stepCount === 'number' ? (payload.stepCount as number) : session.stepCount,
     toolCallCount: typeof payload.toolCallCount === 'number' ? (payload.toolCallCount as number) : session.toolCallCount,
@@ -682,7 +735,7 @@ const handleSessionFinished = async (ctx: MutationCtx, event: IncomingEvent) => 
     estimatedCostUSD,
     actualCostUSD,
     updatedAt: event.timestamp,
-  }));
+  });
 };
 
 const kindHandlers: Record<string, (ctx: MutationCtx, event: IncomingEvent) => Promise<void>> = {
@@ -722,7 +775,7 @@ export const ingestEvent = mutation({
       await handler(ctx, event);
     } else {
       const session = await ensureSessionRecord(ctx, event);
-      await ctx.db.patch(session._id, pickDefined({ updatedAt: event.timestamp }));
+      await applySessionPatch(ctx, session, { updatedAt: event.timestamp });
     }
 
     await updateSessionTiming(ctx, event);
@@ -856,10 +909,11 @@ export const setSessionTag = mutation({
     const parsed = parseSessionTagStorage(session.tags);
     const nextStorage = serializeSessionTagStorage(nextTitle, parsed.tags);
 
-    await ctx.db.patch(session._id, {
+    const now = Date.now();
+    await applySessionPatch(ctx, session, {
       tags: nextStorage,
-      updatedAt: Date.now(),
-    } satisfies Partial<Doc<'agent_sessions'>>);
+      updatedAt: now,
+    });
 
     return { ok: true as const, tag: nextTitle };
   },
@@ -893,10 +947,11 @@ export const addSessionTag = mutation({
     const nextTags = [...parsed.tags, normalized];
     const nextStorage = serializeSessionTagStorage(parsed.title, nextTags);
 
-    await ctx.db.patch(session._id, {
+    const now = Date.now();
+    await applySessionPatch(ctx, session, {
       tags: nextStorage,
-      updatedAt: Date.now(),
-    } satisfies Partial<Doc<'agent_sessions'>>);
+      updatedAt: now,
+    });
 
     return { ok: true as const, tags: dedupePreserveOrder(nextTags) };
   },
@@ -931,10 +986,11 @@ export const removeSessionTag = mutation({
 
     const nextStorage = serializeSessionTagStorage(parsed.title, remaining);
 
-    await ctx.db.patch(session._id, {
+    const now = Date.now();
+    await applySessionPatch(ctx, session, {
       tags: nextStorage,
-      updatedAt: Date.now(),
-    } satisfies Partial<Doc<'agent_sessions'>>);
+      updatedAt: now,
+    });
 
     return { ok: true as const, tags: remaining };
   },

@@ -32,9 +32,10 @@ When creating a new app, follow this two-phase approach:
 
 ### Phase 2: Implementation
 1. Execute the agreed plan. Update \`plan.md\` checkboxes when a full plan exists, otherwise reference the inline outline as you work.
-2. On the fast path, use \`fast_app_create\` to batch the initial scaffold (\`index.tsx\`, \`styles.css\`, \`metadata.json\`, plus any small supporting files) in a single call, and only open \`plan.md\` mid-run if the requirements expand. Do not run \`validate_project\` until there are follow-up edits.
-3. Place the app in \`src/apps/<id>/index.tsx\` with a matching \`metadata.json\`.
-4. Import \`/src/tailwind.css\` and always customize the app-specific \`styles.css\` for unique theming.
+2. On the fast path, use \`fast_app_create\` to batch the initial scaffold (\`index.tsx\`, \`styles.css\`, plus any small supporting files) in a single call—\`metadata.json\` is created automatically, so skip it—and only open \`plan.md\` mid-run if the requirements expand. Do not run \`validate_project\` until there are follow-up edits.
+3. After a successful \`fast_app_create\`, continue by describing the result or editing files with tools like \`web_fs_write\` or \`code_edit_ast\`; only call \`fast_app_create\` again if the previous attempt returned an explicit error.
+4. Place the app in \`src/apps/<id>/index.tsx\`; the platform keeps the corresponding \`metadata.json\` in sync for you.
+5. Import \`/src/tailwind.css\` and always customize the app-specific \`styles.css\` for unique theming.
 
 ### Plan.md Template
 \`\`\`markdown
