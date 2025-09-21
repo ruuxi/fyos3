@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { getUsageCostBreakdown } from '@/lib/agent/metrics/tokenEstimation';
 import { cn } from '@/lib/utils';
 import type { AgentEventKind, AgentMessagePreview } from '@/lib/agent/metrics/types';
-import { ChevronDown, ChevronRight, Pencil } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 
 type UsageRecord = {
   promptTokens?: number;
@@ -332,6 +332,7 @@ export default function AgentDashboardPage() {
   const setSessionTagMutation = useMutation(convexApi.agentMetrics.setSessionTag);
   const addSessionTagMutation = useMutation(convexApi.agentMetrics.addSessionTag);
   const removeSessionTagMutation = useMutation(convexApi.agentMetrics.removeSessionTag);
+  const deleteSessionMutation = useMutation(convexApi.agentMetrics.deleteSession);
 
   const handleSessionSelect = (sessionId: string) => {
     if (sessionId === selectedSessionId) return;
@@ -380,6 +381,8 @@ export default function AgentDashboardPage() {
   const newTagInputRef = useRef<HTMLInputElement | null>(null);
   const [pendingTagRemovalKeys, setPendingTagRemovalKeys] = useState<Record<string, number>>({});
   const tagRemovalTimersRef = useRef<Record<string, number>>({});
+  const [pendingSessionDeletions, setPendingSessionDeletions] = useState<Record<string, number>>({});
+  const sessionDeletionTimersRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (editingTitleSessionId && titleInputRef.current) {
@@ -1540,6 +1543,55 @@ export default function AgentDashboardPage() {
     }));
   };
 
+  const handleSessionDeleteClick = async (event: MouseEvent<HTMLButtonElement>, sessionId: string) => {
+    event.stopPropagation();
+    event.preventDefault();
+    const pending = pendingSessionDeletions[sessionId] ?? 0;
+    if (pending >= 1) {
+      const ok = window.confirm('This will permanently delete this session and its metrics. Are you sure?');
+      if (!ok) return;
+      try {
+        await deleteSessionMutation({ sessionId });
+        setPendingSessionDeletions((prev) => {
+          const { [sessionId]: _removed, ...rest } = prev;
+          return rest;
+        });
+        if (sessionDeletionTimersRef.current[sessionId]) {
+          window.clearTimeout(sessionDeletionTimersRef.current[sessionId]);
+          delete sessionDeletionTimersRef.current[sessionId];
+        }
+        if (selectedSessionId === sessionId) {
+          const next = (sessions ?? []).find((s) => s.sessionId !== sessionId)?.sessionId ?? null;
+          if (next) {
+            handleSessionSelect(next);
+          } else {
+            setSelectedSessionId(null);
+            const params = new URLSearchParams(searchParamsString);
+            params.delete('sessionId');
+            const query = params.toString();
+            router.replace(query ? `${pathname}?${query}` : pathname);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to delete session', error);
+      }
+      return;
+    }
+
+    setPendingSessionDeletions((prev) => ({ ...prev, [sessionId]: 1 }));
+    const timer = window.setTimeout(() => {
+      setPendingSessionDeletions((prev) => {
+        const { [sessionId]: _removed, ...rest } = prev;
+        return rest;
+      });
+      if (sessionDeletionTimersRef.current[sessionId]) {
+        window.clearTimeout(sessionDeletionTimersRef.current[sessionId]);
+        delete sessionDeletionTimersRef.current[sessionId];
+      }
+    }, 2500);
+    sessionDeletionTimersRef.current[sessionId] = timer as unknown as number;
+  };
+
   function getSessionTitle(session: SessionListItem): { title: string; subtitle: string } {
     const previews = Array.isArray(session.messagePreviews) ? session.messagePreviews : [];
     const userPreview = previews.find((preview) => preview.role === 'user' && preview.textPreview?.trim());
@@ -1782,6 +1834,17 @@ export default function AgentDashboardPage() {
                                 ) : (
                                   <ChevronRight className="h-4 w-4" />
                                 )}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={pendingSessionDeletions[session.sessionId] ? 'destructive' : 'ghost'}
+                                size="icon"
+                                className="h-6 w-6"
+                                aria-label={pendingSessionDeletions[session.sessionId] ? 'Click again to confirm delete' : 'Delete session'}
+                                title={pendingSessionDeletions[session.sessionId] ? 'Click again to confirm delete' : 'Delete session'}
+                                onClick={(event) => void handleSessionDeleteClick(event, session.sessionId)}
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>

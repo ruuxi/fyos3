@@ -138,3 +138,17 @@ export const listRecent = query({
     }));
   },
 });
+
+export const deleteRun = mutation({
+  args: {
+    batchRunId: v.id('agent_batch_runs'),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.get(args.batchRunId);
+    if (!existing) {
+      return { ok: false as const, error: 'not_found' as const };
+    }
+    await ctx.db.delete(args.batchRunId);
+    return { ok: true as const };
+  },
+});

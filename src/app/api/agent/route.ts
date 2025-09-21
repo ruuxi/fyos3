@@ -147,11 +147,25 @@ const extractTextFromMessage = (message: MessageEnvelope): string => {
   return typeof message.content === 'string' ? message.content : '';
 };
 
-const CREATE_APP_REGEX = /\b(build|create|scaffold|make|generate|spin\s*up|draft)\b[\s\S]*\bapp\b/i;
-const NEW_APP_REGEX = /\bnew\s+app\b/i;
+// Mirror client-side heuristic to keep behavior consistent.
+// Avoid false positives like "create a poem" by requiring
+// an app-like noun near the verb and filtering out common
+// non-app content requests.
+const NON_APP_CONTENT_REGEX = /(
+  poem|poetry|story|essay|email|message|note|lyrics|song|music|melody|
+  image|picture|photo|art|video|animation|tweet|post|bio|joke|summary|summar(?:y|ise|ize)|article|blog|outline|script|recipe|caption|code snippet|
+  application\s+(letter|form|draft|checklist)|
+  site\s+(visit|report|plan)|
+  project\s+(report|update|recap|name|draft)|
+  website\s+draft
+)/ix;
+// Tighter: avoid plain "project" and prefer explicit software nouns.
+const CREATE_APP_REGEX = /\b(build|create|scaffold|make|generate|spin\s*up|draft)\b(?:\s+\w+){0,6}?\s+\b(app|apps|application|applications|website|web\s*site|web\s*app|ui)\b/i;
+const NEW_APP_REGEX = /\bnew\s+(app|apps|application|applications)\b/i;
 
 const isLikelyAppBuildText = (text: string): boolean => {
   if (!text) return false;
+  if (NON_APP_CONTENT_REGEX.test(text)) return false;
   return CREATE_APP_REGEX.test(text) || NEW_APP_REGEX.test(text);
 };
 

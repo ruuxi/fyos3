@@ -81,11 +81,31 @@ const extractTextFromUiMessage = (message: UIMessage | undefined): string => {
   return typeof content === 'string' ? content : '';
 };
 
+// Heuristic: only treat as app build when the user explicitly
+// mentions an app-like target near the creation verb. This avoids
+// false positives like "create a poem" or "make a song".
 const isLikelyAppBuildMessage = (message: UIMessage | undefined): boolean => {
   const text = extractTextFromUiMessage(message).toLowerCase();
   if (!text) return false;
-  const createAppPattern = /\b(build|create|scaffold|make|generate|spin\s*up|draft)\b[\s\S]*\bapp\b/;
-  const newAppPattern = /\bnew\s+app\b/;
+
+  // Negative intents we never want to classify as app-builds
+  const nonAppContentKeywords = /(
+    poem|poetry|story|essay|email|message|note|lyrics|song|music|melody|
+    image|picture|photo|art|video|animation|tweet|post|bio|joke|summary|summar(?:y|ise|ize)|article|blog|outline|script|recipe|caption|code snippet|
+    application\s+(letter|form|draft|checklist)|
+    site\s+(visit|report|plan)|
+    project\s+(report|update|recap|name|draft)|
+    website\s+draft
+  )/ix;
+  if (nonAppContentKeywords.test(text)) return false;
+
+  // Require an app-like noun close (within ~6 words) to the verb
+  // Tighter: avoid plain "project" and prefer explicit software nouns.
+  const createAppPattern = /\b(build|create|scaffold|make|generate|spin\s*up|draft)\b(?:\s+\w+){0,6}?\s+\b(app|apps|application|applications|website|web\s*site|web\s*app|ui)\b/i;
+
+  // Also allow explicit short forms like "new app"
+  const newAppPattern = /\bnew\s+(app|apps|application|applications)\b/i;
+
   return createAppPattern.test(text) || newAppPattern.test(text);
 };
 // Gating only applies when the last user message matches the create‑app regex; all other 

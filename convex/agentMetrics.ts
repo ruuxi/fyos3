@@ -940,6 +940,40 @@ export const removeSessionTag = mutation({
   },
 });
 
+export const deleteSession = mutation({
+  args: {
+    sessionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query('agent_sessions')
+      .withIndex('by_sessionId', (q) => q.eq('sessionId', args.sessionId))
+      .first();
+
+    if (!session) {
+      return { ok: false as const, error: 'not_found' as const };
+    }
+
+    const deleteBySession = async <T extends keyof typeof import('./_generated/dataModel').tables>(
+      table: T,
+      index: string,
+    ) => {
+      const records = await ctx.db.query(table as any).withIndex(index as any, (q: any) => q.eq('sessionId', args.sessionId)).collect();
+      for (const rec of records) {
+        await ctx.db.delete(rec._id as Id<any>);
+      }
+    };
+
+    await deleteBySession('agent_events', 'by_session');
+    await deleteBySession('agent_steps', 'by_session');
+    await deleteBySession('agent_tool_calls', 'by_session');
+
+    await ctx.db.delete(session._id);
+
+    return { ok: true as const };
+  },
+});
+
 export const getSummary = query({
   args: {
     windowMs: v.optional(v.number()),

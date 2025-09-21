@@ -294,6 +294,19 @@ function AgentBatchInner() {
     }
   }, [convex, convexReady]);
 
+  const deleteHistoryEntry = useCallback(async (batchRunId: Id<'agent_batch_runs'>) => {
+    setHistory((prev) => prev.filter((h) => h.batchRunId !== batchRunId));
+    try {
+      if (convex && convexReady) {
+        // Using any cast to avoid local typegen mismatch if not regenerated yet
+        await convex.mutation((convexApi as any).agentBatches.deleteRun, { batchRunId });
+      }
+    } catch {
+      // If delete fails, refresh to reflect server truth
+      void fetchHistory();
+    }
+  }, [convex, convexReady, fetchHistory]);
+
   useEffect(() => {
     if (!convex || !convexReady) {
       return;
@@ -552,7 +565,23 @@ function AgentBatchInner() {
                         )}
                         <span className="block font-mono text-[11px] text-gray-700 truncate" title={entry.batchId}>{entry.batchId}</span>
                       </span>
-                      <span className="text-[11px] text-gray-600">{entry.promptCount} prompts</span>
+                      <span className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-600">{entry.promptCount} prompts</span>
+                        <button
+                          type="button"
+                          className="text-[11px] text-red-600 hover:underline"
+                          title="Delete batch run"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (confirm('Delete this batch run from history?')) {
+                              void deleteHistoryEntry(entry.batchRunId);
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </span>
                     </summary>
                     <div className="mt-2 space-y-1 text-[11px] text-gray-700">
                       <div>Status: <span className="font-semibold text-gray-900">{entry.status}</span></div>
