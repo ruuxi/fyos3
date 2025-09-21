@@ -820,10 +820,7 @@ export default function Document() {
           if (isOpenAppMessage(data)) {
             const normalizedPayload: OpenAppPayload = { ...data, delayMs: parseDelayMs(data.delayMs) };
             if (!desktopReadyRef.current) {
-              const idx = pendingOpenAppsRef.current.findIndex(
-                (queued) => queued?.app?.id === normalizedPayload?.app?.id,
-              );
-              if (idx === -1) pendingOpenAppsRef.current.push(normalizedPayload);
+              pendingOpenAppsRef.current.push(normalizedPayload);
             } else {
               const target = iframeRef.current?.contentWindow;
               if (target) {

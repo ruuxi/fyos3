@@ -399,11 +399,11 @@ export default function AIAgentBar() {
                 Your chats will show up here. Use the quick actions below to start one.
               </div>
             ) : (
-              chatItems.map((item) => {
+              chatItems.map((item, index) => {
                 const isActive = chatSurface === 'friend' && item.key === activeChatKey;
                 return (
                   <button
-                    key={item.key}
+                    key={`${item.key}-${index}`}
                     type="button"
                     onClick={() => handleSelectChatItem(item)}
                     className={`flex flex-col rounded-lg px-3 py-2 text-left text-xs transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}

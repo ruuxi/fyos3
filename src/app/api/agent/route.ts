@@ -178,21 +178,14 @@ export async function POST(req: Request) {
   // Generate session ID for this conversation
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-  // Sanitize/dedupe messages to avoid downstream gateway duplicate-id issues
-  const seenHashes = new Set<string>();
-  const sanitizedMessages: SanitizedMessage[] = [];
-  for (const message of messagesWithHints) {
-    const text = extractTextFromMessage(message);
-    const key = `${message.role}|${text}`;
-    if (seenHashes.has(key)) continue;
-    seenHashes.add(key);
+  // Strip message IDs to avoid gateway duplicate-id issues but keep repeats intact
+  const sanitizedMessages: SanitizedMessage[] = messagesWithHints.map((message) => {
     if ('id' in message) {
       const { id: _omit, ...rest } = message;
-      sanitizedMessages.push(rest);
-    } else {
-      sanitizedMessages.push(message);
+      return rest;
     }
-  }
+    return message;
+  });
 
   console.log('🔵 [AGENT] Incoming request with messages:', sanitizedMessages.map(message => {
     const text = extractTextFromMessage(message);
