@@ -15,7 +15,6 @@ import {
   AiGenerateInput,
   MediaListInput,
   CodeEditAstInput,
-  SubmitPlanInput,
 } from '@/lib/agentTools';
 import { agentLogger } from '@/lib/agentLogger';
 import { 
@@ -96,6 +95,20 @@ interface StepEventSummary {
 }
 
 type StreamFinishEvent = StepEventSummary & { steps?: StepEventSummary[] };
+
+type ClassificationDecisionEvent = {
+  model: string;
+  result: 'agent' | 'persona';
+  startedAt: number;
+  finishedAt: number;
+  durationMs: number;
+  inputCharCount: number;
+  attachmentsCount: number;
+  usage?: AgentUsageEstimates;
+  estimatedCostUSD?: number;
+  rawOutputPreview?: string;
+  error?: string;
+};
 
 const computeRequestId = (messages: SanitizedMessage[], fallback: string): string => {
   try {
@@ -360,6 +373,8 @@ export async function POST(req: Request) {
   // Persona-only mode: returns a parallel, personality-driven stream that does not use tools
   const url = new URL(req.url);
   let personaMode = url.searchParams.get('persona') === '1' || url.searchParams.get('mode') === 'persona';
+  const classifierModelId = 'google/gemini-2.0-flash';
+  let classificationDecision: ClassificationDecisionEvent | null = null;
 
   // If not explicitly forced, auto-classify last user message using CLASSIFIER_PROMPT (0=persona, 1=agent)
   if (!personaMode) {
@@ -371,18 +386,74 @@ export async function POST(req: Request) {
         : '';
       const classifyInput = (lastText || '') + attachmentsMentioned;
       if (classifyInput) {
-        const classification = await generateText({
-          model: 'google/gemini-2.0-flash',
-          system: CLASSIFIER_PROMPT,
-          prompt: classifyInput,
-        });
-        const raw = (classification?.text || '').trim();
-        if (raw === '0') personaMode = true;
-        else if (raw === '1') personaMode = false;
-        // If unexpected output, default to agent (personaMode=false)
+        const classificationStartedAt = Date.now();
+        let classificationFinishedAt = classificationStartedAt;
+        let raw = '';
+        let promptEstimateChars = classifyInput.length;
+        try {
+          const classification = await generateText({
+            model: classifierModelId,
+            system: CLASSIFIER_PROMPT,
+            prompt: classifyInput,
+          });
+          classificationFinishedAt = Date.now();
+          raw = (classification?.text || '').trim();
+        } catch (error) {
+          classificationFinishedAt = Date.now();
+          const durationMs = Math.max(0, classificationFinishedAt - classificationStartedAt);
+          classificationDecision = {
+            model: classifierModelId,
+            result: 'agent',
+            startedAt: classificationStartedAt,
+            finishedAt: classificationFinishedAt,
+            durationMs,
+            inputCharCount: classifyInput.length,
+            attachmentsCount: hints.length,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+
+        if (!classificationDecision) {
+          if (raw === '0') personaMode = true;
+          else if (raw === '1') personaMode = false;
+          // If unexpected output, default to agent (personaMode=false)
+
+          const promptEstimate = estimateTokensFromText(classifyInput, classifierModelId);
+          promptEstimateChars = promptEstimate.charCount;
+          const completionEstimate = raw ? estimateTokensFromText(raw, classifierModelId) : { tokens: 0, charCount: 0 };
+          const usage = toUsageEstimates(promptEstimate.tokens, completionEstimate.tokens, {
+            charCount: promptEstimate.charCount + completionEstimate.charCount,
+          });
+          const estimatedCostUSD = estimateCostUSD(usage, classifierModelId);
+          classificationDecision = {
+            model: classifierModelId,
+            result: personaMode ? 'persona' : 'agent',
+            startedAt: classificationStartedAt,
+            finishedAt: classificationFinishedAt,
+            durationMs: Math.max(0, classificationFinishedAt - classificationStartedAt),
+            inputCharCount: promptEstimateChars,
+            attachmentsCount: hints.length,
+            usage,
+            estimatedCostUSD,
+            rawOutputPreview: raw ? raw.slice(0, 200) : undefined,
+          };
+        }
       }
     } catch {
       // On classifier error, default to agent mode
+      if (!classificationDecision) {
+        const now = Date.now();
+        classificationDecision = {
+          model: classifierModelId,
+          result: personaMode ? 'persona' : 'agent',
+          startedAt: now,
+          finishedAt: now,
+          durationMs: 0,
+          inputCharCount: 0,
+          attachmentsCount: hints.length,
+          error: 'classifier_failed',
+        };
+      }
     }
   }
 
@@ -486,10 +557,6 @@ export async function POST(req: Request) {
       description: 'Manage apps via action=create|rename|remove; handles scaffolding and registry updates.',
       inputSchema: AppManageInput,
     },
-    [TOOL_NAMES.submit_plan]: {
-      description: 'Create or update src/apps/<id>/plan.md with structured plan text.',
-      inputSchema: SubmitPlanInput,
-    },
     // Validation
     [TOOL_NAMES.validate_project]: {
       description: 'Validate the project: typecheck + lint (changed files); full also runs production build.',
@@ -515,7 +582,7 @@ export async function POST(req: Request) {
 
   // Use all available tools
   const tools = allTools;
-  const modelId = 'openai/gpt-5';
+  const modelId = 'alibaba/qwen3-coder';
   const availableToolNames = Object.keys(tools);
 
   const sessionStartTimestamp = requestReceivedAt;
@@ -542,6 +609,13 @@ export async function POST(req: Request) {
     userIdentifier,
     sessionStartedAt: sessionStartTimestamp,
   }, { dedupeKey: `${sessionId}:session_started`, timestamp: sessionStartTimestamp });
+
+  if (classificationDecision) {
+    void eventEmitter.emit('classification_decided', classificationDecision, {
+      dedupeKey: `${sessionId}:classification_decided`,
+      timestamp: classificationDecision.finishedAt,
+    });
+  }
 
   const emitMessageEvent = (
     role: 'user' | 'assistant' | 'system',
@@ -591,7 +665,15 @@ export async function POST(req: Request) {
   const processedToolResults = new Set<string>();
 
   const result = streamText({
-    model: openrouter('openai/gpt-5'),
+    model: 'alibaba/qwen3-coder',
+    providerOptions: {
+      gateway: {
+        order: ['cerebras', 'groq'], // Try Cerebras first, then Groq
+      },
+      openai: {
+        reasoningEffort: 'low',
+      },
+    },
     messages: convertToModelMessages(sanitizedMessages),
     stopWhen: stepCountIs(15),
     onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage, response }: StepEventSummary) => {
