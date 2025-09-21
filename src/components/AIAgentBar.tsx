@@ -374,15 +374,15 @@ export default function AIAgentBar() {
   ] as const;
 
   const historyView = (
-    <div className="flex h-full flex-col px-4 py-3 text-white">
+    <div className="flex h-full min-h-0 flex-col px-4 py-3 text-white">
       <div className="mb-3 flex items-center justify-between text-sm text-white/70">
         <span className="text-base font-semibold text-white">Chats</span>
         {(friendsState.friendsLoading || groupState.groupsLoading) && (
           <span className="text-[11px] text-white/50">Syncing…</span>
         )}
       </div>
-      <div className="flex-1 overflow-hidden">
-        <div className="flex h-full flex-col gap-3 p-3">
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex h-full min-h-0 flex-col gap-3 p-3">
           <button
             type="button"
             onClick={handleSelectAgent}
@@ -393,7 +393,7 @@ export default function AIAgentBar() {
             </span>
             <span className="font-medium">Start new chat</span>
           </button>
-          <div className="flex-1 overflow-y-auto modern-scrollbar space-y-2 pr-1">
+          <div className="flex-1 min-h-0 overflow-y-auto modern-scrollbar space-y-2 pr-1">
             {chatItems.length === 0 && !friendsState.friendsLoading && !groupState.groupsLoading ? (
               <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-4 text-xs text-white/60">
                 Your chats will show up here. Use the quick actions below to start one.
@@ -441,7 +441,7 @@ export default function AIAgentBar() {
   );
 
   const agentConversation = (
-      <div className="flex h-full flex-col px-4 py-3 text-white">
+      <div className="flex h-full min-h-0 flex-col px-4 py-3 text-white">
       <div className="mb-3 flex items-center gap-2 text-sm text-white/70">
         <button
           type="button"
@@ -453,8 +453,8 @@ export default function AIAgentBar() {
         </button>
         <span className="text-base font-semibold text-white">Assistant</span>
       </div>
-      <div className="relative flex-1 overflow-hidden p-3">
-        <div className="flex h-full flex-col gap-3">
+      <div className="relative flex-1 min-h-0 overflow-hidden p-3">
+        <div className="flex h-full min-h-0 flex-col gap-3">
           <ChatTabs
             openThreads={openThreads}
             historyThreads={historyThreads}
@@ -728,7 +728,7 @@ export default function AIAgentBar() {
   })();
 
   const friendConversation = (
-      <div className="flex h-full flex-col px-4 py-3 text-white">
+      <div className="flex h-full min-h-0 flex-col px-4 py-3 text-white">
       <div className="mb-3 flex items-center gap-2 text-sm text-white/70">
         <button
           type="button"
@@ -879,7 +879,7 @@ export default function AIAgentBar() {
       bottomBar={bottomBar}
       navBar={navBar}
     >
-      <div className="flex h-full flex-col text-white bg-white/5">
+      <div className="flex h-full min-h-0 flex-col text-white bg-white/5">
         <div className="flex-1 min-h-0 overflow-hidden">
           {mainContent}
         </div>

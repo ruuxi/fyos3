@@ -23,6 +23,8 @@ export type AppRegistryEntry = {
   path: string;
 };
 
+const AGENT_APP_CREATED_EVENT = 'fyos:agent-app-created';
+
 type WebContainerFns = {
   readFile: (path: string, encoding?: 'utf-8' | 'base64') => Promise<string>;
   spawn: (command: string, args?: string[], opts?: { cwd?: string }) => Promise<{ exitCode: number; output: string }>;
@@ -141,6 +143,103 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
   const hmrGateActiveRef = useRef<boolean>(false);
   const agentActiveRef = useRef<boolean>(false);
   const registryBeforeRunRef = useRef<AppRegistryEntry[] | null>(null);
+  const pendingAutoOpenRef = useRef<AppRegistryEntry | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return () => {};
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!detail || typeof detail !== 'object') return;
+      const candidate = detail as Partial<AppRegistryEntry>;
+      if (typeof candidate.id !== 'string' || typeof candidate.path !== 'string') return;
+      pendingAutoOpenRef.current = {
+        id: candidate.id,
+        name: typeof candidate.name === 'string' ? candidate.name : candidate.id,
+        icon: typeof candidate.icon === 'string' ? candidate.icon : undefined,
+        path: candidate.path,
+      };
+    };
+    window.addEventListener(AGENT_APP_CREATED_EVENT, handler as EventListener);
+    return () => window.removeEventListener(AGENT_APP_CREATED_EVENT, handler as EventListener);
+  }, []);
+
+  const readRegistry = useCallback(async (): Promise<AppRegistryEntry[] | null> => {
+    try {
+      const raw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      const isRegistryEntry = (entry: unknown): entry is AppRegistryEntry => {
+        return Boolean(
+          entry &&
+          typeof entry === 'object' &&
+          typeof (entry as { id?: unknown }).id === 'string' &&
+          typeof (entry as { path?: unknown }).path === 'string'
+        );
+      };
+      return parsed
+        .filter(isRegistryEntry)
+        .map((entry) => ({
+          id: entry.id,
+          name: typeof entry.name === 'string' ? entry.name : entry.id,
+          icon: typeof entry.icon === 'string' ? entry.icon : undefined,
+          path: entry.path,
+        }));
+    } catch (error) {
+      console.warn('[AGENT] Failed to read app registry snapshot', error);
+      return null;
+    }
+  }, [fnsRef]);
+
+  const finishAgentRun = useCallback(async () => {
+    if (!agentActiveRef.current) {
+      return;
+    }
+
+    const pendingAutoOpen = pendingAutoOpenRef.current;
+    pendingAutoOpenRef.current = null;
+
+    const hadHmrGate = hmrGateActiveRef.current;
+    hmrGateActiveRef.current = false;
+
+    agentActiveRef.current = false;
+    setAgentActive(false);
+
+    const previousRegistry = registryBeforeRunRef.current;
+    registryBeforeRunRef.current = null;
+
+    if (!hadHmrGate) {
+      return;
+    }
+
+    try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
+
+    try {
+      const latestRegistry = await readRegistry();
+      let targetApp: AppRegistryEntry | null = null;
+      if (latestRegistry && latestRegistry.length > 0) {
+        if (previousRegistry && previousRegistry.length > 0) {
+          const previousIds = new Set(previousRegistry.map((entry) => entry.id));
+          const newEntries = latestRegistry.filter((entry) => !previousIds.has(entry.id));
+          targetApp = newEntries[newEntries.length - 1] ?? null;
+        }
+        if (!targetApp) {
+          targetApp = pendingAutoOpen ?? latestRegistry[latestRegistry.length - 1] ?? null;
+        }
+      } else if (pendingAutoOpen) {
+        targetApp = pendingAutoOpen;
+      }
+
+      if (targetApp && targetApp.id && targetApp.path) {
+        try {
+          window.postMessage({ type: 'FYOS_OPEN_APP', app: targetApp, source: 'agent-auto-open' }, '*');
+        } catch (error) {
+          console.warn('[AGENT] Failed to auto-open created app', error);
+        }
+      }
+    } catch (error) {
+      console.warn('[AGENT] Unable to resolve registry after agent run', error);
+    }
+  }, [readRegistry]);
 
   const { messages, sendMessage: sendMessageRaw, status, stop } = useAgentChat({
     id: chatSessionKey,
@@ -239,42 +338,15 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     return () => clearTimeout(timeout);
   }, [messages]);
 
-  const readRegistry = useCallback(async (): Promise<AppRegistryEntry[] | null> => {
-    try {
-      const raw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      const isRegistryEntry = (entry: unknown): entry is AppRegistryEntry => {
-        return Boolean(
-          entry &&
-          typeof entry === 'object' &&
-          typeof (entry as { id?: unknown }).id === 'string' &&
-          typeof (entry as { path?: unknown }).path === 'string'
-        );
-      };
-      return parsed
-        .filter(isRegistryEntry)
-        .map((entry) => ({
-          id: entry.id,
-          name: typeof entry.name === 'string' ? entry.name : entry.id,
-          icon: typeof entry.icon === 'string' ? entry.icon : undefined,
-          path: entry.path,
-        }));
-    } catch (error) {
-      console.warn('[AGENT] Failed to read app registry snapshot', error);
-      return null;
-    }
-  }, [fnsRef]);
-
   const agentStatusPrevRef = useRef<string>('ready');
   useEffect(() => {
-    const prev = agentStatusPrevRef.current;
-    const now = status;
-    const started = (prev === 'ready') && (now === 'submitted' || now === 'streaming');
-    const finished = (prev === 'submitted' || prev === 'streaming') && now === 'ready';
+    const prevStatus = agentStatusPrevRef.current;
+    const statusIsActive = status === 'submitted' || status === 'streaming';
+    const prevWasActive = prevStatus === 'submitted' || prevStatus === 'streaming';
 
-    if (started) {
+    if (statusIsActive && !prevWasActive) {
       setAgentActive(true);
+      agentActiveRef.current = true;
       try {
         const globalWin = getMutableWindow();
         if (globalWin?.__FYOS_FIRST_TOOL_CALLED_REF) {
@@ -283,48 +355,33 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
       } catch {}
       registryBeforeRunRef.current = null;
       (async () => {
-        const snapshot = await readRegistry();
-        if (snapshot) {
-          registryBeforeRunRef.current = snapshot;
+        try {
+          const snapshot = await readRegistry();
+          if (snapshot) {
+            registryBeforeRunRef.current = snapshot;
+          }
+        } catch (error) {
+          console.warn('[AGENT] Failed to snapshot app registry before run', error);
         }
       })();
     }
 
-    const runFinishedWithGate = finished && hmrGateActiveRef.current;
-    if (runFinishedWithGate) {
-      try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
-      hmrGateActiveRef.current = false;
+    if (!statusIsActive && prevWasActive) {
+      void finishAgentRun().catch((error) => {
+        console.warn('[AGENT] Failed to finalize run', error);
+        agentActiveRef.current = false;
+        setAgentActive(false);
+        registryBeforeRunRef.current = null;
+        hmrGateActiveRef.current = false;
+      });
+    } else if (!statusIsActive && agentActiveRef.current) {
       agentActiveRef.current = false;
       setAgentActive(false);
-    }
-    if (finished && !runFinishedWithGate) {
-      setAgentActive(false);
-    }
-
-    if (runFinishedWithGate) {
-      (async () => {
-        const previous = registryBeforeRunRef.current;
-        registryBeforeRunRef.current = null;
-        if (!previous) return;
-        const latest = await readRegistry();
-        if (!latest || latest.length === 0) return;
-        const previousIds = new Set(previous.map((entry) => entry.id));
-        const newEntries = latest.filter((entry) => !previousIds.has(entry.id));
-        if (newEntries.length === 0) return;
-        const targetApp = newEntries[newEntries.length - 1];
-        if (!targetApp || typeof targetApp.id !== 'string' || typeof targetApp.path !== 'string') return;
-        try {
-          window.postMessage({ type: 'FYOS_OPEN_APP', app: targetApp, source: 'agent-auto-open' }, '*');
-        } catch (error) {
-          console.warn('[AGENT] Failed to auto-open created app', error);
-        }
-      })();
-    } else if (finished) {
       registryBeforeRunRef.current = null;
     }
 
-    agentStatusPrevRef.current = now;
-  }, [readRegistry, status]);
+    agentStatusPrevRef.current = status;
+  }, [finishAgentRun, readRegistry, status]);
 
   const sendMessage = useCallback((args: { text: string }) => sendMessageRaw(args), [sendMessageRaw]);
 

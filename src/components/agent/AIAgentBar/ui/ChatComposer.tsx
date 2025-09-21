@@ -22,6 +22,7 @@ export type ChatComposerProps = {
 
 export default function ChatComposer(props: ChatComposerProps) {
   const { input, setInput, status, attachments, removeAttachment, onSubmit, onFileSelect, onStop, onFocus, uploadBusy, canUndo, onUndo } = props;
+  const canSend = status === 'ready' || status === 'error';
   return (
     <form onSubmit={onSubmit}>
       {attachments.length > 0 && (
@@ -79,7 +80,7 @@ export default function ChatComposer(props: ChatComposerProps) {
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (input.trim() && status === 'ready' && !uploadBusy) {
+                if (input.trim() && canSend && !uploadBusy) {
                   e.currentTarget.form?.requestSubmit();
                 }
               }
@@ -129,7 +130,7 @@ export default function ChatComposer(props: ChatComposerProps) {
             </div>
             <Button
               type="submit"
-              disabled={!input.trim() || status !== 'ready' || !!uploadBusy}
+              disabled={!input.trim() || !canSend || !!uploadBusy}
               size="icon"
               variant="ghost"
               className="h-9 w-9 rounded-full text-white hover:bg-white/10"

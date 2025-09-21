@@ -283,18 +283,19 @@ export default function MessagesPane(props: MessagesPaneProps) {
   const lastUserMessage = [...displayMessages].reverse().find(m => m.role === 'user');
   const lastUserMessageId = lastUserMessage?.id;
   return (
-    <div
-      ref={messagesContainerRef}
-      className="h-full overflow-auto pt-0 pb-1 modern-scrollbar pr-0"
-      style={{
-        transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
-        willChange: 'height',
-        scrollBehavior: 'auto',
-        paddingLeft: '0px',
-        paddingRight: '0px',
-      }}
-    >
-      <div ref={messagesInnerRef} className="space-y-3 px-1">
+    <div className="flex h-full min-h-0 flex-col">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto pt-0 pb-1 modern-scrollbar pr-0"
+        style={{
+          transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
+          willChange: 'height',
+          scrollBehavior: 'auto',
+          paddingLeft: '0px',
+          paddingRight: '0px',
+        }}
+      >
+        <div ref={messagesInnerRef} className="space-y-3 px-1">
         {displayMessages.length === 0 && (
           <div className="text-base flex items-center justify-center min-h-[60vh] py-10" aria-label="Welcome message">
             <div className="w-full max-w-3xl text-center px-3">
@@ -516,6 +517,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );

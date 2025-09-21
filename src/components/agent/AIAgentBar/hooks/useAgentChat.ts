@@ -76,6 +76,8 @@ const getMutableWindow = (): MutableWindow | null => {
   return window as MutableWindow;
 };
 
+const AGENT_APP_CREATED_EVENT = 'fyos:agent-app-created';
+
 export function useAgentChat(opts: UseAgentChatOptions) {
   const {
     id,
@@ -418,8 +420,14 @@ export function useAgentChat(opts: UseAgentChatOptions) {
               await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
               const appStylesCss = `/* App-specific theme variables */\n:root {\n  --app-accent: #22c55e;\n  --app-secondary: #64748b;\n  --app-background: #ffffff;\n  --app-surface: #f8fafc;\n  --app-border: #e2e8f0;\n  --app-text: #1e293b;\n  --app-text-muted: #64748b;\n  --app-hover: #16a34a;\n}\n\n/* Base app styling */\nbody {\n  font-family: Inter, ui-sans-serif, system-ui, Arial, sans-serif;\n}\n\n/* App-specific utility classes */\n.app-button {\n  background: var(--app-accent);\n  color: white;\n  transition: all 0.2s ease;\n}\n\n.app-button:hover {\n  background: var(--app-hover);\n  transform: translateY(-1px);\n}\n\n.app-surface {\n  background: var(--app-surface);\n  border: 1px solid var(--app-border);\n}\n\n/* Links */\na {\n  color: var(--app-accent);\n  text-decoration: none;\n}\n\n.a:hover {\n  color: var(--app-hover);\n  text-decoration: underline;\n}`;
               await fnsRef.current.writeFile(`${base}/styles.css`, appStylesCss);
-              registry.push({ id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` });
+              const registryEntry = { id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` };
+              registry.push(registryEntry);
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));
+              if (typeof window !== 'undefined') {
+                try {
+                  window.dispatchEvent(new CustomEvent(AGENT_APP_CREATED_EVENT, { detail: registryEntry }));
+                } catch {}
+              }
               // Auto-open of newly created app has been removed to avoid mid-run UI changes
               // The desktop will reflect the new app via registry refresh.
               addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, id: finalId, name: finalName, base } });
