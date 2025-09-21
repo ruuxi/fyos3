@@ -54,6 +54,8 @@ type AgentPostPayload = {
   attachmentHints?: AttachmentHint[];
   sessionId?: string;
   requestSequence?: number;
+  intent?: string;
+  forceAgentMode?: boolean;
 };
 type SanitizedMessage = Omit<UIMessage, 'id'>;
 type MessageEnvelope = (UIMessage | SanitizedMessage) & { content?: string; toolCalls?: unknown[] };
@@ -145,6 +147,14 @@ const extractTextFromMessage = (message: MessageEnvelope): string => {
   return typeof message.content === 'string' ? message.content : '';
 };
 
+const CREATE_APP_REGEX = /\b(build|create|scaffold|make|generate|spin\s*up|draft)\b[\s\S]*\bapp\b/i;
+const NEW_APP_REGEX = /\bnew\s+app\b/i;
+
+const isLikelyAppBuildText = (text: string): boolean => {
+  if (!text) return false;
+  return CREATE_APP_REGEX.test(text) || NEW_APP_REGEX.test(text);
+};
+
 const appendHintText = (message: MessageEnvelope, text: string) => {
   if (Array.isArray(message.parts)) {
     const textPart: TextUIPart = { type: 'text', text };
@@ -229,6 +239,8 @@ export async function POST(req: Request) {
   const attachmentHintsRaw = Array.isArray(payload.attachmentHints) ? payload.attachmentHints : [];
   const hints = attachmentHintsRaw.filter(isAttachmentHint);
   const messagesWithHints: MessageEnvelope[] = [...messages];
+  const intentRaw = typeof payload.intent === 'string' ? payload.intent.trim().toLowerCase() : undefined;
+  const forceAgentMode = payload.forceAgentMode === true;
 
   console.log('🧩 [AGENT] attachmentHints received:', hints.length > 0 ? hints : 'none');
   // Also detect client-side appended hint user message
@@ -306,6 +318,10 @@ export async function POST(req: Request) {
     return message as SanitizedMessage;
   });
 
+  const lastUserSanitized = [...sanitizedMessages].reverse().find((message) => message?.role === 'user');
+  const lastUserText = lastUserSanitized ? extractTextFromMessage(lastUserSanitized as MessageEnvelope) : '';
+  const isCreateAppIntent = intentRaw === 'create-app' || isLikelyAppBuildText(lastUserText);
+
   const messagePreviews: AgentMessagePreview[] = sanitizedMessages.map((message) => {
     const text = extractTextFromMessage(message as MessageEnvelope);
     const charCount = text.length;
@@ -369,8 +385,12 @@ export async function POST(req: Request) {
   const classifierModelId = 'google/gemini-2.0-flash';
   let classificationDecision: ClassificationDecisionEvent | null = null;
 
+  if (forceAgentMode || isCreateAppIntent) {
+    personaMode = false;
+  }
+
   // If not explicitly forced, auto-classify last user message using CLASSIFIER_PROMPT (0=persona, 1=agent)
-  if (!personaMode) {
+  if (!personaMode && !forceAgentMode && !isCreateAppIntent) {
     try {
       const lastUser = [...sanitizedMessages].reverse().find(m => m.role === 'user');
       const lastText = lastUser ? extractTextFromMessage(lastUser) : '';
@@ -448,6 +468,19 @@ export async function POST(req: Request) {
         };
       }
     }
+  }
+  if (!personaMode && (forceAgentMode || isCreateAppIntent) && !classificationDecision) {
+    const now = Date.now();
+    classificationDecision = {
+      model: forceAgentMode ? 'manual_override:force_agent_mode' : 'manual_override:app_intent',
+      result: 'agent',
+      startedAt: now,
+      finishedAt: now,
+      durationMs: 0,
+      inputCharCount: lastUserText.length,
+      attachmentsCount: hints.length,
+      rawOutputPreview: forceAgentMode ? 'force_agent_mode' : 'app_intent',
+    };
   }
 
   const lastMessage = messagesWithHints[messagesWithHints.length - 1];
@@ -637,6 +670,8 @@ export async function POST(req: Request) {
     pendingMessageEvents.length = 0;
   }
 
+  const maxAgentSteps = isCreateAppIntent ? 6 : 15;
+
   let stepIndex = 0;
   let sessionUsageActual: AgentUsageEstimates = {};
   let sessionUsageEstimated: AgentUsageEstimates = {};
@@ -661,14 +696,14 @@ export async function POST(req: Request) {
     model: 'alibaba/qwen3-coder',
     providerOptions: {
       gateway: {
-        order: ['cerebras', 'groq'], // Try Cerebras first, then Groq
+        order: ['groq', 'cerebras'], // Prefer Groq (lower latency), then fall back to Cerebras
       },
       openai: {
         reasoningEffort: 'low',
       },
     },
     messages: convertToModelMessages(sanitizedMessages),
-    stopWhen: stepCountIs(15),
+    stopWhen: stepCountIs(maxAgentSteps),
     onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage, response }: StepEventSummary) => {
       const currentStepIndex = stepIndex;
       const now = Date.now();

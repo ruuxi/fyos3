@@ -69,6 +69,26 @@ type WebFsReadInput = TWebFsReadInput;
 
 const isTextPart = (part: UIMessage['parts'][number]): part is TextUIPart => part.type === 'text';
 
+const extractTextFromUiMessage = (message: UIMessage | undefined): string => {
+  if (!message) return '';
+  if (Array.isArray(message.parts) && message.parts.length > 0) {
+    return message.parts
+      .filter(isTextPart)
+      .map((part) => part.text ?? '')
+      .join('\n');
+  }
+  const content = (message as { content?: unknown }).content;
+  return typeof content === 'string' ? content : '';
+};
+
+const isLikelyAppBuildMessage = (message: UIMessage | undefined): boolean => {
+  const text = extractTextFromUiMessage(message).toLowerCase();
+  if (!text) return false;
+  const createAppPattern = /\b(build|create|scaffold|make|generate|spin\s*up|draft)\b[\s\S]*\bapp\b/;
+  const newAppPattern = /\bnew\s+app\b/;
+  return createAppPattern.test(text) || newAppPattern.test(text);
+};
+
 type MutableWindow = Window & {
   __FYOS_FIRST_TOOL_CALLED_REF?: { current: boolean };
 };
@@ -210,6 +230,8 @@ export function useAgentChat(opts: UseAgentChatOptions) {
           attachmentHints?: Array<{ contentType: string; url: string }>;
           sessionId?: string;
           requestSequence?: number;
+          intent?: string;
+          forceAgentMode?: boolean;
         } = { id, messages };
         const threadForRequest = typeof opts.getActiveThreadId === 'function'
           ? opts.getActiveThreadId()
@@ -241,6 +263,12 @@ export function useAgentChat(opts: UseAgentChatOptions) {
           }
         } catch {
           // Swallow run tracking errors to avoid breaking requests
+        }
+
+        const lastUserMessage = [...messages].reverse().find((message) => message?.role === 'user');
+        if (isLikelyAppBuildMessage(lastUserMessage)) {
+          body.intent = 'create-app';
+          body.forceAgentMode = true;
         }
         return { body };
       },
