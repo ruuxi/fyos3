@@ -299,10 +299,10 @@ export async function POST(req: Request) {
   const toolCallTimings = new Map<string, number>();
 
   const result = streamText({
-    model: 'alibaba/qwen3-coder',
+    model: 'xai/grok-code-fast-1',
     providerOptions: {
       gateway: {
-        order: ['cerebras', 'groq'], // Try Amazon Bedrock first, then Anthropic
+        order: ['xai', 'groq'], // Try Amazon Bedrock first, then Anthropic
       },
       openai: {
         reasoningEffort: 'low',
