@@ -57,6 +57,31 @@ export const AppManageInput = z.object({
   icon: z.string().optional().describe('Emoji or small SVG (optional).'),
 });
 
+const kebabCaseId = z
+  .string()
+  .min(1)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+  .describe('Kebab-case id (e.g., "notes-app"). Avoid spaces or uppercase letters.');
+
+export const FastAppCreateInput = z.object({
+  id: kebabCaseId,
+  name: z.string().min(1).describe('Display name that appears in the desktop launcher.'),
+  icon: z.string().optional().describe('Emoji or short glyph (optional).'),
+  files: z
+    .array(
+      z.object({
+        path: z
+          .string()
+          .min(1)
+          .describe('File path relative to the app root (ex: "index.tsx" or "components/Hero.tsx").'),
+        content: z.string().describe('Full file contents for the path.'),
+      })
+    )
+    .max(12)
+    .default([])
+    .describe('Optional batch of files to create under the new app directory.'),
+});
+
 // Validation
 export const ValidateProjectInput = z.object({
   scope: z.enum(['quick', 'full']).default('quick').describe('quick: typecheck + lint; full: also runs production build.'),
@@ -143,6 +168,7 @@ export type TWebFsWriteInput = z.infer<typeof WebFsWriteInput>;
 export type TWebFsRmInput = z.infer<typeof WebFsRmInput>;
 export type TWebExecInput = z.infer<typeof WebExecInput>;
 export type TAppManageInput = z.infer<typeof AppManageInput>;
+export type TFastAppCreateInput = z.infer<typeof FastAppCreateInput>;
 export type TValidateProjectInput = z.infer<typeof ValidateProjectInput>;
 export type TCodeEditAstInput = z.infer<typeof CodeEditAstInput>;
 export type TWebSearchInput = z.infer<typeof WebSearchInput>;
@@ -162,6 +188,7 @@ export const TOOL_NAMES = {
   ai_generate: 'ai_generate',
   media_list: 'media_list',
   code_edit_ast: 'code_edit_ast',
+  fast_app_create: 'fast_app_create',
 } as const;
 
 export type ToolName = typeof TOOL_NAMES[keyof typeof TOOL_NAMES];

@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { Doc, Id, TableNames } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 
 type IncomingEvent = {
@@ -954,7 +954,7 @@ export const deleteSession = mutation({
       return { ok: false as const, error: 'not_found' as const };
     }
 
-    const deleteBySession = async <T extends keyof typeof import('./_generated/dataModel').tables>(
+    const deleteBySession = async <T extends TableNames>(
       table: T,
       index: string,
     ) => {

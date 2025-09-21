@@ -561,6 +561,8 @@ export async function POST(req: Request) {
     }
   } catch {}
 
+  const serverTools = buildServerTools(sessionId);
+
   // Define all available tools
   const allTools = {
     // File operations
@@ -595,8 +597,8 @@ export async function POST(req: Request) {
       description: 'Validate the project: typecheck + lint (changed files); full also runs production build.',
       inputSchema: ValidateProjectInput,
     },
-    // Web search (server-side implementation)
-    ...buildServerTools(sessionId),
+    // Server-side tools (web search, fast scaffolds, ...)
+    ...serverTools,
     // AI Media Tools (unified)
     [TOOL_NAMES.ai_generate]: {
       description: 'Generate media using provider=fal|eleven with input only. Model selection happens behind the scenes; outputs are auto‑ingested and returned with durable URLs.',
@@ -622,8 +624,9 @@ export async function POST(req: Request) {
         [TOOL_NAMES.web_fs_rm]: allTools[TOOL_NAMES.web_fs_rm],
         [TOOL_NAMES.app_manage]: allTools[TOOL_NAMES.app_manage],
         [TOOL_NAMES.media_list]: allTools[TOOL_NAMES.media_list],
-        // Keep search available for naming/context if needed; omit exec/validation/code-edit for speed
-        ...buildServerTools(sessionId),
+        // Keep search + fast scaffolding available for intent classification; omit exec/validation/code-edit for speed
+        [TOOL_NAMES.fast_app_create]: serverTools[TOOL_NAMES.fast_app_create],
+        [TOOL_NAMES.web_search]: serverTools[TOOL_NAMES.web_search],
       }
     : allTools;
   const modelId = 'alibaba/qwen3-coder';
