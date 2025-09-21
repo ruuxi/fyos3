@@ -753,7 +753,7 @@ export default function AIAgentBar() {
       : friendConversation;
 
   const bottomBar = (
-    <div className="border-t border-white/10 bg-black/35 px-4 py-4 backdrop-blur-md">
+    <div className="border-t border-white/10 bg-white/5 px-4 py-4">
       <div className="mb-3 flex items-center gap-2">
         {navItems.map(({ key, label, active, onClick, icon: Icon }) => (
           <button

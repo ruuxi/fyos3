@@ -11,14 +11,12 @@ export type FriendMessagesPaneProps = {
 export default function FriendMessagesPane({ messages, activePeerId, currentUserId, meLabel = 'Me', peerLabel = 'Friend' }: FriendMessagesPaneProps) {
   return (
     <div
-      className="overflow-auto pt-2 pb-2 modern-scrollbar pr-2 pl-2"
+      className="modern-scrollbar overflow-auto px-3 py-2"
       style={{
-        maxHeight: '60vh',
+        height: '100%',
         transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
         willChange: 'height',
         scrollBehavior: 'auto',
-        paddingLeft: '12px',
-        paddingRight: '12px',
       }}
     >
       <div className="space-y-3 px-1">
@@ -49,4 +47,3 @@ export default function FriendMessagesPane({ messages, activePeerId, currentUser
     </div>
   );
 }
-
