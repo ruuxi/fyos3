@@ -37,6 +37,12 @@ type UseAgentChatOptions = {
   onToolProgress?: (toolName: string) => void;
 };
 
+type FastAppCreateMirrorPayload = {
+  base: string;
+  registry?: string;
+  files: Array<{ path: string; content: string }>;
+};
+
 type WebFsFindInput = {
   root?: string;
   maxDepth?: number;
@@ -218,6 +224,81 @@ export function useAgentChat(opts: UseAgentChatOptions) {
   }
 
   const dirListingCacheRef = useRef<Map<string, string[] | null>>(new Map());
+  const mirroredFastCreateIdsRef = useRef<Set<string>>(new Set());
+
+  const extractFastAppCreateMirror = (output: unknown): FastAppCreateMirrorPayload | null => {
+    if (!output || typeof output !== 'object') {
+      return null;
+    }
+    const asRecord = output as Record<string, unknown>;
+    const resultCandidate = asRecord.result;
+    const result =
+      resultCandidate && typeof resultCandidate === 'object' && resultCandidate !== null
+        ? (resultCandidate as Record<string, unknown>)
+        : asRecord;
+
+    const base = typeof result.base === 'string' ? result.base : undefined;
+    const mirrorRaw = result.mirror;
+    if (!base || !mirrorRaw || typeof mirrorRaw !== 'object' || mirrorRaw === null) {
+      return null;
+    }
+
+    const mirrorObj = mirrorRaw as Record<string, unknown>;
+    const registryRaw = mirrorObj.registry;
+    const filesRaw = Array.isArray(mirrorObj.files) ? mirrorObj.files : [];
+
+    const files: Array<{ path: string; content: string }> = [];
+    for (const entry of filesRaw) {
+      if (!entry || typeof entry !== 'object') continue;
+      const cursor = entry as Record<string, unknown>;
+      const entryPath = typeof cursor.path === 'string' ? cursor.path : undefined;
+      const entryContent = typeof cursor.content === 'string' ? cursor.content : undefined;
+      if (!entryPath || entryContent === undefined) continue;
+      files.push({ path: entryPath, content: entryContent });
+    }
+
+    const registry = typeof registryRaw === 'string' ? registryRaw : undefined;
+    if (!registry && files.length === 0) {
+      return null;
+    }
+
+    return { base, registry, files };
+  };
+
+  const applyFastAppCreateMirror = async (payload: FastAppCreateMirrorPayload) => {
+    const fns = wc.fnsRef.current;
+    if (!fns) return;
+    try {
+      await fns.mkdir(payload.base, true);
+    } catch {}
+
+    for (const file of payload.files) {
+      const targetPath = `${payload.base}/${file.path}`.replace(/\/+/g, '/');
+      const dir = targetPath.split('/').slice(0, -1).join('/');
+      if (dir) {
+        try {
+          await fns.mkdir(dir, true);
+        } catch {}
+      }
+      try {
+        await fns.writeFile(targetPath, file.content);
+      } catch (error) {
+        console.warn('[AGENT] Failed to mirror fast_app_create file', { targetPath, error });
+      }
+    }
+
+    if (typeof payload.registry === 'string') {
+      try {
+        await fns.writeFile('public/apps/registry.json', payload.registry);
+      } catch (error) {
+        console.warn('[AGENT] Failed to mirror registry.json', error);
+      }
+    }
+
+    try {
+      dirListingCacheRef.current.clear();
+    } catch {}
+  };
 
   const activeThreadIdRef = useRef<string | null>(activeThreadId);
   useEffect(() => { activeThreadIdRef.current = activeThreadId; }, [activeThreadId]);
@@ -288,6 +369,35 @@ export function useAgentChat(opts: UseAgentChatOptions) {
         return { body };
       },
     }),
+    onData(chunk) {
+      try {
+        if (!chunk || typeof chunk !== 'object') return;
+        const typedChunk = chunk as { type?: string; toolName?: string; providerExecuted?: boolean; output?: unknown; toolCallId?: string };
+        if (typedChunk.type !== 'tool-result') return;
+        if (typedChunk.toolName !== 'fast_app_create') return;
+        if (typedChunk.providerExecuted === false) return;
+
+        const payload = extractFastAppCreateMirror(typedChunk.output);
+        if (!payload) return;
+
+        const toolCallId = typeof typedChunk.toolCallId === 'string' ? typedChunk.toolCallId : undefined;
+        if (toolCallId && mirroredFastCreateIdsRef.current.has(toolCallId)) {
+          return;
+        }
+        if (toolCallId) {
+          mirroredFastCreateIdsRef.current.add(toolCallId);
+          if (mirroredFastCreateIdsRef.current.size > 32) {
+            const latest = Array.from(mirroredFastCreateIdsRef.current).slice(-32);
+            mirroredFastCreateIdsRef.current.clear();
+            latest.forEach((idValue) => mirroredFastCreateIdsRef.current.add(idValue));
+          }
+        }
+
+        void applyFastAppCreateMirror(payload);
+      } catch (error) {
+        console.warn('[AGENT] Failed processing fast_app_create mirror payload', error);
+      }
+    },
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     async onToolCall({ toolCall }) {
       if (toolCall.dynamic) return;

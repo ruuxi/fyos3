@@ -1,0 +1,130 @@
+:root {
+  --app-accent: #10b981; /* green-500 */
+  --app-background: #f0fdf4; /* green-50 */
+  --app-text: #0f172a; /* slate-900 */
+  --app-border: #d1d5db; /* gray-300 */
+  --app-hover: #059669; /* green-600 */
+  --app-secondary: #06b6d4; /* cyan-500 */
+  --app-success: #10b981;
+  --app-warning: #f59e0b;
+  --app-error: #ef4444;
+}
+
+body {
+  background-color: var(--app-background);
+  color: var(--app-text);
+  font-family: 'Inter', sans-serif;
+}
+
+.app-header {
+  background: linear-gradient(90deg, #10b981, #06b6d4);
+  color: white;
+  padding: 1rem;
+  border-radius: 0.5rem 0.5rem 0 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.app-card {
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid var(--app-border);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.app-button {
+  background-color: var(--app-accent);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+}
+
+.app-button:hover {
+  background-color: var(--app-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.nutrition-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-card {
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid var(--app-border);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+  text-align: center;
+}
+
+.summary-card h3 {
+  color: var(--app-accent);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.summary-card .value {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.log-form {
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid var(--app-border);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
+}
+
+.log-form input, .log-form select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.log-form input:focus, .log-form select:focus {
+  outline: none;
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.food-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: white;
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.food-entry .name {
+  font-weight: 500;
+}
+
+.food-entry .macros {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.food-entry .calories {
+  font-weight: 700;
+  color: var(--app-accent);
+}
+
+.meal-section {
+  margin-bottom: 1.5rem;
+}
+
+.meal-section h3 {
+  color: var(--app-accent);
+  margin-bottom: 0.5rem;
+}

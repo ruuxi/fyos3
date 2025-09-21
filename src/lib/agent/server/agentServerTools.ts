@@ -156,6 +156,27 @@ export function buildServerTools(sessionId: string) {
           await fs.mkdir(path.dirname(registryPath), { recursive: true });
           await fs.writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`, 'utf-8');
 
+          let registryContent: string | undefined;
+          try {
+            registryContent = await fs.readFile(registryPath, 'utf-8');
+          } catch {}
+
+          const mirrorFiles = await Promise.all(
+            createdFiles.map(async (relativePath) => {
+              try {
+                const content = await fs.readFile(path.join(appBase, relativePath), 'utf-8');
+                return { path: relativePath, content } as const;
+              } catch {
+                return null;
+              }
+            }),
+          );
+
+          const mirror = {
+            registry: registryContent,
+            files: mirrorFiles.filter((entry): entry is { path: string; content: string } => entry !== null),
+          } as const;
+
           const result = {
             ok: true,
             id: finalId,
@@ -164,6 +185,7 @@ export function buildServerTools(sessionId: string) {
             createdFiles,
             icon: safeIcon,
             createdAt,
+            mirror,
           } as const;
 
           await log(result);

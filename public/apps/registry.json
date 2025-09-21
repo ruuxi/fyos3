@@ -1,5 +1,14 @@
 [
-  { "id": "media", "name": "Media", "icon": "🖼️", "path": "/src/apps/media/index.tsx" }
+  {
+    "id": "media",
+    "name": "Media",
+    "icon": "🖼️",
+    "path": "/src/apps/media/index.tsx"
+  },
+  {
+    "id": "food-tracker",
+    "name": "Food Tracker",
+    "icon": "🥗",
+    "path": "/src/apps/food-tracker/index.tsx"
+  }
 ]
-
-
