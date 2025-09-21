@@ -606,8 +606,19 @@ export async function POST(req: Request) {
     },
   };
 
-  // Use all available tools
-  const tools = allTools;
+  // For initial app creation, expose a minimal fast-path toolset to avoid slow validation/exec
+  const tools = isCreateAppIntent
+    ? {
+        [TOOL_NAMES.web_fs_find]: allTools[TOOL_NAMES.web_fs_find],
+        [TOOL_NAMES.web_fs_read]: allTools[TOOL_NAMES.web_fs_read],
+        [TOOL_NAMES.web_fs_write]: allTools[TOOL_NAMES.web_fs_write],
+        [TOOL_NAMES.web_fs_rm]: allTools[TOOL_NAMES.web_fs_rm],
+        [TOOL_NAMES.app_manage]: allTools[TOOL_NAMES.app_manage],
+        [TOOL_NAMES.media_list]: allTools[TOOL_NAMES.media_list],
+        // Keep search available for naming/context if needed; omit exec/validation/code-edit for speed
+        ...buildServerTools(sessionId),
+      }
+    : allTools;
   const modelId = 'alibaba/qwen3-coder';
   const availableToolNames = Object.keys(tools);
 
@@ -670,7 +681,8 @@ export async function POST(req: Request) {
     pendingMessageEvents.length = 0;
   }
 
-  const maxAgentSteps = isCreateAppIntent ? 6 : 15;
+  // Keep initial app creation snappy: at most one or two actions
+  const maxAgentSteps = isCreateAppIntent ? 2 : 15;
 
   let stepIndex = 0;
   let sessionUsageActual: AgentUsageEstimates = {};

@@ -27,11 +27,12 @@ When creating a new app, follow this two-phase approach:
 ### Phase 1: Assess Planning Depth
 1. Use the \`app_manage\` tool with \`action: "create"\`, a descriptive kebab-case \`id\`, and a user-friendly \`name\`.
 2. If the request is **simple or single-screen** (e.g., one feature, straightforward UI), skip \`plan.md\`. Instead, summarize your approach in chat with a brief outline (overview + three bullet implementation steps) and move directly to coding.
+3. For the initial create fast-path: do NOT call \`validate_project\` or \`web_exec\`. Only scaffold via \`app_manage.create\` (batch writes where possible). Run validation or installs only when the user later asks to modify or add features.
 3. If the scope is multi-feature, ambiguous, or needs coordination, create or update \`src/apps/<id>/plan.md\` with a comprehensive implementation plan before writing code.
 
 ### Phase 2: Implementation
 1. Execute the agreed plan. Update \`plan.md\` checkboxes when a full plan exists, otherwise reference the inline outline as you work.
-2. On the fast path, batch the initial scaffold into the smallest set of consecutive writes (\`index.tsx\`, \`styles.css\`, \`metadata.json\`) to limit tool round trips, and only open \`plan.md\` mid-run if the requirements expand.
+2. On the fast path, batch the initial scaffold into the smallest set of consecutive writes (\`index.tsx\`, \`styles.css\`, \`metadata.json\`) to limit tool round trips, and only open \`plan.md\` mid-run if the requirements expand. Do not run \`validate_project\` until there are follow-up edits.
 3. Place the app in \`src/apps/<id>/index.tsx\` with a matching \`metadata.json\`.
 4. Import \`/src/tailwind.css\` and always customize the app-specific \`styles.css\` for unique theming.
 
