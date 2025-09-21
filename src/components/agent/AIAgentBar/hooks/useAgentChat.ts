@@ -95,7 +95,8 @@ const isLikelyAppBuildMessage = (message: UIMessage | undefined): boolean => {
   if (!text) return false;
 
   // Negative intents we never want to classify as app-builds
-  const nonAppContentKeywords = /(poem|poetry|story|essay|email|message|note|lyrics|song|music|melody|image|picture|photo|art|video|animation|tweet|post|bio|joke|summary|summar(?:y|ise|ize)|article|blog|outline|script|recipe|caption|code snippet|application\s+(letter|form|draft|checklist)|site\s+(visit|report|plan)|project\s+(report|update|recap|name|draft)|website\s+draft)/ix;
+  // Keep the pattern case-insensitive; avoid unsupported regex flags in browsers (e.g. /.../ix would throw).
+  const nonAppContentKeywords = /(poem|poetry|story|essay|email|message|note|lyrics|song|music|melody|image|picture|photo|art|video|animation|tweet|post|bio|joke|summary|summar(?:y|ise|ize)|article|blog|outline|script|recipe|caption|code snippet|application\s+(letter|form|draft|checklist)|site\s+(visit|report|plan)|project\s+(report|update|recap|name|draft)|website\s+draft)/i;
   if (nonAppContentKeywords.test(text)) return false;
 
   // Require an app-like noun close (within ~6 words) to the verb

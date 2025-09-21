@@ -310,59 +310,7 @@
   },
   "registries": {}
 }
-ªindex.html¡f¡cÅ§<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark light" />
-    <title>macOS Desktop</title>
-    <style>html,body,#root{height:100%;width:100%;margin:0;padding:0}html,body{background:#0b1020}#root{position:relative}</style>
-    <!-- Preload critical CSS to reduce FOUC during HMR/full reloads -->
-    <link rel="preload" href="/src/tailwind.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/src/tailwind.css"></noscript>
-    <link rel="preload" href="/src/desktop/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/src/desktop/styles.css"></noscript>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>¬package.json¡f¡cÅƒ{
-  "name": "mac-desktop",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@radix-ui/react-dropdown-menu": "^2.1.16",
-    "@radix-ui/react-select": "^2.2.6",
-    "@radix-ui/react-slot": "^1.2.3",
-    "@radix-ui/react-tabs": "^1.1.13",
-    "@tailwindcss/vite": "^4.1.13",
-    "@types/node": "^24.3.1",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.542.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "tailwind-merge": "^3.3.1",
-    "tailwindcss-animate": "^1.0.7"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^4.1.13",
-    "vite": "^5.0.8"
-  }
-}®pnpm-lock.yaml¡f¡cÆ -ølockfileVersion: '6.0'
+®pnpm-lock.yaml¡f¡cÆ -ølockfileVersion: '6.0'
 
 settings:
   autoInstallPeers: true
@@ -2399,7 +2347,41 @@ packages:
     resolution: {integrity: sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==}
     engines: {node: '>=18'}
     dev: false
-±postcss.config.js¡f¡cÄbconst postcssConfig = {
+¬package.json¡f¡cÅƒ{
+  "name": "mac-desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@tailwindcss/vite": "^4.1.13",
+    "@types/node": "^24.3.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.542.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^4.1.13",
+    "vite": "^5.0.8"
+  }
+}±postcss.config.js¡f¡cÄbconst postcssConfig = {
   plugins: {
     autoprefixer: {},
   },
@@ -2407,197 +2389,892 @@ packages:
 
 export default postcssConfig;
 
-¦public¡dƒ¦2.webp¡f¡cÅ 6RIFF.   WEBPVP8 "   0®*€ >Ñh¬Rªº²«¡5£P	inüğãL¯õèg_^?"nÌî/¡¯GxPş¬#c¿·¨Ö­Éûïƒîôéğïú|Õúæ]ÿ}ãÇ`›ôÀ2yËƒ³ o ûó>ş½½/oM^©{z^Ş—·¥íé{fÍƒ³`ìØ<ßÇd›§Z?ş¿îS?ñ9vÔ¬ìufBR-ºôp{Ğƒdşât—ş\àÍÏÿ(ñQ®©¿Î£Â4§|;Ï]¯Œz€/BØÅ©Óe5óO¢ÈÆ5ÃÑ·Yyş-_¼i7eb!”êªöCœl-€º¯c¿H$¢ğú–£Â°úšÔÖ÷®	±[”¿è{t!{¨`ö@¡|—<×?õ¾Öß|7å "òä6§Ò¡ÅÒk?û8I¾hî¯=l ›I½';1mAÎ©±j„;UVd˜;Yá‰>$)–çn…ìl2 •ìwë«ØÒz™;+İˆ_€µÛŞ¤¸“ 6N%É°‘õÛÃ*ø$å³>_Ğ¨¤Ìƒ :É+BèzöÄ|»*t›ŞÑËÍ]&÷®ÇGâº˜‡­>—æãÊ_ô¦!É,oC¤x™(«ñVŸøc=ë‚÷±½])ÒpdrL+^‡In5´ü
-šn‘±ãÃ’Xİ<sŠxİ<r«vs7½p^ñÖ4ó÷®àŠ½ã¬,Èçì$³€ç¦!Ê¸ä–7²\ºRÿ4{œËOÉIZSş±@»òœ’Ô¯{ ºMï\*A{ÇU^Œ&÷ØAì‚é7½p^ñŞz‡İ'ïF=v½æö!VAt§Ì±½]&÷¬ËŞ:Ç[9¾³:ñJÃë!ÃÛ×D•Âm:¦\ïÂ—ÚSTndëáÇoTR²¤Şõ™{Êe¼w—Æ,~*÷‰Ôÿ2EiPÁš–Bè
-±(®ôc×v!ÆÂJ	
-öAt›ŞBD{ÖÿOctğºMï\*BtŞæ¾2Ó^õ»PĞ‘“›ªI«­[A²ozàÁRô‰âé7¦°_à.“{ÖÿOåò›ş/©)€.]&÷®Úš¾	$ë0ÍÉÜ«|úMï[ı<uÓÂäG½p^ñÖU{ ºÉ-Y6N%$ŞšÁ{ÇXŞÈ.”Ä*Ès†ÁfÂbZ~J_å$‰”™½ë‚ö	½]&ôÖàv½å% ÿiÓ’õ½å2Ş:µÓ¼õ ½ã¬od	ôÿ£,ı›ÙÒozà½ã¬nI½ë‚öà3’?{Çy|¦[¿Ÿ÷Áì‚é7½p^ñŞzí{Öîêô“‘õÁ{ÇXŞÈ.“{×îıã{ ºMï\»÷£§X¹Îµd ÙBÃõ ½ã¦R¯V(Z’ÅÎA‹ƒY&^ş/¹¯Œx–<]'ªI—Â»Û‚öËxëÙ/BÙrK3{¿u^Îµ÷³#¿dœ±Éjë!)¦7Ò}úJĞ]8[ÿ"=îjÊæ½ë‚÷±½\ô«m„¼¦[Çy|NÃL~¶L‡¼ë$ah¬Á	IƒdŞõÂ!œ“Ëã¼g×Uj•A¨zéó'åìx¶TmíÁ‚h»÷£Šôtê×Ì5ÌS–r!É<¾;Ëå2P:Æúòõ½„¬n¡Ip©-1¿*}“–7ÖHÃàÆû¾:Æöu˜$Va Ô\@f9ë»åYCí‰w¡#§XŞÈs•e¼pNÍ…¼uìëV?&÷®Ş:Æû¨Õ‹¦9êA‚¤ğŠœ “‡=wb«€ÎUÀg*ËxëÖíÒozßí4û¤âRMñşõÁ{Êe»÷‹œ‡*È.“{×ïZ¨úRäå\rª³9W‚âÙ6Q2rË+¢…Û€îé7½tÿzÒq)cÅÖKêà¸ràŠ¾	'”’Ì¡Œv±ğåUfr®9WŠ+(pÌ×UjÜª--È²˜ÿç*Ëxï0$“{×ïc{ ÅèHÌÏOŠöA‹~ñ(®ôaŸv!Ê¸
-¥80ÈRáSlqÙ/F.¨)ª½\ˆ÷®Ş:ÆA*¯[¸·—ºÈA²˜‚Šà3•oÁÊ¸åUOKú@ép´&BQã¤	ÚK¤òøï/ª½]&²¹¯t!{¿z>ı$OnéLC•K<&º£Ìî“f÷£gı<ukªK<uì‚¡ CÖíÒozÌ¾:ĞAls`rÒË+àÛø  »È
-£šk²×vİ5ÏÅšÂ!‚çZ·œ²ÉeïŞÈ­ÒozèxAÁœ­;:ÓîıÙ	î´éI‡Y"´,qclYˆ~ğ,˜9ĞdÊ-Şµ²L¾$áƒ[OÅZ”U¥1¿ÎiiÒoM`½ãª¯[ÙIáu™½ë‚÷”ËyL·±Œ‘§Z™©dğÊÛê'Ğ¤¸”Ö‹Ç+èVÇÈD2¬‡9T³¿xíVÿt›6Jb1Ëãª¶“Ëã¼õ(x5ï]ag^MkWu'[àÌ5Ø=,£.º­kí NÕo÷I½ë„C9 béy|WÁ‚»_i´éÁ7³­ŸšÁ|á÷IÄ»Íæiø¼zöË=ÈdLƒà A“)€\iÆErwø#ûò+­Å@.3È@³~D{ÍìC•pIá‹Ñ‹ã¼ó,½å*»˜ÒÕ¸¥bW¾Ç/	½] w­şGÚøZ}ÁäÊ$BBVÕÊ§À‹•{Œ!ÔĞJáéAøtTç{p`©
-í|cÀ—oW¡#§X¹¿àÊ¤íõ›|I&÷Ş:Ç[:*1a×À&Æçê|Qà"ÌSŒ
-Ö)€QÏÒ_'Ô"øxßµa6ëèî1¥ZãïL×uxäÎ”Ë‚ÂñŒÑÁÍ–Éì¹È¹€rMı ÖÎÎIçš
-†^ñÁ;Ic|ml” +u¤˜²¡¾“ñ&s s´?¼UŠ£æi‰v/Ô“Y!ıˆOff«%NÂFPù	FYXÜ:U‰ÈŒU)ø¢B*¥ÊrÀ®›×ÀÑ ÇúÒwÂQ’sbÂ*PëKxçT	ÄÏBÑÑBŞ:Ñø«ŞS-„«„àXV ¿ş”Ô„5ƒÖ¿c#ú·å°¡/Ïâ‰Ú…0@*QÇİñU¹êZ 9ÂÛû¦éTh_à®ŠˆŞ¾ü«¦(ûCT:#µ y_K’*·:]¼#S1Ù}É7ÃÂÖİ³[X•9dŞ2Ğ7ÖBOê¥\ò£HñÔõ˜„À(…ˆËíbo†|ü²8wÔs Ñf|¤§ğ_2PŞrƒˆoD¼sFÁ(Â%¤ğ¦/(™!]8ç¸—fÄó{İÈd8ÍÅú?‹¥	é°Y8ÆÛ‘å›å [pi=ä’pp-ÂŠ›—ùPµjoA#èÇ¨Å]×g•@­8ä¡¨¸ÈiÑj<ß#š¢¥ÂiœtC»¹•O³`ÎlVç3ÅŞMO |x» fÇv–^MÎ…Ôo¬Nz0BÙ­Zb.–ŠèaŸ`³#à2Ã1µhÎóĞå˜VHN"–U›4k¶4:Ï (ª¿äf4–üE\õæPŸƒ†¬PÜ‚aÙÔk«‡ ¤	%
-£2š•ç»áÔlOkŒÅ_İˆÇ13UQíZª­º·1­•j«BgîµÑxì^ˆ?áNnòJë«Ş‚ÁCL³µ¦ˆû¼Ç°Ø ë*Åî9°œF±ç·?§ª9Ã5ÆñÇøÏæF
-à-7ŸváÅÇBò·„°[Ğ?öjî(fpw_Æ„»1WÖ«‚‰Vü;-¥L7Ê)…›{!¾¨.‡ú­hh"É^j“Ü2Ùy:gmí«2ˆ‹‰Œ×n7Üö¤–}TÃgf9„U%<® Œ`bİ€x$¸t¨0œ\MÎ0;M3šIjèœ¼Œô2r0jÑdÎeB›"MÜñ¿$¼m+9øRWHş¸iäFÇ¡7ä…û3ø¾t!ÊÒƒ8ªG üõl;v<¶§FÄ÷5AÁ•”¬B–)ŞŒL‹ê†¦O.B» ¢pĞò¡·Ï5ĞÙ#ô¶atzùòÀ*8F˜áœœ)ò8û\(ÛxP·â|º˜¤ÄG¬øÆ`TS£ME,Ã×yó€»&8p.¿å|I°¾°ÅÄÁb¼‹HÌ„®ÔÚÓ˜gğ "mÍCUöâÕŞğæÖ‡|B?õì¬3tÔÊôæu}DaTök¯S!õNK¹	¬Ô6ğŸ8ÕZcïî{Î’¢Œû†òBF}„G ìz²I•AÎ‘:ÃKaDâlÒ.síW 6 ¬h èÔİ˜{¤õ«3•A[³û	ßşšÏ€¯#V6GÃ8áB	ÙùO?™c`ë…ÛNtİåvq=uThšt)ÕM7:ªŞì-R©øH #ÓÈ«nÇ`IÇdïÅOöç!}“—fúàÛ‡+^ŠQÎBåĞTe"7ïx{€ñÌšr&—N±¯¤ŸHnœ~¿2õKÛg"§½IiÜb'ĞSïÌûòy9rı˜ÆÁ×z~  şòa/ÿ¨ŸÍoãš~“ì?a2½èr]Ó ë9ó÷|é¶«t=¶°!UOş*Çï‚TÉm´êù|nµ‡^ÍjˆU`ô3zj]o[d!bµßå¶u6MÍ–;S\8'"Sùİ¶š@¨Æ£?=è—¶(èrÊÁ$êûŞÊ0uÏíb@Ãy¼˜ùƒ+øœHûëuxŞ¿±!Œ(Ô[—tµë±ĞRÙvg!¡“hWVÚÃóÍ)Â´Šªê–è…f£„†EhøOOèøÍ^¨V«àÑî«Qİşj?‹m&!t¥|ş3ûfñ6lbä[¸MeğRì•ú\èj”¦:¸  $!1Z¸ê«h ôos+ÍùèxåY3¼yÜ·g•J=QîûB"0TÃCÚˆ½—¬k«:: UÕ¥Ù¼Ã›iÓr©©dk©¢@Ó›ZËwëO_÷b[vPZ— ÎµÄp>´¾8#ş¡ï ¶€:ğñˆ£–Úïğ2¢¬¸µÜ6W]Ñ9Ä	¯Z¢È”;¥æH§LÈE/l<€   k•V@‹4)3e²PU¬áÀtGÅÿ"±Ú®w>Ä	¿­®|lEã w³~›"«[
-ìDi¥áÿß0¡¡oM)MşÿPÂÀV½·;‡Ëÿ1»Õ¥.G{uTjbµmŞôŞc  ™&ÈŠ@”LW‹Ş ’§
-fú‚‡ßKF»í¯ vşÿµíaÎLçZ`poÓŠƒ¼”®ºë¯ûXˆ„Ü yŸT>·y°8¶Çå”Ñ/<Í•ÂrôÈ>¥Óa¦êQ+¿´¤a?üs0SWà>ğ`—ú44%¸¨.¥C¾NqóMTV¤"“Ğ O¶PÍâ`„Í·‡+ ŸG^€Ì`À˜09¦ô„ÿ1
-¦”²	" Ôº¨qÖ@ÿ£–Ø€e¤§ogts°}¦o‰ë@5íµ‚ØŞzG@ İÜõâ©|ERû¨¾Œºxìw(‘ÿ(ªGÏrğù÷L„Oó‚µfJêª  ¸`„Q¤¡ıt´Z,9"9 d•Æ40n¢   á1
-¨ ê±v]ÈºÌ)¡ıG-·1)WM¢­-ş¨éoÉá    ó¾e1ĞD©âAn ˆÖPì¾Æ£—p/aà…å¼Æ‘iˆ1 
-µZûê¥2È€ú¹[˜j¯>FÔøèià~V`ÉÁÒ¶$ÅÉS‰àZy›>€  ì(+hÄFÇ¦çh– ôyn˜6*Ö.êïFE¼gçYŞHØd35š…eÀ¢&ØªùQé%ËÚ9£İ	€PQ\5°Š®†Ka)XİnKÒèºœ]ú(’0 (ÜËí^ü—[	(k"íĞ1Íw4/¤¢ñÅ¡0]…~á©”ŠÏ|8\SO¢Ä€,’£ ]wt°F«›ÌR]Ü½X5¸ ¦ÊPOé?,rÄĞ§ÚVÛ dÔ:hUœ€  kËF\Ãp[miÕS§aÿğ"â:5Ù¼€å›³R¡JßHyZñVó<• ¡Èà1gf ¸é‰K*ûı8…¸¿W E‘ğ
-u§l´´{.f°ËXÓvèh5ı¨ã°óİ'mLÙq@°~Yd¢5ŒSsÖq%ì2AO¯è„yêMœû=²< H’öæ"ğò•u Ò’ñ|UªY—8CI:8­@P)º®‡¯À†¯Çq‡$™ Í¹˜|¬¶°&­¨w6_êØ«"aøÃvà¥ç‘¿‘HPioáÁ7p£Ù|9şq«ûå´˜b8BpÚYNÙNİİä—şãa,¾Úq™Ú ;gØé	CÅş}ùzÛ=9P·}µ“Ú ™!&\¬kİŞº6œ_·5Â³Š]Œ-
-½üw@MbíMÄnVˆ:iK2Ë ¾o;XŒŒt˜kíê‘Y‚ìJ·¬‰Û<¿7»7hÄâßıÎ±Bb¢'Wvvşm¦†ô|G°x}²ƒ|«ïµu&èvF(2”¨–ûè3İxh>d;Ö·j›gÉµÎzxnS4x˜6öĞ–?W€#H+¼ÿúûuÑw¾¬Œ7-§7ûÆt‘‚‘ÌÃÜüˆ€ÉñP}{ñô"@^½x4ãØj5FLäv"­şŸbN,Õ§ààŠÈ$Z2R–)$KZ²¨>u0zƒ/+¡ çBSóÉ›_½tÑ¡vçt×=T—Él íUÉfrÛSîçzNw–õ¦yË8YşÜ¨Ul«Û+[ıÃ #:ºğsVWÜØd³ıTc ìI«§Œ9‹Š*‘€7æùdüá‘eâ@³ÆÍ¦>$÷†f²NÍ#™ß&´bR\A¤]_OiÆ¶u$†»Cô Efı¡)'¨¹Ş@
-9YÆœœ·‘hO·zö™”èç^WÊ>Z2Y6-‘µ@Ô-î+ ø°ërğ‚Æ%}Jt¶»ªW¼XAÃôTŠ¨$Êıå»¦'¾aJ/õ2lğxvSDÒüé¬v‡Á+7îxD:º…røšôNºêÅ*ÙEÇªRYæ#Ú`Á1g»b¢vlµ¶èbá…/òBu²`?rHÑsò¡¼í¨ıtY®hz8¨»NÜš
-±ÆÏî‹‹úô®¡T2ß!º8tå½Ú=±[¨nØx¤y!)2	¼T4uƒ#UË5oòYVYuíÕ;5ÇJ.Ùê*D:
-Ÿtvw‰ÚlĞ2"ĞiÌa:(~	±ªlYÁcÊI®?°è>µê[¡mêgse2ANÇ¤LÇb’PkY¦á·Äóù¶è3ªifci©ÙQÄŞHËLÛ[l~a|¬7¢Å(•Í§‡ãB~
-„dîîä0Cx.ó+µ'A"å†MÒBÊ¼ù‹xJ–[¯È*>”s\ŠnMâo8ö,i«*ıI-Ôn§·HÙ¤8 ñ²!çÈÃş$[5ş—[¾Ÿ¥îğ5°3~¬Æb-øyßã0ÿ\‰zãˆØiñõ{•:—ë o¡;¨İºtõ¦4+k5Ö QŞËt×±Hè˜{îš#%‘1¡$å#I‚¡Û"3N¦c£¡IUT#Ğ`=Ïs#äÁêñ“jıõ÷‰ˆÃ£„Ûd4¢½œy.e£»Å@š5Y¿×ÿÑpCÊ*	í¬:Öİ+Ô $ÿé¹ÍoYÁ¤¾â82I“{2ÒºfEù›ŞFåÆ
-§kµ ƒ¸¹&Ø"O™[×·e(+'’õkp.ìşe^jğ#aÎÈš 0·Â“¢ˆS|à#eêèñÏÓïºªFĞB“º_bf×—@¤ $áÊgg‰¦ƒí«ãBK-„$ô45.°×‰Äì? È°´šFjyÑ,JF¹€¦0@P´pLĞeFP¥ä"Ù>­š™ Àäõú¤€hÂš`{OWÚõk_*qšƒp4¥>€ÁÅÑá§2áñLX(ÜÛß·ˆc¤‹ıj]_MŠšxØyø™‰~§¥Ì@­ïYş•rÄĞMÍç·k‹grRçå„\«2´´¾5ÿî„²ñ.>ïß=,Q—@¯³è˜[d„Â™Zú*öÇD3[×†¦yÒæI­İp1ğz½ª+p`¡0®"À-ºTF+Kä—~e‹í2mñ¸ÕIv]šÀñÛ()mÔ@]ş¸àêf‰†%r‰ÊÓTxt.ç¢cº.È›¡ª@g%ÇK_ƒsüºÏâßøáèL|ŠëÅyC]7f«¥¾˜çñä~Ø®™.º·BPÕ¬(ú@÷z:}P@p¼A«£ªÈÊŒÏÎòÕìµc¯¬Ï†Æú ÖjgÊ¦g%×"şÛĞ*kí
-Ä^›ÌÅëcX}Zı‚B71ş A%­±}Y{B|j /7-ç:SåJîÒİ
-™D¨‘Rw#ÜGKæà"9ij
-
-¿ôûÃ†±79²»RnGQ÷{¶ôù¼İ“ƒØŒÔ±ÁÜj,¨C›NºLÎœ	úñ :OC°˜İ+:›¢ıQ2j¾Öó%«å¥;ƒ8¨'£;Úµ¾Æ#›ä¤5orÿAš œ«qè¨¸ÂÍÖÎ äx)€)õôaaTAÀr½g2şÖ´V/Ltò¨i¯š(A"÷
-›j+%-n«İXÇêÔ‹ª™Ã[Ù<óä³ù‚­²Úî<!}SWVâÕÜ,áœ,W[“ÑÉg"Ş”Ç’Ø¡5Ş1SÿÑ\HÊ¯räxqk®‹5	+7­¨™ÿÙÆH«¿d ©ld¦P¸®`HO¡ö5\ÖÉ¨¦­eœlÓ¾+~5	ÿ°º×mœyxÏœ(Øh$RŒİeÊéØúAçr^îıºæ•úH?ãlq
-Py`=¯¤æfÉŒÎœv‹@ºÌ°¬#Ü?ììDÕd1¢KiÙv+bÃåÙı]°œŠ	Q¤Ô–s5õÍ=I@'H+ ˆPtãÀyÏO5÷øjÎkDr:ïÇ3ª‡¦#^õ¸R©÷ÚÖ‡7_‰ğÒ@#“Ç9­£W¢½L.Í™Ï­âªV âÖ
-¤FĞ@%ø>-Ã¨`Dè	¢J'` .üDUîdü’«–ÁÖçMz¾¾;ß´€¡¤K×JÂ	ôÈLËºËK§]æ±Ør°7‘İ·V1D›hîQ=ÖÿVÍj0ÈI`÷Â¶Óo2(xaZøTq“Çü³‹@ñµÜr‡ì¡˜­¥ˆ¸rÆ5ÈœÔÎ‰í“ŞlîeüŸóÎ”>q¿À6`¾û´€Öt^rVñÒGr y_Ö;ÕqåxšÚ\˜”ñ„š 'ˆ“¤ÎI÷#º49	wÊ`ïó|`øÓÂ¿ÖäH—.†ºAPQÃg‘ö'»çWëGÉd!ø$CšSCX6uÊ:Wkº¼ÑwôÖèŞ_ó£|­.ß¥ì}°MzÚÎÀùÇ¦‘ñÔ¡ilß²½Â›:0~ÒŒ°LÁr!6ï”ii]û_™5(èÆ èÕ+í•8Øİr/^ë f±mF»QüÇ°Éx'Šœs¨²£şÿWQØ©b€“²f£(ŠÍdØ™¬ûxÿvèE"æ…ÒC‚ç7mDJQ¼R¢ wsÌĞgÚ[vJÊru²§ıøÔÄJr€U†úŸcgÇÙ|O#XÇG7@Â´,`;0qX?EÃÿ^··«à›PÅú.‡v¼ >`ş$àmê"Œ`ÁŠĞ„{÷lëT7R&®OL–Gr'Ã{sGíİ…I^¡gF º„ÕFP.{nšBu/—ÈØrœ¬†ŸH>:·a9]†¡Û)Iz¡!oœ$‹p:ø¢óuî?ÄÅzBi”r€ÙË·lûÙm^n•Í¢£q}0®"Š«9cyªÍ84–…¾Dâ{ã†®÷t]p?¸Ÿ7	««duÑŠY¸[ÌÉÛPºg"ò@%“8µQÔÕª: 6“>Š‘ÊL/›a+u$µ4Ş¡cxÔƒÈQßjV¶‘+n'áî}l¨<¾Q?¸µ­Õ?®”Ã"sO×İ ìü¿ŞK^¨m+¿$je½:Zùs<Sü7m%âĞ4ó:'å:Zyº8œ
-f£%A=ø°N°Ö¯gù˜sÜÖ'È«H[ó‚nD¸!=Ó
-È pÃ¸z+ù,ç&Z+`-=)–òÚ«>rke9B
-j‡MlĞ°ÃŠu3WÉïº -·^õÿè¼†'¯štH-‹~Ô²ÉÌW\Ùö}¼zG©[|¥Ó½÷Ê(ôHoŒšj—"åÂßÓŒZT%WÅ2ƒ-¾Üt] ô™Ó [S+OzeóÓS…š©¼z?ã¹D$¨B [Ş.òV&0±Q­í6‰CõPM¥1@±‹u'„fös¾€Ø©¹´GĞ³kÇ-mÒıgÔsl™D[µíFJ@Èw–ü¼uæ_Š ¤À]âPµe¤ç Eh:ê°)àèÆÛ§ıTZÌ¿xNJ>ğé
-èÜ?™=øX ÌFIÚæ»¸WFÜÜX! -oN{<€ ·K~V(K #g
-ªX)2Şwš‘Iv	 |¨Û Ï¨)¼²•BÒWÌ”€ pËòî¤nùHèX–?-x‡@¼ Æ¨ê#Oò2m-û¡l9È   p„ğ€ ¦3.webp¡f¡cÅŠâRIFFÚŠ  WEBPVP8 ÎŠ  Y*°0>m6–H¤#%$%5	  ‰gnØşÚîy×h)!Nã=âïúA!gCPëGê?Éâ¿ÙÙ‹óWâ¼¿}³ıÏ1ş¤ÿŠtõÑ»Ó
-ùGÙ~~~GÚ¿¸XzlY±¿ı½TÿÉã¯æ¿år¯…¯2YÿÓç·ëg’?õ9ü2cÿÔ}„½QJ5u›Äê\\•.ŸgëÊšå{k®Ê‰‡º•t;)E´IßÊbÖ‹l„ÉZ‹>]?/–yÃœvºì¨˜{¡Ù$ñÂö]:‘^)ocîèú~>;ò¬òè§â~¿ûkª†šS„ÀòÜ®Dû¡ÙQ1dõº&(Î%l”™èqgÆ+¼Èh†(éÁ GQÀÄ`´OÏ3W09'¿yÚØ¯ÛÂ£N®áçœ;kˆû3h0öb°N·=%œv”¶§1˜42»š±€Ğrø êãÑ°<è^<	CiŸc¤Ã|vÍûÂ‚¡s¢-YYÏÊ£;t/,>l.dK,Äàbıy¬J§-4>nŸAÈşI*`7PìÁ
-3R«æjFñj£&ûÎŠsÎß˜*yÃ	&·­ÎƒàmR=¯ì§;Ö–¯òòe¸rŒ¨?8%P|Z|lXÙÓ¸XÖ±›àŠšÖ‚n¹¶#Q¬L=ÁvoÊÉœ±ĞºĞ&ì!öÇFÅåóÚhBD	©}¤Àc*Dİ:Ìj^À=*qGú[=‘W›ÆI´ÿ^“v¨"İåê—Ú¬Ç7Êà›ÙYIO—OËB°ÏuQ-­0‹ƒ>0|GåÓÑ!òÃ–iEº¿öÙå—4„àé ˜YÔ4¥)&=—¾Æ—æRü¾M8ıº~_  Û¹Î–_¢øg¢CX¬ó@C“©×ª^‚DæËeşÁñÿzCiôt”Ldn‘¼CòĞ«£›(Ë©ßŠ­=é’®“î˜œ#î~Â?Rc™×ñ_‰*¸PZ^º|ˆ/QhEC+/—GQ°Ï’ü¶2§ Û×Ï]\)§ü½])ñÍY¬²?ä¨¶Yå¥é±®øÀJr0bdh<l³_„±á.ãjøğ?¢p-?ó<
-|àÜ¾N´ˆÀ£¢ ª¢ßOÂÏ]ûXğ¤õÓì´<'8J$‰•SJùR#A!„†Ò7¹€b¼Ÿ\½»ní2i~ıõCÚ¥	áC€¦ËØ3‰©‡¸.ÅùòÔ2ós‘jÊ‰†SÓwœ¼ÍlFÎÕÎy’Œ]øM PAj?÷p40T]8µpÌb÷sá¹ åÄiprBÃYåÚœ÷¡%
-¶R]#œmÿsÕ³œØ©}»‡TPbÍ[¾Ea”ËD¶Áñaõ_—ÈG«©oŞES<ûËÙHà`Fá°Õ¾„K}N×À+/Ø!¬ ü˜á,áÏØ©z…âXé!;ª{ÉÊÌb	mGx©M?š|0êsK mfsrê^ÁÛ)E²ÓÑ€‡’'£RJA-é ß2SAä|ÅèÜ¼Aûp:ƒ™ÎwoˆLñG)é.Š¾Õ
-O©ÅÖ0uºÌ“ÀÚá{Á—_ídYl- ïÃÅ\†3 I	;ƒ¯ÔÇNĞÈD yü^Ëm2ÀBêK*…j  )§D©QaÙN[Ñ)yŒ/Œ¿ìI€·$y®ç ıºÔ&ª‰ë¤¨Ùæ˜)»šcï ÄĞ‰á–5ó1
-8oe£„¨`ˆ&ÊpİÂêˆAà6_È@ú=‡ºxÁÓÃ ·‚{àÂLê¸8K ’3.ä‘(l,wú2OuQ0Â‚²(ÿ•°@’ß³W©X	ƒ’*9¨šQÒ´y`S¥YïÓĞ§ÈİèyYH6¢bñĞ­/sReÑn&%çù‹lBw8ó6ö'TğyÖìÉ+>¡È+Ÿ@‘1ìÉAs56ZïÀ‡‰M@Ği°BÆºÃ.Œ©àùò“¦LÄtC/DÀ °rø	Ê‚™p]D~tŒº|RóİôÆÌ£˜;•â—u³ù‚¤yIa€Hc¼öIV¦µŸƒ<Çªºƒu)²Äø^—˜·)†Lï‡G-ìéZØ$PşÕ€GÔ—åğX{Â¤2[ÁV€Ëdk…¢foM¯ÿj€/¸­Î!ï\b…|D°¼–*dÙÁ~Ë"Ÿ—ğÊ‡AZ[À*ÿ]°úºòxåï/ËàTSH&É²E‚6¦Q¹tow<¶¬“èºk¶i»ÀH#Pş[Cİ'åê—ó6j(—ÇWuıâ­Å2®Ÿ†÷a`á åx+3fd½†c×ö ‡j¾·¶U˜t¼ÎÊp«¬ffPgúsŠ¡¿ÈÌHtï}€ÌíáØ^À6¼Õá<ÀÕ±Æxaò\NEâXÎı‡òÈı°
-N?(À—¿¨\|n4R&kÓòøB„K·ˆá%ù|Å›4€|†÷I†Î3‚Á„jŒ—vä5Ä¸j7qcîsé‘Pºœ»Æ”ğ)Yâùeh§1q]7_&Ò<mÈfñ¢ë2t¶lYP8½{¼€4NŞ¶ÔŒJƒÙåˆ6eŒ£5ÍyZe«+2/'dS’Ğİÿî½×§/W¬¸BCšKfJK[£Ñ„½”s/Bê/•Ô7¯ßşÁLÂø6Î‘=”ji›öøğ@¾´Ù>)òä·é‰JYSUCè5âQoŒb¶–şºíåÄ‹zû «t†ü|R]:õ,¨j1’Å'â†?«y#ŠtF÷W‰d«‰dæYâİ”VüVØb:ôwC‘Ä·V¿ØJ}üÎ	GÇe¢¿7‡j–Œ±ÏA_	ñô@Ä˜½,óğƒGODåş¦ûdËb*˜T~ôÜ? !ÄÏ‰@Šéš]Kø²24·8JÁ¼?¹¢«Œ™ÌEö­µRÎ¨dIäùåT¶ñêB`›·°* o8[sW˜R¶0w*PêŞeùŞÂè–µ•1µÅ¡<sod=Z·³4äïv1»;n®ß¸S×Ç„TkÓ2rªÈÌÕŞw2bjU„M§„½]SgSÇ1ëô¡«Ø:İ"¨?r(†¾M€M†&õÌœäµË(h7¤Ğ\¾°g×"W>Š×Ô¾›¼°öšºqºÌr(Ü½òÊMOÑZO¯tTJ©Leu:u´î2«çì>Ò[ûâ°F—Xvw“’q¼WR^Óàˆ6|UÏ®ÿ«5¿æº¥ÿ¸­¨è˜é{ÇÏÇ]L|*W^5÷öeÆÆ^-ä
-Åü±×«ËáuûFj ãÔÄA\nû½NãßàË•&Î†¶@‘k¡}^î¢ÓÊ¦âøø©¡Aòj[ÕkÙyÇŞˆsÁƒU‹PBxÍ'|LıŸ6äPfÓÊâÒ³+ Œuó™ùSæ¦òøÜ}U{÷ŞÑÕƒlÁ¶(•ë‘â'†ä)„%î´;,çíj³…V£ï+³f—¸ñ=~3„‡¥{ÄÄ0€TU¿Sõ<z%ñÅ6tk¢~ø‰Ùø­
-w¸ÛàÜyÖßé’qÑ[TÌËßH±œ$5s\MÊ‹7¨~ZÄe‡;”®œaAğë¦O^ÏG-×f–“vX0¼å‡¶:Œ[©×ÔÏü¯|*)7µŒ¿ŸP]şşÀ¨ˆ^ÆJFk¯Û¬ÚÈö$vH?’ÊIéZ AY%Š—½†jctÄ±G—ÊA-ªä6¶Ÿ§Àe`ğB®ÛìVŸ&¶\`eÙ%òzB³±·œFœü‹²ü4‹M2æ$®3	Gè§tBâ­Hó¹e×g¶"´—ùOÎ(¥\[›|ˆ0kF—ï§›(åõ3‘&dmõrSĞ$‘ôÃÏÓ©ŞQZ›ßàÕqÉ"¦6pI'»i(6IhRÔÍ9ÏáiÑŠƒÂ§¶¾rúMÕ% Œ)ãg“h Û×Õ#>¼KbÁšı¤›xÂÊ¬ÅD$÷ÌmÈ+ ø%Ğ“Q%¤\©„{‰–wE´x,n”I5zŸaŒâ¬Îô0õ¸kòp½Kô´âIûgIÑ•DéV“¾¾‹@T¼†Û‰œÇ²UïpjÂÅv¶û$+‘:sKTR”`…ñğªl¬ô<G—:¿µ±ş£‹€kÛt®-NŠy\ƒûŒ'áw`²œ‹d ü‹„ô)İ¦òb;8sÕC¶áÎ'^eTY>56k®áÖq³á†Ë™ÔÂç¶w5¿áHàÍ~·°I=Ó[€%†“ë<‚âBRLÇ»`˜Ö±ê@@·(^§¤ıé,@«NT¬€}a¼şÛåGeMª¥„1%38?d(1Ä/ã@0Áü_G$ñ)h*.•øRY¢_²6Ê®”uÓ1¬)ÁF!ÉÏFÜz”JaPb ˆ~=ïÉlÊ+„fQû¥qŠè¤…+ùt+óÿ †`QîÈÙäkqH¸Óî„m
-d=Ïc„2’úqôPädë»¶+¬Â„xàWŒÜãn¿©T r{õ®±J¸å÷^/„"§íÀ¨äã$’SzWG½L””–¶³†íæ®HzT™yúzk‹PÓ¹?s2Lÿå¬%p„<¼òùÄ Æ³ñw‚3€?ª»0ş‰‰OÜn§ûÁLsGÓÜªÂ9>ÔB_,™§g2±¼¬nÖŞ ÑÒ*¿aÔ‚å{ë¡@Í11s¤%íÃmÓû¼åHZ—lsØÆºrÜïcMÄËJ¿¸×ìeª6JğU¥Æ…EeE@'p4Mƒ8'v+S#êÅG½c~Í-íâçüWß ¬—¯w·,noˆ¨’°PÕ˜å|AïåÙo÷ZØÊşÀbn—;5 [ôûS3/a5ßKôvoä­üRQ=3Ñ ïD¡GğĞ*ÍˆåóI…x®´œ‰—0ŞçÛn²™Í¶%.¼š~ˆŸ™ŞÈ5¬#Ë¯®i÷;ªâ3½¸\áªrÃUl'ÉŸfä&<í7„¢ÑX˜0hbHû±.ş9PÈ»Üèêı¢;°×'áPj2ÜOH”w¸€ˆ{iË5qs³Œù2¸üç;¹Hª_Ç×hnh”DÑ¯JÇ8g¯¶Zó|)M9âq‚|‰Ê
-ZÛÚËçé!ˆz“xÍr:ì=u¨s s…«Œ1l÷Ã‰ù+£Âƒ‹üj±/Rº™a›InHGqØ¨Öâ™ŒˆŒŒÊÏŒsö‡±"êÀU@$¶ìÖ€Ø–ÄBêÑ%OÑÑø"Ój3ı%ÿ®>)Wñoº^Åzpãÿç…F´gÚ>¯Èã<²Jì‡‹z~’ì’\ªòèÜ‹jÎ÷91<jÜ“”„­Ã—W¾”VHÚ\bb—`D…,çÚ¥B»¸™å®ÿ‹4³<
-í£ÀÎ¶snü
-ÏêLN­XZ·z·W‚\ÌE”ãbâ}[„¶;J³âŒ8%«*jÄ¤YÌñ¨ø»-¹tí> Î$e·Ë+*>à òrW–†7bÖ­<¥hü-¦V§_Ğh:£vÅÅú+2Ì*ÙøNºvp©ıÈu!Ñ¹xÀyÕ–‹5ÈIE# «ßEc{¯iƒw3¿7ù˜¯ù#VÕuŒÑ¤ŠC­½M`M×CÏL¨ÛæQjfµ’ $¢}êÿª[^Œ¦äR1ı…¤Ò|”Ş\ı¯ WğËÛŸxåVHpJcñéN€–6ì˜C¤«­hpkZ;øÁ“¬	6šïõ‹Ì–vÄÆUù+{Xvªqt“Ê¬qI£m=sèÙ ?l–ã,zÚì|„o3Ô2„*Æ ¨OF“Ïqõrp™2ù!,ÆKÌ‹W¶ñ^¨B¬K	_æóH!1Kò´NRs‘O[/ûü~r*UTn0k°HQ­ |ña½Bj'÷:Rjâô&äˆh_0MúÆOÂZXÌŞ²; Âş<”÷Á“Â{t"PæZíıÿ¼¾EÖ“ä…¶'JBi¨x· Ë!—è¡j®·w£ğ
-9Ğ{ÛjÂ<%NíÑ)qôÏÇ`[·ø‰æ8tÜµ°¯v§[öKºÒ5ŞrtMiR§8±${áëîÿÂSÚ¹ıÍkÍcK<Óz2nß:%ˆGÉk€Y,5¢§àœ9sÉ—¾½]}‰‰oH—€ÿÏzÎÄïßŸc½%µäõ@Ş“¶@ÜXcÊŞr/7iÑ*iLå#uh«çõÀ‚IôŞ@ëÃßwDï…}]ûÿæ³¼‚ZÚ©=÷ßêî"²nõ<^ZûŞëâ4Féá½ŒtÃüÂT0t.®Í<£§ßñ=^Ry;á3yú|Èà¸5fTeP…#Ú4„ìÓ]¯NqÕW‚Ñ$R¤õI+Â6‚	$h•yµ‰­æeÚŞøé™¢ÌËˆÄø‹Ë
-Û›L.€Ã„‘ †(ÔFvğætÓî@´K¸:%Øæ{Âí¤š±·N1f5YÙaóA:KãŒíàZÌ[‡:Õ³€¿ÃQ*KÍ~ˆÎ¯†š°±È^m- <ÓO¼ôïA7ÏÏQ„d¥‹¥èFgG’~d ³‚>¬kİöŞ¸Z|/6Jv»ÿ+;µ?}OÄ¤îc'sf@Ì—ƒ2ìJ|q¨¦M:p<ôõc:fV
-Ğ—á‘Ï+qÃşÜĞór’BâÌ@,:¹mà‚cÎoG6Ó-Bé³]>•ò)»µ=Eƒh9¢VSÇ¿n‰(B (÷,VEƒLY•$ŒÎ AîÏñáÂID˜ªkİ_êÇš=T¾€”€ê–ıÌÍ…xã]ÏÙ²¡Í®ç²·Ş"RX>‹¸sÛ[melæEûíÍ!-f¥–«
-Uê‡~Ù	=¼<•Ô×5K’¿(Üë/%kî ö.`ì}?cÃ~*ˆ–qO|V»JZ&åOò³)G%Ü¯ .	r¯)²×ÖôUvï±!Øô.U†™?Œ‘Ëx#òUaü’ù-_’3íØ¼ÜSe†s’,ö'ÅgŒZ‰UîfØ¦¡R=BM®ˆfQ»ORÁÊS³ı-·š‰Ğç}	>(Ô´—ßhÄ?SLc¯¤–*½O“Í(…kB›´_IZF´œäWÆÌ*§4„u¼ô7‘Æ²?å.ÈNËòÃğ²Æã?˜î¯L%ÏÌ/úˆ¡:|³«ê	Ñ•#`Y1Öø"­aä	jç]?ÔFÂä¡1Q¯®öË?	C^[¯ë@)–ñ1š¼#@¨õVG™/Ã(A¤+ÜgN?«¿Š›S¾“6 W+~ÜâG‡Íf¼Npe#Æ)p€ûipŞ=k¦ÄÉ7aF¡ËÃNê»•º˜4lÕX“ÎwïéOÜÓ_¬t«Ëí×¹Õ‰ú¼º<ü9·=rœo}«VŒ(iÎñ÷‹Ç‚¦fnğ±Ó×tm*lêTŞŞ3–sUÓ90şnuDïı-X$ÁGY¢O\å¡kePsc/§©@›W¯;É¥ËU).ùµWõµ‡'Uìñi¢Y"¦ ³e«XÉZr7øıBP±˜B„8æ/™…Ÿ†›.w·><WŞÀpÆûïLÏOÒ\o€¦èÏR¯0~o˜¢T‘àÎ¨ë™õ$ÀK÷XáA˜ç°ü˜Ú \å‘†ÛbKgAŠ—®xJw4ÅS¸õ£iËÊwÓ+‰;7‡,8pıºâ™Ì1fÄnQÃ
-¾Ì‚ÀG&š”ñO ğ` ìB fvdwMæ+m~ÃLÂdO»¿¾&aüãáŸ”
-’z±ÌCãÇ’JOa~¿dR÷‡Ûä’Ù3!aYİ<Šv®êbùáˆ¶6"¨Ó‹ÅĞ$âÎXxà‰çë#]U¸™c!rV*Äù@ş>İõ[ÔÁ8–fpŒ‡a:mÂ®È ¶ğèZ‹%>Nøø,Ù(HµRK´9ãÒ½‰åá€¨Apt-ËS $o2ûí*ìd¹RÇÕß:k²ô²C'v¶=ğsMğ9÷ÒÑJN“†x‹Æ‡ş¤BïˆµÿÎ—1Ò³1ñ›o”œL°Øa"ú>74ı]n¦±JdHëßş<B8–[Ò¼¤şwË-ª%KÈN¢nr+œ¯Ê‘Á{l'ÏYØKyY_¯—æî¢Şò®jÎa/ğcJÖ HSi5…´½W#Ú®67øORçwCwÜËÛsõTÆœ3ÿØ;9?”ãíRËëh§ÛñWX"¢ˆ1 Mİ-åÔ¨Šş$ñ°‘êØK+¸6(F£6Ú¸ÈÄéí’üt\~$ºZ«èËx­é›á.°‰*â»kŸ?Á¹ÿ†6ÿçY©á÷KÉ–ÑÌkæŸ8ïwÌü¦+¦” ¸½z’è²'XÆæŸÒJmœÙŒ`,ï>X®Vm½é¤P‹«_alû']>·?¸¯¤Gıa4ºc0B"ñÚ<«êZ»ƒ¦ã]4àËi8=Ùô, ¾Y51=YmïŒµg-óµ8JÚî©/ìÿO@g=â÷Î¦SøğşÉ(šëµB´›€5w0~)ŒĞÃˆÍHpğ®‹½"¥­²ß.&c)Ef‘?àÁY²w¨K ‹\_ùœÌ:—pRï|Å­ˆád<ãØû%Ÿw}YÏH”ÜIù]ák+;ß7=ªî*C]0¦Œ`Ş¥<åú³’Stçûuâ€İ½fH˜ˆ¯SåbÎÆ[ºDñ{ƒº=Îæ&y{ŒùmÁ®ÇyN·y	'Î#dg$q.®ŞPbãOR$'èµ?ïló£Æìn,Í&“¾ËŒ–Pyaª'XpU:†—ÔxK#¹t„×z!QØë,<'¶óÃ¸° ¼ã÷MÎÄÒ?W8Kaòñ/rø¬@‰€e©mm›"”“ßÿéœPk×Fók…SÇVoµõÓÜmd­ÏëÈVmÒÈà88=ËöæE5X¯ò	¨¥Ã^:^š8M†b‘kÌS›„ÁIìroüY ÷£¼[WMO¼à€.½{Jrv”ñRÔÍMÂŠVsTF5PËAÍ	-#ôØßêH[–DõıSò&µE½N±Ñ“iô~‚…Á×üî•x¦)WÉm©ÕÍÑ—¸×X•ò×n¦e4aÕ*û‚
-½šÎœ_­¯°¬+P8aÔãSBAÖ‹ä/…Q[g»¼"('6<nãpYRVğxÜÇ¶;£å!\MdÁœ8¯Å@¯PîQQ¯³{´j˜Ë@Š›R˜
-‹jˆ‚ãH
-(K*©jÑ_íy»è¸YÊ˜5nŒ§üı 9~³,^.c™Ò[ô—]U,MsŠ‚†|v§ÑÓÙğ"²+/e‚›¥y#P–¤æ‹eÒ½wı¢:ñ²woÆ€£Œ=ßFc™x¾xn•µo&ŒKêDûù,ÌóK‚–?Á!‰^ö‚¾;g¿Ô™ÒÄÑ‹¬nÖÁ3Õ~rª8â“6`c‹Äp†¯¢~Ë¥u×¹¤IÕÔq#N †4eÊO¾ÀZ*ï›P0B´Øo’J^?Á^C>Ó­Äµ€Q±4Õ±[0 “ÌïQvVÉ|ïüø6’#Ø(QSJhöæ86g3{/pğÍ!Äj7\‰…ç-AÌ³\7†%Û©R¦ê¶\1£NCÀÜôAçp ôWU'%Í”©Åkİ“ßQrSRøt˜€E˜y¸·n˜ØJ‰bbxàª£w€r~¹ğoÈ1ŠC×©"1/»$ÖÄ-Ã°Ç©Í¿'•/kî;[¹Çæò"FøCB"“TÊôR!êÃôPĞ
-9%òÊ¾ÙéöQèb*G6Æô¬&ç’_.!ˆlîÔoåHLÉ9aĞŸæÎü‚ó…Pg‘p­³-Ãy~TëÌ“<”›Ö•Ö¿£ùù§İ>H_¹HHîÑ„’sw©v¸¯2UnE"_Áqy->3£gµÇEMĞò³©e¦i¾`Ò^ß%ïZP¹›Vƒ¡Oª°…_¬…¢]¿
-e#ñ(¸ »‘‡j‡Š÷G!?…cU±N2œQĞ¿CíÑ9F`„¥}[oi!<8éÛ§DÌªc™¡Õ­éÀæ˜`ÎĞ•Z¿÷ó’ 3ÁMGÓE°×’ÿï_ç®ëB¶§6r‘JhâÈ]e¬wV¥Ô#oû‹,Š”œãßÃ£ü€AhÖáÄ‰M¾:1Nñ(‘0æG‰œ}ÃıÆ§•|ı7w86~É°J!ï/½IÍÊRÜŒdÊE"8ÒMè•)9øÇl˜ìÿè³­°œôÀ*ñ°9·çÃE§Ä+»	˜ë¥—P×Û5ˆ³a2–2’ı„¤Hö§XZÀZ:Zj1#×'\ë¡ëQ?q¬ÊŸ7í@ŞH†jÈmèİÃÂˆ[zª›ØB^F&ä³]{Rµÿë…ëË)ßZÛ
-–ÃIqóè4…Y+_²(òˆ·ü¿4y?·I_ëë€Ğç\Ÿx„;'a_÷ºª(à'ü²³KB»H".‰>^ïİÎz/²®åJƒÉšKëÓ…?[«ãZB¾1Q˜Œöº¶¡éP½/)?Æ¡PË÷dX@PğŠì^+ê®Ñ/:¼M°JåH)Z~vgÄÓ`£s¹àı\¤Ÿ~jgmªãWYåGÑÌ–Bj•è­›4åôÒî¡Æ½1Nú JaèÏbÂf¥­ËzU)Ô³2‚Å»øo0!*vÓ ¢v5éÛÒ%hü·…á®„Y `nÚ¼ã^JÓ†ûÑ]ŸøbáøÇÁÇ´tVHn½ÈéÅlrWk_w“¤2ıÉäÍBúÓİ%õô K¢ìà¦ôÍ€¶™N„^.ôb0*7Ã:dÍõÒÃ…æ4ïºÅ©h¾byêH6÷'óê[	¢nÄ;lOé:=UÉ§Uı=ˆæX)GÎC+í›o"å@@ÿñ®èû*ÕS'ÎúNt™çXd L,)"pÿÛã>Z÷Ò™_Ã¦‘•7’¢~´5VìÅİ(Yã-L–ï†e¬;ÇÁÅë„Œ1¥¸õ8¯ÓDä®T’}ß/\Siüåöd@4SYĞ*gRÍW*È~ÿHÂµ…‰PĞÿúÎ
-b¡­MGÓŞJIöã ƒºy´¨ƒ8œB—ô\‚K3±¨¿jjp?-I«éÔÅt2Ó… à*êÑøÖÒ³{P7@›ÑMµ1Ùœ	Ã
-Ú©ÅŞÍúd˜ÄÈ„ÜG½aÎÉZd°@ÓFÜdét&üxÛJ~ë@«ÕóÄøûbYÙ9öüS–¬Ö2
-åóÇ&Š;şt§ÕÖÀ•·ä¥!LUô~pQj;ˆFF†ó0Ğç'ƒ¬r*vl—ÅŒ@r¤­©s|ÆdE>~å¦…‹—ı µì]|\L›÷V;WHoÚ¤™j4cm¯»@@*G[pDBc`—Ù§R#]E™î&e·TÖ|-¬ñ“”¬»t³#B^—TNj´ï~Z‘L¢QucÎÑ‰³Ã±†oF{iõñXB]ØéüÔ$ï˜1ÎMùğ-ûİã–Ó‚ÎÔ\ˆˆUw˜rE­²:ïycÒq¼øŞZ¯•E.¦‚ö	…É¼uU£å·L¬ä©U€æT­¯If1û|jÆ?&ƒÆLÃ[Ê@ñÒ¸­ø¤Ú¹õ$E	˜¦İ!|€ şâ$ûùùoîõwp=øPÊ|,ÕûGgG£7İ]ul{7ò|W
-ßµeC¸©/0á).šˆ@÷ƒ±‚rÃ÷sĞ0#vvÍÈnó2»i~ø@¨TN™DöA¼Ø nNY{„ka[äQ}dÕ2ùcIcİ›¥Ü[uQ×—Û r²§FAªO<°ÏÁ÷2k•ÆE2M³”éópº;A½8‘`È]ÆgçvÈñ}¾´5‰Ä
-¶—]fN©<r¯¯y3m6~¯¤€€=0·4*BÁ\Ø]5@«®OC*zô‹'˜%ƒä[ğ[ÍO¬4´V;¯z¤°hë”¸-0ÛŠïÖ–ü	Ì:â†ç¾]1Ò½ ×öËÂàÇz(\ğŞÄ'qßœ´®4kŸG¬'Ov_’EwKT¿Z€:W¼ãêOŒì(ÙŒFáÑaÆ*%ò`MşGÛ‰ŠÇ½=:ü?dÏ‘l¡ 	ù¯Wí0Çd=,©†q%.[ğ1$ ¶k3Ô%Ë>ÖÈpèƒ §äu(¨\ƒİñ‹„`ğ “1ØÁ½ÊHaƒà	qß/-CïO§niËo+å‡É²Gk%V \¦iª	ÛÜ	â›!qŒnˆ9ª÷W›·Ã¡¸bÎ¶#M®½¤Ü¨»fÅ{‹QÁm¸A-7H0å1É§‹7ÙÛšk„¾ÍgO0‡`¢Œò½ˆÁ+Á7XLÚ±/J`¡k3m£"ıWeÁ7_P´Eğ@ÄÑ¢´=õÉG@ÌnÈlÚ&œ›g“ñè}É¦”·Óû–*›è¤eÊò=å ïk/ÖØÅÎ¡‡yIl¸z'z•‰4šüË£Ä)Š+tÇú*ÒPk¦^5~Aäú·)ƒ|`iLcP~vsîŞ2:È(†}§Oi¦º(Égƒ·Ñ¾"t÷\Âó5MğÉ‰ökG#7ÈÑSœ6“ŠAMÆ
-áëÆüÂúÑ¢Qz–6†æÏV	ˆp’¢‚şÎzx¿Ğ~rÉÂ~5Šø’ÒØú½Â&ÿ°ŒQ¾ÄnÌÀ(Q¨ÛÕ÷•öî ¸ø ®€}PÈÀ„a`û=¢y_(±LöË˜)AUâVaÜy³`±Ş8U€•f~ê£/#xwoÑd¿Ë›E¸Âñ…æz<¯ÎPdæ}  b4©¡Ò&‘KY¿…2:×¯ı|wÅ1ñF	5õÜ,7Š	\A0×Ë† s–ßËÔMz¶h¬»Óöèôë“¾¢dw³‡ï¨ÔìÃb¦Û’é)Ì{œ©<P¯|-hòœ!íI<{À!}AäD™;õè’N!õÀƒøp-ˆ6c¢*°F©Õø	Èæc|:b2·º£ÿGüëãt­qlé7¾4"×·:ƒ^ûD•HUg2š€ª"©×¬ƒ¥¯¦”ÍbŸbt¼¢1îM ÉÔµÏX
-kv)µvÁ\ Æ‘¶AcpA×‰€ç	¡ıÿZZ8?Kÿ¤3		Ş¨j`7Ü`X…@Ø×N£sÃîp`%˜ß˜ì!L¡Ûñv«!³yT‰3>k;€dX*cƒÊzkrƒó|„ØöJ$ØúFIõQ7tzŒÄ"×ÀáKÂ$¤rc=%WM˜UgèH á§ ƒÉ mŞÓKê4àQì’Jn1@chøµ T…/ÌŸä[áÕ‹RGşhqêØyÈ Œa¼ØÇÅR	d¢×á§ÊŠºX;ÙÔ»b¯?×ø À¯eé‚ ÿ3%9h‘â~Ãz°¿‚ª„Û¾ÅÚMæ¦{˜	Ë‹§İBM..ÒB4´ò Y<}Ğ¶mı-xïºçğƒMœ÷¶ufeˆÁ
-8É;ègÈ˜£°Q]¹8M E>«ƒÒµPH‹eFì‰[ş+±XífèÊktaÒ.à§Y!8º’Ğµ®>Æ<ÿ6€#Aí*)»«½UE!ÃÄ§¡ÌÀ' ÉÓÜU;êÛÚ›‡°NßIqvÇC¿È¼Æ hïàl¢‹»“I[IGu7§ÒP(¦ O>r²çRV…à ŠÒ5š TûWøEÄ¿$ˆˆ&C¥‡Í”$ÅjåL{P[1W¦ş:ah¯É6“ßAÜUvfgaS8=ä1Ë«-Â‚.T½Z²`·*×M‰}åŸRI™ıèAïÊ\lô>  TÆ¡¿@so&SC*Sşà×YHÕñÔóí ıWÛ>ÂÀö£ÂÅ`­YJ%BŒÎ‚¾4¦êIŞ/ôk>¨0<‰-n7ù\ò£*#æI)m¨õ<ÙùŠ’İ|âbó Ï½Öµó˜âb¡ÿ“_’åÅÇˆh_Xƒ4Z( Ä{'©N$aï {*-Ø×™Ï%øf‹öÕ¢—Á>ÁØ@šÖú†M7®Ä´À¾? J³Eb c‚*SÆ'yƒDÈ¡aîzº1‘S,áÿÎM*¶…˜7İ µ*Ÿú0¢éÀ’yBäósğÀå×Ò.Æ=Gó ì`7È];“ÊŒîKgR\ï£uH~;émÌaÿŞ Ğ(!‰²³=ZÒô5lU§óÕ”eØ‰“aÊ\fmÈ™Õ&ráqäÍèÎye7hŠs‡EÆËe´uC¼²ËCÊ¤ñZpÍÈì™Õ®6¨”a;Ì8z8œNi‘ÑWÙø*×¯cd7w9İõqtehZƒGæ‡QéB:Æë›ô®|lC©]<ƒÈ›n>­eÃH©hÇiTw6¨â¤ŒšDÿ5¹röAˆåÀ¸t3…°¶­X‡‘ô¹° ?£&™-‡ğ‰uj+98ÛôËçÿaCa&°sq¬{w W»(5BLí²Ák™Šğë]?”Úñ›€İ]FoSÁ„”»¯‹²~-°KgPw²YdÎ&Yápx[kO›·£“B5zİÒ?¡Ôe;øúF¬'EŞğ 4¨şÈœÏÏ¡€Ò6Øàº×À|8yNñIúÛ¢-ñÊÊX—WˆNêP×@i[û>UBÛ&·\Âi”’Õèö/ƒ5–„mš  e±µ,‘v÷Ow±“Ü‰°–82x°¥Ğ¸İ´¬Ãå]ÅyG¿b?™ \íjÄ  ojÃ®4“!†Â´úJ_1#Ğ8ùÒîıªã†T#´²yzXAÆP'–+…+ÌËå'» iGG¢$\¨M^…S„ãˆ3}cqjS/æìh" [ÁúÒ¢‰ôZŒ‚Oà:WğW>iö Ö ˆ<x³.-!MzUáf¦û¦ÿdœHuH€&„ø:ç„Z…-ÿm3Mi(ÛCØóKrkü¸¡2»+ost¹£®9U¢GĞEƒ'÷ª÷ûçÔBÈÖoL¼@ 4²Xy‡œ~K`–ŠlÂ!°®[™¤¢\Zb™Oèñ/»Ğo|Î/eâì’;ïO!’Ì÷ñ¾;"Œ	SP4²gB ­Í¹‡))|EBÆé~oµÎUÀcÛó/ÃáÕóˆXcø¼ëlxd ÙÂ\¨ğ_Ú)êºÈdàÿÇMØƒ96§
-K_–j3ç31nîá3sw#[Ü;ï¡Rı»Â	Ÿbn0¼Â]åìÙ7˜J„Sx+&¤©‚Ñ•u¨–Rf8Jr¿°˜oÅï—ÿ^?û`È’Ï”fo0RL]Kòü¼{ÆZL½¢¼1í¦~,èGĞ|eîmHH´^ëÆ8œüøÃäZˆ€Cğ:¢âFîNá&õ×Zg~”ÄÃCÁ˜ñ®*dFAŸàÈÈëÅ…{Şõ´F§·6Xv&•±MÂo„‚fJZv·ÇEfa€3ar;@kræÍ‰|^Û5mÕÈ.ø„   x‰	£  ×€Cø1›ÍôNàÙ0ieœ¤F—Œ–‚?ÌË’†ıËÍè¼Ö'ÊT£Tü>¦Â¿€c · -‚`F0šğ™3İ)O]Ş÷!™Ùi%Í„/Hcm=\¬*tĞ®ù(Ø Àhè=‹tÆ  ?•ãƒzkKš‰C©h7â‚0ÀàAp{&á«ö[Ê+7?ÜÂ“PcğGü7®ü<Ö²t\2]­‹œàìŠ¬zÆ—AJ
-<p 7¡{‰W¯]/¨ÍXÈ	‡à%G¯Æ     lN?:ÌÅB	8$€À®¤‚b¬¹'D@³¹£‰b2T¢Õ™˜£G4!æì¬6,@Â~ÿ|
-ËUá…ï63Ó	LuÙ1Û]=ô1b”ş„Æœk|Âáì“!qÚ/ ¸~ø…ã,fz§h ‡$¼MÁïßÂç­Ûù£eÒßõwî®! ²)3¡+?ö)LÀâI~Û?‰ÙFÇ)Ä¬ş“ÂÂêÖä+` âYíih:~´U°h¦ôW wµnH˜7ºÑˆíÜËZ]ß‚Òã‘ûå°Íù0,>y¯¾ú|’ CçÉrQ§ÔyÖ"w~Ùã]JN>>Á¨¯#`}/˜ğ,¥$äáUZÔd}” ÛtN{”QHÚ°˜¿o™OÏF'4ü?~6CÚ}.ä•%(.¹qóQ¬°6 {•ñ›‡O(ßPî5/?9_M›Rn
-.ÅËóû³”ê)Q^ÅıvR«nBy.F‡†ÏX´èî¯±ÀëúücT4¼şeA‹wçg„³ÊoÑrÍŞ$Ï@ğ+÷ôî5EÊû7Ğ/"o#È UydpOnª½-P¨n!tw	kœ 9dD/%í_{Ëù¤F¢Q|×±·E!†Êº	‰×İÇ(úâ_F–'¬}¥ œYïmP,)9¼ŞßÈZ :aÎŒ"É¹qrÌİ
-«Cå¦	jG1B'ûR
-Ÿ-…œ2c,x4œ~Ç LĞ@3[i›Õ³ñP1'œ²»©Í=néÉî—³Sya®ûbPÊ-[èJcªõšcsEØØ¦¾w[ïğ•‡%#”:åñmĞÎH€ZRiL8Ù€ ^COÏYÎóĞ%*ô=º¥!ôË‡rŞbÛHÀm·†ğM>œtZ^Ù{Ji„íÍÛ‰„NuæÊÛÑùà" †F)Jî0ÂŒ²b¼î`3»±gĞºNİ'Fş½5…ï[DT”+İI¦î3Ğ0ù¤•ò8û)#Õ¢Õ™àR6c%Z%V%»3Jµmìç[Š_'k"nPËşáT« [¦8B©ú€@ ­Ä¦ô #7yfÀ–¬gµœ@Õ¥ÇŸ¸=Ø±WKéÁ@eÄ‡k7?T%`éO¾N(cŠßïcB ƒòµº1G¯“;®€Õ©1R÷²à¤ÿB©Fß—o¢\#Ëİü¿ÆfÕÇœzÑá¾¡!òÇmì®Ì¬!åRI¨ŠûñøÛÒT¾œmá’ëæc½½şß…­CËëˆ@ª=“nvDÒ
-3˜õDx²ƒ”q¨®w¤CPeŞ_¡´½¿âÄPr¬ó0·ÒÄ­?:rÓ£z3$y"›Pš]³9şe›Ol³ékè9'Ä.üwôU—Áñ*lCåRsJ@>mš´LæŸŒ6ã–ó?O¢a·Æ5Ü²7*ñ'Âf­Ñ+©Šù0ÕV®5	EÖÅ	Õ]Î.'ÌÓ¹b$¼Í2D„PÎüØÑšO’EOöU£¯Ù
-…ôàkáP$‚V´GÔ®ÍnZ°àÚ]²şÓ&é ^‹EH:fhXıè¸«T6"¿½¦ƒÄIo‡¾Š¯@$ÇøŠ¼_e
-'ãdóAö‹ |^…¤.íuè Ş¢7‚8øY¡²ê:TòõİeïfÇ±ZE“)d‚´ƒ§ÀC†_–dfC®v8eÛvÌİ(¢tŞ¸ş¨ç2–Íˆ°¯À”ò’d´°gki'rEDİY¾VÃX$¾¼qZ7@Cäb †
-Sú¬ß	(ˆûïÖú1æÚŞ¹§ÇÛß¦kë[5ß¨ö-#IÀ%a¡¤š">!/Ur+©@4ËŒ¾m/F[*õ·˜FSÚæi–PP•ŠÁ^¿ı™%ú'¸_F¶²¤14÷E°ß€Ñvù'ÄF§)p.öš#DğF—¢F/ÃGÓ‡¥!T¤Im:ª“Üû<0…!ÓĞwF/Ê çĞ¦9‹Â[5çİ±è‘¡aĞË-Îx'mxÛD(ñc8I’Ï=—YèõÔ{Xñ ~Õ-Á‚yÍÛvÕM$d8sWM$§¶ÀÉëîàYé©÷½,Â‘ÂÔ6K¶óCUî…™\vÁó×%®uƒo+“¬4„½ù÷\kCı(ÛxV|RÙàYÒ)=‹íƒ¯`tŸÇ>ë#a*ì\ëh†6¼[£i€àêÎ72ùîÙ·.W²¿½oi&ã!¼“>—^¾¯:Yù¹åÆş¶'*ŞI.v™n/Ê’–¡ª–Š¶ÿíŒÓvn[ÓL?P/€ü8Ësz€	ô1!ŞÓğ¢Ú#%ZÕ‰HıÏ
-íJf¡›œ¶äØÎtÊ^@Æ&#Qoo%ÄšKcAØ³aâ~Éî)¡J1Ülô÷º M%|U+}ş©JH>€Ælµí\ŞRgjw"b7âºqj	gÌ²-3â¸W%êñBtÚ:ùUë¼ÿòW£l«ù*K´vÂ‰/¾~ˆ8!Bu@‹«­hƒ/xS
-25©ipåwÀÖ…oœü›ÈKñBÂ¬‰UV …ÌsYaR˜9¼è°Ï<ÜÀ¥¯ypƒ<ğèPMşĞ3"W}» „¿dR<IÙãÙ@º*~Ö¬Z•Ú¢rG»99°!uÎ õYš­íàÈ İÿöNª³1LË¾*ÔÇ2Î;°Vayãw'€6›°÷wÀaf¶Í‰còÒÇ‚‚\ù©âUÒ@­¦ˆÈô‰½WÏ¹×X~-Â³Wø¹ÅR¼êöØÉÑGCÙ¬¶ÖQœ^ûíˆûw‰ 1G£k{.6üÛ×ÆŒ.ojZ 2nm–¾²ß>aÒ'Ï±ÃvÎ+"ö@xšô˜ò°ô‹@é¢ÜpB¸´Á!;ÿøú5ˆÇ^ÙÖÇEÓ­ èJ/©k:ÇÔ–dÊü <`Ë3$	ÁûËßuFÁxÉ\_YZÃ@Óæzÿ”ÏL<ëK/°‹”TyÎ†¨H8¹ÎqÙ+BğYôv…ë +·ŸkëûÓÌd+ç¤¬¥\ğ…;&aèÆäÙ"İB=Ğ­"àÕWâ–‰äk{ş#7/UÍµü—hQÈì3æ6e·Àº¥ªÁT«e“¨—ã¡¯!jjQÀi¸Ú•&¬+Åk”æFşáÌë	•.í_rª<Š¨¢{v	-Å|«÷ë~Ú±Z˜ h½ğ’{î÷h²ğü·”É"qÉñÛ‰ƒ$^Ø{f4îŠW© ×³tI²VÏ˜3Y‹í (9ofˆNî]qj’ÀÊ…	³÷GüØ‹?"ƒ-nœ¨?¥6òÿpM„0ºÃ Óñ-‹1USÚAì?&‰)óN¼%ø»ˆVÚŠL¼¾ğ{¯ FÇöÈ¼x¹rbêt‹0V·1ô¯¬ï@A8fôK=ÿ§w{3±]HnôL=ö¨ió¡Š5ŸúÈ¾¯¸–s—¢‘İ%á<¾¾Æb½«ñğxš7ö2ü±×=Î	ü‘Æ5êø¥ôıtªp™[½æEAÚ¢]iíß¥Ì¹.ä—y•®ZuŒÒŸŒ²`"àS¸ÙdÅí6®@¶ÂİIæ¾„~N}ÎàlÊ7P¸òÄôù[Ÿ_÷šfñ÷PCÊÈ±QÓğµ$qfLPø¹ß.5( 9€òİ™.Û„gÚpäI7ÈæB«ß[fW!·‰³ùÛöRXxä3|—  G¬É]4,RÍú¯v–HJ¨,bÀèîbŒ‰Ç¶9“¸Õá~/æIWªÒ:*Tƒ–½c·”2¤‹Zía¥±ˆ$BN§ûşPdáÙåx.˜aØ:rQkvÙgVNiw!™__\àNßòOõ…ˆ½MqxŠ˜Ë)ä±ì¹ÃÃ¾øï1Ô`Äú¡hıbĞKGš××ìßæ¶ÖWâÙÑB™ª|<ivW?RÚ˜¢[sæJ«)˜“pˆwwüoB ‡ìô¨§¡ş³äÄü‡İˆwQğ?˜j¬·Eàªu—ö7h?"*/ö-b„d8¨‚Á®´²çùÀ0Fåòmß¥×À´e6tº…Øu–ÇÁŠÔE+d	§¢QËÄr÷ÃºÿHd &î¤ş›vÄ±´Ô)¬}E‡›ºì¦ ÇÑ<ƒ'\ğßh0ÛÒÜN±aA2Òú¦7Ñ"ıÍ¡‡ó¡³Š³(‹­›÷õL"2ÿ½İö‹“á	‡Ğê›®kø+Şä…&¹5]æÿÄ^Ä¿mMâiñCLRğ¿ÂàÕs4HtI'à(¶µY<D"ßvİ‚ ìÆF\S,…O%K»}Š)4É†š”LîmxÃƒ”½Û÷{-’·VÂY(ƒçÒ¬L/hïÛ
-Z{!¯yòVöxbÀ´^—h¦$OĞ(>^mÙ™^f ‘‹1†6İÆº&%›k ë-È6¾\*Švİİw^âÛN­CV¥”D¯şÎÓ„	ÁÉbšÜÒ¼À0m±:, Âxë¯ƒ/<¯_wöï
-mü5Ş©?_LŸÚ,$kkÊy 	•áàÜ0Ûx-m
-2µ%İ¹Òb ªb&yqdG‡º¯Ipù¦Êæç
-NæhëS¡•šB¿Èûä¿ –š˜ãû¶8hËĞBf-®{cç¹eğ8ğ‡ÎNQ«(K¥€f(¶mÉ‚øvØòNz?•LÌĞF¯üÓW³zµçPgÅ…D iåÂ€|¡Å³B´…gJVIßŸÚ­Šcô_€íwªò¿QüÁ„[!Â)p®î¹ı´éœ':ë_TÊ ş‡¿c„ úhRî…Ò2ÕïXØÆßvõAàæ pº8’¾É—Ö`Y÷R»ª6Xº‚>F’pÆQ}†hVy.ëU.¢ÏÏ>cÈıü»sëòx
-k\ÊD¤Íñr§‰Ò©Nã­Yqo¢÷y\.ÇÍz$¿Ïª‡|pTã¦´‡Uüêu¶g@ı¾¯Î`ÉƒŠŞ¨éÔI7Lßç!¢£ZÑí‚G°V›K€©Ã»û;—¹™Ğ½Z‰ ²ïÕ¥’6ØĞ¼MGİı*Iß]>;®rÊÎJ¾`ávf,ryŒ8‘vçŒ[°[FèæËA‡hºP»_¨¦ÑûNkÆôKÖy¹hUIk93²`UÑ/Û.óñ1ô¹>MÿZ<Lä±5×Õ:ÍùVLåc°,ÃIøHFönaôcaI'C…wÈp¤z²lá>"Å]kı¨tO-}¿d‚,¡dì
-ò Üß… ÀLoŸ!JÔ <¯§|j¦‘¶t¬§ €»$áÀ²¯›às½%B©è%ÂÅÚ˜5qÚÂ¼¬ó(ö€¨ˆë±ÕŠ;i»ä%Ó‹@Ç!¨[ÚkoñÆ°¬ÁÏĞm/ÁÓ^d¤È²¹Ë?-LÜ)ßVÔ1ünLph¬)dÂ`‚ç¹¾vÎÒğLèN*.øÈ5KhvôU­¡”G5Â¡İ™Î¸—(Ä¸óòİ)éÌÌ=eèÌ«À¶UîŠÂ8€SvY
-£•¯¹<¿[Ü}!ÜT%XókR,[øªUa@W«!ï$d¥Ô|\İÒC¤nP¾á–ªP#}š(ŞmÁË»¯Y]jõq ©»à6º´ºŞJ4Ù9k¤;TÉûÅBOÚÉe.ëŠÇİ£M
-¡ö–Â˜Ÿ},ıc·C‰)·¤y.}êOı˜$Ìûcc°Ö~'àÌ€à~‘ÌF7ì0XYè~òVG¼äpK%\'sÈ"£?D W¥?ƒØtÿl\.á€À¦‡ñ„ß³àéá!w‹Î†QN æÌ5€lºû“4}Ü´“övÆb}ëÈx!ĞÖêé4ò]øLË‹I}DÀ­F|–Úp¯ú±÷ÚLS'"Š	iåŠ
-ÈüZ¦Šx>]¹O0JåO³bˆ]&{UK'ŸÚ÷T”U`UëLYñ\Ìè¢(Ş2V‹€¿÷ÏM°.à%'(_ÎqH)c•¹`ß—8Ï'‡—KD_—…l÷
-ùöïbßÎë-0dB>h>L±Õ¼Î~·Ìxà•­›£$i'÷Yf,^™'îxv=şÙ$İjÖ~tıNƒÁ6r;x£ŸäwÙ?ozl—táÙ×¦Ÿ»Å$‡k¨ç¥\¿…í#N
-äïúç¶pïZğğËD3½[’L¨ªX¦>©ò¸ÚjÙ>™QCŠù*'S±Ã‘–a‰<YNWmW lıÿ‹‚õÖUE…ô©/‘vnJ2mÚÎĞğN0Î]ÈşÏªÜ{>¾ÈYnÏCÚE&ÎÕ¹tw«ì"˜às± ûØg9Ãã<Ø19ºä+ï¹UÆÓİ‹àNÜ¼7œnP±,Ğ¥rl‰ÍqÔÌK’”ôè=V&â•ñ&à .Üit„Kr‘öœü€<âø—&ÂC`9„—Ú½a^à¦O7©óÖ°-1ÙbÇ\È¼†“àr|/)²[Í¾ı˜YtwY€¸ZòµÎZíŸşd8»4ÛÉ´³_"ylº>sÛm%z¯5¹úbö‹HJ&j#7Kog “ª¾V]½pÀ´ÿ»¢½tŸ&t_á¾ò¯)—Óî’i’¼DµÖ'L­8Y€ò±£…Fº”İÃYfåğ`øíünlŠáÊ±ó¹éÂ¼Vİœ$r}"8ˆ5ªC²,b¨_Ù!ÊHš^¸Y:eá?Ô„Ñ x]Ü¯'[ß!âWçâ˜,·¢&¯sŸ…éM«¾‰LŠ|…ö»æÀ.KòõïÖ ¸«‘Ú³¢9<Z×Æ¯È×«%»‘;àù*(¢ÿ¥¯œ}˜Şºı˜ì‰¼×::³5Ÿ9Û‘ñØĞÓÌ©ÈwJï7soì:m×“qx…ìW]8Õ¶ÂkoÇ|.ÂV‰U\EïqİZ˜L-SùU»¯¿!$O»l]İóú°Cğ¬(òfTÌôüå;˜@³s/ºiL«Qëó¡‡—ùS3E1év¼æ¥ºu3`š±5¬AØŒ™f½›}°8àÕ]­ tB"ëÕ"qu^[=ÍFKŸ„œ±¯Ï;Á~Óá,íÂâ}Éˆ¼Ö ›B„øì[’¶Ó/·Ed³×8"z[üV>™±¾õÂÜ×3Â‡ìëx4±œ´¼±ô}íù{Çf‚¢RÈ¹Q›d
-_HîeESÒ(@]s<Ë§+
-x7;˜ušË†üüÈ5P`+²»şjÏØÇV"éI)î#“ì°•(üñ‘G‹ÌĞå@÷h%Ê µNu» xa7‘Tëü2²~ç›+Eh
-·-§Š˜×±3ÑÕâÈ_æç‰X©oB’eÏÅƒuH¸ÀXu­ş/ı‚âG=ÃMLªMvğòİîø
-D®Äèq]&äDƒd7J²¹;æqÑ‹©y¼-ïŞ¡6Ù,i( éê{!¡êò¬P¸>I1;%³È L½pÜâ'&V
-¬3»pˆë9`¨"ºÔ³ÍlÄÀTî›ÑÜğÎj±:öGh÷næÁtHCêZı[~j´MÅIŞÒªVË“»rÈ1•Æ›òµ¶ø©‹­ïæ>°Fmj—#ST"®u¡zWÅ¸ç
-?…–‡37d[&IW^©khD‘‚]š¹û¬”Â¥ò+Ì`ş5
- ÛâúÒG„nŒÕÆßU¾t‡âdÇ"Á"¯`™•æÌÃ^¬6ëç˜KÄàè{Ó¦‰²	™E`âDôıuêÕ%®¾ BhÔÒÕœç]4•Í¤ãŸyÆ[´+r¾Å–ƒ0yAeGŸğh‚E)ªÆæ"V`b’û\'†Õ-ğOşÎ]¢#Ñè„Ñ’zš½¶^¥
-ƒ#8°šˆ\f³-µƒòñ+08>ÁAQ|æÌ×ÑòrÈÀÏÂ}è¡=¦ò¸ØÔá¦Ø0Øx¦D³I#7êş¦Hİ‚9La7á±õ·RÊŸÜe¡öı±p¾’ô¥PÂÓ ™£Z¿ÖÉs§‘äT_¾ğœ„}Ûô¶Ö8dº+ÙJJäFßcvo±ê¬|ôG\æqÛSi„T²ˆÖk;`õ;/P>×†åŞ¡VLğ¨q6»“"].(sÆcÔÍ×¶d[õ¬7$·@àh¨ÏÎ€;‹cáÁæÔjÈêú¾5çtaË¼ÿä@ñˆ.;c™gş7´1´ÜÆü@Ñ”’™jªn,W‡§ÅX·*–SÙiXkÄxÚÑîöRh!äzÀPBî¡lFÔ¿|mß‰Ÿ“,1òD»EùÂŠİœsƒÒëøĞ”JNb!R[“xzïª/çÊ›9™_'L4A¥‡9°ÙÏ%}Y«#N¡xéÈóiÀi¬é««Û0¯8+cãh¤z
-ö-ÕZO´XïŸï óVª$äçYFø¥íÃÇ´IÍÅİ1Ûx1£ Hq}á€´f€õş›2$#³qéy»x½cš¨àH›L’	qj›ÃåıçÊ¡cÚwM·ŸÑ(Aõ™VôÆ‘²ÆÈòøÃ^Œí¡Â;å@t•Ë¥ÜŠ"{Q-›ØpÁjëXá±j÷ØÊ½¾MjâgsÄõ¬|›õ„C™&L!QeM™İËqgÈµEbåŠiÑ§¨|×@ÆÊ\Ûö¤[íŸ%•Ó’b<}SoºŒ9Ó‘\	ÅÔ”+*bÂ™SÕÎ“$Æjíºg fÛf-zI~Õó®O÷v„—bH;'ÈËÑs‰c)‰Ö¾×ß‹ÈÅÛqlÛ×nnj5(ÛçÏN¶ïÉu·Í`	š%›Kƒo]€jPk+L¤¡·p,åÖiŠ @â‚¢ÛäêşpÖæn7wÚÖÃåÊİƒÿMó/^¯±\i2ÀCüÓX
-¸/åD,¹çµÕt`ÜÚ9Â±5‡ç†@İœß„LºH‘‘	èÈ¬fŞîGÏóÂH°¤Xè>—­tÔFÊôèoêU{n`=RåF5;ÎèTñ˜ğ_–oS­ÕÇ0cEf›œü²ú:ƒ~Û³Ë,Y:7°2òC|¾¼Q¨l|»úæëtö¿Ôc0ÂYå
-¦ÁœfÉzM
-ğ1âµŸè,öÀ™ôb7{ı<²:„ ]q¿)zH=¢İ/D‰Aûj:åEÖ,yc(DÕ…¨%³@Äî1DÊÍ“æwƒn}ğÖœƒö·2üü×€û#  .&»VÁykü>\XTa¦y¬ôœÇÄMÎ®éĞY×¶Êf ªG£%ùyZ¤—Ow¤Jh%’2ã™Äöy·
-4’n¾¿F  2Ğõ÷Xù&v«®ÓÍ‡XTUÜYäÇ`Í]Åí§Ä%šS·+å11¹h‡–2ûppPg;ú¿Û<Ä|Dø7ÿç#[G¡ón?È8…¡e£ß`Òİğw(•+/–_<ßÊsŞô,/ôİ0³·¶‰VÁ˜Ëş`c<çËb¹1—42š6k¾p5zy÷~[Û¤$J±3•¡U‘âµxW$ZWPñ1J[|ÀÇ}"8Ã»V3±/ËÁ¥ÌªËy(XF8[ŒO{‹Â‚°Ë8ñõ~aB^·OŒ]m×KH%øõÎnœÇT!K)=ÏneóÒÔ]ucB¹vnó-=::‡S÷³ö3şÏ¥6«ØßĞ«Ú«Mf'’ÃÃ•~8ÎTíàòf2°ìe+	‘‹Û0¡\ãšÃQÌ^Ã‰^IôìöKïÔX½è´"¡%X8pÎÈ0L$©¼kåbà-dÊ“©m©Äc qK_Şv&ú<â²Û:.œè_MgáÒqÅ¶;"[lßFk}0Wg5YÀ&Çã¹Ñ¾n¹Œt5¥Ç…½vğS0ÿÙ²À("ğ‚ìr.=fû”@ À¥®“@şà‘=&FWQÏ…è(ãÖ½Ö;I–®1­ ¢„¹:9¸ô:Ë‚Û?2‘çm£ŞQS†›iS¦‰’`¯MŠ—bˆ­B3ò¯éœÑ6Ÿow1VUıéÒõ3.ô%RÌ ÅÛC­}ù».…RCÊA@Ş»ö=˜½âŞ¨n–	Àøñ¿¦Ô¶ ƒ?Õ~Ôò»·…ƒÓ+Ñ^å¬Ñ½0,ÂT|»²©cQjN‘	–&¢JÚ;åHÓ£¦gıF«^'ªÜürêˆ]7@	t’ÄD>$—\ËÛrğşO%Ë»V½ò0ˆ•dO2ğ^CÌqÜ±XıçŸşZ®DÌ¢éR9`pš­š5gMÆ-C×Şió§«bÜÄrØwt²}%†ú"r¹óŒ&­iÑ%ÿ•#.1»3š’‰’°hÆ
-Öÿ¡ÖDŠTË…Øø}9(-7ÂÆŞryxßKä‰-÷'=æq¹šqÖßkZMQ øbå×K¸ˆ×ƒ"/­œŸkˆåh´I}?ï@q>%¦ÂsÏ Sær@vàLmàcˆÓyŸm«LÿsÇf\UİÑ¦à…z1‹¾¾L–ªwì6aè‹–:Ó+vàèıgV-àbœU0?£ØÑtQ”#™™ï<šàN°—F¢\ Õ¹àD%lxØÅŠbÊí:riérÚ<†Ğöoê`oÓ\µ¨ÔñÙ"‘¢Õø+˜=_+ÊïÄ>±#±#*.K…â‡Œl‡É=g89sq“i§”5²E™Ì$USBFŞ²ëÛıíë ª$§æ!ÏBÔ¦ŒHè[¡Â]/M1?öq¾)tƒíEpG‹ç™œÄ£OÆ€9½—ñ7è~ØñûßÉĞ<aÓ{‹™¸-Ã‘¹ğ|´})Øf]t¿öö“ ë”q0ï/p7ri¦BäUr'V§!D(™„ß£#Ñ<Zæ1ìö‰Ó®Ë+$'òqDË?	Ğpd¶¼É:¨P†Ù¢TŠÆ€*ª…`×Ô/l¨
-¹²_K!ØŞÌš¹yĞæEÔ¯Ç†v={ÃÑılñ¨yšü\…u9V³-”+o>°†0·îøFW¶¦ &3xi€Œ2ZÃ7_Ÿø¨­ã(œdïNh‡üOÛ @%A%9Ùª:ObL°B¸&7”]4²bªÿ’«PMHŠ›şØƒ,^Ê1ºSY“•‹Nõ¡€%êÒâéDxü«ˆ•éºv´<U½sï°à°r‚Z”üïËJ‰TnÉgøç6E{“ƒÈÓï»w)}á¾"f1 Ê¹•¬‡¹`ÇG‹íRrzaõ›6)ˆÖy„¨*Â¡»¶%ÌşåÁy&(ò™=O÷•|Å´Kã,ßëèİËÚ³zÙ–ı‰ÇfoT‹B[[ZŠ,8Aß±\;~ÇO&Ñpµ²¶Ëv(PÈÈ1Y‘•ƒÆèc
-F§.ŞÄ‚nT…œğgDê£^ëå5U–Q‘„w•1 RM—O¥É¾9h¸7k—{¨b
-àC?w«·ëËÒÛ‚@öx¥Ô°›¨Ã&{ZÔ\Z„éç0—ƒlój¾á¦?>™XğZLÙÑqßùƒ¢F*@cŸ-ËÌ…Y_F7º[sßáX_*™<$/’½Xã'C'¶æPõ×ı"M¼â	_øš«½Ÿ
-?Û­7]ŸwACi)Ú"³WX+@çÒ™ĞÓ×Ÿ²oO×\³{†ÆÉ>5ñ¨®¨—¾Ğ‚.]S®Ù>ï~L1É9ã¬7S'¹³9}Ñ€'=ºnÑÑõõ³à¸Éo:CùôäX6!búz~¾6RÙ;¾ 3j$'ä&äu»şïGå÷'h^^ÍB¿AAY¹lŒ.†(‡ôNGmòÈM#èÄ,/³ØyZe¹Œ#©–îYëº{W@ßVlPü:Ö*I„”ªö;wWCº	*Ä^ßBy˜Ğ ªİfngº'ğ’[ÿÒ`¶y¹[çJÇÚ£q¼gºâŠ4´›ô°±«ş±À¿ŸÔÅkhh~ğ½´üáêŸ±äQ@Ğ¸Øë«Ø¤[>«[d¤6£¨PØ9Cô0ãŠqÇ{…v«*Óéˆ©ò(÷ªåãûBÑJ^†*•ã0>í}XÉ'¾e	ª×Æ	ØxøöÉ†E8t	‹Õ¹c¬¶0zËÌ´),BÀ¤áêôÇ™Öó±&°‰e„˜7cã…ì s_ib…t§”h‘ î—’î.©šÀÜ»zşËr;›Æíú]4y2êŞ •&çŸÚ1q,š…@ÁJí’GBëf¶ ~•Èüıb´Ó5TOòï8{9pDíµõì[+¿
-n‘¼·R¨QÖY›¾	èa4AËmG%72²Ö(	}H§:[ŞUtìXÏ%')fGk"¶(GV"Äò­H5˜ö`Û6|ó€[S„c«B`ëŸ>7¨´'æözÙ `¦¬™.Ñ~.Af&ç&.—wºô{í©¦qïì¢fÖz-şò|fÁşSŞ÷cQ›AqÎŠìa³ègéáEçuçŸÍch1‘±°ñAå‰öò)~ë§~y½ã@µg†°¥z*cŒ'.²–w_šB~*õë¦ª<Uñ®qV3çN¦ä\´’)Ş >‚”@z¸mN•#äğˆä+«EÂB‘‚o«M”ëáVZ-ƒ;V}7!ÏÎi²Oíåáru½ØÊœî¸\§ÆiÀ/ÕkrPL ’İ"«'şã´1må2U•ÕO7/£*»ÛÍ:váW:ŸÎAÖÖ‹ÿö ìŸ1GnÉ";$!ÙxÏsºÇùˆ{E€Ç8šc=çU4ÜëB}Ë´¬O'¢Êl&¨"¡ş”+—Ö×Ì†uï	/î[Lìä#Qm´„ÔâíílZĞ¾úI‰¤JU•út?©½´RézüDÀ¤LÛWÂ¼­„Û‡%¿‰U5À/õa5$’®0ko$G²$Vó†W®½®§/Í/aGo ÈäŠôq4*©›B­¡Wtº‹U G¾]¢ê—cû’¤ĞzAš¹ó†/ÄE"†Û—ŸŠ™	»;|øÕ¦:I(]ÙÒ©Ix‰4îoùdo¢"üu5AO×8²Ï¨‘º2³\‰¿ÎûÅ/d¿ªŞÇV»7Ö·0:Æó#>’0X7ış¸03} Çû÷â?¼aÖ•.ÉãuäP¥™€iÁ ˜fzç…zB+"Ó íÎÂÃ¹‹;¼Œ›Øò.¾°¿¯ëÏlîÇ˜à)î‹÷d&ŸP%÷gt+®Èıã® ©¬ú¨•Í^x[:è<š%äû5şlĞ7]ñ^•ªzhsÓ8pÏÏ¼I  £àİVw_|ºxd3·§"ÄOœl­rşü£é?ÛíáÛ¢õ	¶[VóÖµº4ÙŸ§¤òÃ6ÉÇÓÁòŞì[ ë®œºê£†µKÈe…2²Š)ÕuğônÑãÿ_ÛÍu¼Y¿àÍâ ½‘n4Ç;&…â‹‡^ôpÅ¶ŒX”Ò"¿·_>Œ…’ ­‘\7
-%G dÔdrxhu‡\7üˆ¨ëÙyµ.¢Ï æFË£ŒMn¸J€xåF`Ë2®v*^_çÒû2¶*$’(éºÂbF¦QçÎÏKOx“¤T-âüÙƒa(|‡z­S® e¦Afûi¯È¾«VáÑñ	¶ôK¿2ÊnßLš´}u,[°*“r>'Ï7\¸?C„Âù\+:Ï—TÚgÄ$+gÚbp®Éˆ’ÃD—C%¯Å‹¾5Y1ƒmùY“YPèwÕá‹tZŞ²ÄúÊıï
-¸ÈÑÑég6 6®÷ûSÁ6]$ª5•éÑOeKyÿš+§oòÛUÛÖXvìŠka¬TV[Ï<¦·—ä)?w³Ó0cKz¡Äç.ôÎ(QW”Iìfo%@W§>šÚ¥›I<ÆßİÓ1A}¶Û>øÒ0/ pW^SMnDøæ2 êd?Kô,}ÀÌä†ô=ÁXÇ“vM!!eyya±sªÇq"…™.¼5BÅqa-±¿ùxØ@ªµPyY³øš'¡ÎG5|‘‘Èü\$€”±Otı3•çzV¯Ş-·ëo1l·Q©É`…P–S<ROãöôfR¿·T¤A’"Ã¿ İPXª™—@¾²Oâ(ù¸1¯Şˆ³©ç%
- ¶­d2ä=9AüÜZùã¾LÔ“­!9L„´¨’y;éì¼GòQè½=WÑVXZìë[`íûõñ4fÜ{ù4cs–OX©&ıñBÙ—ô€SÆrµVc(ƒ`ñ¬™æ…».Es"ªK(éQÛİ®m¨p“«‡ÖiÙ"£åˆö(%r(~··&D2©d!
-î°§–ı® ì»hP{Mºr†?R
-Wc¿q—Ä']
-{ÒèÍÌÖÒ í™ˆ€å*‡$Ö«êÑ¤i,I "Ñ[_ß?Å±¿wÃÜdw³‘×%±¥»r8à¥;O!êá¡q?GÜÅãZ˜…(İÇÖì'^‚³`E×
-ÅÒËV¨í<Ó7¯ı˜ç1=¥‚jÏ-&øæ¦Â÷æÑyØïe#ÊÍ—ÜéÔ‰Æ‘Aëh-a*
-¤òä‹lšË£ñËÆBA†	ô¡®­dáoÃ­€é2 ®ŞÒ 0­Í°L€ú¨ÈéJ	4×fd×áÕKeÉ…g´È
-\×ZEnÙW¸^'~ÊĞ®SD¹“3?xóè;¼ÏöıIİH¾ƒA»ñÊ©N‹dºÓm˜2Më‚§iûÊ&rmÛŞš‡%=Š9ÕRU1l°õ‡Ë|) {ô¶¯ÌÆ8çG3 7U‘åR»Ëßƒ1RZh„ö•§ô¾¹ˆ0Q¯:…Zùv¶úÛyŒëC [P´PTzK?äûãUÙpgiÔ­úc›‘zêÎu¨ÂHvÊ¿sœ¡Ø»Xò¶*c¿}"ˆ³«Ÿ&¹“]…6Yğb‚¹VCÔAŒêş¢MîBıÍî‰Ã +Îù	cö…Ìhò\TÙgƒ÷±1nàF0C-`¡-ˆŞh}©¹ñ4:CÃó¿šAß,˜™RÔg85&Çíı–or±G’—w}çHjEŒ´ú"Dà¯‚®/,ô%\ÙŒÛ¡³O=×H%UFÍQ²—Ã‰`Cıvoa^¡ÈwJœ#(Åj»°#ŠÈñYZ?cé« pV2š¨1¸£ğçhÁù2¯0%¡µ(ºUvİÒİf³3ãE‰ø‡»;×©ÑÎ×mƒ“æàYYİcÚG»gR)2¿tòÁnïà[ |l÷P†LĞa»‹*h2ª¶[´y×C|Lå/Q§è$æÄOløËŠZ“RB Ô4)u­¥¹”+ñéWÃD¨ƒ\wİ+í§¨:©$E’«ò5ñL;Øà\©ûéVìÔäH±o„¼Q¶ü:ÖğåÎà5…PĞ¼ßàÓy0$Nq×åíÓK¬*‘ò!²NÚxf·ÇøQm“¤Æ¬µGM½Y§›ÕÊ?qäÚú”‹ó×§'Á_†º„ôş>yˆiß¨ZÃíè„3ëpU&÷I«’Ü&dkï`)+'ÇÚùíAì˜ÅÚÛdEñèÈ9Ú0ïî¨+¢O#òlRçKF¤äËºUrÇ»Ø¡¯ÖïDjbøìBî˜ıê RL¾-!&¼]šëœ—„i¹4f˜B@Æ˜µn}Œ~8E¥SĞğ[øs@”Ó1·aXîÊû	Ÿ˜®VUíÀçÁÅHz}Ã”¿í]çÅÀIÛ}ouHÑªuœ¯ì©>]\äÁ.¶@­éLı] $4ÀSX)è»GU"Ú¢·Õ€ˆáN¦ÁOÖ/Æµõæ¹€‘Œ’¶şmùaÌ¸¢ÌKºg¸T}$Áûº¨´÷WP=¦lÇ'œÛp9ıB¦iÊŸ	€Ò)?iä)×ë@ÉOYÏøé0ùìb]Z§Eßr¥>7<!vå'ˆ&´%mòf åa—	Ö\ì½½6ÈG¢åO[nŠd‚éqÜà8	öj">°¨èœd¸’?"Wâ¼j{‹ğ(]şxŸö@@BKd,ü¤¦Ôªyt°NpØà&Ja+ñ]rrÌÓa—NX‚ødN*`jıO8U±@eq¥æy²®[Ôy+É¯^7­Tki%êü;èçf“2\ 4X!ã@µ±í$LÌÕ*:–.H›ƒ#ğï`Î(PîL«Iİ§•(h8ÒèLùÑ3×ŒSp€¥Ëí«X÷…;ƒ•ı¯ñ;´¿n@’Ï©á”R&×% ¾¬û!Ê;$Oo©¯Oké'âÕ´İ~²–Ê’LvoRv Êÿ$o=à¿PMë‚ó,#ä”~Ê¿¤ÂFMHCç($YÊk<ÒŞ>w[@Í¹2ÃÓ¯+Ü*ÃÁE$§u VÚé¢‡z†ñŸN†÷á¹÷¼B<bh¸¡–¹jİ€¼ì¡éÕcqúƒyĞôê•ìôšzçCä@ãê(Ü6ÍwÒ*,ÿx®`ùÆëEšš. C5à[6*vÖ[ê@qŞ
-o¥ÑCÑÈoªúfÿ’Ã8FÍğ¶7Ë-éŸN†ßÍÿYŸ@ˆcŒtí€^vœİ€aZ§OÏdkık@À+40%oõÀª¨Û„M©=PõkK¦kk†Ç[	ç¥ã—p#cï½š".ÆŸ9Ç‚PhÊĞšÔ‰!]<9”ZĞº>§ºŠîvj.$vS°”–ä[„¶FÈ"¯æu‹¸¡WPÜ¨ìîŞ”KŠòöÉuGØ¯b¬f†€°¹¦ÖQHÒ6\oävFÿ ÌX8¦.¿=FH[ÊvÜi¶üCM®Œ¸«faÁøm·÷ìJŠ{,âd§ıô9‚ÍC7©êI ÁFñ“ò¼ûrAÿEş¤^Ú|‰C>t¤Ë¦ô>Âf?ç6ƒ•_2!é1ÈM=i‡8˜#(ÀJrá0Æ¿è~waÚšğ¨Ñÿ-{³~¯VaócğŞÚ'+‹(^XTùqÑkéj”–wE^Õ»]°åò:%¾Ê“ÃÃ}‰v¸·U¬~¡üg Míxùë½6gq¦·fN{îº±ÿF”¶uÜª£ê_”à!›ikA½W!ßàp%*Ì¢®üãbíÒôšö²/Mäy×*İ Â€3
-±Å«0ñÅ*aw>°A
-Çš®q„¡¥´ÈIZ#ìŒ'û¬ÿ,pÍÏió6˜êt¹å­Ÿ ázKŒJG";Çƒb€Ì7ùÖş/^%Ğg±¨w!©ï{ÓáNşÑš_A¥ 7iZ¥=^?ÿOµ"‰âmı² ²ş¸Ô§DœÓ*1‹¨‚"ÔoŞÇã4Zv‘-ÆzÔÁ¾W7¯ñ™o=éå×f	-”ƒ‹ªoU±¤ÈŞb7×ÎË¹Ë^>ù3¯²Âgìftç%A/ŒÜ·”¬¾Å@ĞØrõ5Ñ`,	e¡Î.òyLö@§£)½‹ÀìXx}œ•àjp[-æ ’Ğ.¶UWóY=¹¶-\¿vÆçœG„òrY‘¸_0€„EZ—¶ªº¨Ê?M8k³C5¡Ó-ù›¸Ìı‘\™ty¿€¸Ûuj QµÊí´‰	 ¦:ídÆmÊşH¯Š@Áêpú3­,`i cE[˜
-±cÇœˆÙu«lÅ,ÂÕG°«Şïô¼b)NÔAqûİR©Ò’À`‘ÙB¯Aò­Ä®å÷YªÁnÜù”_»zFR«/¦GdÏ¬d|ÜØ-™a•úDØ”	ABıoy*·o¯9ã cË:ü9§‘g#y?
-[0‚@ßğÓ§–ÀL¢“äI¬‡ŸÄ§ğ‹ÿ74K,K×|…åu'ïW¡†¾Ì†\Lc‘+yt†Ÿ5L6TÅ”	Šœ{ˆ¢yCîÚîT¾Ê£¹?ùUhÒÿŠÃ„ˆ©WÜfpø6Sw,È[ñÇeöVSî\`i[¡ÆP³‰ºÃ üø4”@tõ8=£yøÎÜ}6f£m›ÖÜç.ÌHõ8£HjÃ“@\éXÜØŠ†6Jƒ¦ÔÃW +FTvşÎ6³ğÜÃVJu+A# ¡äûJ]8AEÃoœP÷°9ßÈë¹»˜î	ÀéÂ> #ü K±î4+  ]ÑÃ®Ó¿ëÓ
-öY)-Šô8Ûÿê)Od,îîÑ·Ké¡¢¢O°kÿo\ñ={ØÅsMU¹F8‰ô*nd±%tíCš3ë?z–ñé¼ìAV|×‰€7d<Ï2¥©ÚÁ[q¼3ú¬ /—3hü³	Kúã‰qÏÚÕ¡~À®ò·=Ìôê_Ï14%@°©N˜ÁzäÚÈS<ÑèêéÖğ¨ù‚ÇĞZ“JR(Àª¤4&A§å\›s$>`%t-ê‰çæÈT®Ê«R\ÁëNÇ/ÿ’…£§ÍĞ´_6º—&o¢å%ÿõåş'è~5 ğÎ$,q›‘C\Úˆ¿9oMkYáÈ¦Ò*{ïš•ò¼éª6Øbs¤‹Q-dzô¨-Û£Z‘Î±>¶Ù’‚Â'vŒÅèL>(ÎE¬T T[áı_ä
-fr"'˜¼	ìŸ•óï ~fèÂQ1uÛ¶hiç´&ká†ÈdéË2·#vÑŞ"Ú–© l"d¢dŸä\2V-óÖ³U´Ğù‚cªv™k”{£ãÏÏ8Ä€hÒb	#L
-ÈÛõ[ò“®‚Õ7:pÈj½K,Ôüõÿ’XÊ\ëélO¥‡4vø_~wÔJ‚†ô+¢o?bdRåAõ ß54µ.”Á.0eWc9è£âÉ“_< "›¼ë×ªTá³ñ5éÔøŒÙë×ÉóÛº¤ñ<J-:Ö–9–C°	öu´vS}ä¨y(¦{›4C¬blüZˆ\¿×Ö¨¨ı)—ÙD\-ônHZr\-Um0>»Ü5:H@šşpùtJ|Ú²K›kÉmkôùäp`DÛÛt*+‚†S|‚yºqLx¦=¯ÎÓª¤5îº^Â¬ö»¬½C¶ŞSÜƒÌıçA#2-™®¦°	÷3´Ö÷(t>n`ŒxæıË´mPAÂ)¬K™ÚP¸­=†¾€)ı|³!Ë4Hh„Ä&j'rö2t]]ßÒÔ™|-Êd·Ë»Ff¯«öèÖ½zÂØùÁ©A$ªgöòÀ~áûTÇ)gÙLë€#÷‰,CÓˆñ2pqfkë%„b¬Wp‰ãiÿqnµğæÚ<úàéôjª	yŸ’@&™YE ­#Ğ²Òäz>Ì¼xœç³&Ù§ïcèx52äşÑG‹¿1èİ»U‰@™/!á¶Šxèçaë“˜†Rf\
-ˆI›ØìZ‰şˆÕ
-ÖÑËÅe®«•Iœb!2˜S¹™ĞÍ£8c•­]Šˆ'*ÑîØrÅ2í]Bl(ÆZ§!A‰í}–W^\Ã³œ$DöefŒ²ğRPdN”‹RÙ€ú.]èæå¶ß¤cÌj`çÔgvAöúRMyM‚-R²¤ÈoÒ0ÀHÆ0@¹¶4ql¤È@u¬%šF:]Q†±}‡„ûcŒïÃõE¤Jé-KTí{˜%µÖæãó3ûŸ”çı7s†O· vÍkbÀ’ƒW$óø°DÒäo­“ğ¥'‘DşŸe|¢üD¯õÔG§h’Û96QONc,#8 	ù07ör;-ô™¸`7¥¤@+¬`!Ùµt‹ÕÄ¯'§xq’c_ûp^K±ØÎßÎAâ‹Anot'Má5d¯*ÿåıüóğ‚·Ep‹ki$ÒÕ7ıÍ7 A’ììV¢Qkæ ¼¸m¯Ó¹gÆxáÇæ;MªƒÑşZ³ÚÓâÈùÏñ-Î˜Àíè5ğ5tj¨©XJûÏ£Dƒì¿0­ìUğúH;x‚Æ¯İiû…àç¿ï…øyÈÚkõµNJğ¾[A<_eñÉ¨¯~àB³€0>‘5#Eüü)i,ËÚıŸ¼{B‘7½‚”¹”£°LVgI6 uâôåsc¬Â:»:×±N4+•Ç–œÁ!³5WyPÊ.C¨˜:èØ"òƒO‹Ù?aí“Åïï¯rÇl–BÈÉÍÉ!Äd¦{3“UJ ı?Èw‘€ö†öÀòŠ·‹Cq/’ØH!qlª( ˆ*løP´…ÈÙÀß–%r êóDdqÀ‹xlE„Ío[†ù‹İºÔbÀx5ª áüóò^µ~>º*[)%–ºûê¿-{e5h)å'Ú¿>ÁKdÓËQtœ»!EŠ‹ÔvĞãsƒ0\šTÙ1£@yqg¶Å:ÑÎ‰hp¼™ÿ17›É»néõ/EvH‘#ÏÍ7ÕéöD§$›ªvÈ^B¥©ø;ÉKnÀ§DŒ^wq’|fS‘•»íš{³V×¹wIh™¸ä
-Ìï²~2áğí•ã×Â£`@¡ÇÓ¨ÁƒõTv‚ÓŠôäáVsuV¶å „³†åØ{8ÇªÀ´1hEÈ5P=˜‡D„ñpFfrM¡İ­´µÕÖ½¾½˜^hg·
-¸~wGàú˜8™a•±ø€ZaÃÑ"KÖâÅøú\èÒÒªî±®¸Ğ4Ãùğâ£_˜­Øb•»Ã-„º»ÑŞJ=Ú}îÊtÁXöBnW£F¢Q¢miLTsé‰ügõşÜ2n}
-íÈ4yŠTUfk*ŞÈd<§AJ J³ÏrÇ[
-ôÍıŞô
-Mİ"“j¡d½TÎ¾Òı{ˆıã
-ß>f‡éLkcİ›7ÛKlÍ›¥Î
-¤‡–C›ïdJôPPn¡cã›ái&ŒÕµw‡ñt¨™ -¹3LÄ7y× Òİ&Û[ğAŞlô¦—¾~®Í¨f¶íğça£ÿÎÀç/¨, ä¯€eKhç~Š§{÷âV¤EŒ,­k9qÃô4ìCé"ºTU‹[Oµ~]±oDËŸ¼†)È›üØİç½‰„òı×şd½ÎÈı,¯Şü ¼iœWGİùÇ ØÎ§+şÕÙ¿ÓéİœH7Ã!§o%jÁ0SÆ*©‚Öº£üzĞñ‘‹^¿‚q^#¾ô²nc°åjG`¾Ğâ¾àëŒ¸ªÏxd-ë®}ùOİƒ*%q”ôº İw¢ˆ±õ.}yÁÚŒæf¿,İ”c›½A#È¡yuSÓqKäĞ”‘1©Élş¹‡Ù»”¤õ+•Ğ§“P¤ş†²ó¨¹°èÑ’‘Ó^‰õĞÅ¯·½Â{“‚k¤¾eæV³&Ÿ*ƒ®Ğáš†×|
-Ù5íĞÉYF—>œÒ—’'+Ğ}Æ¥WPyNJM‡o¯ é¿¼ç‰$¯`>‚dº÷‚¾ÑúVî".Š./iqØˆZÂ‡†ÎÀ·vÑŠåÌLÜ×Hİé›’…@’uË§ÂZ[×'e4¾”N à.‰I*Å«àWTÕİëLóÒ^”@çñ¨^-çË\uhÙ1{
-<	|XÚ{)j®%«÷‰øÀÖÔ<ÚÖPùô Ğµ¥¬ç‘‡Gî&x9<½“¢„’üw¡9BÉH¨÷_ı V_KÌvu_âwct¢gf¶:Oœ®é¦?\™a_ .q{ŸØIaÎŞgNñY+õÜãpœ*q®w3EåÀw×¯µ’Š¿fg´MIA«ÓAZ¶’bËù`Od¨–¿Œ“ŒH‘•9’hÁÖÇ×QHÈL*ß=@uæDrâ©DN¦ÒáyjÁ  ’ëà;ëœ óJŒ/Ãl×nË(_rÊ)½wÊ’]ôÀX¨À¤9ÇÔ·FmXÈÉ/|_Ëø5±™@3…zÙXäS‰>ıä²<?óï¶`Ÿg”ÆFú–åš_«è¤}ÔYãÈ0>:Í±;0_D;ú4Öè¥U^‘è¥ö|ö–q.;<nÏ^F°POpªğjp@ş)ÜW	‚P%ò‘œ)Øä¯¼RÂ_oš7›¥ëBZÎÁu™e»Ê Ñºù›ûww;–€4îc‹Üë o"Ç{0+ÉÆË•ëQ6š¾›(ÅÌ,1£ÍQ”£[vÖBÖiË[¤p:ÈŒ­Ö8”Tª‹ [×CYÄ'FÅßË)€’¦.a@tK¶—­<ëGˆv÷×åŞíå7 é'!6j³iÀ¨qAFA‡¿EÇ{àÅíæ¹/œ8†€q2Wh}Y íFQŠú¤3 ie1^»õËh¾õñ›TQuxxÉ·a¿‹3g›o8Ì¾É¼ô}˜@°•$ğÒ­Y¹éPÅŸO[Ù*Âüøâçü½aÀSóUN‡Ûö‰ m
-­Æ¡>Ñ=ôÎËü“ÓÒÈ§í†‚€›ê¼ mP ØsÁ1¬”W©†¢DÙıpxîJ1[È6ÌAÆT¹€ÜD?‡Ş5óSÉTt)cm?HT¹QÆ¶½»<Ë“ÀÂ)»b¯Nú7{.®˜É
-Ùaéû€éÓ­Å+cïåM”b~<òSeHY’¤kŸó°šw”´*ã·³j…<š¸ô“AŠ]­÷qşÒ¥>r§UnšJ]†œÓ†ï,µŒˆï ÄLf®óîn·Üç|cPkt´„½U‚wwp1¥ÔLÓİ»‘€ºX%˜ãÇ#@<¦Õ¤«	ı´%°€?o—ÙÍîßO¥äì®ó“–Îïö¿ÄÊzË„JÊdMMe¬“¤k90q÷R––“ZF0&>âùIğ:%Ñ,½c°Ot{“m5x¯«[V{ç÷F,ı£@ó˜%ÿC/“Ò„äæ¸“ÑV…ïÎ{êbuPİ|ôBt¸v¡bB¬/O¶AjG†«Ä¨“>ËóbäEÚÒx…óQdÑàÍ¶»iZÄSZèåì@h}´€êÒ8r/%aéôÁ¥~RÔîr7v!Vdr?ÎúãsÚ±P}f¼¼l2ı5lĞ›="0x1Î';¸Õå)_¢æErQ}÷²	ÂŠ†Í†#ÌöŠ "ñ¾ıluŞX!mÄQ`fÄüCxdßå–O2_%Ù¨œ«çp‰C,bÈ™„ğöuXö5'PÀÅ!ÜŒ<à©?	Şãf£¾QŒì«ïèT•B¥ZãÕ½ü/•¸—õŞ½RÂ‘màÍ‹OtnŒ4eø/½›ß'E´]>….RV&dŒG_Òçú«ü…dvWH¥ÕWY©ú5ówóŸ8wá¯YGbÙO‘?®»ßáŸ’›ÇM,ã«¨N‘¡ÌX~@¿ñDÊª‘üGs»6éàåi=w<é$:1›./Wùnß5ı®ñR(İ.‡lá¿->”[ÉdG—çlŞ=‡¬cµÙ¶+·E™n÷õkykøÙ§Pµ.¢ˆ)€#{¬R
-V]¢.ñºS‚¨×Ğ´C…Ò¯Ë¬6 ?¡ùkÑJ¹®OÂà}îÉÖ!AGÍ&~ÒxÚ6+€·H¸z#(ÆgqÊW¶øÖu¿êá Šr¹Úqá×öe-S“ÙÏCÅ\UÔ–ãnWi%ÅÁ¾–Í¨/:Â2¡*„i4ÎU­EäÇ»íı<ê"MÚ{„+ÍoÅY`V{d¬·Ë„Ï64Ğü=afÖXîEÛk…H,[dEÆŒç£ˆÊ§-¬H`ŞbRÆ"yO†>+õ˜ú”³øÁ.Í²À°`ÆpA~¦şË›³×?™´´¤NÔHÏ¡ô`NÜ”Ê¢aÕ°TmÊYÌp]?Ğ¸pv“bEWˆcfútWEš^²/Ø„o‘Å†Ã©²yöŞÉC!$£s.íCø¹IóƒÄ&*êuv¯ï÷TĞUA_z÷ ‚—u¶¢ÂŒ&Û‹	Š|Îlˆ:cõp+A+“Ò@„rCÿ‚âû´¹•ˆPòĞ~B¹ÄÕou,U¼K×$?a·…(Éêe¤1²ÃÏRÈË%&…>ø)EûõLùöÈ²HóOQBQÌ)Ëz­‰â^¼‘£taÇâf(Aàˆ¾H80kõ´ˆwõëVeãvÕYhzQÏ„~yÿ	ö¼°"¨œ6YÏ‡¯Áúoña¬c~å#ø,»È4wÿ3xÇ“l¶}
-ØÅ*î?œòñÃ›ê¶*ÇY‹°ùæA
-.ƒ­&¢.ıf 
-çÇtEg àM]€|2I­°IeË]º„B£¬¶½ÌAïğµ(ÏF’	4™Š¿Äƒw“Dˆo9@úHºL‡ò?2ò*›Ã:â•g2`<÷äÂ€Ÿˆ}uû9kàß®H”ÎéVÅGäøs‡´¦ìÈĞÈó2,Ğ‘­Sf6¢ãø+4õFòŸ,BÀ%¯~xRÎá£ÁNúduê•0¢İj4¾öúMæE,Ù3ï9ùL.:ãÑ_#2òÇk–ø°Cepä/Ô•‰†KíF.EÑÈ}eàÔ:?©H;å¡Ô­p}e¡JE
-3¤<+)×3iæş¡CrG¹2Wöõï6ƒ"'Ueàœøã<	¼‚Óî|ÛG,
-wu4/o+iŒÃ5ÊQbBÏK|C¥Ró8Ù¿Öôm|4#51kq¯İŒø_îMfI–‰¿Tï>>#VhîĞŒ.ĞùÙªZWÈ#JİÄ’`¦/$ôÇ“ïĞ³b!R@F«‰ëÂå¯äxÍ+W(³†(ã‡İM¡m[m8#T/É€S/T1Tñ§…ºĞ 'Â¬"!"¼ão\\¢	’«Cê#÷#vT
-/”¡{¤sJlÉåœä›€¤ÙS®Y„d^<Ï*Ë}SäqzFvmA¤qZÇõ«¹æxµÔû9õàQ²Ã²<Æ²£‹GNöşl5ßUÉ¯â a¹êÇJ,IFŸºöwçè+¹šĞ~ö@ÍYˆ/Cø¿£Ê´{£–j¸-‰# µéUˆÔ»)ç(++?{­İÍŸ
-„¤ Êy$ ctŸóíÁ&`ì
-hû>6bĞ*…6ÿl¸3Æ#31ß¨®½"#YRu%¯¯U§ˆ´Zo‘ú¿b=8{‡qÖ£²‰ìı¼ôşùr2nª¬Rq$€:é_qUœ!‹Ác°ò]wÜôyDTBN—DçtĞ‚ÖÁÙœÔõİ7b€»‡•Äy-LÑ¿i)NVo1å¢ÿWZ
-×mÙñ¢°P Ôòºè–÷Y³îS
-è¸X}©¥Ü\±õOÜ£Ó!Ó$VÙB)øëíÖÒü«OËOÖşE,AcnÙÌ>÷BÎAB¾	2+àcĞ—]èóÉ7}Ô`Ìî¸£XØÀ§8¸"u×4PÛ<‚%­G±£F&·Ö[¡ˆU> .Œ¼¥ïÿgºñÙÓÃÄI*O–¥^ …²€CfQå½§É¯Q"é§ıÑÿ?ææ#S	#Ü³™¬ŸéZ¶átÚu¤ËKäÅ$gõb®i‘daÁlÙZÛşmÖí²“º„Ù?ÿˆQÆkÈ=.7Xõw_äƒõ§gOçätöü`uYòÔ˜øGä~ËcE| Hñõ=Ğ5¼›Óç6TLi'Ûà.$e\eª“×ê@¼y±X³®æ¡{ÆµÄÚç:Z›œ‹è40NÇ%%†-;[Œ8åiÛRü†ç ƒRÆ/PÊyaÙD7 èL'v[PÖÎ:>‡c‰!¯Öòş³‡)§E®&HRÉ!'%hqíodYHÒ²ˆrD@b2ô•Ò{HÛ´#ÏD˜é/;G]·YË2êğ³dC$Æ˜\ÌŠœzn,•;ó2)÷ÄŠó½IÉçÌB•-l-VdvyxBî;M¬wõ£[ÓÒ<Í1gßnušlŞ–2Íş‘Ìzj‹×Z¬‘Ø  Ç`™·Í
-vâ&ğ]ÁºTJi1MöXBµ¯şÅâír_^Ú‡±Ê¿dùc6 0-]¼QÌ‹o64ƒ®å‚b",oØVWªgú¾B­Oª—(»'V›}•â#2ye¦Oƒ*B/7Åe‚ê&`Å´¡º“¸Íá¶8’4Sà:Hb5AE²êXğÒKdÅr`ÈL.IÍ¶»Ïß<Ü‘ô !fEaÅ7›s(Ó8mà‡q Âc.\•íÍ8(pÄŒ´ƒ’
-]}
-MÇÓûRàâ*àëü	6Çt?d-b‚£ğ€8¸x,î«îÇÛÌØ5¨5­›ugÓ:¾°­sØE¢¦D»NzçÍ’sS1£S~+»›?wšB¶ñ¹x*”C"˜aÙµOY‹IFÌ~¶Ìÿ °¨#AĞfVª”€ŸÁ¯‡ñ]ğ]$‡ÿ·vÉîj©ºUK@1Ö»€Qˆ®&¿bVÇ©¸å€´Æ7ôÂÏ¶©v¬agw	4qòT9hu¯å*h§l‘şIBTjy9åºÍ/rî¶ˆúD\ÄÛ8Ëê…±ósØ%ĞÛ4JqˆÉ.	;òöò™ı”l}’At#ïx!åiZ^\væX·´±¥=¹o¸İ÷îE~âëMß>ÌyÀ†jPŠŠí[0\×sÑ¨:¤[´Œ‹¦­ñk–úœ¹€¬{—ÓŒhı¯qdAâ×’¤Ö|Ä^:×¯2¥ Š-Z s&‰íŒöÁ`{{wî¾àLì’ÁÇl/Ğ“Ô1ˆ{?0I²æçíûp·¥%Ò^Àİ·¹wìK.¤eQ;m®õÊĞJà•ûå‡€wL{’ä›&,G„„ƒsˆÊy£çåÁ+ª@ênx2•›ˆ&[Š6ÇAÓ*òÃLjãê*éUÿ5RğÓtwŞà’Muz´c Ã*À@,À‚~„ÜÔ×¤a8 zÉ\¯#³¸%ÁÓ]àw0ËÓ:QÉèÁ‰¸&äÂcG7òÙĞæâĞsÜË®³dîÙ¹@\QTù×à­{ÕÄ>İPäDë¡+—ß×Ùü²úŒˆ>iŠª f^©¼N¬#TFıä«†NˆÕ$7zÔŒpØl¥œO–§üxbîˆy7¿5ğ¡~aF!Œ±§Ö„İ9ë«õÆ˜“GˆŠûL'?Ç£=ã<1/ïrw¡ÖğÙ–ŞVáH€æJ}“IÂW±ª`ûà¼jvÜ|~ç~pü)úAô’_*»Ìi§‚oÁ»œ|Š¶©_×A$¾şo®‹óª¨Sh÷Õ¢J¤*ƒŞ@Úåê Ï¾¾ LrÚ`"WQ/)³9`]æØ|$(äg -1·[ú–3£•aoA®¿-5¦}|8Œïòpt_l\2YgÜûŒgSLš}uHÏ/7ìdÅOôÒGúûëô_ZÎXúÇÙ›ÓQ ıä52Ì!,dÜ‚[:.à]	Xı\(—òµõ[¤#ª»xö9A™Âk·6³“w„-jçr†iø-Ô>§ƒ­rıÅ©ˆŞ/ÕÁ«†^ùÜ¦Ò«××3xÇ¹£*0R»¡ÑyàFtÇ6Ÿ^h¹[$ãYØ£%D—$šH®="oG~1‹ps<=·TÃÎ;‚Õ„´qo£}ıEï~¹¦ö§È lgÊÔ©]{t/Ve³†2p{¶QhÅÎg”Ìõtü&¡œ®¥cZó¶ş¸#¤ù¿÷Õä´‚Ğ	ÿöÿ'À±S•B'ÚF"{[\bf›%B­frÏÂœ"Ø:wµûªİ%¸O¿‹^ “R™â:!U·>[¥¶UhÄõìï`¡i>m#Æ²¡Æ9·Ö0ß 6Óî„I~n	KbDÒu_Àp’ÕûëBs£g>º=~k¤™Ğ8ÓÇx RZÚ¶œoWıôj½9:jÅßö~íªÑ;§0±¤iÜ‰¸iÁŠV8h\7T.ˆë·ÀPì¿«3h;û»uxÙ¦è”Áİªô$>íæˆ‘õ°*=q•Ã-ïğ%¤{šµ¤–ßy˜ı0së)~«[‘˜,Œ¾<NÂüÏm%¼¿¢š„ƒG‘¾¶w¶ÕğGzjßmeAÎIp™KØ³²‘ñqq¼WZı ÂlGVè%ûÖ~mâ°ÆËäß…-tJ´h[»Ğ+e·Ãîû„E»iN”ÍÄù½xëYÉU}¢şiĞE±¿H2¸‚g|­qWC3æË…¥Ü0Êí’ô°f§ßù,sXø[ÒÆ[ÙÓc…º|õÊ±óY±pH;.;@@—ÕÈHO»6^é/Ähp¢7Ç[vN™-î—Ê{?Å1Ì¯J|ÙDQ}H‡=İÇ)ëØiÉÛsuéòÊ‚¥Ÿ ¢ §/„ı®ÉÜ!™üÆ€$NÁ=Q9Œ^©R5äK¢pÖˆN˜oøßÀwë»ôaáIbjĞıÚ¯âÍ¨:Şgñ5?2Û8İ°Xç^s³[%±ş#figë+×Ò‡sHoñ4QË¤¥–İCL<Œ3WæŸ‚ÚÅ+ésg …!À8uó
-6Ã¡½>^OÍıé¹bÕ™)†1&ÅÕ(È#şR„ ˆI”•"ı‘T¨¸Ê?s}­r!§»3xñååb	Ñ½lŠÊ·£ÀÔºı²šÄ8¶õ¹“÷52"õÌÿ«¶!5&2seû°Ó¨(¯u“óí#¾SÂ·	”İã5mÁGı¾0¯·K„e¿0­—¹Œ¿–€£`Á”\Õ2Ş¿¡BCÿ~’ ,xëƒÑÊ8ÒÏïšd	uéL¢õÀî~Ú<“ÇÎ‡Ù˜'0Şop±'œ…RcÕóYO(ÖÓÍ§à·âJ¾ÒãN·”nñêUB¿0‚w=º·×–E‹· =m¶-úñ€U¨%éRÿ¼q8cıöDš¯Hq"†ä©âí¼*·õßúç;ĞeìBèzhËo1ñÄ`š$iaÊ<Aó²Á+é|c+Å*à‘#a ¨…IöÒºJ¨Ì‰èR ©¾›O¤*ñ*¤EÉ®{(s{ö3n´?>‡cÁ¯J@8ä¿.D;Ú,Ÿ–¥[İ,?:Ë•’¶ Ës=ğ#Ìäe€âš'!øÊ®²­ƒ«BDF¢ÊE9±gWlİ‰í—é'ğç¢jx >èG ¢P¤Ç^³-¯’Ÿÿ·CUyÍè®æå^z5¿SB ¬øsöšš\Àëvo²"‚0¡y9=+Û¹lg< ÃŠ/Gïü›Fùâ@áÜu0O»Ñ$aÙ$Ö²LÊ‰±•îGU´õq±AØ=¨U
-êÂWq÷£eKI+¢éw kë¹MÿÅ&"¦Í@µ\?™#qáÃmM{ø£Qå/‰~jx`êÁZxDÓœ™™Ş¿KZ¢gë×,	pè°úˆèmÃ£(Æ,Ãô-šj æ/]%\àJüaàóÆÏ'(+¸;oÜäVzÑ†gšÙÉDJÉñyœ e·&_Eàæ•†TìF xC6šñõ«9â³£ØÄÁeoßu¥6°Hß9{HQÛ/ZYI©Lo[ÄmÆK”»‘sKL81çuL'¸–]‡š6Q•¤ä0™ÒµÆ6ÔQsÔö[ÿMNQEnÔƒK€%­e°¹9•ß$záŸSy,ü¿èg5"ûJh*Ê‚3ÍW”Î‰‹gëgÛš`ÂEìŸDR Ç†°V#ä¥2_Q­«RÇe€„~§eìN4UÿµÈİJr8p˜Û’5kœ‚ŞRê©=—?.)GV@õÂ„5?Š=À`{ÁZªÓQœèÄÛV(ûX¤¤èäã[Y@3ÚË1C´FÕ‚C1 5wàBa³ì§èŠKGò=êm€åe•üÇj˜¶Á3|£RÄÈT4imrç48–rIPL,‡gzÎë¬Ç)BMÍ^yô¨¥M]s³‰±®õë_ó‡$©·úv¯éTAdn*àµX›kAÛ(c¢*îöÈıÔ³Ş§j·ü&“ÚEH‘
-n
-/dÁskr^ÿÆ…Ãrlj_ÇSŒØYf€l,ëÑZß…à§F1ÕÕôb5jeE¢sßYSiğæË›å3°5Òµ_Ï®2í*uNtîk‹E¯HHãF5ÉÍëSAÂîU´¥µñÒ=ÖÅ.Ğ9Ñr!a¬8gpÂ]­9F•Å)5"’uÈ¯'²RéL{"¸04~Í%h|årôÜƒ˜œ} ^§ŒÜ¯0ò±íA¿c“–X½ı5²ì „Ætòô·ø#–	¯B—hãËğ²ÕQ0}!`jSÅQH¸ `bŠá-y3P¦{MÚ¿ì¹WÌ(ÇvşÖÉ¦[¢ÏJ.¬¹p8q³cMvìlÛÈ+õÖI,Ñ7tü¶ÈµAW•×[]µ‡Á¯]6şsÈx>²c/vt
-;VÎ`VjW™º6¤É(7€å·¥‰8‰«³N ®7I™ÉÍˆ7Ø¼ä‡ÉÊ÷çz¬wa+ıƒ™‡.±›aaš4g.tègÁªò+øÄÙŸ%cş‰(OÎÏrÿìÄ»¡w‡Øìk¶)OäŒƒXU$ªAœÌôTó;úœÅç5¢ÌwRLP	ˆAÇ%1ñÃOU$È	nÉê¹¨bl…›CÖ_2”9+¬ÒØC‡°˜me¾•ˆ`€Èb©ÊÆwÀ¶o4àó ^•SE\Lş¢à\©D²` MØØQè°/•Dp§«pE¸ºéf`n¿%¼Ë3Zv¾1ŞaÖ¨´ı• P \šÏ€©ÄÈğ,§\#‹XËsHì¦å^ #kÆ/âı¨]æP  ¤apps¡d­registry.json¡f¡cÅD[
+£src¡dŒ¤apps¡d‡©app-store¡d©index.tsx¡f¡cÅ©import { useEffect, useMemo, useState } from 'react'
+
+type AppRecord = {
+  _id: string;
+  appId: string;
+  name: string;
+  icon?: string;
+  description?: string;
+  tags?: string[];
+};
+
+async function fetchJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return res.json();
+}
+
+export default function AppStore() {
+  const [apps, setApps] = useState<AppRecord[]>([])
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const data = await fetchJSON<{ apps: AppRecord[] }>(`/api/store/apps`)
+        if (!mounted) return
+        setApps(data.apps || [])
+      } catch (e: unknown) {
+        if (!mounted) return
+        setError(e instanceof Error ? e.message : 'Failed to load')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    })()
+    return () => { mounted = false }
+  }, [])
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return apps
+    const s = search.toLowerCase()
+    return apps.filter(a => a.name.toLowerCase().includes(s) || (a.description||'').toLowerCase().includes(s) || (a.tags||[]).some(t => t.toLowerCase().includes(s)))
+  }, [apps, search])
+
+  return (
+    <div className="h-full overflow-auto">
+      <div className="sticky top-0 bg-white/70 backdrop-blur border-b px-3 py-2">
+        <div className="flex items-center gap-2">
+          <div className="font-semibold">App Store</div>
+          <div className="ml-auto">
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search apps" className="border rounded px-2 py-1 text-sm" />
+          </div>
+        </div>
+      </div>
+      <div className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {loading && <div className="text-sm text-gray-500">Loadingâ€¦</div>}
+        {error && <div className="text-sm text-red-600">{error}</div>}
+        {!loading && !error && filtered.length === 0 && (
+          <div className="text-sm text-gray-500">No apps found.</div>
+        )}
+        {filtered.map(a => (
+          <div key={a._id} className="border rounded-lg p-3 bg-white">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-lg">{a.icon || 'ğŸ“¦'}</div>
+              <div className="font-medium truncate" title={a.name}>{a.name}</div>
+            </div>
+            {a.description && <div className="text-xs text-gray-600 line-clamp-2 mb-2">{a.description}</div>}
+            <div className="flex items-center gap-2">
+              <button
+                className="text-xs px-2 py-1 rounded bg-black text-white"
+                onClick={() => {
+                  try {
+                    window.parent?.postMessage({ type: 'FYOS_INSTALL_APP', appId: a._id }, '*')
+                  } catch {}
+                }}
+              >Install</button>
+              <a href={`/api/store/apps/${a._id}/bundle`} target="_blank" className="text-xs px-2 py-1 rounded border">Download</a>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+¦finder¡d©index.tsx¡f¡cÅimport React from 'react'
+export default function Finder(){
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Finder</div>
+        <span className="badge">Home</span>
+      </div>
+      <p className="muted">This is a simple Finder. It lists installed apps:</p>
+      <AppsList />
+    </div>
+  )
+}
+
+type App = { id: string; name: string; icon: string }
+
+function AppsList(){
+  const [apps, setApps] = React.useState<App[]>([])
+  React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
+  return (
+    <ul className="list">
+      {apps.map(a=> <li key={a.id}>{a.icon} {a.name} <code style={{color:'#6b7280'}}>{a.id.slice(0,8)}</code></li>)}
+    </ul>
+  )
+}
+¥notes¡d©index.tsx¡f¡cÅšimport React from 'react'
+export default function Notes(){
+  const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])
+  const [t, setT] = React.useState('')
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Notes</div>
+        <span className="badge">Local</span>
+      </div>
+      <div style={{display:'flex',gap:10,marginTop:10}}>
+        <textarea value={t} onChange={e=>setT(e.target.value)} placeholder="Write a noteâ€¦" style={{flex:1,height:90,border:'1px solid #e5e7eb',borderRadius:8,padding:8}} />
+        <button onClick={()=>{ if(t.trim()){ setNotes(n=>[{id:Date.now(),text:t.trim()},...n]); setT('') } }} style={{padding:'8px 12px'}}>Add</button>
+      </div>
+      <ul className="list" style={{marginTop:8}}>
+        {notes.map(n=> <li key={n.id}>{n.text}</li>)}
+      </ul>
+    </div>
+  )
+}
+¦safari¡d©index.tsx¡f¡cÅĞimport React from 'react'
+export default function Safari(){
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Safari</div>
+        <span className="badge">Preview</span>
+      </div>
+      <p className="muted">Minimal browser placeholder. Open external sites is disabled in this preview.</p>
+      <div style={{background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:8,padding:10}}>
+        <div style={{fontSize:13,color:'#6b7280'}}>Address Bar</div>
+        <input style={{width:'100%',padding:8,borderRadius:6,border:'1px solid #d1d5db'}} placeholder="https://example.com" disabled />
+      </div>
+    </div>
+  )
+}
+¨settings¡d©index.tsx¡f¡cÅBimport React from 'react'
+export default function Settings(){
+  const [dark, setDark] = React.useState(false)
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Settings</div>
+        <span className="badge">System</span>
+      </div>
+      <div style={{marginTop:10}}>
+        <label style={{display:'flex',alignItems:'center',gap:8}}>
+          <input type="checkbox" checked={dark} onChange={()=>setDark(v=>!v)} /> Dark Mode (demo)
+        </label>
+      </div>
+    </div>
+  )
+}
+¨terminal¡d©index.tsx¡f¡cÅ¯import React from 'react'
+export default function Terminal(){
+  const [lines, setLines] = React.useState(['Welcome to Terminal'])
+  const [cmd, setCmd] = React.useState('help')
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Terminal</div>
+        <span className="badge">Demo</span>
+      </div>
+      <div style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',background:'#111827',color:'#d1d5db',borderRadius:8,padding:10,marginTop:8}}>
+        {lines.map((l,i)=>(<div key={i}>{'>'} {l}</div>))}
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:8}}>
+        <input value={cmd} onChange={e=>setCmd(e.target.value)} style={{flex:1,border:'1px solid #e5e7eb',borderRadius:6,padding:8}} />
+        <button onClick={()=>{ setLines(l=>[...l, 'executed: '+cmd]); setCmd('') }}>Run</button>
+      </div>
+    </div>
+  )
+}
+¥visit¡d©index.tsx¡f¡cÅµimport { useEffect, useMemo, useState } from 'react'
+
+type DesktopRecord = {
+  _id: string;
+  title: string;
+  description?: string;
+  icon?: string;
+};
+
+async function fetchJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return res.json();
+}
+
+export default function Visit() {
+  const [desktops, setDesktops] = useState<DesktopRecord[]>([])
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const data = await fetchJSON<{ desktops: DesktopRecord[] }>(`/api/visit/desktops`)
+        if (!mounted) return
+        setDesktops(data.desktops || [])
+      } catch (e: unknown) {
+        if (!mounted) return
+        setError(e instanceof Error ? e.message : 'Failed to load')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    })()
+    return () => { mounted = false }
+  }, [])
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return desktops
+    const s = search.toLowerCase()
+    return desktops.filter(a => a.title.toLowerCase().includes(s) || (a.description||'').toLowerCase().includes(s))
+  }, [desktops, search])
+
+  return (
+    <div className="h-full overflow-auto">
+      <div className="sticky top-0 bg-white/70 backdrop-blur border-b px-3 py-2">
+        <div className="flex items-center gap-2">
+          <div className="font-semibold">Visit Desktops</div>
+          <div className="ml-auto">
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search desktops" className="border rounded px-2 py-1 text-sm" />
+          </div>
+        </div>
+      </div>
+      <div className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {loading && <div className="text-sm text-gray-500">Loadingâ€¦</div>}
+        {error && <div className="text-sm text-red-600">{error}</div>}
+        {!loading && !error && filtered.length === 0 && (
+          <div className="text-sm text-gray-500">No desktops found.</div>
+        )}
+        {filtered.map(d => (
+          <div key={d._id} className="border rounded-lg p-3 bg-white">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-lg">{d.icon || 'ğŸ–¥ï¸'}</div>
+              <div className="font-medium truncate" title={d.title}>{d.title}</div>
+            </div>
+            {d.description && <div className="text-xs text-gray-600 line-clamp-2 mb-2">{d.description}</div>}
+            <div className="flex items-center gap-2">
+              <a href={`/d/${d._id}`} className="text-xs px-2 py-1 rounded bg-black text-white">Open</a>
+              <a href={`/api/visit/desktops/${d._id}/snapshot`} target="_blank" className="text-xs px-2 py-1 rounded border">Download</a>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+¦assets¡d©react.svg¡f¡cÅ<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ªcomponents¡d¢ui¡dˆ©badge.tsx¡f¡cÅtimport * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@/lib/utils"
+
+const badgeVariants = cva(
+  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
   {
-    "id": "finder",
-    "name": "Finder",
-    "icon": "ğŸ—‚ï¸",
-    "path": "/src/apps/finder/index.tsx"
-  },
-  {
-    "id": "safari",
-    "name": "Safari",
-    "icon": "ğŸŒ",
-    "path": "/src/apps/safari/index.tsx"
-  },
-  {
-    "id": "notes",
-    "name": "Notes",
-    "icon": "ğŸ“",
-    "path": "/src/apps/notes/index.tsx"
-  },
-  {
-    "id": "terminal",
-    "name": "Terminal",
-    "icon": "ğŸ–¥ï¸",
-    "path": "/src/apps/terminal/index.tsx"
-  },
-  {
-    "id": "settings",
-    "name": "Settings",
-    "icon": "âš™ï¸",
-    "path": "/src/apps/settings/index.tsx"
+    variants: {
+      variant: {
+        default:
+          "border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/80",
+        secondary:
+          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        destructive:
+          "border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80",
+        outline: "text-foreground",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
   }
-]
-£src¡dŒ§App.css¡f¡cÅ]#root {
+)
+
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof badgeVariants> {}
+
+function Badge({ className, variant, ...props }: BadgeProps) {
+  return (
+    <div className={cn(badgeVariants({ variant }), className)} {...props} />
+  )
+}
+
+export { Badge, badgeVariants }
+ªbutton.tsx¡f¡cÅnimport * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@/lib/utils"
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        default:
+          "bg-primary text-primary-foreground shadow hover:bg-primary/90",
+        destructive:
+          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        outline:
+          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+        secondary:
+          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-9 px-4 py-2",
+        sm: "h-8 rounded-md px-3 text-xs",
+        lg: "h-10 rounded-md px-8",
+        icon: "h-9 w-9",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button"
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Button.displayName = "Button"
+
+export { Button, buttonVariants }
+¨card.tsx¡f¡cÅ$import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+const Card = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      "rounded-xl border bg-card text-card-foreground shadow",
+      className
+    )}
+    {...props}
+  />
+))
+Card.displayName = "Card"
+
+const CardHeader = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    {...props}
+  />
+))
+CardHeader.displayName = "CardHeader"
+
+const CardTitle = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("font-semibold leading-none tracking-tight", className)}
+    {...props}
+  />
+))
+CardTitle.displayName = "CardTitle"
+
+const CardDescription = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+))
+CardDescription.displayName = "CardDescription"
+
+const CardContent = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+))
+CardContent.displayName = "CardContent"
+
+const CardFooter = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("flex items-center p-6 pt-0", className)}
+    {...props}
+  />
+))
+CardFooter.displayName = "CardFooter"
+
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+±dropdown-menu.tsx¡f¡cÅ¨import * as React from "react"
+import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
+import { Check, ChevronRight, Circle } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+const DropdownMenu = DropdownMenuPrimitive.Root
+
+const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
+
+const DropdownMenuGroup = DropdownMenuPrimitive.Group
+
+const DropdownMenuPortal = DropdownMenuPrimitive.Portal
+
+const DropdownMenuSub = DropdownMenuPrimitive.Sub
+
+const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup
+
+const DropdownMenuSubTrigger = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> & {
+    inset?: boolean
+  }
+>(({ className, inset, children, ...props }, ref) => (
+  <DropdownMenuPrimitive.SubTrigger
+    ref={ref}
+    className={cn(
+      "flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+      inset && "pl-8",
+      className
+    )}
+    {...props}
+  >
+    {children}
+    <ChevronRight className="ml-auto" />
+  </DropdownMenuPrimitive.SubTrigger>
+))
+DropdownMenuSubTrigger.displayName =
+  DropdownMenuPrimitive.SubTrigger.displayName
+
+const DropdownMenuSubContent = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
+>(({ className, ...props }, ref) => (
+  <DropdownMenuPrimitive.SubContent
+    ref={ref}
+    className={cn(
+      "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-dropdown-menu-content-transform-origin]",
+      className
+    )}
+    {...props}
+  />
+))
+DropdownMenuSubContent.displayName =
+  DropdownMenuPrimitive.SubContent.displayName
+
+const DropdownMenuContent = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
+>(({ className, sideOffset = 4, ...props }, ref) => (
+  <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.Content
+      ref={ref}
+      sideOffset={sideOffset}
+      className={cn(
+        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-dropdown-menu-content-transform-origin]",
+        className
+      )}
+      {...props}
+    />
+  </DropdownMenuPrimitive.Portal>
+))
+DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
+
+const DropdownMenuItem = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
+    inset?: boolean
+  }
+>(({ className, inset, ...props }, ref) => (
+  <DropdownMenuPrimitive.Item
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0",
+      inset && "pl-8",
+      className
+    )}
+    {...props}
+  />
+))
+DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName
+
+const DropdownMenuCheckboxItem = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>
+>(({ className, children, checked, ...props }, ref) => (
+  <DropdownMenuPrimitive.CheckboxItem
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className
+    )}
+    checked={checked}
+    {...props}
+  >
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+      <DropdownMenuPrimitive.ItemIndicator>
+        <Check className="h-4 w-4" />
+      </DropdownMenuPrimitive.ItemIndicator>
+    </span>
+    {children}
+  </DropdownMenuPrimitive.CheckboxItem>
+))
+DropdownMenuCheckboxItem.displayName =
+  DropdownMenuPrimitive.CheckboxItem.displayName
+
+const DropdownMenuRadioItem = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem>
+>(({ className, children, ...props }, ref) => (
+  <DropdownMenuPrimitive.RadioItem
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className
+    )}
+    {...props}
+  >
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+      <DropdownMenuPrimitive.ItemIndicator>
+        <Circle className="h-2 w-2 fill-current" />
+      </DropdownMenuPrimitive.ItemIndicator>
+    </span>
+    {children}
+  </DropdownMenuPrimitive.RadioItem>
+))
+DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName
+
+const DropdownMenuLabel = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Label>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label> & {
+    inset?: boolean
+  }
+>(({ className, inset, ...props }, ref) => (
+  <DropdownMenuPrimitive.Label
+    ref={ref}
+    className={cn(
+      "px-2 py-1.5 text-sm font-semibold",
+      inset && "pl-8",
+      className
+    )}
+    {...props}
+  />
+))
+DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName
+
+const DropdownMenuSeparator = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Separator>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Separator>
+>(({ className, ...props }, ref) => (
+  <DropdownMenuPrimitive.Separator
+    ref={ref}
+    className={cn("-mx-1 my-1 h-px bg-muted", className)}
+    {...props}
+  />
+))
+DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName
+
+const DropdownMenuShortcut = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLSpanElement>) => {
+  return (
+    <span
+      className={cn("ml-auto text-xs tracking-widest opacity-60", className)}
+      {...props}
+    />
+  )
+}
+DropdownMenuShortcut.displayName = "DropdownMenuShortcut"
+
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuGroup,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup,
+}
+ªselect.tsx¡f¡cÅcimport * as React from "react"
+import * as SelectPrimitive from "@radix-ui/react-select"
+import { Check, ChevronDown, ChevronUp } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+const Select = SelectPrimitive.Root
+
+const SelectGroup = SelectPrimitive.Group
+
+const SelectValue = SelectPrimitive.Value
+
+const SelectTrigger = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
+>(({ className, children, ...props }, ref) => (
+  <SelectPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      className
+    )}
+    {...props}
+  >
+    {children}
+    <SelectPrimitive.Icon asChild>
+      <ChevronDown className="h-4 w-4 opacity-50" />
+    </SelectPrimitive.Icon>
+  </SelectPrimitive.Trigger>
+))
+SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
+
+const SelectScrollUpButton = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.ScrollUpButton>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollUpButton>
+>(({ className, ...props }, ref) => (
+  <SelectPrimitive.ScrollUpButton
+    ref={ref}
+    className={cn(
+      "flex cursor-default items-center justify-center py-1",
+      className
+    )}
+    {...props}
+  >
+    <ChevronUp className="h-4 w-4" />
+  </SelectPrimitive.ScrollUpButton>
+))
+SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName
+
+const SelectScrollDownButton = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.ScrollDownButton>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollDownButton>
+>(({ className, ...props }, ref) => (
+  <SelectPrimitive.ScrollDownButton
+    ref={ref}
+    className={cn(
+      "flex cursor-default items-center justify-center py-1",
+      className
+    )}
+    {...props}
+  >
+    <ChevronDown className="h-4 w-4" />
+  </SelectPrimitive.ScrollDownButton>
+))
+SelectScrollDownButton.displayName =
+  SelectPrimitive.ScrollDownButton.displayName
+
+const SelectContent = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
+>(({ className, children, position = "popper", ...props }, ref) => (
+  <SelectPrimitive.Portal>
+    <SelectPrimitive.Content
+      ref={ref}
+      className={cn(
+        "relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-select-content-transform-origin]",
+        position === "popper" &&
+          "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+        className
+      )}
+      position={position}
+      {...props}
+    >
+      <SelectScrollUpButton />
+      <SelectPrimitive.Viewport
+        className={cn(
+          "p-1",
+          position === "popper" &&
+            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
+        )}
+      >
+        {children}
+      </SelectPrimitive.Viewport>
+      <SelectScrollDownButton />
+    </SelectPrimitive.Content>
+  </SelectPrimitive.Portal>
+))
+SelectContent.displayName = SelectPrimitive.Content.displayName
+
+const SelectLabel = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Label>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Label>
+>(({ className, ...props }, ref) => (
+  <SelectPrimitive.Label
+    ref={ref}
+    className={cn("px-2 py-1.5 text-sm font-semibold", className)}
+    {...props}
+  />
+))
+SelectLabel.displayName = SelectPrimitive.Label.displayName
+
+const SelectItem = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
+>(({ className, children, ...props }, ref) => (
+  <SelectPrimitive.Item
+    ref={ref}
+    className={cn(
+      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className
+    )}
+    {...props}
+  >
+    <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+      <SelectPrimitive.ItemIndicator>
+        <Check className="h-4 w-4" />
+      </SelectPrimitive.ItemIndicator>
+    </span>
+    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+  </SelectPrimitive.Item>
+))
+SelectItem.displayName = SelectPrimitive.Item.displayName
+
+const SelectSeparator = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Separator>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>
+>(({ className, ...props }, ref) => (
+  <SelectPrimitive.Separator
+    ref={ref}
+    className={cn("-mx-1 my-1 h-px bg-muted", className)}
+    {...props}
+  />
+))
+SelectSeparator.displayName = SelectPrimitive.Separator.displayName
+
+export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectLabel,
+  SelectItem,
+  SelectSeparator,
+  SelectScrollUpButton,
+  SelectScrollDownButton,
+}
+©input.tsx¡f¡cÅ import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
+  ({ className, type, ...props }, ref) => {
+    return (
+      <input
+        type={type}
+        className={cn(
+          "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Input.displayName = "Input"
+
+export { Input }
+¬textarea.tsx¡f¡cÅ‰import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+const Textarea = React.forwardRef<
+  HTMLTextAreaElement,
+  React.ComponentProps<"textarea">
+>(({ className, ...props }, ref) => {
+  return (
+    <textarea
+      className={cn(
+        "flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+        className
+      )}
+      ref={ref}
+      {...props}
+    />
+  )
+})
+Textarea.displayName = "Textarea"
+
+export { Textarea }
+¨tabs.tsx¡f¡cÅUimport * as React from "react"
+import * as TabsPrimitive from "@radix-ui/react-tabs"
+
+import { cn } from "@/lib/utils"
+
+const Tabs = TabsPrimitive.Root
+
+const TabsList = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.List
+    ref={ref}
+    className={cn(
+      "inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground",
+      className
+    )}
+    {...props}
+  />
+))
+TabsList.displayName = TabsPrimitive.List.displayName
+
+const TabsTrigger = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
+      className
+    )}
+    {...props}
+  />
+))
+TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
+
+const TabsContent = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Content
+    ref={ref}
+    className={cn(
+      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      className
+    )}
+    {...props}
+  />
+))
+TabsContent.displayName = TabsPrimitive.Content.displayName
+
+export { Tabs, TabsList, TabsTrigger, TabsContent }
+§App.css¡f¡cÅ]#root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
@@ -2978,891 +3655,56 @@ export async function multiviewTo3D(images: Array<File | string>, options: Plain
   for (const img of images) image_urls.push(await ensurePublicUrl(img));
   return callFal('tripo3d/tripo/v2.5/multiview-to-3d', { image_urls, ...options });
 }
-¤apps¡d‡©app-store¡d©index.tsx¡f¡cÅ©import { useEffect, useMemo, useState } from 'react'
+®iframe-root.js¡f¡cÅöimport React, { StrictMode } from 'react'
+import { createRoot as createReactRoot } from 'react-dom/client'
 
-type AppRecord = {
-  _id: string;
-  appId: string;
-  name: string;
-  icon?: string;
-  description?: string;
-  tags?: string[];
-};
-
-async function fetchJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`Failed: ${res.status}`);
-  return res.json();
-}
-
-export default function AppStore() {
-  const [apps, setApps] = useState<AppRecord[]>([])
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const data = await fetchJSON<{ apps: AppRecord[] }>(`/api/store/apps`)
-        if (!mounted) return
-        setApps(data.apps || [])
-      } catch (e: unknown) {
-        if (!mounted) return
-        setError(e instanceof Error ? e.message : 'Failed to load')
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    })()
-    return () => { mounted = false }
-  }, [])
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return apps
-    const s = search.toLowerCase()
-    return apps.filter(a => a.name.toLowerCase().includes(s) || (a.description||'').toLowerCase().includes(s) || (a.tags||[]).some(t => t.toLowerCase().includes(s)))
-  }, [apps, search])
-
-  return (
-    <div className="h-full overflow-auto">
-      <div className="sticky top-0 bg-white/70 backdrop-blur border-b px-3 py-2">
-        <div className="flex items-center gap-2">
-          <div className="font-semibold">App Store</div>
-          <div className="ml-auto">
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search apps" className="border rounded px-2 py-1 text-sm" />
-          </div>
-        </div>
-      </div>
-      <div className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-        {loading && <div className="text-sm text-gray-500">Loadingâ€¦</div>}
-        {error && <div className="text-sm text-red-600">{error}</div>}
-        {!loading && !error && filtered.length === 0 && (
-          <div className="text-sm text-gray-500">No apps found.</div>
-        )}
-        {filtered.map(a => (
-          <div key={a._id} className="border rounded-lg p-3 bg-white">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="text-lg">{a.icon || 'ğŸ“¦'}</div>
-              <div className="font-medium truncate" title={a.name}>{a.name}</div>
-            </div>
-            {a.description && <div className="text-xs text-gray-600 line-clamp-2 mb-2">{a.description}</div>}
-            <div className="flex items-center gap-2">
-              <button
-                className="text-xs px-2 py-1 rounded bg-black text-white"
-                onClick={() => {
-                  try {
-                    window.parent?.postMessage({ type: 'FYOS_INSTALL_APP', appId: a._id }, '*')
-                  } catch {}
-                }}
-              >Install</button>
-              <a href={`/api/store/apps/${a._id}/bundle`} target="_blank" className="text-xs px-2 py-1 rounded border">Download</a>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-¦finder¡d©index.tsx¡f¡cÅimport React from 'react'
-export default function Finder(){
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Finder</div>
-        <span className="badge">Home</span>
-      </div>
-      <p className="muted">This is a simple Finder. It lists installed apps:</p>
-      <AppsList />
-    </div>
-  )
-}
-
-type App = { id: string; name: string; icon: string }
-
-function AppsList(){
-  const [apps, setApps] = React.useState<App[]>([])
-  React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
-  return (
-    <ul className="list">
-      {apps.map(a=> <li key={a.id}>{a.icon} {a.name} <code style={{color:'#6b7280'}}>{a.id.slice(0,8)}</code></li>)}
-    </ul>
-  )
-}
-¥notes¡d©index.tsx¡f¡cÅšimport React from 'react'
-export default function Notes(){
-  const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])
-  const [t, setT] = React.useState('')
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Notes</div>
-        <span className="badge">Local</span>
-      </div>
-      <div style={{display:'flex',gap:10,marginTop:10}}>
-        <textarea value={t} onChange={e=>setT(e.target.value)} placeholder="Write a noteâ€¦" style={{flex:1,height:90,border:'1px solid #e5e7eb',borderRadius:8,padding:8}} />
-        <button onClick={()=>{ if(t.trim()){ setNotes(n=>[{id:Date.now(),text:t.trim()},...n]); setT('') } }} style={{padding:'8px 12px'}}>Add</button>
-      </div>
-      <ul className="list" style={{marginTop:8}}>
-        {notes.map(n=> <li key={n.id}>{n.text}</li>)}
-      </ul>
-    </div>
-  )
-}
-¦safari¡d©index.tsx¡f¡cÅĞimport React from 'react'
-export default function Safari(){
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Safari</div>
-        <span className="badge">Preview</span>
-      </div>
-      <p className="muted">Minimal browser placeholder. Open external sites is disabled in this preview.</p>
-      <div style={{background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:8,padding:10}}>
-        <div style={{fontSize:13,color:'#6b7280'}}>Address Bar</div>
-        <input style={{width:'100%',padding:8,borderRadius:6,border:'1px solid #d1d5db'}} placeholder="https://example.com" disabled />
-      </div>
-    </div>
-  )
-}
-¨settings¡d©index.tsx¡f¡cÅBimport React from 'react'
-export default function Settings(){
-  const [dark, setDark] = React.useState(false)
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Settings</div>
-        <span className="badge">System</span>
-      </div>
-      <div style={{marginTop:10}}>
-        <label style={{display:'flex',alignItems:'center',gap:8}}>
-          <input type="checkbox" checked={dark} onChange={()=>setDark(v=>!v)} /> Dark Mode (demo)
-        </label>
-      </div>
-    </div>
-  )
-}
-¨terminal¡d©index.tsx¡f¡cÅ¯import React from 'react'
-export default function Terminal(){
-  const [lines, setLines] = React.useState(['Welcome to Terminal'])
-  const [cmd, setCmd] = React.useState('help')
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Terminal</div>
-        <span className="badge">Demo</span>
-      </div>
-      <div style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',background:'#111827',color:'#d1d5db',borderRadius:8,padding:10,marginTop:8}}>
-        {lines.map((l,i)=>(<div key={i}>{'>'} {l}</div>))}
-      </div>
-      <div style={{display:'flex',gap:8,marginTop:8}}>
-        <input value={cmd} onChange={e=>setCmd(e.target.value)} style={{flex:1,border:'1px solid #e5e7eb',borderRadius:6,padding:8}} />
-        <button onClick={()=>{ setLines(l=>[...l, 'executed: '+cmd]); setCmd('') }}>Run</button>
-      </div>
-    </div>
-  )
-}
-¥visit¡d©index.tsx¡f¡cÅµimport { useEffect, useMemo, useState } from 'react'
-
-type DesktopRecord = {
-  _id: string;
-  title: string;
-  description?: string;
-  icon?: string;
-};
-
-async function fetchJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`Failed: ${res.status}`);
-  return res.json();
-}
-
-export default function Visit() {
-  const [desktops, setDesktops] = useState<DesktopRecord[]>([])
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const data = await fetchJSON<{ desktops: DesktopRecord[] }>(`/api/visit/desktops`)
-        if (!mounted) return
-        setDesktops(data.desktops || [])
-      } catch (e: unknown) {
-        if (!mounted) return
-        setError(e instanceof Error ? e.message : 'Failed to load')
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    })()
-    return () => { mounted = false }
-  }, [])
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return desktops
-    const s = search.toLowerCase()
-    return desktops.filter(a => a.title.toLowerCase().includes(s) || (a.description||'').toLowerCase().includes(s))
-  }, [desktops, search])
-
-  return (
-    <div className="h-full overflow-auto">
-      <div className="sticky top-0 bg-white/70 backdrop-blur border-b px-3 py-2">
-        <div className="flex items-center gap-2">
-          <div className="font-semibold">Visit Desktops</div>
-          <div className="ml-auto">
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search desktops" className="border rounded px-2 py-1 text-sm" />
-          </div>
-        </div>
-      </div>
-      <div className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-        {loading && <div className="text-sm text-gray-500">Loadingâ€¦</div>}
-        {error && <div className="text-sm text-red-600">{error}</div>}
-        {!loading && !error && filtered.length === 0 && (
-          <div className="text-sm text-gray-500">No desktops found.</div>
-        )}
-        {filtered.map(d => (
-          <div key={d._id} className="border rounded-lg p-3 bg-white">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="text-lg">{d.icon || 'ğŸ–¥ï¸'}</div>
-              <div className="font-medium truncate" title={d.title}>{d.title}</div>
-            </div>
-            {d.description && <div className="text-xs text-gray-600 line-clamp-2 mb-2">{d.description}</div>}
-            <div className="flex items-center gap-2">
-              <a href={`/d/${d._id}`} className="text-xs px-2 py-1 rounded bg-black text-white">Open</a>
-              <a href={`/api/visit/desktops/${d._id}/snapshot`} target="_blank" className="text-xs px-2 py-1 rounded border">Download</a>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-¦assets¡d©react.svg¡f¡cÅ<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ªcomponents¡d¢ui¡dˆªbutton.tsx¡f¡cÅnimport * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
-
-import { cn } from "@/lib/utils"
-
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
-  {
-    variants: {
-      variant: {
-        default:
-          "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
-        icon: "h-9 w-9",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
+class ErrorBoundary extends React.Component {
+  constructor(props){
+    super(props)
+    this.state = { error: null }
   }
-)
-
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
-  asChild?: boolean
+  static getDerivedStateFromError(error){
+    return { error }
+  }
+  componentDidCatch(error, info){
+    try{ console.error('[App iframe] render error:', error, info) } catch{}
+  }
+  render(){
+    const { error } = this.state
+    if (error){
+      const message = (error && (error.message || String(error))) || 'Unknown error'
+      return React.createElement('div', {
+        style: {
+          height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(255,255,255,0.75)', color: '#991b1b', padding: 16, textAlign: 'center'
+        }, role: 'alert'
+      },
+      React.createElement('div', { style: { fontWeight: 600, marginBottom: 6 } }, 'This app crashed'),
+      React.createElement('div', { style: { fontSize: 12, color: '#7f1d1d', whiteSpace: 'pre-wrap' } }, message),
+      React.createElement('button', { onClick: ()=> location.reload(), style: { marginTop: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid #fecaca', background: '#fee2e2', color: '#7f1d1d' } }, 'Reload app')
+      )
+    }
+    return this.props.children
+  }
 }
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
-    return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
-        {...props}
-      />
+export function createRoot(mountEl, Comp, name){
+  const root = createReactRoot(mountEl)
+  function Wrapper(){
+    if (!Comp) return React.createElement('div', null, `Missing component: ${name || 'App'}`)
+    return React.createElement(Comp)
+  }
+  root.render(
+    React.createElement(StrictMode, null,
+      React.createElement(ErrorBoundary, { name },
+        React.createElement(Wrapper)
+      )
     )
-  }
-)
-Button.displayName = "Button"
-
-export { Button, buttonVariants }
-©badge.tsx¡f¡cÅtimport * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-
-import { cn } from "@/lib/utils"
-
-const badgeVariants = cva(
-  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-  {
-    variants: {
-      variant: {
-        default:
-          "border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/80",
-        secondary:
-          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        destructive:
-          "border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80",
-        outline: "text-foreground",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-)
-
-export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof badgeVariants> {}
-
-function Badge({ className, variant, ...props }: BadgeProps) {
-  return (
-    <div className={cn(badgeVariants({ variant }), className)} {...props} />
   )
+  return root
 }
 
-export { Badge, badgeVariants }
-¨card.tsx¡f¡cÅ$import * as React from "react"
 
-import { cn } from "@/lib/utils"
-
-const Card = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "rounded-xl border bg-card text-card-foreground shadow",
-      className
-    )}
-    {...props}
-  />
-))
-Card.displayName = "Card"
-
-const CardHeader = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-6", className)}
-    {...props}
-  />
-))
-CardHeader.displayName = "CardHeader"
-
-const CardTitle = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("font-semibold leading-none tracking-tight", className)}
-    {...props}
-  />
-))
-CardTitle.displayName = "CardTitle"
-
-const CardDescription = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
-))
-CardDescription.displayName = "CardDescription"
-
-const CardContent = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
-))
-CardContent.displayName = "CardContent"
-
-const CardFooter = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("flex items-center p-6 pt-0", className)}
-    {...props}
-  />
-))
-CardFooter.displayName = "CardFooter"
-
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
-±dropdown-menu.tsx¡f¡cÅ¨import * as React from "react"
-import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
-import { Check, ChevronRight, Circle } from "lucide-react"
-
-import { cn } from "@/lib/utils"
-
-const DropdownMenu = DropdownMenuPrimitive.Root
-
-const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
-
-const DropdownMenuGroup = DropdownMenuPrimitive.Group
-
-const DropdownMenuPortal = DropdownMenuPrimitive.Portal
-
-const DropdownMenuSub = DropdownMenuPrimitive.Sub
-
-const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup
-
-const DropdownMenuSubTrigger = React.forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> & {
-    inset?: boolean
-  }
->(({ className, inset, children, ...props }, ref) => (
-  <DropdownMenuPrimitive.SubTrigger
-    ref={ref}
-    className={cn(
-      "flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
-      inset && "pl-8",
-      className
-    )}
-    {...props}
-  >
-    {children}
-    <ChevronRight className="ml-auto" />
-  </DropdownMenuPrimitive.SubTrigger>
-))
-DropdownMenuSubTrigger.displayName =
-  DropdownMenuPrimitive.SubTrigger.displayName
-
-const DropdownMenuSubContent = React.forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
->(({ className, ...props }, ref) => (
-  <DropdownMenuPrimitive.SubContent
-    ref={ref}
-    className={cn(
-      "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-dropdown-menu-content-transform-origin]",
-      className
-    )}
-    {...props}
-  />
-))
-DropdownMenuSubContent.displayName =
-  DropdownMenuPrimitive.SubContent.displayName
-
-const DropdownMenuContent = React.forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
-  <DropdownMenuPrimitive.Portal>
-    <DropdownMenuPrimitive.Content
-      ref={ref}
-      sideOffset={sideOffset}
-      className={cn(
-        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-dropdown-menu-content-transform-origin]",
-        className
-      )}
-      {...props}
-    />
-  </DropdownMenuPrimitive.Portal>
-))
-DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
-
-const DropdownMenuItem = React.forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
-    inset?: boolean
-  }
->(({ className, inset, ...props }, ref) => (
-  <DropdownMenuPrimitive.Item
-    ref={ref}
-    className={cn(
-      "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0",
-      inset && "pl-8",
-      className
-    )}
-    {...props}
-  />
-))
-DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName
-
-const DropdownMenuCheckboxItem = React.forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>
->(({ className, children, checked, ...props }, ref) => (
-  <DropdownMenuPrimitive.CheckboxItem
-    ref={ref}
-    className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className
-    )}
-    checked={checked}
-    {...props}
-  >
-    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-      <DropdownMenuPrimitive.ItemIndicator>
-        <Check className="h-4 w-4" />
-      </DropdownMenuPrimitive.ItemIndicator>
-    </span>
-    {children}
-  </DropdownMenuPrimitive.CheckboxItem>
-))
-DropdownMenuCheckboxItem.displayName =
-  DropdownMenuPrimitive.CheckboxItem.displayName
-
-const DropdownMenuRadioItem = React.forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem>
->(({ className, children, ...props }, ref) => (
-  <DropdownMenuPrimitive.RadioItem
-    ref={ref}
-    className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className
-    )}
-    {...props}
-  >
-    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-      <DropdownMenuPrimitive.ItemIndicator>
-        <Circle className="h-2 w-2 fill-current" />
-      </DropdownMenuPrimitive.ItemIndicator>
-    </span>
-    {children}
-  </DropdownMenuPrimitive.RadioItem>
-))
-DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName
-
-const DropdownMenuLabel = React.forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.Label>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label> & {
-    inset?: boolean
-  }
->(({ className, inset, ...props }, ref) => (
-  <DropdownMenuPrimitive.Label
-    ref={ref}
-    className={cn(
-      "px-2 py-1.5 text-sm font-semibold",
-      inset && "pl-8",
-      className
-    )}
-    {...props}
-  />
-))
-DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName
-
-const DropdownMenuSeparator = React.forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.Separator>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Separator>
->(({ className, ...props }, ref) => (
-  <DropdownMenuPrimitive.Separator
-    ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-muted", className)}
-    {...props}
-  />
-))
-DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName
-
-const DropdownMenuShortcut = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLSpanElement>) => {
-  return (
-    <span
-      className={cn("ml-auto text-xs tracking-widest opacity-60", className)}
-      {...props}
-    />
-  )
-}
-DropdownMenuShortcut.displayName = "DropdownMenuShortcut"
-
-export {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuCheckboxItem,
-  DropdownMenuRadioItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuGroup,
-  DropdownMenuPortal,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuRadioGroup,
-}
-©input.tsx¡f¡cÅ import * as React from "react"
-
-import { cn } from "@/lib/utils"
-
-const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
-    return (
-      <input
-        type={type}
-        className={cn(
-          "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-          className
-        )}
-        ref={ref}
-        {...props}
-      />
-    )
-  }
-)
-Input.displayName = "Input"
-
-export { Input }
-ªselect.tsx¡f¡cÅcimport * as React from "react"
-import * as SelectPrimitive from "@radix-ui/react-select"
-import { Check, ChevronDown, ChevronUp } from "lucide-react"
-
-import { cn } from "@/lib/utils"
-
-const Select = SelectPrimitive.Root
-
-const SelectGroup = SelectPrimitive.Group
-
-const SelectValue = SelectPrimitive.Value
-
-const SelectTrigger = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
-  <SelectPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
-      className
-    )}
-    {...props}
-  >
-    {children}
-    <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-50" />
-    </SelectPrimitive.Icon>
-  </SelectPrimitive.Trigger>
-))
-SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
-
-const SelectScrollUpButton = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.ScrollUpButton>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollUpButton>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.ScrollUpButton
-    ref={ref}
-    className={cn(
-      "flex cursor-default items-center justify-center py-1",
-      className
-    )}
-    {...props}
-  >
-    <ChevronUp className="h-4 w-4" />
-  </SelectPrimitive.ScrollUpButton>
-))
-SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName
-
-const SelectScrollDownButton = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.ScrollDownButton>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollDownButton>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.ScrollDownButton
-    ref={ref}
-    className={cn(
-      "flex cursor-default items-center justify-center py-1",
-      className
-    )}
-    {...props}
-  >
-    <ChevronDown className="h-4 w-4" />
-  </SelectPrimitive.ScrollDownButton>
-))
-SelectScrollDownButton.displayName =
-  SelectPrimitive.ScrollDownButton.displayName
-
-const SelectContent = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
-  <SelectPrimitive.Portal>
-    <SelectPrimitive.Content
-      ref={ref}
-      className={cn(
-        "relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-select-content-transform-origin]",
-        position === "popper" &&
-          "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
-        className
-      )}
-      position={position}
-      {...props}
-    >
-      <SelectScrollUpButton />
-      <SelectPrimitive.Viewport
-        className={cn(
-          "p-1",
-          position === "popper" &&
-            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
-        )}
-      >
-        {children}
-      </SelectPrimitive.Viewport>
-      <SelectScrollDownButton />
-    </SelectPrimitive.Content>
-  </SelectPrimitive.Portal>
-))
-SelectContent.displayName = SelectPrimitive.Content.displayName
-
-const SelectLabel = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Label>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Label>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.Label
-    ref={ref}
-    className={cn("px-2 py-1.5 text-sm font-semibold", className)}
-    {...props}
-  />
-))
-SelectLabel.displayName = SelectPrimitive.Label.displayName
-
-const SelectItem = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
-  <SelectPrimitive.Item
-    ref={ref}
-    className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className
-    )}
-    {...props}
-  >
-    <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
-      <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4" />
-      </SelectPrimitive.ItemIndicator>
-    </span>
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-  </SelectPrimitive.Item>
-))
-SelectItem.displayName = SelectPrimitive.Item.displayName
-
-const SelectSeparator = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Separator>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.Separator
-    ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-muted", className)}
-    {...props}
-  />
-))
-SelectSeparator.displayName = SelectPrimitive.Separator.displayName
-
-export {
-  Select,
-  SelectGroup,
-  SelectValue,
-  SelectTrigger,
-  SelectContent,
-  SelectLabel,
-  SelectItem,
-  SelectSeparator,
-  SelectScrollUpButton,
-  SelectScrollDownButton,
-}
-¨tabs.tsx¡f¡cÅUimport * as React from "react"
-import * as TabsPrimitive from "@radix-ui/react-tabs"
-
-import { cn } from "@/lib/utils"
-
-const Tabs = TabsPrimitive.Root
-
-const TabsList = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    ref={ref}
-    className={cn(
-      "inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground",
-      className
-    )}
-    {...props}
-  />
-))
-TabsList.displayName = TabsPrimitive.List.displayName
-
-const TabsTrigger = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
-      className
-    )}
-    {...props}
-  />
-))
-TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
-
-const TabsContent = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Content
-    ref={ref}
-    className={cn(
-      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-      className
-    )}
-    {...props}
-  />
-))
-TabsContent.displayName = TabsPrimitive.Content.displayName
-
-export { Tabs, TabsList, TabsTrigger, TabsContent }
-¬textarea.tsx¡f¡cÅ‰import * as React from "react"
-
-import { cn } from "@/lib/utils"
-
-const Textarea = React.forwardRef<
-  HTMLTextAreaElement,
-  React.ComponentProps<"textarea">
->(({ className, ...props }, ref) => {
-  return (
-    <textarea
-      className={cn(
-        "flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        className
-      )}
-      ref={ref}
-      {...props}
-    />
-  )
-})
-Textarea.displayName = "Textarea"
-
-export { Textarea }
 §desktop¡d‚«Desktop.tsx¡f¡cÅç"import React, { useEffect, useRef, useState } from 'react'
 
 // Shared constants
@@ -5546,56 +5388,127 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .dial-center::after{content:"";position:absolute;inset:14px;border-radius:999px;background:linear-gradient(160deg,rgba(255,255,255,0.28),rgba(255,255,255,0));opacity:0.75}
 .dial-center.active{background:linear-gradient(160deg,rgba(255,255,255,0.88),rgba(255,255,255,0.6));border-color:rgba(255,255,255,0.78);transform:translate(-50%,-50%) scale(1.08);box-shadow:0 18px 36px rgba(148,197,255,0.38)}
 .dial-center-label{position:relative;z-index:2}
-®iframe-root.js¡f¡cÅöimport React, { StrictMode } from 'react'
-import { createRoot as createReactRoot } from 'react-dom/client'
+£lib¡d¨utils.ts¡f¡cÄ¦import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
 
-class ErrorBoundary extends React.Component {
-  constructor(props){
-    super(props)
-    this.state = { error: null }
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+¬tailwind.css¡f¡cÅ„@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem
   }
-  static getDerivedStateFromError(error){
-    return { error }
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%
   }
-  componentDidCatch(error, info){
-    try{ console.error('[App iframe] render error:', error, info) } catch{}
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
   }
-  render(){
-    const { error } = this.state
-    if (error){
-      const message = (error && (error.message || String(error))) || 'Unknown error'
-      return React.createElement('div', {
-        style: {
-          height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(255,255,255,0.75)', color: '#991b1b', padding: 16, textAlign: 'center'
-        }, role: 'alert'
-      },
-      React.createElement('div', { style: { fontWeight: 600, marginBottom: 6 } }, 'This app crashed'),
-      React.createElement('div', { style: { fontSize: 12, color: '#7f1d1d', whiteSpace: 'pre-wrap' } }, message),
-      React.createElement('button', { onClick: ()=> location.reload(), style: { marginTop: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid #fecaca', background: '#fee2e2', color: '#7f1d1d' } }, 'Reload app')
-      )
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}¨main.tsx¡f¡cÅGimport { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import Desktop from './desktop/Desktop'
+import './desktop/styles.css'
+import './tailwind.css'
+
+type ViteHotEvent = 'vite:beforeUpdate' | 'vite:afterUpdate' | 'full-reload'
+
+type ViteHot = {
+  on(event: ViteHotEvent, callback: () => void): void
+}
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <Desktop />
+  </StrictMode>
+)
+
+// Lightweight HMR anti-flash mask
+const hot = (import.meta as ImportMeta & { hot?: ViteHot }).hot
+if (hot) {
+  try {
+    const maskId = 'vite-hmr-mask'
+    let mask = document.getElementById(maskId)
+    const ensureMask = () => {
+      if (!mask) {
+        mask = document.createElement('div')
+        mask.id = maskId
+        mask.className = 'hmr-mask'
+        document.body.appendChild(mask)
+      }
+      return mask as HTMLDivElement
     }
-    return this.props.children
-  }
+    const show = () => { ensureMask().classList.add('active') }
+    const hideSoon = () => { setTimeout(() => ensureMask().classList.remove('active'), 120) }
+
+    hot.on('vite:beforeUpdate', () => {
+      // HMR update incoming; briefly mask
+      show()
+    })
+    hot.on('vite:afterUpdate', () => {
+      hideSoon()
+    })
+    hot.on('full-reload', () => {
+      // Mask until the new page paints; keep active, browser reload will clear
+      show()
+    })
+  } catch {}
 }
-
-export function createRoot(mountEl, Comp, name){
-  const root = createReactRoot(mountEl)
-  function Wrapper(){
-    if (!Comp) return React.createElement('div', null, `Missing component: ${name || 'App'}`)
-    return React.createElement(Comp)
-  }
-  root.render(
-    React.createElement(StrictMode, null,
-      React.createElement(ErrorBoundary, { name },
-        React.createElement(Wrapper)
-      )
-    )
-  )
-  return root
-}
-
-
 ¯iframe-root.tsx¡f¡cÅDimport React, { StrictMode, Component, ComponentType, ErrorInfo, ReactNode } from 'react'
 import { createRoot as createReactRoot } from 'react-dom/client'
 
@@ -5722,128 +5635,243 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
-}£lib¡d¨utils.ts¡f¡cÄ¦import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-¨main.tsx¡f¡cÅGimport { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import Desktop from './desktop/Desktop'
-import './desktop/styles.css'
-import './tailwind.css'
-
-type ViteHotEvent = 'vite:beforeUpdate' | 'vite:afterUpdate' | 'full-reload'
-
-type ViteHot = {
-  on(event: ViteHotEvent, callback: () => void): void
-}
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <Desktop />
-  </StrictMode>
-)
-
-// Lightweight HMR anti-flash mask
-const hot = (import.meta as ImportMeta & { hot?: ViteHot }).hot
-if (hot) {
-  try {
-    const maskId = 'vite-hmr-mask'
-    let mask = document.getElementById(maskId)
-    const ensureMask = () => {
-      if (!mask) {
-        mask = document.createElement('div')
-        mask.id = maskId
-        mask.className = 'hmr-mask'
-        document.body.appendChild(mask)
-      }
-      return mask as HTMLDivElement
+}ªindex.html¡f¡cÅ§<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <title>macOS Desktop</title>
+    <style>html,body,#root{height:100%;width:100%;margin:0;padding:0}html,body{background:#0b1020}#root{position:relative}</style>
+    <!-- Preload critical CSS to reduce FOUC during HMR/full reloads -->
+    <link rel="preload" href="/src/tailwind.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/src/tailwind.css"></noscript>
+    <link rel="preload" href="/src/desktop/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/src/desktop/styles.css"></noscript>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>±tsconfig.app.json¡f¡cÅP{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
     }
-    const show = () => { ensureMask().classList.add('active') }
-    const hideSoon = () => { setTimeout(() => ensureMask().classList.remove('active'), 120) }
-
-    hot.on('vite:beforeUpdate', () => {
-      // HMR update incoming; briefly mask
-      show()
-    })
-    hot.on('vite:afterUpdate', () => {
-      hideSoon()
-    })
-    hot.on('full-reload', () => {
-      // Mask until the new page paints; keep active, browser reload will clear
-      show()
-    })
-  } catch {}
-}
-¬tailwind.css¡f¡cÅ„@import "tailwindcss";
-
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem
-  }
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%
-  }
+  },
+  "include": ["src"]
 }
 
-@layer base {
-  * {
-    border-color: hsl(var(--border));
+¦public¡dƒ¦2.webp¡f¡cÅ 6RIFF.   WEBPVP8 "   0®*€ >Ñh¬Rªº²«¡5£P	inüğãL¯õèg_^?"nÌî/¡¯GxPş¬#c¿·¨Ö­Éûïƒîôéğïú|Õúæ]ÿ}ãÇ`›ôÀ2yËƒ³ o ûó>ş½½/oM^©{z^Ş—·¥íé{fÍƒ³`ìØ<ßÇd›§Z?ş¿îS?ñ9vÔ¬ìufBR-ºôp{Ğƒdşât—ş\àÍÏÿ(ñQ®©¿Î£Â4§|;Ï]¯Œz€/BØÅ©Óe5óO¢ÈÆ5ÃÑ·Yyş-_¼i7eb!”êªöCœl-€º¯c¿H$¢ğú–£Â°úšÔÖ÷®	±[”¿è{t!{¨`ö@¡|—<×?õ¾Öß|7å "òä6§Ò¡ÅÒk?û8I¾hî¯=l ›I½';1mAÎ©±j„;UVd˜;Yá‰>$)–çn…ìl2 •ìwë«ØÒz™;+İˆ_€µÛŞ¤¸“ 6N%É°‘õÛÃ*ø$å³>_Ğ¨¤Ìƒ :É+BèzöÄ|»*t›ŞÑËÍ]&÷®ÇGâº˜‡­>—æãÊ_ô¦!É,oC¤x™(«ñVŸøc=ë‚÷±½])ÒpdrL+^‡In5´ü
+šn‘±ãÃ’Xİ<sŠxİ<r«vs7½p^ñÖ4ó÷®àŠ½ã¬,Èçì$³€ç¦!Ê¸ä–7²\ºRÿ4{œËOÉIZSş±@»òœ’Ô¯{ ºMï\*A{ÇU^Œ&÷ØAì‚é7½p^ñŞz‡İ'ïF=v½æö!VAt§Ì±½]&÷¬ËŞ:Ç[9¾³:ñJÃë!ÃÛ×D•Âm:¦\ïÂ—ÚSTndëáÇoTR²¤Şõ™{Êe¼w—Æ,~*÷‰Ôÿ2EiPÁš–Bè
+±(®ôc×v!ÆÂJ	
+öAt›ŞBD{ÖÿOctğºMï\*BtŞæ¾2Ó^õ»PĞ‘“›ªI«­[A²ozàÁRô‰âé7¦°_à.“{ÖÿOåò›ş/©)€.]&÷®Úš¾	$ë0ÍÉÜ«|úMï[ı<uÓÂäG½p^ñÖU{ ºÉ-Y6N%$ŞšÁ{ÇXŞÈ.”Ä*Ès†ÁfÂbZ~J_å$‰”™½ë‚ö	½]&ôÖàv½å% ÿiÓ’õ½å2Ş:µÓ¼õ ½ã¬od	ôÿ£,ı›ÙÒozà½ã¬nI½ë‚öà3’?{Çy|¦[¿Ÿ÷Áì‚é7½p^ñŞzí{Öîêô“‘õÁ{ÇXŞÈ.“{×îıã{ ºMï\»÷£§X¹Îµd ÙBÃõ ½ã¦R¯V(Z’ÅÎA‹ƒY&^ş/¹¯Œx–<]'ªI—Â»Û‚öËxëÙ/BÙrK3{¿u^Îµ÷³#¿dœ±Éjë!)¦7Ò}úJĞ]8[ÿ"=îjÊæ½ë‚÷±½\ô«m„¼¦[Çy|NÃL~¶L‡¼ë$ah¬Á	IƒdŞõÂ!œ“Ëã¼g×Uj•A¨zéó'åìx¶TmíÁ‚h»÷£Šôtê×Ì5ÌS–r!É<¾;Ëå2P:Æúòõ½„¬n¡Ip©-1¿*}“–7ÖHÃàÆû¾:Æöu˜$Va Ô\@f9ë»åYCí‰w¡#§XŞÈs•e¼pNÍ…¼uìëV?&÷®Ş:Æû¨Õ‹¦9êA‚¤ğŠœ “‡=wb«€ÎUÀg*ËxëÖíÒozßí4û¤âRMñşõÁ{Êe»÷‹œ‡*È.“{×ïZ¨úRäå\rª³9W‚âÙ6Q2rË+¢…Û€îé7½tÿzÒq)cÅÖKêà¸ràŠ¾	'”’Ì¡Œv±ğåUfr®9WŠ+(pÌ×UjÜª--È²˜ÿç*Ëxï0$“{×ïc{ ÅèHÌÏOŠöA‹~ñ(®ôaŸv!Ê¸
+¥80ÈRáSlqÙ/F.¨)ª½\ˆ÷®Ş:ÆA*¯[¸·—ºÈA²˜‚Šà3•oÁÊ¸åUOKú@ép´&BQã¤	ÚK¤òøï/ª½]&²¹¯t!{¿z>ı$OnéLC•K<&º£Ìî“f÷£gı<ukªK<uì‚¡ CÖíÒozÌ¾:ĞAls`rÒË+àÛø  »È
+£šk²×vİ5ÏÅšÂ!‚çZ·œ²ÉeïŞÈ­ÒozèxAÁœ­;:ÓîıÙ	î´éI‡Y"´,qclYˆ~ğ,˜9ĞdÊ-Şµ²L¾$áƒ[OÅZ”U¥1¿ÎiiÒoM`½ãª¯[ÙIáu™½ë‚÷”ËyL·±Œ‘§Z™©dğÊÛê'Ğ¤¸”Ö‹Ç+èVÇÈD2¬‡9T³¿xíVÿt›6Jb1Ëãª¶“Ëã¼õ(x5ï]ag^MkWu'[àÌ5Ø=,£.º­kí NÕo÷I½ë„C9 béy|WÁ‚»_i´éÁ7³­ŸšÁ|á÷IÄ»Íæiø¼zöË=ÈdLƒà A“)€\iÆErwø#ûò+­Å@.3È@³~D{ÍìC•pIá‹Ñ‹ã¼ó,½å*»˜ÒÕ¸¥bW¾Ç/	½] w­şGÚøZ}ÁäÊ$BBVÕÊ§À‹•{Œ!ÔĞJáéAøtTç{p`©
+í|cÀ—oW¡#§X¹¿àÊ¤íõ›|I&÷Ş:Ç[:*1a×À&Æçê|Qà"ÌSŒ
+Ö)€QÏÒ_'Ô"øxßµa6ëèî1¥ZãïL×uxäÎ”Ë‚ÂñŒÑÁÍ–Éì¹È¹€rMı ÖÎÎIçš
+†^ñÁ;Ic|ml” +u¤˜²¡¾“ñ&s s´?¼UŠ£æi‰v/Ô“Y!ıˆOff«%NÂFPù	FYXÜ:U‰ÈŒU)ø¢B*¥ÊrÀ®›×ÀÑ ÇúÒwÂQ’sbÂ*PëKxçT	ÄÏBÑÑBŞ:Ñø«ŞS-„«„àXV ¿ş”Ô„5ƒÖ¿c#ú·å°¡/Ïâ‰Ú…0@*QÇİñU¹êZ 9ÂÛû¦éTh_à®ŠˆŞ¾ü«¦(ûCT:#µ y_K’*·:]¼#S1Ù}É7ÃÂÖİ³[X•9dŞ2Ğ7ÖBOê¥\ò£HñÔõ˜„À(…ˆËíbo†|ü²8wÔs Ñf|¤§ğ_2PŞrƒˆoD¼sFÁ(Â%¤ğ¦/(™!]8ç¸—fÄó{İÈd8ÍÅú?‹¥	é°Y8ÆÛ‘å›å [pi=ä’pp-ÂŠ›—ùPµjoA#èÇ¨Å]×g•@­8ä¡¨¸ÈiÑj<ß#š¢¥ÂiœtC»¹•O³`ÎlVç3ÅŞMO |x» fÇv–^MÎ…Ôo¬Nz0BÙ­Zb.–ŠèaŸ`³#à2Ã1µhÎóĞå˜VHN"–U›4k¶4:Ï (ª¿äf4–üE\õæPŸƒ†¬PÜ‚aÙÔk«‡ ¤	%
+£2š•ç»áÔlOkŒÅ_İˆÇ13UQíZª­º·1­•j«BgîµÑxì^ˆ?áNnòJë«Ş‚ÁCL³µ¦ˆû¼Ç°Ø ë*Åî9°œF±ç·?§ª9Ã5ÆñÇøÏæF
+à-7ŸváÅÇBò·„°[Ğ?öjî(fpw_Æ„»1WÖ«‚‰Vü;-¥L7Ê)…›{!¾¨.‡ú­hh"É^j“Ü2Ùy:gmí«2ˆ‹‰Œ×n7Üö¤–}TÃgf9„U%<® Œ`bİ€x$¸t¨0œ\MÎ0;M3šIjèœ¼Œô2r0jÑdÎeB›"MÜñ¿$¼m+9øRWHş¸iäFÇ¡7ä…û3ø¾t!ÊÒƒ8ªG üõl;v<¶§FÄ÷5AÁ•”¬B–)ŞŒL‹ê†¦O.B» ¢pĞò¡·Ï5ĞÙ#ô¶atzùòÀ*8F˜áœœ)ò8û\(ÛxP·â|º˜¤ÄG¬øÆ`TS£ME,Ã×yó€»&8p.¿å|I°¾°ÅÄÁb¼‹HÌ„®ÔÚÓ˜gğ "mÍCUöâÕŞğæÖ‡|B?õì¬3tÔÊôæu}DaTök¯S!õNK¹	¬Ô6ğŸ8ÕZcïî{Î’¢Œû†òBF}„G ìz²I•AÎ‘:ÃKaDâlÒ.síW 6 ¬h èÔİ˜{¤õ«3•A[³û	ßşšÏ€¯#V6GÃ8áB	ÙùO?™c`ë…ÛNtİåvq=uThšt)ÕM7:ªŞì-R©øH #ÓÈ«nÇ`IÇdïÅOöç!}“—fúàÛ‡+^ŠQÎBåĞTe"7ïx{€ñÌšr&—N±¯¤ŸHnœ~¿2õKÛg"§½IiÜb'ĞSïÌûòy9rı˜ÆÁ×z~  şòa/ÿ¨ŸÍoãš~“ì?a2½èr]Ó ë9ó÷|é¶«t=¶°!UOş*Çï‚TÉm´êù|nµ‡^ÍjˆU`ô3zj]o[d!bµßå¶u6MÍ–;S\8'"Sùİ¶š@¨Æ£?=è—¶(èrÊÁ$êûŞÊ0uÏíb@Ãy¼˜ùƒ+øœHûëuxŞ¿±!Œ(Ô[—tµë±ĞRÙvg!¡“hWVÚÃóÍ)Â´Šªê–è…f£„†EhøOOèøÍ^¨V«àÑî«Qİşj?‹m&!t¥|ş3ûfñ6lbä[¸MeğRì•ú\èj”¦:¸  $!1Z¸ê«h ôos+ÍùèxåY3¼yÜ·g•J=QîûB"0TÃCÚˆ½—¬k«:: UÕ¥Ù¼Ã›iÓr©©dk©¢@Ó›ZËwëO_÷b[vPZ— ÎµÄp>´¾8#ş¡ï ¶€:ğñˆ£–Úïğ2¢¬¸µÜ6W]Ñ9Ä	¯Z¢È”;¥æH§LÈE/l<€   k•V@‹4)3e²PU¬áÀtGÅÿ"±Ú®w>Ä	¿­®|lEã w³~›"«[
+ìDi¥áÿß0¡¡oM)MşÿPÂÀV½·;‡Ëÿ1»Õ¥.G{uTjbµmŞôŞc  ™&ÈŠ@”LW‹Ş ’§
+fú‚‡ßKF»í¯ vşÿµíaÎLçZ`poÓŠƒ¼”®ºë¯ûXˆ„Ü yŸT>·y°8¶Çå”Ñ/<Í•ÂrôÈ>¥Óa¦êQ+¿´¤a?üs0SWà>ğ`—ú44%¸¨.¥C¾NqóMTV¤"“Ğ O¶PÍâ`„Í·‡+ ŸG^€Ì`À˜09¦ô„ÿ1
+¦”²	" Ôº¨qÖ@ÿ£–Ø€e¤§ogts°}¦o‰ë@5íµ‚ØŞzG@ İÜõâ©|ERû¨¾Œºxìw(‘ÿ(ªGÏrğù÷L„Oó‚µfJêª  ¸`„Q¤¡ıt´Z,9"9 d•Æ40n¢   á1
+¨ ê±v]ÈºÌ)¡ıG-·1)WM¢­-ş¨éoÉá    ó¾e1ĞD©âAn ˆÖPì¾Æ£—p/aà…å¼Æ‘iˆ1 
+µZûê¥2È€ú¹[˜j¯>FÔøèià~V`ÉÁÒ¶$ÅÉS‰àZy›>€  ì(+hÄFÇ¦çh– ôyn˜6*Ö.êïFE¼gçYŞHØd35š…eÀ¢&ØªùQé%ËÚ9£İ	€PQ\5°Š®†Ka)XİnKÒèºœ]ú(’0 (ÜËí^ü—[	(k"íĞ1Íw4/¤¢ñÅ¡0]…~á©”ŠÏ|8\SO¢Ä€,’£ ]wt°F«›ÌR]Ü½X5¸ ¦ÊPOé?,rÄĞ§ÚVÛ dÔ:hUœ€  kËF\Ãp[miÕS§aÿğ"â:5Ù¼€å›³R¡JßHyZñVó<• ¡Èà1gf ¸é‰K*ûı8…¸¿W E‘ğ
+u§l´´{.f°ËXÓvèh5ı¨ã°óİ'mLÙq@°~Yd¢5ŒSsÖq%ì2AO¯è„yêMœû=²< H’öæ"ğò•u Ò’ñ|UªY—8CI:8­@P)º®‡¯À†¯Çq‡$™ Í¹˜|¬¶°&­¨w6_êØ«"aøÃvà¥ç‘¿‘HPioáÁ7p£Ù|9şq«ûå´˜b8BpÚYNÙNİİä—şãa,¾Úq™Ú ;gØé	CÅş}ùzÛ=9P·}µ“Ú ™!&\¬kİŞº6œ_·5Â³Š]Œ-
+½üw@MbíMÄnVˆ:iK2Ë ¾o;XŒŒt˜kíê‘Y‚ìJ·¬‰Û<¿7»7hÄâßıÎ±Bb¢'Wvvşm¦†ô|G°x}²ƒ|«ïµu&èvF(2”¨–ûè3İxh>d;Ö·j›gÉµÎzxnS4x˜6öĞ–?W€#H+¼ÿúûuÑw¾¬Œ7-§7ûÆt‘‚‘ÌÃÜüˆ€ÉñP}{ñô"@^½x4ãØj5FLäv"­şŸbN,Õ§ààŠÈ$Z2R–)$KZ²¨>u0zƒ/+¡ çBSóÉ›_½tÑ¡vçt×=T—Él íUÉfrÛSîçzNw–õ¦yË8YşÜ¨Ul«Û+[ıÃ #:ºğsVWÜØd³ıTc ìI«§Œ9‹Š*‘€7æùdüá‘eâ@³ÆÍ¦>$÷†f²NÍ#™ß&´bR\A¤]_OiÆ¶u$†»Cô Efı¡)'¨¹Ş@
+9YÆœœ·‘hO·zö™”èç^WÊ>Z2Y6-‘µ@Ô-î+ ø°ërğ‚Æ%}Jt¶»ªW¼XAÃôTŠ¨$Êıå»¦'¾aJ/õ2lğxvSDÒüé¬v‡Á+7îxD:º…røšôNºêÅ*ÙEÇªRYæ#Ú`Á1g»b¢vlµ¶èbá…/òBu²`?rHÑsò¡¼í¨ıtY®hz8¨»NÜš
+±ÆÏî‹‹úô®¡T2ß!º8tå½Ú=±[¨nØx¤y!)2	¼T4uƒ#UË5oòYVYuíÕ;5ÇJ.Ùê*D:
+Ÿtvw‰ÚlĞ2"ĞiÌa:(~	±ªlYÁcÊI®?°è>µê[¡mêgse2ANÇ¤LÇb’PkY¦á·Äóù¶è3ªifci©ÙQÄŞHËLÛ[l~a|¬7¢Å(•Í§‡ãB~
+„dîîä0Cx.ó+µ'A"å†MÒBÊ¼ù‹xJ–[¯È*>”s\ŠnMâo8ö,i«*ıI-Ôn§·HÙ¤8 ñ²!çÈÃş$[5ş—[¾Ÿ¥îğ5°3~¬Æb-øyßã0ÿ\‰zãˆØiñõ{•:—ë o¡;¨İºtõ¦4+k5Ö QŞËt×±Hè˜{îš#%‘1¡$å#I‚¡Û"3N¦c£¡IUT#Ğ`=Ïs#äÁêñ“jıõ÷‰ˆÃ£„Ûd4¢½œy.e£»Å@š5Y¿×ÿÑpCÊ*	í¬:Öİ+Ô $ÿé¹ÍoYÁ¤¾â82I“{2ÒºfEù›ŞFåÆ
+§kµ ƒ¸¹&Ø"O™[×·e(+'’õkp.ìşe^jğ#aÎÈš 0·Â“¢ˆS|à#eêèñÏÓïºªFĞB“º_bf×—@¤ $áÊgg‰¦ƒí«ãBK-„$ô45.°×‰Äì? È°´šFjyÑ,JF¹€¦0@P´pLĞeFP¥ä"Ù>­š™ Àäõú¤€hÂš`{OWÚõk_*qšƒp4¥>€ÁÅÑá§2áñLX(ÜÛß·ˆc¤‹ıj]_MŠšxØyø™‰~§¥Ì@­ïYş•rÄĞMÍç·k‹grRçå„\«2´´¾5ÿî„²ñ.>ïß=,Q—@¯³è˜[d„Â™Zú*öÇD3[×†¦yÒæI­İp1ğz½ª+p`¡0®"À-ºTF+Kä—~e‹í2mñ¸ÕIv]šÀñÛ()mÔ@]ş¸àêf‰†%r‰ÊÓTxt.ç¢cº.È›¡ª@g%ÇK_ƒsüºÏâßøáèL|ŠëÅyC]7f«¥¾˜çñä~Ø®™.º·BPÕ¬(ú@÷z:}P@p¼A«£ªÈÊŒÏÎòÕìµc¯¬Ï†Æú ÖjgÊ¦g%×"şÛĞ*kí
+Ä^›ÌÅëcX}Zı‚B71ş A%­±}Y{B|j /7-ç:SåJîÒİ
+™D¨‘Rw#ÜGKæà"9ij
+
+¿ôûÃ†±79²»RnGQ÷{¶ôù¼İ“ƒØŒÔ±ÁÜj,¨C›NºLÎœ	úñ :OC°˜İ+:›¢ıQ2j¾Öó%«å¥;ƒ8¨'£;Úµ¾Æ#›ä¤5orÿAš œ«qè¨¸ÂÍÖÎ äx)€)õôaaTAÀr½g2şÖ´V/Ltò¨i¯š(A"÷
+›j+%-n«İXÇêÔ‹ª™Ã[Ù<óä³ù‚­²Úî<!}SWVâÕÜ,áœ,W[“ÑÉg"Ş”Ç’Ø¡5Ş1SÿÑ\HÊ¯räxqk®‹5	+7­¨™ÿÙÆH«¿d ©ld¦P¸®`HO¡ö5\ÖÉ¨¦­eœlÓ¾+~5	ÿ°º×mœyxÏœ(Øh$RŒİeÊéØúAçr^îıºæ•úH?ãlq
+Py`=¯¤æfÉŒÎœv‹@ºÌ°¬#Ü?ììDÕd1¢KiÙv+bÃåÙı]°œŠ	Q¤Ô–s5õÍ=I@'H+ ˆPtãÀyÏO5÷øjÎkDr:ïÇ3ª‡¦#^õ¸R©÷ÚÖ‡7_‰ğÒ@#“Ç9­£W¢½L.Í™Ï­âªV âÖ
+¤FĞ@%ø>-Ã¨`Dè	¢J'` .üDUîdü’«–ÁÖçMz¾¾;ß´€¡¤K×JÂ	ôÈLËºËK§]æ±Ør°7‘İ·V1D›hîQ=ÖÿVÍj0ÈI`÷Â¶Óo2(xaZøTq“Çü³‹@ñµÜr‡ì¡˜­¥ˆ¸rÆ5ÈœÔÎ‰í“ŞlîeüŸóÎ”>q¿À6`¾û´€Öt^rVñÒGr y_Ö;ÕqåxšÚ\˜”ñ„š 'ˆ“¤ÎI÷#º49	wÊ`ïó|`øÓÂ¿ÖäH—.†ºAPQÃg‘ö'»çWëGÉd!ø$CšSCX6uÊ:Wkº¼ÑwôÖèŞ_ó£|­.ß¥ì}°MzÚÎÀùÇ¦‘ñÔ¡ilß²½Â›:0~ÒŒ°LÁr!6ï”ii]û_™5(èÆ èÕ+í•8Øİr/^ë f±mF»QüÇ°Éx'Šœs¨²£şÿWQØ©b€“²f£(ŠÍdØ™¬ûxÿvèE"æ…ÒC‚ç7mDJQ¼R¢ wsÌĞgÚ[vJÊru²§ıøÔÄJr€U†úŸcgÇÙ|O#XÇG7@Â´,`;0qX?EÃÿ^··«à›PÅú.‡v¼ >`ş$àmê"Œ`ÁŠĞ„{÷lëT7R&®OL–Gr'Ã{sGíİ…I^¡gF º„ÕFP.{nšBu/—ÈØrœ¬†ŸH>:·a9]†¡Û)Iz¡!oœ$‹p:ø¢óuî?ÄÅzBi”r€ÙË·lûÙm^n•Í¢£q}0®"Š«9cyªÍ84–…¾Dâ{ã†®÷t]p?¸Ÿ7	««duÑŠY¸[ÌÉÛPºg"ò@%“8µQÔÕª: 6“>Š‘ÊL/›a+u$µ4Ş¡cxÔƒÈQßjV¶‘+n'áî}l¨<¾Q?¸µ­Õ?®”Ã"sO×İ ìü¿ŞK^¨m+¿$je½:Zùs<Sü7m%âĞ4ó:'å:Zyº8œ
+f£%A=ø°N°Ö¯gù˜sÜÖ'È«H[ó‚nD¸!=Ó
+È pÃ¸z+ù,ç&Z+`-=)–òÚ«>rke9B
+j‡MlĞ°ÃŠu3WÉïº -·^õÿè¼†'¯štH-‹~Ô²ÉÌW\Ùö}¼zG©[|¥Ó½÷Ê(ôHoŒšj—"åÂßÓŒZT%WÅ2ƒ-¾Üt] ô™Ó [S+OzeóÓS…š©¼z?ã¹D$¨B [Ş.òV&0±Q­í6‰CõPM¥1@±‹u'„fös¾€Ø©¹´GĞ³kÇ-mÒıgÔsl™D[µíFJ@Èw–ü¼uæ_Š ¤À]âPµe¤ç Eh:ê°)àèÆÛ§ıTZÌ¿xNJ>ğé
+èÜ?™=øX ÌFIÚæ»¸WFÜÜX! -oN{<€ ·K~V(K #g
+ªX)2Şwš‘Iv	 |¨Û Ï¨)¼²•BÒWÌ”€ pËòî¤nùHèX–?-x‡@¼ Æ¨ê#Oò2m-û¡l9È   p„ğ€ ¦3.webp¡f¡cÅŠâRIFFÚŠ  WEBPVP8 ÎŠ  Y*°0>m6–H¤#%$%5	  ‰gnØşÚîy×h)!Nã=âïúA!gCPëGê?Éâ¿ÙÙ‹óWâ¼¿}³ıÏ1ş¤ÿŠtõÑ»Ó
+ùGÙ~~~GÚ¿¸XzlY±¿ı½TÿÉã¯æ¿år¯…¯2YÿÓç·ëg’?õ9ü2cÿÔ}„½QJ5u›Äê\\•.ŸgëÊšå{k®Ê‰‡º•t;)E´IßÊbÖ‹l„ÉZ‹>]?/–yÃœvºì¨˜{¡Ù$ñÂö]:‘^)ocîèú~>;ò¬òè§â~¿ûkª†šS„ÀòÜ®Dû¡ÙQ1dõº&(Î%l”™èqgÆ+¼Èh†(éÁ GQÀÄ`´OÏ3W09'¿yÚØ¯ÛÂ£N®áçœ;kˆû3h0öb°N·=%œv”¶§1˜42»š±€Ğrø êãÑ°<è^<	CiŸc¤Ã|vÍûÂ‚¡s¢-YYÏÊ£;t/,>l.dK,Äàbıy¬J§-4>nŸAÈşI*`7PìÁ
+3R«æjFñj£&ûÎŠsÎß˜*yÃ	&·­ÎƒàmR=¯ì§;Ö–¯òòe¸rŒ¨?8%P|Z|lXÙÓ¸XÖ±›àŠšÖ‚n¹¶#Q¬L=ÁvoÊÉœ±ĞºĞ&ì!öÇFÅåóÚhBD	©}¤Àc*Dİ:Ìj^À=*qGú[=‘W›ÆI´ÿ^“v¨"İåê—Ú¬Ç7Êà›ÙYIO—OËB°ÏuQ-­0‹ƒ>0|GåÓÑ!òÃ–iEº¿öÙå—4„àé ˜YÔ4¥)&=—¾Æ—æRü¾M8ıº~_  Û¹Î–_¢øg¢CX¬ó@C“©×ª^‚DæËeşÁñÿzCiôt”Ldn‘¼CòĞ«£›(Ë©ßŠ­=é’®“î˜œ#î~Â?Rc™×ñ_‰*¸PZ^º|ˆ/QhEC+/—GQ°Ï’ü¶2§ Û×Ï]\)§ü½])ñÍY¬²?ä¨¶Yå¥é±®øÀJr0bdh<l³_„±á.ãjøğ?¢p-?ó<
+|àÜ¾N´ˆÀ£¢ ª¢ßOÂÏ]ûXğ¤õÓì´<'8J$‰•SJùR#A!„†Ò7¹€b¼Ÿ\½»ní2i~ıõCÚ¥	áC€¦ËØ3‰©‡¸.ÅùòÔ2ós‘jÊ‰†SÓwœ¼ÍlFÎÕÎy’Œ]øM PAj?÷p40T]8µpÌb÷sá¹ åÄiprBÃYåÚœ÷¡%
+¶R]#œmÿsÕ³œØ©}»‡TPbÍ[¾Ea”ËD¶Áñaõ_—ÈG«©oŞES<ûËÙHà`Fá°Õ¾„K}N×À+/Ø!¬ ü˜á,áÏØ©z…âXé!;ª{ÉÊÌb	mGx©M?š|0êsK mfsrê^ÁÛ)E²ÓÑ€‡’'£RJA-é ß2SAä|ÅèÜ¼Aûp:ƒ™ÎwoˆLñG)é.Š¾Õ
+O©ÅÖ0uºÌ“ÀÚá{Á—_ídYl- ïÃÅ\†3 I	;ƒ¯ÔÇNĞÈD yü^Ëm2ÀBêK*…j  )§D©QaÙN[Ñ)yŒ/Œ¿ìI€·$y®ç ıºÔ&ª‰ë¤¨Ùæ˜)»šcï ÄĞ‰á–5ó1
+8oe£„¨`ˆ&ÊpİÂêˆAà6_È@ú=‡ºxÁÓÃ ·‚{àÂLê¸8K ’3.ä‘(l,wú2OuQ0Â‚²(ÿ•°@’ß³W©X	ƒ’*9¨šQÒ´y`S¥YïÓĞ§ÈİèyYH6¢bñĞ­/sReÑn&%çù‹lBw8ó6ö'TğyÖìÉ+>¡È+Ÿ@‘1ìÉAs56ZïÀ‡‰M@Ği°BÆºÃ.Œ©àùò“¦LÄtC/DÀ °rø	Ê‚™p]D~tŒº|RóİôÆÌ£˜;•â—u³ù‚¤yIa€Hc¼öIV¦µŸƒ<Çªºƒu)²Äø^—˜·)†Lï‡G-ìéZØ$PşÕ€GÔ—åğX{Â¤2[ÁV€Ëdk…¢foM¯ÿj€/¸­Î!ï\b…|D°¼–*dÙÁ~Ë"Ÿ—ğÊ‡AZ[À*ÿ]°úºòxåï/ËàTSH&É²E‚6¦Q¹tow<¶¬“èºk¶i»ÀH#Pş[Cİ'åê—ó6j(—ÇWuıâ­Å2®Ÿ†÷a`á åx+3fd½†c×ö ‡j¾·¶U˜t¼ÎÊp«¬ffPgúsŠ¡¿ÈÌHtï}€ÌíáØ^À6¼Õá<ÀÕ±Æxaò\NEâXÎı‡òÈı°
+N?(À—¿¨\|n4R&kÓòøB„K·ˆá%ù|Å›4€|†÷I†Î3‚Á„jŒ—vä5Ä¸j7qcîsé‘Pºœ»Æ”ğ)Yâùeh§1q]7_&Ò<mÈfñ¢ë2t¶lYP8½{¼€4NŞ¶ÔŒJƒÙåˆ6eŒ£5ÍyZe«+2/'dS’Ğİÿî½×§/W¬¸BCšKfJK[£Ñ„½”s/Bê/•Ô7¯ßşÁLÂø6Î‘=”ji›öøğ@¾´Ù>)òä·é‰JYSUCè5âQoŒb¶–şºíåÄ‹zû «t†ü|R]:õ,¨j1’Å'â†?«y#ŠtF÷W‰d«‰dæYâİ”VüVØb:ôwC‘Ä·V¿ØJ}üÎ	GÇe¢¿7‡j–Œ±ÏA_	ñô@Ä˜½,óğƒGODåş¦ûdËb*˜T~ôÜ? !ÄÏ‰@Šéš]Kø²24·8JÁ¼?¹¢«Œ™ÌEö­µRÎ¨dIäùåT¶ñêB`›·°* o8[sW˜R¶0w*PêŞeùŞÂè–µ•1µÅ¡<sod=Z·³4äïv1»;n®ß¸S×Ç„TkÓ2rªÈÌÕŞw2bjU„M§„½]SgSÇ1ëô¡«Ø:İ"¨?r(†¾M€M†&õÌœäµË(h7¤Ğ\¾°g×"W>Š×Ô¾›¼°öšºqºÌr(Ü½òÊMOÑZO¯tTJ©Leu:u´î2«çì>Ò[ûâ°F—Xvw“’q¼WR^Óàˆ6|UÏ®ÿ«5¿æº¥ÿ¸­¨è˜é{ÇÏÇ]L|*W^5÷öeÆÆ^-ä
+Åü±×«ËáuûFj ãÔÄA\nû½NãßàË•&Î†¶@‘k¡}^î¢ÓÊ¦âøø©¡Aòj[ÕkÙyÇŞˆsÁƒU‹PBxÍ'|LıŸ6äPfÓÊâÒ³+ Œuó™ùSæ¦òøÜ}U{÷ŞÑÕƒlÁ¶(•ë‘â'†ä)„%î´;,çíj³…V£ï+³f—¸ñ=~3„‡¥{ÄÄ0€TU¿Sõ<z%ñÅ6tk¢~ø‰Ùø­
+w¸ÛàÜyÖßé’qÑ[TÌËßH±œ$5s\MÊ‹7¨~ZÄe‡;”®œaAğë¦O^ÏG-×f–“vX0¼å‡¶:Œ[©×ÔÏü¯|*)7µŒ¿ŸP]şşÀ¨ˆ^ÆJFk¯Û¬ÚÈö$vH?’ÊIéZ AY%Š—½†jctÄ±G—ÊA-ªä6¶Ÿ§Àe`ğB®ÛìVŸ&¶\`eÙ%òzB³±·œFœü‹²ü4‹M2æ$®3	Gè§tBâ­Hó¹e×g¶"´—ùOÎ(¥\[›|ˆ0kF—ï§›(åõ3‘&dmõrSĞ$‘ôÃÏÓ©ŞQZ›ßàÕqÉ"¦6pI'»i(6IhRÔÍ9ÏáiÑŠƒÂ§¶¾rúMÕ% Œ)ãg“h Û×Õ#>¼KbÁšı¤›xÂÊ¬ÅD$÷ÌmÈ+ ø%Ğ“Q%¤\©„{‰–wE´x,n”I5zŸaŒâ¬Îô0õ¸kòp½Kô´âIûgIÑ•DéV“¾¾‹@T¼†Û‰œÇ²UïpjÂÅv¶û$+‘:sKTR”`…ñğªl¬ô<G—:¿µ±ş£‹€kÛt®-NŠy\ƒûŒ'áw`²œ‹d ü‹„ô)İ¦òb;8sÕC¶áÎ'^eTY>56k®áÖq³á†Ë™ÔÂç¶w5¿áHàÍ~·°I=Ó[€%†“ë<‚âBRLÇ»`˜Ö±ê@@·(^§¤ıé,@«NT¬€}a¼şÛåGeMª¥„1%38?d(1Ä/ã@0Áü_G$ñ)h*.•øRY¢_²6Ê®”uÓ1¬)ÁF!ÉÏFÜz”JaPb ˆ~=ïÉlÊ+„fQû¥qŠè¤…+ùt+óÿ †`QîÈÙäkqH¸Óî„m
+d=Ïc„2’úqôPädë»¶+¬Â„xàWŒÜãn¿©T r{õ®±J¸å÷^/„"§íÀ¨äã$’SzWG½L””–¶³†íæ®HzT™yúzk‹PÓ¹?s2Lÿå¬%p„<¼òùÄ Æ³ñw‚3€?ª»0ş‰‰OÜn§ûÁLsGÓÜªÂ9>ÔB_,™§g2±¼¬nÖŞ ÑÒ*¿aÔ‚å{ë¡@Í11s¤%íÃmÓû¼åHZ—lsØÆºrÜïcMÄËJ¿¸×ìeª6JğU¥Æ…EeE@'p4Mƒ8'v+S#êÅG½c~Í-íâçüWß ¬—¯w·,noˆ¨’°PÕ˜å|AïåÙo÷ZØÊşÀbn—;5 [ôûS3/a5ßKôvoä­üRQ=3Ñ ïD¡GğĞ*ÍˆåóI…x®´œ‰—0ŞçÛn²™Í¶%.¼š~ˆŸ™ŞÈ5¬#Ë¯®i÷;ªâ3½¸\áªrÃUl'ÉŸfä&<í7„¢ÑX˜0hbHû±.ş9PÈ»Üèêı¢;°×'áPj2ÜOH”w¸€ˆ{iË5qs³Œù2¸üç;¹Hª_Ç×hnh”DÑ¯JÇ8g¯¶Zó|)M9âq‚|‰Ê
+ZÛÚËçé!ˆz“xÍr:ì=u¨s s…«Œ1l÷Ã‰ù+£Âƒ‹üj±/Rº™a›InHGqØ¨Öâ™ŒˆŒŒÊÏŒsö‡±"êÀU@$¶ìÖ€Ø–ÄBêÑ%OÑÑø"Ój3ı%ÿ®>)Wñoº^Åzpãÿç…F´gÚ>¯Èã<²Jì‡‹z~’ì’\ªòèÜ‹jÎ÷91<jÜ“”„­Ã—W¾”VHÚ\bb—`D…,çÚ¥B»¸™å®ÿ‹4³<
+í£ÀÎ¶snü
+ÏêLN­XZ·z·W‚\ÌE”ãbâ}[„¶;J³âŒ8%«*jÄ¤YÌñ¨ø»-¹tí> Î$e·Ë+*>à òrW–†7bÖ­<¥hü-¦V§_Ğh:£vÅÅú+2Ì*ÙøNºvp©ıÈu!Ñ¹xÀyÕ–‹5ÈIE# «ßEc{¯iƒw3¿7ù˜¯ù#VÕuŒÑ¤ŠC­½M`M×CÏL¨ÛæQjfµ’ $¢}êÿª[^Œ¦äR1ı…¤Ò|”Ş\ı¯ WğËÛŸxåVHpJcñéN€–6ì˜C¤«­hpkZ;øÁ“¬	6šïõ‹Ì–vÄÆUù+{Xvªqt“Ê¬qI£m=sèÙ ?l–ã,zÚì|„o3Ô2„*Æ ¨OF“Ïqõrp™2ù!,ÆKÌ‹W¶ñ^¨B¬K	_æóH!1Kò´NRs‘O[/ûü~r*UTn0k°HQ­ |ña½Bj'÷:Rjâô&äˆh_0MúÆOÂZXÌŞ²; Âş<”÷Á“Â{t"PæZíıÿ¼¾EÖ“ä…¶'JBi¨x· Ë!—è¡j®·w£ğ
+9Ğ{ÛjÂ<%NíÑ)qôÏÇ`[·ø‰æ8tÜµ°¯v§[öKºÒ5ŞrtMiR§8±${áëîÿÂSÚ¹ıÍkÍcK<Óz2nß:%ˆGÉk€Y,5¢§àœ9sÉ—¾½]}‰‰oH—€ÿÏzÎÄïßŸc½%µäõ@Ş“¶@ÜXcÊŞr/7iÑ*iLå#uh«çõÀ‚IôŞ@ëÃßwDï…}]ûÿæ³¼‚ZÚ©=÷ßêî"²nõ<^ZûŞëâ4Féá½ŒtÃüÂT0t.®Í<£§ßñ=^Ry;á3yú|Èà¸5fTeP…#Ú4„ìÓ]¯NqÕW‚Ñ$R¤õI+Â6‚	$h•yµ‰­æeÚŞøé™¢ÌËˆÄø‹Ë
+Û›L.€Ã„‘ †(ÔFvğætÓî@´K¸:%Øæ{Âí¤š±·N1f5YÙaóA:KãŒíàZÌ[‡:Õ³€¿ÃQ*KÍ~ˆÎ¯†š°±È^m- <ÓO¼ôïA7ÏÏQ„d¥‹¥èFgG’~d ³‚>¬kİöŞ¸Z|/6Jv»ÿ+;µ?}OÄ¤îc'sf@Ì—ƒ2ìJ|q¨¦M:p<ôõc:fV
+Ğ—á‘Ï+qÃşÜĞór’BâÌ@,:¹mà‚cÎoG6Ó-Bé³]>•ò)»µ=Eƒh9¢VSÇ¿n‰(B (÷,VEƒLY•$ŒÎ AîÏñáÂID˜ªkİ_êÇš=T¾€”€ê–ıÌÍ…xã]ÏÙ²¡Í®ç²·Ş"RX>‹¸sÛ[melæEûíÍ!-f¥–«
+Uê‡~Ù	=¼<•Ô×5K’¿(Üë/%kî ö.`ì}?cÃ~*ˆ–qO|V»JZ&åOò³)G%Ü¯ .	r¯)²×ÖôUvï±!Øô.U†™?Œ‘Ëx#òUaü’ù-_’3íØ¼ÜSe†s’,ö'ÅgŒZ‰UîfØ¦¡R=BM®ˆfQ»ORÁÊS³ı-·š‰Ğç}	>(Ô´—ßhÄ?SLc¯¤–*½O“Í(…kB›´_IZF´œäWÆÌ*§4„u¼ô7‘Æ²?å.ÈNËòÃğ²Æã?˜î¯L%ÏÌ/úˆ¡:|³«ê	Ñ•#`Y1Öø"­aä	jç]?ÔFÂä¡1Q¯®öË?	C^[¯ë@)–ñ1š¼#@¨õVG™/Ã(A¤+ÜgN?«¿Š›S¾“6 W+~ÜâG‡Íf¼Npe#Æ)p€ûipŞ=k¦ÄÉ7aF¡ËÃNê»•º˜4lÕX“ÎwïéOÜÓ_¬t«Ëí×¹Õ‰ú¼º<ü9·=rœo}«VŒ(iÎñ÷‹Ç‚¦fnğ±Ó×tm*lêTŞŞ3–sUÓ90şnuDïı-X$ÁGY¢O\å¡kePsc/§©@›W¯;É¥ËU).ùµWõµ‡'Uìñi¢Y"¦ ³e«XÉZr7øıBP±˜B„8æ/™…Ÿ†›.w·><WŞÀpÆûïLÏOÒ\o€¦èÏR¯0~o˜¢T‘àÎ¨ë™õ$ÀK÷XáA˜ç°ü˜Ú \å‘†ÛbKgAŠ—®xJw4ÅS¸õ£iËÊwÓ+‰;7‡,8pıºâ™Ì1fÄnQÃ
+¾Ì‚ÀG&š”ñO ğ` ìB fvdwMæ+m~ÃLÂdO»¿¾&aüãáŸ”
+’z±ÌCãÇ’JOa~¿dR÷‡Ûä’Ù3!aYİ<Šv®êbùáˆ¶6"¨Ó‹ÅĞ$âÎXxà‰çë#]U¸™c!rV*Äù@ş>İõ[ÔÁ8–fpŒ‡a:mÂ®È ¶ğèZ‹%>Nøø,Ù(HµRK´9ãÒ½‰åá€¨Apt-ËS $o2ûí*ìd¹RÇÕß:k²ô²C'v¶=ğsMğ9÷ÒÑJN“†x‹Æ‡ş¤BïˆµÿÎ—1Ò³1ñ›o”œL°Øa"ú>74ı]n¦±JdHëßş<B8–[Ò¼¤şwË-ª%KÈN¢nr+œ¯Ê‘Á{l'ÏYØKyY_¯—æî¢Şò®jÎa/ğcJÖ HSi5…´½W#Ú®67øORçwCwÜËÛsõTÆœ3ÿØ;9?”ãíRËëh§ÛñWX"¢ˆ1 Mİ-åÔ¨Šş$ñ°‘êØK+¸6(F£6Ú¸ÈÄéí’üt\~$ºZ«èËx­é›á.°‰*â»kŸ?Á¹ÿ†6ÿçY©á÷KÉ–ÑÌkæŸ8ïwÌü¦+¦” ¸½z’è²'XÆæŸÒJmœÙŒ`,ï>X®Vm½é¤P‹«_alû']>·?¸¯¤Gıa4ºc0B"ñÚ<«êZ»ƒ¦ã]4àËi8=Ùô, ¾Y51=YmïŒµg-óµ8JÚî©/ìÿO@g=â÷Î¦SøğşÉ(šëµB´›€5w0~)ŒĞÃˆÍHpğ®‹½"¥­²ß.&c)Ef‘?àÁY²w¨K ‹\_ùœÌ:—pRï|Å­ˆád<ãØû%Ÿw}YÏH”ÜIù]ák+;ß7=ªî*C]0¦Œ`Ş¥<åú³’Stçûuâ€İ½fH˜ˆ¯SåbÎÆ[ºDñ{ƒº=Îæ&y{ŒùmÁ®ÇyN·y	'Î#dg$q.®ŞPbãOR$'èµ?ïló£Æìn,Í&“¾ËŒ–Pyaª'XpU:†—ÔxK#¹t„×z!QØë,<'¶óÃ¸° ¼ã÷MÎÄÒ?W8Kaòñ/rø¬@‰€e©mm›"”“ßÿéœPk×Fók…SÇVoµõÓÜmd­ÏëÈVmÒÈà88=ËöæE5X¯ò	¨¥Ã^:^š8M†b‘kÌS›„ÁIìroüY ÷£¼[WMO¼à€.½{Jrv”ñRÔÍMÂŠVsTF5PËAÍ	-#ôØßêH[–DõıSò&µE½N±Ñ“iô~‚…Á×üî•x¦)WÉm©ÕÍÑ—¸×X•ò×n¦e4aÕ*û‚
+½šÎœ_­¯°¬+P8aÔãSBAÖ‹ä/…Q[g»¼"('6<nãpYRVğxÜÇ¶;£å!\MdÁœ8¯Å@¯PîQQ¯³{´j˜Ë@Š›R˜
+‹jˆ‚ãH
+(K*©jÑ_íy»è¸YÊ˜5nŒ§üı 9~³,^.c™Ò[ô—]U,MsŠ‚†|v§ÑÓÙğ"²+/e‚›¥y#P–¤æ‹eÒ½wı¢:ñ²woÆ€£Œ=ßFc™x¾xn•µo&ŒKêDûù,ÌóK‚–?Á!‰^ö‚¾;g¿Ô™ÒÄÑ‹¬nÖÁ3Õ~rª8â“6`c‹Äp†¯¢~Ë¥u×¹¤IÕÔq#N †4eÊO¾ÀZ*ï›P0B´Øo’J^?Á^C>Ó­Äµ€Q±4Õ±[0 “ÌïQvVÉ|ïüø6’#Ø(QSJhöæ86g3{/pğÍ!Äj7\‰…ç-AÌ³\7†%Û©R¦ê¶\1£NCÀÜôAçp ôWU'%Í”©Åkİ“ßQrSRøt˜€E˜y¸·n˜ØJ‰bbxàª£w€r~¹ğoÈ1ŠC×©"1/»$ÖÄ-Ã°Ç©Í¿'•/kî;[¹Çæò"FøCB"“TÊôR!êÃôPĞ
+9%òÊ¾ÙéöQèb*G6Æô¬&ç’_.!ˆlîÔoåHLÉ9aĞŸæÎü‚ó…Pg‘p­³-Ãy~TëÌ“<”›Ö•Ö¿£ùù§İ>H_¹HHîÑ„’sw©v¸¯2UnE"_Áqy->3£gµÇEMĞò³©e¦i¾`Ò^ß%ïZP¹›Vƒ¡Oª°…_¬…¢]¿
+e#ñ(¸ »‘‡j‡Š÷G!?…cU±N2œQĞ¿CíÑ9F`„¥}[oi!<8éÛ§DÌªc™¡Õ­éÀæ˜`ÎĞ•Z¿÷ó’ 3ÁMGÓE°×’ÿï_ç®ëB¶§6r‘JhâÈ]e¬wV¥Ô#oû‹,Š”œãßÃ£ü€AhÖáÄ‰M¾:1Nñ(‘0æG‰œ}ÃıÆ§•|ı7w86~É°J!ï/½IÍÊRÜŒdÊE"8ÒMè•)9øÇl˜ìÿè³­°œôÀ*ñ°9·çÃE§Ä+»	˜ë¥—P×Û5ˆ³a2–2’ı„¤Hö§XZÀZ:Zj1#×'\ë¡ëQ?q¬ÊŸ7í@ŞH†jÈmèİÃÂˆ[zª›ØB^F&ä³]{Rµÿë…ëË)ßZÛ
+–ÃIqóè4…Y+_²(òˆ·ü¿4y?·I_ëë€Ğç\Ÿx„;'a_÷ºª(à'ü²³KB»H".‰>^ïİÎz/²®åJƒÉšKëÓ…?[«ãZB¾1Q˜Œöº¶¡éP½/)?Æ¡PË÷dX@PğŠì^+ê®Ñ/:¼M°JåH)Z~vgÄÓ`£s¹àı\¤Ÿ~jgmªãWYåGÑÌ–Bj•è­›4åôÒî¡Æ½1Nú JaèÏbÂf¥­ËzU)Ô³2‚Å»øo0!*vÓ ¢v5éÛÒ%hü·…á®„Y `nÚ¼ã^JÓ†ûÑ]ŸøbáøÇÁÇ´tVHn½ÈéÅlrWk_w“¤2ıÉäÍBúÓİ%õô K¢ìà¦ôÍ€¶™N„^.ôb0*7Ã:dÍõÒÃ…æ4ïºÅ©h¾byêH6÷'óê[	¢nÄ;lOé:=UÉ§Uı=ˆæX)GÎC+í›o"å@@ÿñ®èû*ÕS'ÎúNt™çXd L,)"pÿÛã>Z÷Ò™_Ã¦‘•7’¢~´5VìÅİ(Yã-L–ï†e¬;ÇÁÅë„Œ1¥¸õ8¯ÓDä®T’}ß/\Siüåöd@4SYĞ*gRÍW*È~ÿHÂµ…‰PĞÿúÎ
+b¡­MGÓŞJIöã ƒºy´¨ƒ8œB—ô\‚K3±¨¿jjp?-I«éÔÅt2Ó… à*êÑøÖÒ³{P7@›ÑMµ1Ùœ	Ã
+Ú©ÅŞÍúd˜ÄÈ„ÜG½aÎÉZd°@ÓFÜdét&üxÛJ~ë@«ÕóÄøûbYÙ9öüS–¬Ö2
+åóÇ&Š;şt§ÕÖÀ•·ä¥!LUô~pQj;ˆFF†ó0Ğç'ƒ¬r*vl—ÅŒ@r¤­©s|ÆdE>~å¦…‹—ı µì]|\L›÷V;WHoÚ¤™j4cm¯»@@*G[pDBc`—Ù§R#]E™î&e·TÖ|-¬ñ“”¬»t³#B^—TNj´ï~Z‘L¢QucÎÑ‰³Ã±†oF{iõñXB]ØéüÔ$ï˜1ÎMùğ-ûİã–Ó‚ÎÔ\ˆˆUw˜rE­²:ïycÒq¼øŞZ¯•E.¦‚ö	…É¼uU£å·L¬ä©U€æT­¯If1û|jÆ?&ƒÆLÃ[Ê@ñÒ¸­ø¤Ú¹õ$E	˜¦İ!|€ şâ$ûùùoîõwp=øPÊ|,ÕûGgG£7İ]ul{7ò|W
+ßµeC¸©/0á).šˆ@÷ƒ±‚rÃ÷sĞ0#vvÍÈnó2»i~ø@¨TN™DöA¼Ø nNY{„ka[äQ}dÕ2ùcIcİ›¥Ü[uQ×—Û r²§FAªO<°ÏÁ÷2k•ÆE2M³”éópº;A½8‘`È]ÆgçvÈñ}¾´5‰Ä
+¶—]fN©<r¯¯y3m6~¯¤€€=0·4*BÁ\Ø]5@«®OC*zô‹'˜%ƒä[ğ[ÍO¬4´V;¯z¤°hë”¸-0ÛŠïÖ–ü	Ì:â†ç¾]1Ò½ ×öËÂàÇz(\ğŞÄ'qßœ´®4kŸG¬'Ov_’EwKT¿Z€:W¼ãêOŒì(ÙŒFáÑaÆ*%ò`MşGÛ‰ŠÇ½=:ü?dÏ‘l¡ 	ù¯Wí0Çd=,©†q%.[ğ1$ ¶k3Ô%Ë>ÖÈpèƒ §äu(¨\ƒİñ‹„`ğ “1ØÁ½ÊHaƒà	qß/-CïO§niËo+å‡É²Gk%V \¦iª	ÛÜ	â›!qŒnˆ9ª÷W›·Ã¡¸bÎ¶#M®½¤Ü¨»fÅ{‹QÁm¸A-7H0å1É§‹7ÙÛšk„¾ÍgO0‡`¢Œò½ˆÁ+Á7XLÚ±/J`¡k3m£"ıWeÁ7_P´Eğ@ÄÑ¢´=õÉG@ÌnÈlÚ&œ›g“ñè}É¦”·Óû–*›è¤eÊò=å ïk/ÖØÅÎ¡‡yIl¸z'z•‰4šüË£Ä)Š+tÇú*ÒPk¦^5~Aäú·)ƒ|`iLcP~vsîŞ2:È(†}§Oi¦º(Égƒ·Ñ¾"t÷\Âó5MğÉ‰ökG#7ÈÑSœ6“ŠAMÆ
+áëÆüÂúÑ¢Qz–6†æÏV	ˆp’¢‚şÎzx¿Ğ~rÉÂ~5Šø’ÒØú½Â&ÿ°ŒQ¾ÄnÌÀ(Q¨ÛÕ÷•öî ¸ø ®€}PÈÀ„a`û=¢y_(±LöË˜)AUâVaÜy³`±Ş8U€•f~ê£/#xwoÑd¿Ë›E¸Âñ…æz<¯ÎPdæ}  b4©¡Ò&‘KY¿…2:×¯ı|wÅ1ñF	5õÜ,7Š	\A0×Ë† s–ßËÔMz¶h¬»Óöèôë“¾¢dw³‡ï¨ÔìÃb¦Û’é)Ì{œ©<P¯|-hòœ!íI<{À!}AäD™;õè’N!õÀƒøp-ˆ6c¢*°F©Õø	Èæc|:b2·º£ÿGüëãt­qlé7¾4"×·:ƒ^ûD•HUg2š€ª"©×¬ƒ¥¯¦”ÍbŸbt¼¢1îM ÉÔµÏX
+kv)µvÁ\ Æ‘¶AcpA×‰€ç	¡ıÿZZ8?Kÿ¤3		Ş¨j`7Ü`X…@Ø×N£sÃîp`%˜ß˜ì!L¡Ûñv«!³yT‰3>k;€dX*cƒÊzkrƒó|„ØöJ$ØúFIõQ7tzŒÄ"×ÀáKÂ$¤rc=%WM˜UgèH á§ ƒÉ mŞÓKê4àQì’Jn1@chøµ T…/ÌŸä[áÕ‹RGşhqêØyÈ Œa¼ØÇÅR	d¢×á§ÊŠºX;ÙÔ»b¯?×ø À¯eé‚ ÿ3%9h‘â~Ãz°¿‚ª„Û¾ÅÚMæ¦{˜	Ë‹§İBM..ÒB4´ò Y<}Ğ¶mı-xïºçğƒMœ÷¶ufeˆÁ
+8É;ègÈ˜£°Q]¹8M E>«ƒÒµPH‹eFì‰[ş+±XífèÊktaÒ.à§Y!8º’Ğµ®>Æ<ÿ6€#Aí*)»«½UE!ÃÄ§¡ÌÀ' ÉÓÜU;êÛÚ›‡°NßIqvÇC¿È¼Æ hïàl¢‹»“I[IGu7§ÒP(¦ O>r²çRV…à ŠÒ5š TûWøEÄ¿$ˆˆ&C¥‡Í”$ÅjåL{P[1W¦ş:ah¯É6“ßAÜUvfgaS8=ä1Ë«-Â‚.T½Z²`·*×M‰}åŸRI™ıèAïÊ\lô>  TÆ¡¿@so&SC*Sşà×YHÕñÔóí ıWÛ>ÂÀö£ÂÅ`­YJ%BŒÎ‚¾4¦êIŞ/ôk>¨0<‰-n7ù\ò£*#æI)m¨õ<ÙùŠ’İ|âbó Ï½Öµó˜âb¡ÿ“_’åÅÇˆh_Xƒ4Z( Ä{'©N$aï {*-Ø×™Ï%øf‹öÕ¢—Á>ÁØ@šÖú†M7®Ä´À¾? J³Eb c‚*SÆ'yƒDÈ¡aîzº1‘S,áÿÎM*¶…˜7İ µ*Ÿú0¢éÀ’yBäósğÀå×Ò.Æ=Gó ì`7È];“ÊŒîKgR\ï£uH~;émÌaÿŞ Ğ(!‰²³=ZÒô5lU§óÕ”eØ‰“aÊ\fmÈ™Õ&ráqäÍèÎye7hŠs‡EÆËe´uC¼²ËCÊ¤ñZpÍÈì™Õ®6¨”a;Ì8z8œNi‘ÑWÙø*×¯cd7w9İõqtehZƒGæ‡QéB:Æë›ô®|lC©]<ƒÈ›n>­eÃH©hÇiTw6¨â¤ŒšDÿ5¹röAˆåÀ¸t3…°¶­X‡‘ô¹° ?£&™-‡ğ‰uj+98ÛôËçÿaCa&°sq¬{w W»(5BLí²Ák™Šğë]?”Úñ›€İ]FoSÁ„”»¯‹²~-°KgPw²YdÎ&Yápx[kO›·£“B5zİÒ?¡Ôe;øúF¬'EŞğ 4¨şÈœÏÏ¡€Ò6Øàº×À|8yNñIúÛ¢-ñÊÊX—WˆNêP×@i[û>UBÛ&·\Âi”’Õèö/ƒ5–„mš  e±µ,‘v÷Ow±“Ü‰°–82x°¥Ğ¸İ´¬Ãå]ÅyG¿b?™ \íjÄ  ojÃ®4“!†Â´úJ_1#Ğ8ùÒîıªã†T#´²yzXAÆP'–+…+ÌËå'» iGG¢$\¨M^…S„ãˆ3}cqjS/æìh" [ÁúÒ¢‰ôZŒ‚Oà:WğW>iö Ö ˆ<x³.-!MzUáf¦û¦ÿdœHuH€&„ø:ç„Z…-ÿm3Mi(ÛCØóKrkü¸¡2»+ost¹£®9U¢GĞEƒ'÷ª÷ûçÔBÈÖoL¼@ 4²Xy‡œ~K`–ŠlÂ!°®[™¤¢\Zb™Oèñ/»Ğo|Î/eâì’;ïO!’Ì÷ñ¾;"Œ	SP4²gB ­Í¹‡))|EBÆé~oµÎUÀcÛó/ÃáÕóˆXcø¼ëlxd ÙÂ\¨ğ_Ú)êºÈdàÿÇMØƒ96§
+K_–j3ç31nîá3sw#[Ü;ï¡Rı»Â	Ÿbn0¼Â]åìÙ7˜J„Sx+&¤©‚Ñ•u¨–Rf8Jr¿°˜oÅï—ÿ^?û`È’Ï”fo0RL]Kòü¼{ÆZL½¢¼1í¦~,èGĞ|eîmHH´^ëÆ8œüøÃäZˆ€Cğ:¢âFîNá&õ×Zg~”ÄÃCÁ˜ñ®*dFAŸàÈÈëÅ…{Şõ´F§·6Xv&•±MÂo„‚fJZv·ÇEfa€3ar;@kræÍ‰|^Û5mÕÈ.ø„   x‰	£  ×€Cø1›ÍôNàÙ0ieœ¤F—Œ–‚?ÌË’†ıËÍè¼Ö'ÊT£Tü>¦Â¿€c · -‚`F0šğ™3İ)O]Ş÷!™Ùi%Í„/Hcm=\¬*tĞ®ù(Ø Àhè=‹tÆ  ?•ãƒzkKš‰C©h7â‚0ÀàAp{&á«ö[Ê+7?ÜÂ“PcğGü7®ü<Ö²t\2]­‹œàìŠ¬zÆ—AJ
+<p 7¡{‰W¯]/¨ÍXÈ	‡à%G¯Æ     lN?:ÌÅB	8$€À®¤‚b¬¹'D@³¹£‰b2T¢Õ™˜£G4!æì¬6,@Â~ÿ|
+ËUá…ï63Ó	LuÙ1Û]=ô1b”ş„Æœk|Âáì“!qÚ/ ¸~ø…ã,fz§h ‡$¼MÁïßÂç­Ûù£eÒßõwî®! ²)3¡+?ö)LÀâI~Û?‰ÙFÇ)Ä¬ş“ÂÂêÖä+` âYíih:~´U°h¦ôW wµnH˜7ºÑˆíÜËZ]ß‚Òã‘ûå°Íù0,>y¯¾ú|’ CçÉrQ§ÔyÖ"w~Ùã]JN>>Á¨¯#`}/˜ğ,¥$äáUZÔd}” ÛtN{”QHÚ°˜¿o™OÏF'4ü?~6CÚ}.ä•%(.¹qóQ¬°6 {•ñ›‡O(ßPî5/?9_M›Rn
+.ÅËóû³”ê)Q^ÅıvR«nBy.F‡†ÏX´èî¯±ÀëúücT4¼şeA‹wçg„³ÊoÑrÍŞ$Ï@ğ+÷ôî5EÊû7Ğ/"o#È UydpOnª½-P¨n!tw	kœ 9dD/%í_{Ëù¤F¢Q|×±·E!†Êº	‰×İÇ(úâ_F–'¬}¥ œYïmP,)9¼ŞßÈZ :aÎŒ"É¹qrÌİ
+«Cå¦	jG1B'ûR
+Ÿ-…œ2c,x4œ~Ç LĞ@3[i›Õ³ñP1'œ²»©Í=néÉî—³Sya®ûbPÊ-[èJcªõšcsEØØ¦¾w[ïğ•‡%#”:åñmĞÎH€ZRiL8Ù€ ^COÏYÎóĞ%*ô=º¥!ôË‡rŞbÛHÀm·†ğM>œtZ^Ù{Ji„íÍÛ‰„NuæÊÛÑùà" †F)Jî0ÂŒ²b¼î`3»±gĞºNİ'Fş½5…ï[DT”+İI¦î3Ğ0ù¤•ò8û)#Õ¢Õ™àR6c%Z%V%»3Jµmìç[Š_'k"nPËşáT« [¦8B©ú€@ ­Ä¦ô #7yfÀ–¬gµœ@Õ¥ÇŸ¸=Ø±WKéÁ@eÄ‡k7?T%`éO¾N(cŠßïcB ƒòµº1G¯“;®€Õ©1R÷²à¤ÿB©Fß—o¢\#Ëİü¿ÆfÕÇœzÑá¾¡!òÇmì®Ì¬!åRI¨ŠûñøÛÒT¾œmá’ëæc½½şß…­CËëˆ@ª=“nvDÒ
+3˜õDx²ƒ”q¨®w¤CPeŞ_¡´½¿âÄPr¬ó0·ÒÄ­?:rÓ£z3$y"›Pš]³9şe›Ol³ékè9'Ä.üwôU—Áñ*lCåRsJ@>mš´LæŸŒ6ã–ó?O¢a·Æ5Ü²7*ñ'Âf­Ñ+©Šù0ÕV®5	EÖÅ	Õ]Î.'ÌÓ¹b$¼Í2D„PÎüØÑšO’EOöU£¯Ù
+…ôàkáP$‚V´GÔ®ÍnZ°àÚ]²şÓ&é ^‹EH:fhXıè¸«T6"¿½¦ƒÄIo‡¾Š¯@$ÇøŠ¼_e
+'ãdóAö‹ |^…¤.íuè Ş¢7‚8øY¡²ê:TòõİeïfÇ±ZE“)d‚´ƒ§ÀC†_–dfC®v8eÛvÌİ(¢tŞ¸ş¨ç2–Íˆ°¯À”ò’d´°gki'rEDİY¾VÃX$¾¼qZ7@Cäb †
+Sú¬ß	(ˆûïÖú1æÚŞ¹§ÇÛß¦kë[5ß¨ö-#IÀ%a¡¤š">!/Ur+©@4ËŒ¾m/F[*õ·˜FSÚæi–PP•ŠÁ^¿ı™%ú'¸_F¶²¤14÷E°ß€Ñvù'ÄF§)p.öš#DğF—¢F/ÃGÓ‡¥!T¤Im:ª“Üû<0…!ÓĞwF/Ê çĞ¦9‹Â[5çİ±è‘¡aĞË-Îx'mxÛD(ñc8I’Ï=—YèõÔ{Xñ ~Õ-Á‚yÍÛvÕM$d8sWM$§¶ÀÉëîàYé©÷½,Â‘ÂÔ6K¶óCUî…™\vÁó×%®uƒo+“¬4„½ù÷\kCı(ÛxV|RÙàYÒ)=‹íƒ¯`tŸÇ>ë#a*ì\ëh†6¼[£i€àêÎ72ùîÙ·.W²¿½oi&ã!¼“>—^¾¯:Yù¹åÆş¶'*ŞI.v™n/Ê’–¡ª–Š¶ÿíŒÓvn[ÓL?P/€ü8Ësz€	ô1!ŞÓğ¢Ú#%ZÕ‰HıÏ
+íJf¡›œ¶äØÎtÊ^@Æ&#Qoo%ÄšKcAØ³aâ~Éî)¡J1Ülô÷º M%|U+}ş©JH>€Ælµí\ŞRgjw"b7âºqj	gÌ²-3â¸W%êñBtÚ:ùUë¼ÿòW£l«ù*K´vÂ‰/¾~ˆ8!Bu@‹«­hƒ/xS
+25©ipåwÀÖ…oœü›ÈKñBÂ¬‰UV …ÌsYaR˜9¼è°Ï<ÜÀ¥¯ypƒ<ğèPMşĞ3"W}» „¿dR<IÙãÙ@º*~Ö¬Z•Ú¢rG»99°!uÎ õYš­íàÈ İÿöNª³1LË¾*ÔÇ2Î;°Vayãw'€6›°÷wÀaf¶Í‰còÒÇ‚‚\ù©âUÒ@­¦ˆÈô‰½WÏ¹×X~-Â³Wø¹ÅR¼êöØÉÑGCÙ¬¶ÖQœ^ûíˆûw‰ 1G£k{.6üÛ×ÆŒ.ojZ 2nm–¾²ß>aÒ'Ï±ÃvÎ+"ö@xšô˜ò°ô‹@é¢ÜpB¸´Á!;ÿøú5ˆÇ^ÙÖÇEÓ­ èJ/©k:ÇÔ–dÊü <`Ë3$	ÁûËßuFÁxÉ\_YZÃ@Óæzÿ”ÏL<ëK/°‹”TyÎ†¨H8¹ÎqÙ+BğYôv…ë +·ŸkëûÓÌd+ç¤¬¥\ğ…;&aèÆäÙ"İB=Ğ­"àÕWâ–‰äk{ş#7/UÍµü—hQÈì3æ6e·Àº¥ªÁT«e“¨—ã¡¯!jjQÀi¸Ú•&¬+Åk”æFşáÌë	•.í_rª<Š¨¢{v	-Å|«÷ë~Ú±Z˜ h½ğ’{î÷h²ğü·”É"qÉñÛ‰ƒ$^Ø{f4îŠW© ×³tI²VÏ˜3Y‹í (9ofˆNî]qj’ÀÊ…	³÷GüØ‹?"ƒ-nœ¨?¥6òÿpM„0ºÃ Óñ-‹1USÚAì?&‰)óN¼%ø»ˆVÚŠL¼¾ğ{¯ FÇöÈ¼x¹rbêt‹0V·1ô¯¬ï@A8fôK=ÿ§w{3±]HnôL=ö¨ió¡Š5ŸúÈ¾¯¸–s—¢‘İ%á<¾¾Æb½«ñğxš7ö2ü±×=Î	ü‘Æ5êø¥ôıtªp™[½æEAÚ¢]iíß¥Ì¹.ä—y•®ZuŒÒŸŒ²`"àS¸ÙdÅí6®@¶ÂİIæ¾„~N}ÎàlÊ7P¸òÄôù[Ÿ_÷šfñ÷PCÊÈ±QÓğµ$qfLPø¹ß.5( 9€òİ™.Û„gÚpäI7ÈæB«ß[fW!·‰³ùÛöRXxä3|—  G¬É]4,RÍú¯v–HJ¨,bÀèîbŒ‰Ç¶9“¸Õá~/æIWªÒ:*Tƒ–½c·”2¤‹Zía¥±ˆ$BN§ûşPdáÙåx.˜aØ:rQkvÙgVNiw!™__\àNßòOõ…ˆ½MqxŠ˜Ë)ä±ì¹ÃÃ¾øï1Ô`Äú¡hıbĞKGš××ìßæ¶ÖWâÙÑB™ª|<ivW?RÚ˜¢[sæJ«)˜“pˆwwüoB ‡ìô¨§¡ş³äÄü‡İˆwQğ?˜j¬·Eàªu—ö7h?"*/ö-b„d8¨‚Á®´²çùÀ0Fåòmß¥×À´e6tº…Øu–ÇÁŠÔE+d	§¢QËÄr÷ÃºÿHd &î¤ş›vÄ±´Ô)¬}E‡›ºì¦ ÇÑ<ƒ'\ğßh0ÛÒÜN±aA2Òú¦7Ñ"ıÍ¡‡ó¡³Š³(‹­›÷õL"2ÿ½İö‹“á	‡Ğê›®kø+Şä…&¹5]æÿÄ^Ä¿mMâiñCLRğ¿ÂàÕs4HtI'à(¶µY<D"ßvİ‚ ìÆF\S,…O%K»}Š)4É†š”LîmxÃƒ”½Û÷{-’·VÂY(ƒçÒ¬L/hïÛ
+Z{!¯yòVöxbÀ´^—h¦$OĞ(>^mÙ™^f ‘‹1†6İÆº&%›k ë-È6¾\*Švİİw^âÛN­CV¥”D¯şÎÓ„	ÁÉbšÜÒ¼À0m±:, Âxë¯ƒ/<¯_wöï
+mü5Ş©?_LŸÚ,$kkÊy 	•áàÜ0Ûx-m
+2µ%İ¹Òb ªb&yqdG‡º¯Ipù¦Êæç
+NæhëS¡•šB¿Èûä¿ –š˜ãû¶8hËĞBf-®{cç¹eğ8ğ‡ÎNQ«(K¥€f(¶mÉ‚øvØòNz?•LÌĞF¯üÓW³zµçPgÅ…D iåÂ€|¡Å³B´…gJVIßŸÚ­Šcô_€íwªò¿QüÁ„[!Â)p®î¹ı´éœ':ë_TÊ ş‡¿c„ úhRî…Ò2ÕïXØÆßvõAàæ pº8’¾É—Ö`Y÷R»ª6Xº‚>F’pÆQ}†hVy.ëU.¢ÏÏ>cÈıü»sëòx
+k\ÊD¤Íñr§‰Ò©Nã­Yqo¢÷y\.ÇÍz$¿Ïª‡|pTã¦´‡Uüêu¶g@ı¾¯Î`ÉƒŠŞ¨éÔI7Lßç!¢£ZÑí‚G°V›K€©Ã»û;—¹™Ğ½Z‰ ²ïÕ¥’6ØĞ¼MGİı*Iß]>;®rÊÎJ¾`ávf,ryŒ8‘vçŒ[°[FèæËA‡hºP»_¨¦ÑûNkÆôKÖy¹hUIk93²`UÑ/Û.óñ1ô¹>MÿZ<Lä±5×Õ:ÍùVLåc°,ÃIøHFönaôcaI'C…wÈp¤z²lá>"Å]kı¨tO-}¿d‚,¡dì
+ò Üß… ÀLoŸ!JÔ <¯§|j¦‘¶t¬§ €»$áÀ²¯›às½%B©è%ÂÅÚ˜5qÚÂ¼¬ó(ö€¨ˆë±ÕŠ;i»ä%Ó‹@Ç!¨[ÚkoñÆ°¬ÁÏĞm/ÁÓ^d¤È²¹Ë?-LÜ)ßVÔ1ünLph¬)dÂ`‚ç¹¾vÎÒğLèN*.øÈ5KhvôU­¡”G5Â¡İ™Î¸—(Ä¸óòİ)éÌÌ=eèÌ«À¶UîŠÂ8€SvY
+£•¯¹<¿[Ü}!ÜT%XókR,[øªUa@W«!ï$d¥Ô|\İÒC¤nP¾á–ªP#}š(ŞmÁË»¯Y]jõq ©»à6º´ºŞJ4Ù9k¤;TÉûÅBOÚÉe.ëŠÇİ£M
+¡ö–Â˜Ÿ},ıc·C‰)·¤y.}êOı˜$Ìûcc°Ö~'àÌ€à~‘ÌF7ì0XYè~òVG¼äpK%\'sÈ"£?D W¥?ƒØtÿl\.á€À¦‡ñ„ß³àéá!w‹Î†QN æÌ5€lºû“4}Ü´“övÆb}ëÈx!ĞÖêé4ò]øLË‹I}DÀ­F|–Úp¯ú±÷ÚLS'"Š	iåŠ
+ÈüZ¦Šx>]¹O0JåO³bˆ]&{UK'ŸÚ÷T”U`UëLYñ\Ìè¢(Ş2V‹€¿÷ÏM°.à%'(_ÎqH)c•¹`ß—8Ï'‡—KD_—…l÷
+ùöïbßÎë-0dB>h>L±Õ¼Î~·Ìxà•­›£$i'÷Yf,^™'îxv=şÙ$İjÖ~tıNƒÁ6r;x£ŸäwÙ?ozl—táÙ×¦Ÿ»Å$‡k¨ç¥\¿…í#N
+äïúç¶pïZğğËD3½[’L¨ªX¦>©ò¸ÚjÙ>™QCŠù*'S±Ã‘–a‰<YNWmW lıÿ‹‚õÖUE…ô©/‘vnJ2mÚÎĞğN0Î]ÈşÏªÜ{>¾ÈYnÏCÚE&ÎÕ¹tw«ì"˜às± ûØg9Ãã<Ø19ºä+ï¹UÆÓİ‹àNÜ¼7œnP±,Ğ¥rl‰ÍqÔÌK’”ôè=V&â•ñ&à .Üit„Kr‘öœü€<âø—&ÂC`9„—Ú½a^à¦O7©óÖ°-1ÙbÇ\È¼†“àr|/)²[Í¾ı˜YtwY€¸ZòµÎZíŸşd8»4ÛÉ´³_"ylº>sÛm%z¯5¹úbö‹HJ&j#7Kog “ª¾V]½pÀ´ÿ»¢½tŸ&t_á¾ò¯)—Óî’i’¼DµÖ'L­8Y€ò±£…Fº”İÃYfåğ`øíünlŠáÊ±ó¹éÂ¼Vİœ$r}"8ˆ5ªC²,b¨_Ù!ÊHš^¸Y:eá?Ô„Ñ x]Ü¯'[ß!âWçâ˜,·¢&¯sŸ…éM«¾‰LŠ|…ö»æÀ.KòõïÖ ¸«‘Ú³¢9<Z×Æ¯È×«%»‘;àù*(¢ÿ¥¯œ}˜Şºı˜ì‰¼×::³5Ÿ9Û‘ñØĞÓÌ©ÈwJï7soì:m×“qx…ìW]8Õ¶ÂkoÇ|.ÂV‰U\EïqİZ˜L-SùU»¯¿!$O»l]İóú°Cğ¬(òfTÌôüå;˜@³s/ºiL«Qëó¡‡—ùS3E1év¼æ¥ºu3`š±5¬AØŒ™f½›}°8àÕ]­ tB"ëÕ"qu^[=ÍFKŸ„œ±¯Ï;Á~Óá,íÂâ}Éˆ¼Ö ›B„øì[’¶Ó/·Ed³×8"z[üV>™±¾õÂÜ×3Â‡ìëx4±œ´¼±ô}íù{Çf‚¢RÈ¹Q›d
+_HîeESÒ(@]s<Ë§+
+x7;˜ušË†üüÈ5P`+²»şjÏØÇV"éI)î#“ì°•(üñ‘G‹ÌĞå@÷h%Ê µNu» xa7‘Tëü2²~ç›+Eh
+·-§Š˜×±3ÑÕâÈ_æç‰X©oB’eÏÅƒuH¸ÀXu­ş/ı‚âG=ÃMLªMvğòİîø
+D®Äèq]&äDƒd7J²¹;æqÑ‹©y¼-ïŞ¡6Ù,i( éê{!¡êò¬P¸>I1;%³È L½pÜâ'&V
+¬3»pˆë9`¨"ºÔ³ÍlÄÀTî›ÑÜğÎj±:öGh÷næÁtHCêZı[~j´MÅIŞÒªVË“»rÈ1•Æ›òµ¶ø©‹­ïæ>°Fmj—#ST"®u¡zWÅ¸ç
+?…–‡37d[&IW^©khD‘‚]š¹û¬”Â¥ò+Ì`ş5
+ ÛâúÒG„nŒÕÆßU¾t‡âdÇ"Á"¯`™•æÌÃ^¬6ëç˜KÄàè{Ó¦‰²	™E`âDôıuêÕ%®¾ BhÔÒÕœç]4•Í¤ãŸyÆ[´+r¾Å–ƒ0yAeGŸğh‚E)ªÆæ"V`b’û\'†Õ-ğOşÎ]¢#Ñè„Ñ’zš½¶^¥
+ƒ#8°šˆ\f³-µƒòñ+08>ÁAQ|æÌ×ÑòrÈÀÏÂ}è¡=¦ò¸ØÔá¦Ø0Øx¦D³I#7êş¦Hİ‚9La7á±õ·RÊŸÜe¡öı±p¾’ô¥PÂÓ ™£Z¿ÖÉs§‘äT_¾ğœ„}Ûô¶Ö8dº+ÙJJäFßcvo±ê¬|ôG\æqÛSi„T²ˆÖk;`õ;/P>×†åŞ¡VLğ¨q6»“"].(sÆcÔÍ×¶d[õ¬7$·@àh¨ÏÎ€;‹cáÁæÔjÈêú¾5çtaË¼ÿä@ñˆ.;c™gş7´1´ÜÆü@Ñ”’™jªn,W‡§ÅX·*–SÙiXkÄxÚÑîöRh!äzÀPBî¡lFÔ¿|mß‰Ÿ“,1òD»EùÂŠİœsƒÒëøĞ”JNb!R[“xzïª/çÊ›9™_'L4A¥‡9°ÙÏ%}Y«#N¡xéÈóiÀi¬é««Û0¯8+cãh¤z
+ö-ÕZO´XïŸï óVª$äçYFø¥íÃÇ´IÍÅİ1Ûx1£ Hq}á€´f€õş›2$#³qéy»x½cš¨àH›L’	qj›ÃåıçÊ¡cÚwM·ŸÑ(Aõ™VôÆ‘²ÆÈòøÃ^Œí¡Â;å@t•Ë¥ÜŠ"{Q-›ØpÁjëXá±j÷ØÊ½¾MjâgsÄõ¬|›õ„C™&L!QeM™İËqgÈµEbåŠiÑ§¨|×@ÆÊ\Ûö¤[íŸ%•Ó’b<}SoºŒ9Ó‘\	ÅÔ”+*bÂ™SÕÎ“$Æjíºg fÛf-zI~Õó®O÷v„—bH;'ÈËÑs‰c)‰Ö¾×ß‹ÈÅÛqlÛ×nnj5(ÛçÏN¶ïÉu·Í`	š%›Kƒo]€jPk+L¤¡·p,åÖiŠ @â‚¢ÛäêşpÖæn7wÚÖÃåÊİƒÿMó/^¯±\i2ÀCüÓX
+¸/åD,¹çµÕt`ÜÚ9Â±5‡ç†@İœß„LºH‘‘	èÈ¬fŞîGÏóÂH°¤Xè>—­tÔFÊôèoêU{n`=RåF5;ÎèTñ˜ğ_–oS­ÕÇ0cEf›œü²ú:ƒ~Û³Ë,Y:7°2òC|¾¼Q¨l|»úæëtö¿Ôc0ÂYå
+¦ÁœfÉzM
+ğ1âµŸè,öÀ™ôb7{ı<²:„ ]q¿)zH=¢İ/D‰Aûj:åEÖ,yc(DÕ…¨%³@Äî1DÊÍ“æwƒn}ğÖœƒö·2üü×€û#  .&»VÁykü>\XTa¦y¬ôœÇÄMÎ®éĞY×¶Êf ªG£%ùyZ¤—Ow¤Jh%’2ã™Äöy·
+4’n¾¿F  2Ğõ÷Xù&v«®ÓÍ‡XTUÜYäÇ`Í]Åí§Ä%šS·+å11¹h‡–2ûppPg;ú¿Û<Ä|Dø7ÿç#[G¡ón?È8…¡e£ß`Òİğw(•+/–_<ßÊsŞô,/ôİ0³·¶‰VÁ˜Ëş`c<çËb¹1—42š6k¾p5zy÷~[Û¤$J±3•¡U‘âµxW$ZWPñ1J[|ÀÇ}"8Ã»V3±/ËÁ¥ÌªËy(XF8[ŒO{‹Â‚°Ë8ñõ~aB^·OŒ]m×KH%øõÎnœÇT!K)=ÏneóÒÔ]ucB¹vnó-=::‡S÷³ö3şÏ¥6«ØßĞ«Ú«Mf'’ÃÃ•~8ÎTíàòf2°ìe+	‘‹Û0¡\ãšÃQÌ^Ã‰^IôìöKïÔX½è´"¡%X8pÎÈ0L$©¼kåbà-dÊ“©m©Äc qK_Şv&ú<â²Û:.œè_MgáÒqÅ¶;"[lßFk}0Wg5YÀ&Çã¹Ñ¾n¹Œt5¥Ç…½vğS0ÿÙ²À("ğ‚ìr.=fû”@ À¥®“@şà‘=&FWQÏ…è(ãÖ½Ö;I–®1­ ¢„¹:9¸ô:Ë‚Û?2‘çm£ŞQS†›iS¦‰’`¯MŠ—bˆ­B3ò¯éœÑ6Ÿow1VUıéÒõ3.ô%RÌ ÅÛC­}ù».…RCÊA@Ş»ö=˜½âŞ¨n–	Àøñ¿¦Ô¶ ƒ?Õ~Ôò»·…ƒÓ+Ñ^å¬Ñ½0,ÂT|»²©cQjN‘	–&¢JÚ;åHÓ£¦gıF«^'ªÜürêˆ]7@	t’ÄD>$—\ËÛrğşO%Ë»V½ò0ˆ•dO2ğ^CÌqÜ±XıçŸşZ®DÌ¢éR9`pš­š5gMÆ-C×Şió§«bÜÄrØwt²}%†ú"r¹óŒ&­iÑ%ÿ•#.1»3š’‰’°hÆ
+Öÿ¡ÖDŠTË…Øø}9(-7ÂÆŞryxßKä‰-÷'=æq¹šqÖßkZMQ øbå×K¸ˆ×ƒ"/­œŸkˆåh´I}?ï@q>%¦ÂsÏ Sær@vàLmàcˆÓyŸm«LÿsÇf\UİÑ¦à…z1‹¾¾L–ªwì6aè‹–:Ó+vàèıgV-àbœU0?£ØÑtQ”#™™ï<šàN°—F¢\ Õ¹àD%lxØÅŠbÊí:riérÚ<†Ğöoê`oÓ\µ¨ÔñÙ"‘¢Õø+˜=_+ÊïÄ>±#±#*.K…â‡Œl‡É=g89sq“i§”5²E™Ì$USBFŞ²ëÛıíë ª$§æ!ÏBÔ¦ŒHè[¡Â]/M1?öq¾)tƒíEpG‹ç™œÄ£OÆ€9½—ñ7è~ØñûßÉĞ<aÓ{‹™¸-Ã‘¹ğ|´})Øf]t¿öö“ ë”q0ï/p7ri¦BäUr'V§!D(™„ß£#Ñ<Zæ1ìö‰Ó®Ë+$'òqDË?	Ğpd¶¼É:¨P†Ù¢TŠÆ€*ª…`×Ô/l¨
+¹²_K!ØŞÌš¹yĞæEÔ¯Ç†v={ÃÑılñ¨yšü\…u9V³-”+o>°†0·îøFW¶¦ &3xi€Œ2ZÃ7_Ÿø¨­ã(œdïNh‡üOÛ @%A%9Ùª:ObL°B¸&7”]4²bªÿ’«PMHŠ›şØƒ,^Ê1ºSY“•‹Nõ¡€%êÒâéDxü«ˆ•éºv´<U½sï°à°r‚Z”üïËJ‰TnÉgøç6E{“ƒÈÓï»w)}á¾"f1 Ê¹•¬‡¹`ÇG‹íRrzaõ›6)ˆÖy„¨*Â¡»¶%ÌşåÁy&(ò™=O÷•|Å´Kã,ßëèİËÚ³zÙ–ı‰ÇfoT‹B[[ZŠ,8Aß±\;~ÇO&Ñpµ²¶Ëv(PÈÈ1Y‘•ƒÆèc
+F§.ŞÄ‚nT…œğgDê£^ëå5U–Q‘„w•1 RM—O¥É¾9h¸7k—{¨b
+àC?w«·ëËÒÛ‚@öx¥Ô°›¨Ã&{ZÔ\Z„éç0—ƒlój¾á¦?>™XğZLÙÑqßùƒ¢F*@cŸ-ËÌ…Y_F7º[sßáX_*™<$/’½Xã'C'¶æPõ×ı"M¼â	_øš«½Ÿ
+?Û­7]ŸwACi)Ú"³WX+@çÒ™ĞÓ×Ÿ²oO×\³{†ÆÉ>5ñ¨®¨—¾Ğ‚.]S®Ù>ï~L1É9ã¬7S'¹³9}Ñ€'=ºnÑÑõõ³à¸Éo:CùôäX6!búz~¾6RÙ;¾ 3j$'ä&äu»şïGå÷'h^^ÍB¿AAY¹lŒ.†(‡ôNGmòÈM#èÄ,/³ØyZe¹Œ#©–îYëº{W@ßVlPü:Ö*I„”ªö;wWCº	*Ä^ßBy˜Ğ ªİfngº'ğ’[ÿÒ`¶y¹[çJÇÚ£q¼gºâŠ4´›ô°±«ş±À¿ŸÔÅkhh~ğ½´üáêŸ±äQ@Ğ¸Øë«Ø¤[>«[d¤6£¨PØ9Cô0ãŠqÇ{…v«*Óéˆ©ò(÷ªåãûBÑJ^†*•ã0>í}XÉ'¾e	ª×Æ	ØxøöÉ†E8t	‹Õ¹c¬¶0zËÌ´),BÀ¤áêôÇ™Öó±&°‰e„˜7cã…ì s_ib…t§”h‘ î—’î.©šÀÜ»zşËr;›Æíú]4y2êŞ •&çŸÚ1q,š…@ÁJí’GBëf¶ ~•Èüıb´Ó5TOòï8{9pDíµõì[+¿
+n‘¼·R¨QÖY›¾	èa4AËmG%72²Ö(	}H§:[ŞUtìXÏ%')fGk"¶(GV"Äò­H5˜ö`Û6|ó€[S„c«B`ëŸ>7¨´'æözÙ `¦¬™.Ñ~.Af&ç&.—wºô{í©¦qïì¢fÖz-şò|fÁşSŞ÷cQ›AqÎŠìa³ègéáEçuçŸÍch1‘±°ñAå‰öò)~ë§~y½ã@µg†°¥z*cŒ'.²–w_šB~*õë¦ª<Uñ®qV3çN¦ä\´’)Ş >‚”@z¸mN•#äğˆä+«EÂB‘‚o«M”ëáVZ-ƒ;V}7!ÏÎi²Oíåáru½ØÊœî¸\§ÆiÀ/ÕkrPL ’İ"«'şã´1må2U•ÕO7/£*»ÛÍ:váW:ŸÎAÖÖ‹ÿö ìŸ1GnÉ";$!ÙxÏsºÇùˆ{E€Ç8šc=çU4ÜëB}Ë´¬O'¢Êl&¨"¡ş”+—Ö×Ì†uï	/î[Lìä#Qm´„ÔâíílZĞ¾úI‰¤JU•út?©½´RézüDÀ¤LÛWÂ¼­„Û‡%¿‰U5À/õa5$’®0ko$G²$Vó†W®½®§/Í/aGo ÈäŠôq4*©›B­¡Wtº‹U G¾]¢ê—cû’¤ĞzAš¹ó†/ÄE"†Û—ŸŠ™	»;|øÕ¦:I(]ÙÒ©Ix‰4îoùdo¢"üu5AO×8²Ï¨‘º2³\‰¿ÎûÅ/d¿ªŞÇV»7Ö·0:Æó#>’0X7ış¸03} Çû÷â?¼aÖ•.ÉãuäP¥™€iÁ ˜fzç…zB+"Ó íÎÂÃ¹‹;¼Œ›Øò.¾°¿¯ëÏlîÇ˜à)î‹÷d&ŸP%÷gt+®Èıã® ©¬ú¨•Í^x[:è<š%äû5şlĞ7]ñ^•ªzhsÓ8pÏÏ¼I  £àİVw_|ºxd3·§"ÄOœl­rşü£é?ÛíáÛ¢õ	¶[VóÖµº4ÙŸ§¤òÃ6ÉÇÓÁòŞì[ ë®œºê£†µKÈe…2²Š)ÕuğônÑãÿ_ÛÍu¼Y¿àÍâ ½‘n4Ç;&…â‹‡^ôpÅ¶ŒX”Ò"¿·_>Œ…’ ­‘\7
+%G dÔdrxhu‡\7üˆ¨ëÙyµ.¢Ï æFË£ŒMn¸J€xåF`Ë2®v*^_çÒû2¶*$’(éºÂbF¦QçÎÏKOx“¤T-âüÙƒa(|‡z­S® e¦Afûi¯È¾«VáÑñ	¶ôK¿2ÊnßLš´}u,[°*“r>'Ï7\¸?C„Âù\+:Ï—TÚgÄ$+gÚbp®Éˆ’ÃD—C%¯Å‹¾5Y1ƒmùY“YPèwÕá‹tZŞ²ÄúÊıï
+¸ÈÑÑég6 6®÷ûSÁ6]$ª5•éÑOeKyÿš+§oòÛUÛÖXvìŠka¬TV[Ï<¦·—ä)?w³Ó0cKz¡Äç.ôÎ(QW”Iìfo%@W§>šÚ¥›I<ÆßİÓ1A}¶Û>øÒ0/ pW^SMnDøæ2 êd?Kô,}ÀÌä†ô=ÁXÇ“vM!!eyya±sªÇq"…™.¼5BÅqa-±¿ùxØ@ªµPyY³øš'¡ÎG5|‘‘Èü\$€”±Otı3•çzV¯Ş-·ëo1l·Q©É`…P–S<ROãöôfR¿·T¤A’"Ã¿ İPXª™—@¾²Oâ(ù¸1¯Şˆ³©ç%
+ ¶­d2ä=9AüÜZùã¾LÔ“­!9L„´¨’y;éì¼GòQè½=WÑVXZìë[`íûõñ4fÜ{ù4cs–OX©&ıñBÙ—ô€SÆrµVc(ƒ`ñ¬™æ…».Es"ªK(éQÛİ®m¨p“«‡ÖiÙ"£åˆö(%r(~··&D2©d!
+î°§–ı® ì»hP{Mºr†?R
+Wc¿q—Ä']
+{ÒèÍÌÖÒ í™ˆ€å*‡$Ö«êÑ¤i,I "Ñ[_ß?Å±¿wÃÜdw³‘×%±¥»r8à¥;O!êá¡q?GÜÅãZ˜…(İÇÖì'^‚³`E×
+ÅÒËV¨í<Ó7¯ı˜ç1=¥‚jÏ-&øæ¦Â÷æÑyØïe#ÊÍ—ÜéÔ‰Æ‘Aëh-a*
+¤òä‹lšË£ñËÆBA†	ô¡®­dáoÃ­€é2 ®ŞÒ 0­Í°L€ú¨ÈéJ	4×fd×áÕKeÉ…g´È
+\×ZEnÙW¸^'~ÊĞ®SD¹“3?xóè;¼ÏöıIİH¾ƒA»ñÊ©N‹dºÓm˜2Më‚§iûÊ&rmÛŞš‡%=Š9ÕRU1l°õ‡Ë|) {ô¶¯ÌÆ8çG3 7U‘åR»Ëßƒ1RZh„ö•§ô¾¹ˆ0Q¯:…Zùv¶úÛyŒëC [P´PTzK?äûãUÙpgiÔ­úc›‘zêÎu¨ÂHvÊ¿sœ¡Ø»Xò¶*c¿}"ˆ³«Ÿ&¹“]…6Yğb‚¹VCÔAŒêş¢MîBıÍî‰Ã +Îù	cö…Ìhò\TÙgƒ÷±1nàF0C-`¡-ˆŞh}©¹ñ4:CÃó¿šAß,˜™RÔg85&Çíı–or±G’—w}çHjEŒ´ú"Dà¯‚®/,ô%\ÙŒÛ¡³O=×H%UFÍQ²—Ã‰`Cıvoa^¡ÈwJœ#(Åj»°#ŠÈñYZ?cé« pV2š¨1¸£ğçhÁù2¯0%¡µ(ºUvİÒİf³3ãE‰ø‡»;×©ÑÎ×mƒ“æàYYİcÚG»gR)2¿tòÁnïà[ |l÷P†LĞa»‹*h2ª¶[´y×C|Lå/Q§è$æÄOløËŠZ“RB Ô4)u­¥¹”+ñéWÃD¨ƒ\wİ+í§¨:©$E’«ò5ñL;Øà\©ûéVìÔäH±o„¼Q¶ü:ÖğåÎà5…PĞ¼ßàÓy0$Nq×åíÓK¬*‘ò!²NÚxf·ÇøQm“¤Æ¬µGM½Y§›ÕÊ?qäÚú”‹ó×§'Á_†º„ôş>yˆiß¨ZÃíè„3ëpU&÷I«’Ü&dkï`)+'ÇÚùíAì˜ÅÚÛdEñèÈ9Ú0ïî¨+¢O#òlRçKF¤äËºUrÇ»Ø¡¯ÖïDjbøìBî˜ıê RL¾-!&¼]šëœ—„i¹4f˜B@Æ˜µn}Œ~8E¥SĞğ[øs@”Ó1·aXîÊû	Ÿ˜®VUíÀçÁÅHz}Ã”¿í]çÅÀIÛ}ouHÑªuœ¯ì©>]\äÁ.¶@­éLı] $4ÀSX)è»GU"Ú¢·Õ€ˆáN¦ÁOÖ/Æµõæ¹€‘Œ’¶şmùaÌ¸¢ÌKºg¸T}$Áûº¨´÷WP=¦lÇ'œÛp9ıB¦iÊŸ	€Ò)?iä)×ë@ÉOYÏøé0ùìb]Z§Eßr¥>7<!vå'ˆ&´%mòf åa—	Ö\ì½½6ÈG¢åO[nŠd‚éqÜà8	öj">°¨èœd¸’?"Wâ¼j{‹ğ(]şxŸö@@BKd,ü¤¦Ôªyt°NpØà&Ja+ñ]rrÌÓa—NX‚ødN*`jıO8U±@eq¥æy²®[Ôy+É¯^7­Tki%êü;èçf“2\ 4X!ã@µ±í$LÌÕ*:–.H›ƒ#ğï`Î(PîL«Iİ§•(h8ÒèLùÑ3×ŒSp€¥Ëí«X÷…;ƒ•ı¯ñ;´¿n@’Ï©á”R&×% ¾¬û!Ê;$Oo©¯Oké'âÕ´İ~²–Ê’LvoRv Êÿ$o=à¿PMë‚ó,#ä”~Ê¿¤ÂFMHCç($YÊk<ÒŞ>w[@Í¹2ÃÓ¯+Ü*ÃÁE$§u VÚé¢‡z†ñŸN†÷á¹÷¼B<bh¸¡–¹jİ€¼ì¡éÕcqúƒyĞôê•ìôšzçCä@ãê(Ü6ÍwÒ*,ÿx®`ùÆëEšš. C5à[6*vÖ[ê@qŞ
+o¥ÑCÑÈoªúfÿ’Ã8FÍğ¶7Ë-éŸN†ßÍÿYŸ@ˆcŒtí€^vœİ€aZ§OÏdkık@À+40%oõÀª¨Û„M©=PõkK¦kk†Ç[	ç¥ã—p#cï½š".ÆŸ9Ç‚PhÊĞšÔ‰!]<9”ZĞº>§ºŠîvj.$vS°”–ä[„¶FÈ"¯æu‹¸¡WPÜ¨ìîŞ”KŠòöÉuGØ¯b¬f†€°¹¦ÖQHÒ6\oävFÿ ÌX8¦.¿=FH[ÊvÜi¶üCM®Œ¸«faÁøm·÷ìJŠ{,âd§ıô9‚ÍC7©êI ÁFñ“ò¼ûrAÿEş¤^Ú|‰C>t¤Ë¦ô>Âf?ç6ƒ•_2!é1ÈM=i‡8˜#(ÀJrá0Æ¿è~waÚšğ¨Ñÿ-{³~¯VaócğŞÚ'+‹(^XTùqÑkéj”–wE^Õ»]°åò:%¾Ê“ÃÃ}‰v¸·U¬~¡üg Míxùë½6gq¦·fN{îº±ÿF”¶uÜª£ê_”à!›ikA½W!ßàp%*Ì¢®üãbíÒôšö²/Mäy×*İ Â€3
+±Å«0ñÅ*aw>°A
+Çš®q„¡¥´ÈIZ#ìŒ'û¬ÿ,pÍÏió6˜êt¹å­Ÿ ázKŒJG";Çƒb€Ì7ùÖş/^%Ğg±¨w!©ï{ÓáNşÑš_A¥ 7iZ¥=^?ÿOµ"‰âmı² ²ş¸Ô§DœÓ*1‹¨‚"ÔoŞÇã4Zv‘-ÆzÔÁ¾W7¯ñ™o=éå×f	-”ƒ‹ªoU±¤ÈŞb7×ÎË¹Ë^>ù3¯²Âgìftç%A/ŒÜ·”¬¾Å@ĞØrõ5Ñ`,	e¡Î.òyLö@§£)½‹ÀìXx}œ•àjp[-æ ’Ğ.¶UWóY=¹¶-\¿vÆçœG„òrY‘¸_0€„EZ—¶ªº¨Ê?M8k³C5¡Ó-ù›¸Ìı‘\™ty¿€¸Ûuj QµÊí´‰	 ¦:ídÆmÊşH¯Š@Áêpú3­,`i cE[˜
+±cÇœˆÙu«lÅ,ÂÕG°«Şïô¼b)NÔAqûİR©Ò’À`‘ÙB¯Aò­Ä®å÷YªÁnÜù”_»zFR«/¦GdÏ¬d|ÜØ-™a•úDØ”	ABıoy*·o¯9ã cË:ü9§‘g#y?
+[0‚@ßğÓ§–ÀL¢“äI¬‡ŸÄ§ğ‹ÿ74K,K×|…åu'ïW¡†¾Ì†\Lc‘+yt†Ÿ5L6TÅ”	Šœ{ˆ¢yCîÚîT¾Ê£¹?ùUhÒÿŠÃ„ˆ©WÜfpø6Sw,È[ñÇeöVSî\`i[¡ÆP³‰ºÃ üø4”@tõ8=£yøÎÜ}6f£m›ÖÜç.ÌHõ8£HjÃ“@\éXÜØŠ†6Jƒ¦ÔÃW +FTvşÎ6³ğÜÃVJu+A# ¡äûJ]8AEÃoœP÷°9ßÈë¹»˜î	ÀéÂ> #ü K±î4+  ]ÑÃ®Ó¿ëÓ
+öY)-Šô8Ûÿê)Od,îîÑ·Ké¡¢¢O°kÿo\ñ={ØÅsMU¹F8‰ô*nd±%tíCš3ë?z–ñé¼ìAV|×‰€7d<Ï2¥©ÚÁ[q¼3ú¬ /—3hü³	Kúã‰qÏÚÕ¡~À®ò·=Ìôê_Ï14%@°©N˜ÁzäÚÈS<ÑèêéÖğ¨ù‚ÇĞZ“JR(Àª¤4&A§å\›s$>`%t-ê‰çæÈT®Ê«R\ÁëNÇ/ÿ’…£§ÍĞ´_6º—&o¢å%ÿõåş'è~5 ğÎ$,q›‘C\Úˆ¿9oMkYáÈ¦Ò*{ïš•ò¼éª6Øbs¤‹Q-dzô¨-Û£Z‘Î±>¶Ù’‚Â'vŒÅèL>(ÎE¬T T[áı_ä
+fr"'˜¼	ìŸ•óï ~fèÂQ1uÛ¶hiç´&ká†ÈdéË2·#vÑŞ"Ú–© l"d¢dŸä\2V-óÖ³U´Ğù‚cªv™k”{£ãÏÏ8Ä€hÒb	#L
+ÈÛõ[ò“®‚Õ7:pÈj½K,Ôüõÿ’XÊ\ëélO¥‡4vø_~wÔJ‚†ô+¢o?bdRåAõ ß54µ.”Á.0eWc9è£âÉ“_< "›¼ë×ªTá³ñ5éÔøŒÙë×ÉóÛº¤ñ<J-:Ö–9–C°	öu´vS}ä¨y(¦{›4C¬blüZˆ\¿×Ö¨¨ı)—ÙD\-ônHZr\-Um0>»Ü5:H@šşpùtJ|Ú²K›kÉmkôùäp`DÛÛt*+‚†S|‚yºqLx¦=¯ÎÓª¤5îº^Â¬ö»¬½C¶ŞSÜƒÌıçA#2-™®¦°	÷3´Ö÷(t>n`ŒxæıË´mPAÂ)¬K™ÚP¸­=†¾€)ı|³!Ë4Hh„Ä&j'rö2t]]ßÒÔ™|-Êd·Ë»Ff¯«öèÖ½zÂØùÁ©A$ªgöòÀ~áûTÇ)gÙLë€#÷‰,CÓˆñ2pqfkë%„b¬Wp‰ãiÿqnµğæÚ<úàéôjª	yŸ’@&™YE ­#Ğ²Òäz>Ì¼xœç³&Ù§ïcèx52äşÑG‹¿1èİ»U‰@™/!á¶Šxèçaë“˜†Rf\
+ˆI›ØìZ‰şˆÕ
+ÖÑËÅe®«•Iœb!2˜S¹™ĞÍ£8c•­]Šˆ'*ÑîØrÅ2í]Bl(ÆZ§!A‰í}–W^\Ã³œ$DöefŒ²ğRPdN”‹RÙ€ú.]èæå¶ß¤cÌj`çÔgvAöúRMyM‚-R²¤ÈoÒ0ÀHÆ0@¹¶4ql¤È@u¬%šF:]Q†±}‡„ûcŒïÃõE¤Jé-KTí{˜%µÖæãó3ûŸ”çı7s†O· vÍkbÀ’ƒW$óø°DÒäo­“ğ¥'‘DşŸe|¢üD¯õÔG§h’Û96QONc,#8 	ù07ör;-ô™¸`7¥¤@+¬`!Ùµt‹ÕÄ¯'§xq’c_ûp^K±ØÎßÎAâ‹Anot'Má5d¯*ÿåıüóğ‚·Ep‹ki$ÒÕ7ıÍ7 A’ììV¢Qkæ ¼¸m¯Ó¹gÆxáÇæ;MªƒÑşZ³ÚÓâÈùÏñ-Î˜Àíè5ğ5tj¨©XJûÏ£Dƒì¿0­ìUğúH;x‚Æ¯İiû…àç¿ï…øyÈÚkõµNJğ¾[A<_eñÉ¨¯~àB³€0>‘5#Eüü)i,ËÚıŸ¼{B‘7½‚”¹”£°LVgI6 uâôåsc¬Â:»:×±N4+•Ç–œÁ!³5WyPÊ.C¨˜:èØ"òƒO‹Ù?aí“Åïï¯rÇl–BÈÉÍÉ!Äd¦{3“UJ ı?Èw‘€ö†öÀòŠ·‹Cq/’ØH!qlª( ˆ*løP´…ÈÙÀß–%r êóDdqÀ‹xlE„Ío[†ù‹İºÔbÀx5ª áüóò^µ~>º*[)%–ºûê¿-{e5h)å'Ú¿>ÁKdÓËQtœ»!EŠ‹ÔvĞãsƒ0\šTÙ1£@yqg¶Å:ÑÎ‰hp¼™ÿ17›É»néõ/EvH‘#ÏÍ7ÕéöD§$›ªvÈ^B¥©ø;ÉKnÀ§DŒ^wq’|fS‘•»íš{³V×¹wIh™¸ä
+Ìï²~2áğí•ã×Â£`@¡ÇÓ¨ÁƒõTv‚ÓŠôäáVsuV¶å „³†åØ{8ÇªÀ´1hEÈ5P=˜‡D„ñpFfrM¡İ­´µÕÖ½¾½˜^hg·
+¸~wGàú˜8™a•±ø€ZaÃÑ"KÖâÅøú\èÒÒªî±®¸Ğ4Ãùğâ£_˜­Øb•»Ã-„º»ÑŞJ=Ú}îÊtÁXöBnW£F¢Q¢miLTsé‰ügõşÜ2n}
+íÈ4yŠTUfk*ŞÈd<§AJ J³ÏrÇ[
+ôÍıŞô
+Mİ"“j¡d½TÎ¾Òı{ˆıã
+ß>f‡éLkcİ›7ÛKlÍ›¥Î
+¤‡–C›ïdJôPPn¡cã›ái&ŒÕµw‡ñt¨™ -¹3LÄ7y× Òİ&Û[ğAŞlô¦—¾~®Í¨f¶íğça£ÿÎÀç/¨, ä¯€eKhç~Š§{÷âV¤EŒ,­k9qÃô4ìCé"ºTU‹[Oµ~]±oDËŸ¼†)È›üØİç½‰„òı×şd½ÎÈı,¯Şü ¼iœWGİùÇ ØÎ§+şÕÙ¿ÓéİœH7Ã!§o%jÁ0SÆ*©‚Öº£üzĞñ‘‹^¿‚q^#¾ô²nc°åjG`¾Ğâ¾àëŒ¸ªÏxd-ë®}ùOİƒ*%q”ôº İw¢ˆ±õ.}yÁÚŒæf¿,İ”c›½A#È¡yuSÓqKäĞ”‘1©Élş¹‡Ù»”¤õ+•Ğ§“P¤ş†²ó¨¹°èÑ’‘Ó^‰õĞÅ¯·½Â{“‚k¤¾eæV³&Ÿ*ƒ®Ğáš†×|
+Ù5íĞÉYF—>œÒ—’'+Ğ}Æ¥WPyNJM‡o¯ é¿¼ç‰$¯`>‚dº÷‚¾ÑúVî".Š./iqØˆZÂ‡†ÎÀ·vÑŠåÌLÜ×Hİé›’…@’uË§ÂZ[×'e4¾”N à.‰I*Å«àWTÕİëLóÒ^”@çñ¨^-çË\uhÙ1{
+<	|XÚ{)j®%«÷‰øÀÖÔ<ÚÖPùô Ğµ¥¬ç‘‡Gî&x9<½“¢„’üw¡9BÉH¨÷_ı V_KÌvu_âwct¢gf¶:Oœ®é¦?\™a_ .q{ŸØIaÎŞgNñY+õÜãpœ*q®w3EåÀw×¯µ’Š¿fg´MIA«ÓAZ¶’bËù`Od¨–¿Œ“ŒH‘•9’hÁÖÇ×QHÈL*ß=@uæDrâ©DN¦ÒáyjÁ  ’ëà;ëœ óJŒ/Ãl×nË(_rÊ)½wÊ’]ôÀX¨À¤9ÇÔ·FmXÈÉ/|_Ëø5±™@3…zÙXäS‰>ıä²<?óï¶`Ÿg”ÆFú–åš_«è¤}ÔYãÈ0>:Í±;0_D;ú4Öè¥U^‘è¥ö|ö–q.;<nÏ^F°POpªğjp@ş)ÜW	‚P%ò‘œ)Øä¯¼RÂ_oš7›¥ëBZÎÁu™e»Ê Ñºù›ûww;–€4îc‹Üë o"Ç{0+ÉÆË•ëQ6š¾›(ÅÌ,1£ÍQ”£[vÖBÖiË[¤p:ÈŒ­Ö8”Tª‹ [×CYÄ'FÅßË)€’¦.a@tK¶—­<ëGˆv÷×åŞíå7 é'!6j³iÀ¨qAFA‡¿EÇ{àÅíæ¹/œ8†€q2Wh}Y íFQŠú¤3 ie1^»õËh¾õñ›TQuxxÉ·a¿‹3g›o8Ì¾É¼ô}˜@°•$ğÒ­Y¹éPÅŸO[Ù*Âüøâçü½aÀSóUN‡Ûö‰ m
+­Æ¡>Ñ=ôÎËü“ÓÒÈ§í†‚€›ê¼ mP ØsÁ1¬”W©†¢DÙıpxîJ1[È6ÌAÆT¹€ÜD?‡Ş5óSÉTt)cm?HT¹QÆ¶½»<Ë“ÀÂ)»b¯Nú7{.®˜É
+Ùaéû€éÓ­Å+cïåM”b~<òSeHY’¤kŸó°šw”´*ã·³j…<š¸ô“AŠ]­÷qşÒ¥>r§UnšJ]†œÓ†ï,µŒˆï ÄLf®óîn·Üç|cPkt´„½U‚wwp1¥ÔLÓİ»‘€ºX%˜ãÇ#@<¦Õ¤«	ı´%°€?o—ÙÍîßO¥äì®ó“–Îïö¿ÄÊzË„JÊdMMe¬“¤k90q÷R––“ZF0&>âùIğ:%Ñ,½c°Ot{“m5x¯«[V{ç÷F,ı£@ó˜%ÿC/“Ò„äæ¸“ÑV…ïÎ{êbuPİ|ôBt¸v¡bB¬/O¶AjG†«Ä¨“>ËóbäEÚÒx…óQdÑàÍ¶»iZÄSZèåì@h}´€êÒ8r/%aéôÁ¥~RÔîr7v!Vdr?ÎúãsÚ±P}f¼¼l2ı5lĞ›="0x1Î';¸Õå)_¢æErQ}÷²	ÂŠ†Í†#ÌöŠ "ñ¾ıluŞX!mÄQ`fÄüCxdßå–O2_%Ù¨œ«çp‰C,bÈ™„ğöuXö5'PÀÅ!ÜŒ<à©?	Şãf£¾QŒì«ïèT•B¥ZãÕ½ü/•¸—õŞ½RÂ‘màÍ‹OtnŒ4eø/½›ß'E´]>….RV&dŒG_Òçú«ü…dvWH¥ÕWY©ú5ówóŸ8wá¯YGbÙO‘?®»ßáŸ’›ÇM,ã«¨N‘¡ÌX~@¿ñDÊª‘üGs»6éàåi=w<é$:1›./Wùnß5ı®ñR(İ.‡lá¿->”[ÉdG—çlŞ=‡¬cµÙ¶+·E™n÷õkykøÙ§Pµ.¢ˆ)€#{¬R
+V]¢.ñºS‚¨×Ğ´C…Ò¯Ë¬6 ?¡ùkÑJ¹®OÂà}îÉÖ!AGÍ&~ÒxÚ6+€·H¸z#(ÆgqÊW¶øÖu¿êá Šr¹Úqá×öe-S“ÙÏCÅ\UÔ–ãnWi%ÅÁ¾–Í¨/:Â2¡*„i4ÎU­EäÇ»íı<ê"MÚ{„+ÍoÅY`V{d¬·Ë„Ï64Ğü=afÖXîEÛk…H,[dEÆŒç£ˆÊ§-¬H`ŞbRÆ"yO†>+õ˜ú”³øÁ.Í²À°`ÆpA~¦şË›³×?™´´¤NÔHÏ¡ô`NÜ”Ê¢aÕ°TmÊYÌp]?Ğ¸pv“bEWˆcfútWEš^²/Ø„o‘Å†Ã©²yöŞÉC!$£s.íCø¹IóƒÄ&*êuv¯ï÷TĞUA_z÷ ‚—u¶¢ÂŒ&Û‹	Š|Îlˆ:cõp+A+“Ò@„rCÿ‚âû´¹•ˆPòĞ~B¹ÄÕou,U¼K×$?a·…(Éêe¤1²ÃÏRÈË%&…>ø)EûõLùöÈ²HóOQBQÌ)Ëz­‰â^¼‘£taÇâf(Aàˆ¾H80kõ´ˆwõëVeãvÕYhzQÏ„~yÿ	ö¼°"¨œ6YÏ‡¯Áúoña¬c~å#ø,»È4wÿ3xÇ“l¶}
+ØÅ*î?œòñÃ›ê¶*ÇY‹°ùæA
+.ƒ­&¢.ıf 
+çÇtEg àM]€|2I­°IeË]º„B£¬¶½ÌAïğµ(ÏF’	4™Š¿Äƒw“Dˆo9@úHºL‡ò?2ò*›Ã:â•g2`<÷äÂ€Ÿˆ}uû9kàß®H”ÎéVÅGäøs‡´¦ìÈĞÈó2,Ğ‘­Sf6¢ãø+4õFòŸ,BÀ%¯~xRÎá£ÁNúduê•0¢İj4¾öúMæE,Ù3ï9ùL.:ãÑ_#2òÇk–ø°Cepä/Ô•‰†KíF.EÑÈ}eàÔ:?©H;å¡Ô­p}e¡JE
+3¤<+)×3iæş¡CrG¹2Wöõï6ƒ"'Ueàœøã<	¼‚Óî|ÛG,
+wu4/o+iŒÃ5ÊQbBÏK|C¥Ró8Ù¿Öôm|4#51kq¯İŒø_îMfI–‰¿Tï>>#VhîĞŒ.ĞùÙªZWÈ#JİÄ’`¦/$ôÇ“ïĞ³b!R@F«‰ëÂå¯äxÍ+W(³†(ã‡İM¡m[m8#T/É€S/T1Tñ§…ºĞ 'Â¬"!"¼ão\\¢	’«Cê#÷#vT
+/”¡{¤sJlÉåœä›€¤ÙS®Y„d^<Ï*Ë}SäqzFvmA¤qZÇõ«¹æxµÔû9õàQ²Ã²<Æ²£‹GNöşl5ßUÉ¯â a¹êÇJ,IFŸºöwçè+¹šĞ~ö@ÍYˆ/Cø¿£Ê´{£–j¸-‰# µéUˆÔ»)ç(++?{­İÍŸ
+„¤ Êy$ ctŸóíÁ&`ì
+hû>6bĞ*…6ÿl¸3Æ#31ß¨®½"#YRu%¯¯U§ˆ´Zo‘ú¿b=8{‡qÖ£²‰ìı¼ôşùr2nª¬Rq$€:é_qUœ!‹Ác°ò]wÜôyDTBN—DçtĞ‚ÖÁÙœÔõİ7b€»‡•Äy-LÑ¿i)NVo1å¢ÿWZ
+×mÙñ¢°P Ôòºè–÷Y³îS
+è¸X}©¥Ü\±õOÜ£Ó!Ó$VÙB)øëíÖÒü«OËOÖşE,AcnÙÌ>÷BÎAB¾	2+àcĞ—]èóÉ7}Ô`Ìî¸£XØÀ§8¸"u×4PÛ<‚%­G±£F&·Ö[¡ˆU> .Œ¼¥ïÿgºñÙÓÃÄI*O–¥^ …²€CfQå½§É¯Q"é§ıÑÿ?ææ#S	#Ü³™¬ŸéZ¶átÚu¤ËKäÅ$gõb®i‘daÁlÙZÛşmÖí²“º„Ù?ÿˆQÆkÈ=.7Xõw_äƒõ§gOçätöü`uYòÔ˜øGä~ËcE| Hñõ=Ğ5¼›Óç6TLi'Ûà.$e\eª“×ê@¼y±X³®æ¡{ÆµÄÚç:Z›œ‹è40NÇ%%†-;[Œ8åiÛRü†ç ƒRÆ/PÊyaÙD7 èL'v[PÖÎ:>‡c‰!¯Öòş³‡)§E®&HRÉ!'%hqíodYHÒ²ˆrD@b2ô•Ò{HÛ´#ÏD˜é/;G]·YË2êğ³dC$Æ˜\ÌŠœzn,•;ó2)÷ÄŠó½IÉçÌB•-l-VdvyxBî;M¬wõ£[ÓÒ<Í1gßnušlŞ–2Íş‘Ìzj‹×Z¬‘Ø  Ç`™·Í
+vâ&ğ]ÁºTJi1MöXBµ¯şÅâír_^Ú‡±Ê¿dùc6 0-]¼QÌ‹o64ƒ®å‚b",oØVWªgú¾B­Oª—(»'V›}•â#2ye¦Oƒ*B/7Åe‚ê&`Å´¡º“¸Íá¶8’4Sà:Hb5AE²êXğÒKdÅr`ÈL.IÍ¶»Ïß<Ü‘ô !fEaÅ7›s(Ó8mà‡q Âc.\•íÍ8(pÄŒ´ƒ’
+]}
+MÇÓûRàâ*àëü	6Çt?d-b‚£ğ€8¸x,î«îÇÛÌØ5¨5­›ugÓ:¾°­sØE¢¦D»NzçÍ’sS1£S~+»›?wšB¶ñ¹x*”C"˜aÙµOY‹IFÌ~¶Ìÿ °¨#AĞfVª”€ŸÁ¯‡ñ]ğ]$‡ÿ·vÉîj©ºUK@1Ö»€Qˆ®&¿bVÇ©¸å€´Æ7ôÂÏ¶©v¬agw	4qòT9hu¯å*h§l‘şIBTjy9åºÍ/rî¶ˆúD\ÄÛ8Ëê…±ósØ%ĞÛ4JqˆÉ.	;òöò™ı”l}’At#ïx!åiZ^\væX·´±¥=¹o¸İ÷îE~âëMß>ÌyÀ†jPŠŠí[0\×sÑ¨:¤[´Œ‹¦­ñk–úœ¹€¬{—ÓŒhı¯qdAâ×’¤Ö|Ä^:×¯2¥ Š-Z s&‰íŒöÁ`{{wî¾àLì’ÁÇl/Ğ“Ô1ˆ{?0I²æçíûp·¥%Ò^Àİ·¹wìK.¤eQ;m®õÊĞJà•ûå‡€wL{’ä›&,G„„ƒsˆÊy£çåÁ+ª@ênx2•›ˆ&[Š6ÇAÓ*òÃLjãê*éUÿ5RğÓtwŞà’Muz´c Ã*À@,À‚~„ÜÔ×¤a8 zÉ\¯#³¸%ÁÓ]àw0ËÓ:QÉèÁ‰¸&äÂcG7òÙĞæâĞsÜË®³dîÙ¹@\QTù×à­{ÕÄ>İPäDë¡+—ß×Ùü²úŒˆ>iŠª f^©¼N¬#TFıä«†NˆÕ$7zÔŒpØl¥œO–§üxbîˆy7¿5ğ¡~aF!Œ±§Ö„İ9ë«õÆ˜“GˆŠûL'?Ç£=ã<1/ïrw¡ÖğÙ–ŞVáH€æJ}“IÂW±ª`ûà¼jvÜ|~ç~pü)úAô’_*»Ìi§‚oÁ»œ|Š¶©_×A$¾şo®‹óª¨Sh÷Õ¢J¤*ƒŞ@Úåê Ï¾¾ LrÚ`"WQ/)³9`]æØ|$(äg -1·[ú–3£•aoA®¿-5¦}|8Œïòpt_l\2YgÜûŒgSLš}uHÏ/7ìdÅOôÒGúûëô_ZÎXúÇÙ›ÓQ ıä52Ì!,dÜ‚[:.à]	Xı\(—òµõ[¤#ª»xö9A™Âk·6³“w„-jçr†iø-Ô>§ƒ­rıÅ©ˆŞ/ÕÁ«†^ùÜ¦Ò«××3xÇ¹£*0R»¡ÑyàFtÇ6Ÿ^h¹[$ãYØ£%D—$šH®="oG~1‹ps<=·TÃÎ;‚Õ„´qo£}ıEï~¹¦ö§È lgÊÔ©]{t/Ve³†2p{¶QhÅÎg”Ìõtü&¡œ®¥cZó¶ş¸#¤ù¿÷Õä´‚Ğ	ÿöÿ'À±S•B'ÚF"{[\bf›%B­frÏÂœ"Ø:wµûªİ%¸O¿‹^ “R™â:!U·>[¥¶UhÄõìï`¡i>m#Æ²¡Æ9·Ö0ß 6Óî„I~n	KbDÒu_Àp’ÕûëBs£g>º=~k¤™Ğ8ÓÇx RZÚ¶œoWıôj½9:jÅßö~íªÑ;§0±¤iÜ‰¸iÁŠV8h\7T.ˆë·ÀPì¿«3h;û»uxÙ¦è”Áİªô$>íæˆ‘õ°*=q•Ã-ïğ%¤{šµ¤–ßy˜ı0së)~«[‘˜,Œ¾<NÂüÏm%¼¿¢š„ƒG‘¾¶w¶ÕğGzjßmeAÎIp™KØ³²‘ñqq¼WZı ÂlGVè%ûÖ~mâ°ÆËäß…-tJ´h[»Ğ+e·Ãîû„E»iN”ÍÄù½xëYÉU}¢şiĞE±¿H2¸‚g|­qWC3æË…¥Ü0Êí’ô°f§ßù,sXø[ÒÆ[ÙÓc…º|õÊ±óY±pH;.;@@—ÕÈHO»6^é/Ähp¢7Ç[vN™-î—Ê{?Å1Ì¯J|ÙDQ}H‡=İÇ)ëØiÉÛsuéòÊ‚¥Ÿ ¢ §/„ı®ÉÜ!™üÆ€$NÁ=Q9Œ^©R5äK¢pÖˆN˜oøßÀwë»ôaáIbjĞıÚ¯âÍ¨:Şgñ5?2Û8İ°Xç^s³[%±ş#figë+×Ò‡sHoñ4QË¤¥–İCL<Œ3WæŸ‚ÚÅ+ésg …!À8uó
+6Ã¡½>^OÍıé¹bÕ™)†1&ÅÕ(È#şR„ ˆI”•"ı‘T¨¸Ê?s}­r!§»3xñååb	Ñ½lŠÊ·£ÀÔºı²šÄ8¶õ¹“÷52"õÌÿ«¶!5&2seû°Ó¨(¯u“óí#¾SÂ·	”İã5mÁGı¾0¯·K„e¿0­—¹Œ¿–€£`Á”\Õ2Ş¿¡BCÿ~’ ,xëƒÑÊ8ÒÏïšd	uéL¢õÀî~Ú<“ÇÎ‡Ù˜'0Şop±'œ…RcÕóYO(ÖÓÍ§à·âJ¾ÒãN·”nñêUB¿0‚w=º·×–E‹· =m¶-úñ€U¨%éRÿ¼q8cıöDš¯Hq"†ä©âí¼*·õßúç;ĞeìBèzhËo1ñÄ`š$iaÊ<Aó²Á+é|c+Å*à‘#a ¨…IöÒºJ¨Ì‰èR ©¾›O¤*ñ*¤EÉ®{(s{ö3n´?>‡cÁ¯J@8ä¿.D;Ú,Ÿ–¥[İ,?:Ë•’¶ Ës=ğ#Ìäe€âš'!øÊ®²­ƒ«BDF¢ÊE9±gWlİ‰í—é'ğç¢jx >èG ¢P¤Ç^³-¯’Ÿÿ·CUyÍè®æå^z5¿SB ¬øsöšš\Àëvo²"‚0¡y9=+Û¹lg< ÃŠ/Gïü›Fùâ@áÜu0O»Ñ$aÙ$Ö²LÊ‰±•îGU´õq±AØ=¨U
+êÂWq÷£eKI+¢éw kë¹MÿÅ&"¦Í@µ\?™#qáÃmM{ø£Qå/‰~jx`êÁZxDÓœ™™Ş¿KZ¢gë×,	pè°úˆèmÃ£(Æ,Ãô-šj æ/]%\àJüaàóÆÏ'(+¸;oÜäVzÑ†gšÙÉDJÉñyœ e·&_Eàæ•†TìF xC6šñõ«9â³£ØÄÁeoßu¥6°Hß9{HQÛ/ZYI©Lo[ÄmÆK”»‘sKL81çuL'¸–]‡š6Q•¤ä0™ÒµÆ6ÔQsÔö[ÿMNQEnÔƒK€%­e°¹9•ß$záŸSy,ü¿èg5"ûJh*Ê‚3ÍW”Î‰‹gëgÛš`ÂEìŸDR Ç†°V#ä¥2_Q­«RÇe€„~§eìN4UÿµÈİJr8p˜Û’5kœ‚ŞRê©=—?.)GV@õÂ„5?Š=À`{ÁZªÓQœèÄÛV(ûX¤¤èäã[Y@3ÚË1C´FÕ‚C1 5wàBa³ì§èŠKGò=êm€åe•üÇj˜¶Á3|£RÄÈT4imrç48–rIPL,‡gzÎë¬Ç)BMÍ^yô¨¥M]s³‰±®õë_ó‡$©·úv¯éTAdn*àµX›kAÛ(c¢*îöÈıÔ³Ş§j·ü&“ÚEH‘
+n
+/dÁskr^ÿÆ…Ãrlj_ÇSŒØYf€l,ëÑZß…à§F1ÕÕôb5jeE¢sßYSiğæË›å3°5Òµ_Ï®2í*uNtîk‹E¯HHãF5ÉÍëSAÂîU´¥µñÒ=ÖÅ.Ğ9Ñr!a¬8gpÂ]­9F•Å)5"’uÈ¯'²RéL{"¸04~Í%h|årôÜƒ˜œ} ^§ŒÜ¯0ò±íA¿c“–X½ı5²ì „Ætòô·ø#–	¯B—hãËğ²ÕQ0}!`jSÅQH¸ `bŠá-y3P¦{MÚ¿ì¹WÌ(ÇvşÖÉ¦[¢ÏJ.¬¹p8q³cMvìlÛÈ+õÖI,Ñ7tü¶ÈµAW•×[]µ‡Á¯]6şsÈx>²c/vt
+;VÎ`VjW™º6¤É(7€å·¥‰8‰«³N ®7I™ÉÍˆ7Ø¼ä‡ÉÊ÷çz¬wa+ıƒ™‡.±›aaš4g.tègÁªò+øÄÙŸ%cş‰(OÎÏrÿìÄ»¡w‡Øìk¶)OäŒƒXU$ªAœÌôTó;úœÅç5¢ÌwRLP	ˆAÇ%1ñÃOU$È	nÉê¹¨bl…›CÖ_2”9+¬ÒØC‡°˜me¾•ˆ`€Èb©ÊÆwÀ¶o4àó ^•SE\Lş¢à\©D²` MØØQè°/•Dp§«pE¸ºéf`n¿%¼Ë3Zv¾1ŞaÖ¨´ı• P \šÏ€©ÄÈğ,§\#‹XËsHì¦å^ #kÆ/âı¨]æP  ¤apps¡d­registry.json¡f¡cÅD[
+  {
+    "id": "finder",
+    "name": "Finder",
+    "icon": "ğŸ—‚ï¸",
+    "path": "/src/apps/finder/index.tsx"
+  },
+  {
+    "id": "safari",
+    "name": "Safari",
+    "icon": "ğŸŒ",
+    "path": "/src/apps/safari/index.tsx"
+  },
+  {
+    "id": "notes",
+    "name": "Notes",
+    "icon": "ğŸ“",
+    "path": "/src/apps/notes/index.tsx"
+  },
+  {
+    "id": "terminal",
+    "name": "Terminal",
+    "icon": "ğŸ–¥ï¸",
+    "path": "/src/apps/terminal/index.tsx"
+  },
+  {
+    "id": "settings",
+    "name": "Settings",
+    "icon": "âš™ï¸",
+    "path": "/src/apps/settings/index.tsx"
   }
-  body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
-  }
-}²tailwind.config.js¡f¡cÅ·import tailwindcssAnimate from "tailwindcss-animate"
+]
+²tailwind.config.js¡f¡cÅ·import tailwindcssAnimate from "tailwindcss-animate"
 
 /** @type {import('tailwindcss').Config} */
 const tailwindConfig = {
@@ -5910,32 +5938,19 @@ const tailwindConfig = {
 
 export default tailwindConfig;
 
-±tsconfig.app.json¡f¡cÅP{
+²tsconfig.node.json¡f¡cÅ{
   "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "target": "ES2022",
+    "lib": ["ES2023"],
     "module": "ESNext",
     "skipLibCheck": true,
-    
+
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "react-jsx",
-    
+    "allowSyntheticDefaultImports": true,
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "noEmit": true
   },
-  "include": ["src"]
+  "include": ["vite.config.js"]
 }
 
 ­tsconfig.json¡f¡cÄê{
@@ -5954,21 +5969,6 @@ export default tailwindConfig;
       "@/*": ["./src/*"]
     }
   }
-}
-
-²tsconfig.node.json¡f¡cÅ{
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2023"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-
-    "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "noEmit": true
-  },
-  "include": ["vite.config.js"]
 }
 
 ®vite.config.js¡f¡cÅimport path from "path"
