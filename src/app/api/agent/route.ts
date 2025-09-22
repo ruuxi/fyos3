@@ -533,6 +533,11 @@ export async function POST(req: Request) {
           });
 
           const agentText = (event.text || '').trim();
+          const finishToolCalls = (event.toolCalls ?? []) as GenericToolCall[];
+          const finishToolResults = (event.toolResults ?? []) as GenericToolResult[];
+          const requiresFollowUp = event.finishReason === 'tool-calls'
+            || (!agentText && finishToolCalls.length > 0);
+
           if (agentText) {
             await agentLogger.logMessage(sessionId, `assistant_${Date.now()}`, 'assistant', agentText);
             await appendMessageToThread('assistant', agentText, 'agent', personaSession);
@@ -562,7 +567,6 @@ export async function POST(req: Request) {
             );
           }
 
-          const finishToolCalls = (event.toolCalls ?? []) as GenericToolCall[];
           if (finishToolCalls.length > 0) {
             console.log('🔧 [AI] Tool calls made:', finishToolCalls.map((tc) => ({
               name: tc.toolName,
@@ -570,13 +574,16 @@ export async function POST(req: Request) {
               id: tc.toolCallId ? tc.toolCallId.slice(0, 8) : 'unknown',
             })));
           }
-          const finishToolResults = (event.toolResults ?? []) as GenericToolResult[];
           if (finishToolResults.length > 0) {
             console.log('📋 [AI] Tool results received:', finishToolResults.map((tr) => ({
               name: tr.toolName,
               success: !hasErrorField(tr.output),
               id: tr.toolCallId ? tr.toolCallId.slice(0, 8) : 'unknown',
             })));
+          }
+
+          if (requiresFollowUp) {
+            return;
           }
 
           const toolSummary = summarizeToolResults(finishToolResults);
@@ -593,7 +600,7 @@ export async function POST(req: Request) {
           const streamPersona = async () => {
             try {
               const personaResult = streamText({
-                model: 'xai/grok-4-fast-non-reasoning',
+                model: 'openai/gpt-4o-mini',
                 system: PERSONA_TRANSLATOR_SYSTEM_PROMPT,
                 messages: [
                   {
