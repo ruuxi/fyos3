@@ -600,7 +600,7 @@ export async function POST(req: Request) {
           const streamPersona = async () => {
             try {
               const personaResult = streamText({
-                model: 'openai/gpt-4o-mini',
+                model: 'xai/grok-4-fast-non-reasoning',
                 system: PERSONA_TRANSLATOR_SYSTEM_PROMPT,
                 messages: [
                   {
