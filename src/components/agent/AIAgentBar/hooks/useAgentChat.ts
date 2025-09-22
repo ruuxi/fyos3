@@ -8,6 +8,7 @@ import { autoIngestInputs } from '@/utils/auto-ingest';
 import { guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 import type { TCodeEditAstInput, TWebFsReadInput } from '@/lib/agentTools';
 import { performFastAppCreate, type FastAppCreateRequest, type FastAppCreateSuccess } from '@/lib/apps/fastAppCreate';
+import { performDesktopCustomize, type DesktopCustomizeRequest } from '@/lib/apps/desktopCustomize';
 
 const DEPS_READY_TIMEOUT_MS = 120_000;
 const DEPS_READY_INTERVAL_MS = 150;
@@ -109,6 +110,55 @@ const isLikelyAppBuildMessage = (message: UIMessage | undefined): boolean => {
 // Gating only applies when the last user message matches the create‑app regex; all other 
 // requests keep the full toolset and 15‑step budget, so edits are unaffected.
 
+const MEDIA_VERB_REGEX = /(generate|create|make|produce|render|draw|paint|compose|remix|stylize|transform|edit|enhance|upscale|riff|animate|record|shoot|film|write)/i;
+const MEDIA_NOUN_REGEX = /(image|images|photo|photos|picture|art|visual|graphic|logo|icon|poster|banner|illustration|video|videos|clip|clips|animation|animations|gif|music|song|audio|sound|voice|track|sfx|effect|3d|model|asset|texture)/i;
+const DESKTOP_KEYWORD_REGEX = /(desktop|workspace|fromyou|from\s*you|launcher|window|wallpaper|background|theme|palette|layout|grid|arrangement|dock|taskbar|ambient|vibe|icon\s*pack|icon\s*set|widgets?)/i;
+const DESKTOP_ACTION_REGEX = /(customize|refresh|change|tweak|restyle|retheme|recolor|set|apply|switch|update)/i;
+const DESKTOP_APP_PHRASE_REGEX = /desktop\s+(app|application)/i;
+
+type AttachmentHintPayload = { contentType?: string; url: string };
+
+const hasMediaAttachmentHint = (hints: AttachmentHintPayload[]): boolean => {
+  return hints.some((hint) => {
+    const type = (hint.contentType || '').toLowerCase();
+    if (type.startsWith('image/') || type.startsWith('video/') || type.startsWith('audio/')) {
+      return true;
+    }
+    if (type === 'model/gltf+json' || type === 'model/obj' || type === 'model/glb') {
+      return true;
+    }
+    return /\.(png|jpe?g|gif|bmp|webp|mp4|mov|m4v|avi|mp3|wav|flac|ogg|glb|gltf|obj)$/i.test(hint.url);
+  });
+};
+
+const isLikelyMediaMessage = (message: UIMessage | undefined, hints: AttachmentHintPayload[]): boolean => {
+  const text = extractTextFromUiMessage(message).toLowerCase();
+  if (MEDIA_NOUN_REGEX.test(text) && MEDIA_VERB_REGEX.test(text)) {
+    return true;
+  }
+  if (hints.length === 0) return false;
+  const mediaAttachment = hasMediaAttachmentHint(hints);
+  if (!mediaAttachment) return false;
+  if (!text) return true;
+  if (isLikelyAppBuildMessage(message)) return false;
+  return /(edit|transform|styl(?:e|ize)|remix|turn|make|generate|create|polish|refine|convert)/i.test(text);
+};
+
+const isLikelyDesktopCustomizationMessage = (message: UIMessage | undefined): boolean => {
+  const text = extractTextFromUiMessage(message).toLowerCase();
+  if (!text) return false;
+  if (DESKTOP_APP_PHRASE_REGEX.test(text)) return false;
+
+  const mentionsWallpaperOrTheme = /(wallpaper|background|theme|palette|ambient|vibe|accent)/i.test(text);
+  const mentionsDesktopContext = DESKTOP_KEYWORD_REGEX.test(text);
+  const mentionsAction = DESKTOP_ACTION_REGEX.test(text) || mentionsWallpaperOrTheme;
+
+  if (mentionsWallpaperOrTheme && mentionsDesktopContext) return true;
+  if (mentionsDesktopContext && mentionsAction) return true;
+  if (mentionsWallpaperOrTheme) return true;
+  return false;
+};
+
 type MutableWindow = Window & {
   __FYOS_FIRST_TOOL_CALLED_REF?: { current: boolean };
 };
@@ -205,13 +255,14 @@ const SAFE_TOOL_NAMES = new Set<string>([
   'web_fs_write',
   'media_list',
   'app_manage',
+  'desktop_customize',
 ]);
 
 const EXEC_GATED_TOOL_NAMES = new Set<string>(['web_exec', 'validate_project']);
 
 // Tools that can proceed without an initialized WebContainer instance because
 // they only require the fs bridge exposed via fnsRef (e.g., fast_app_create).
-const INSTANCE_OPTIONAL_TOOL_NAMES = new Set<string>(['fast_app_create']);
+const INSTANCE_OPTIONAL_TOOL_NAMES = new Set<string>(['fast_app_create', 'desktop_customize']);
 
 export function useAgentChat(opts: UseAgentChatOptions) {
   const { id, initialMessages, activeThreadId, wc, runValidation, attachmentsProvider } = opts;
@@ -264,12 +315,27 @@ export function useAgentChat(opts: UseAgentChatOptions) {
           : activeThreadIdRef.current;
         if (threadForRequest) body.threadId = threadForRequest;
         // Include attachment hints so server-side classifier can detect media ops
+        let attachmentHints: AttachmentHintPayload[] = [];
         try {
           if (typeof attachmentsProvider === 'function') {
-            const hints = attachmentsProvider()?.map((attachment) => ({ contentType: attachment.contentType, url: attachment.publicUrl })) || [];
-            if (hints.length > 0) body.attachmentHints = hints;
+            attachmentHints = attachmentsProvider()?.map((attachment) => ({
+              contentType: attachment.contentType,
+              url: attachment.publicUrl,
+            })) || [];
+            if (attachmentHints.length > 0) {
+              // Filter out hints without contentType and ensure required string type
+              const validHints = attachmentHints
+                .filter((hint): hint is { contentType: string; url: string } => 
+                  typeof hint.contentType === 'string' && hint.contentType.length > 0
+                );
+              if (validHints.length > 0) {
+                body.attachmentHints = validHints;
+              }
+            }
           }
-        } catch {}
+        } catch {
+          attachmentHints = [];
+        }
 
         try {
           if (typeof opts.getRunId === 'function') {
@@ -301,6 +367,12 @@ export function useAgentChat(opts: UseAgentChatOptions) {
         }
         if (isLikelyAppBuildMessage(lastUserMessage)) {
           body.intent = 'create-app';
+          body.forceAgentMode = true;
+        } else if (isLikelyMediaMessage(lastUserMessage, attachmentHints)) {
+          body.intent = 'media';
+          body.forceAgentMode = true;
+        } else if (isLikelyDesktopCustomizationMessage(lastUserMessage)) {
+          body.intent = 'desktop';
           body.forceAgentMode = true;
         }
         return { body };
@@ -801,6 +873,17 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             }
             break;
           }
+          case 'desktop_customize': {
+            const input = tc.input as DesktopCustomizeRequest;
+            try {
+              const result = await performDesktopCustomize({ input });
+              await logAndAddResult(result);
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              await logAndAddResult({ ok: false, error: message, followUps: Array.isArray((input as { followUps?: unknown }).followUps) ? (input as { followUps?: string[] }).followUps : undefined });
+            }
+            break;
+          }
           case 'fast_app_create': {
             const input = tc.input as FastAppCreateRequest;
             const rawRequestedId = typeof input.id === 'string' ? input.id : '';
@@ -927,48 +1010,18 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             }
             if (action === 'remove') {
               const { id } = tc.input as { action: 'remove'; id: string };
-              let reg: Array<{ id: string; name: string; icon?: string; path: string }> = [];
-              let appName = 'Unknown';
-              let canonicalDir: string | null = null;
-
+              let reg: Array<{ id: string; name: string; icon?: string; path: string }> = []; let appName = 'Unknown';
               try {
                 const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
                 reg = JSON.parse(regRaw);
-                const app = reg.find(r => r.id === id);
-                if (app) {
-                  appName = app.name;
-                  const pathDir = typeof app.path === 'string' ? app.path.replace(/^\/+/, '') : '';
-                  if (pathDir.includes('/')) {
-                    canonicalDir = pathDir.slice(0, pathDir.lastIndexOf('/'));
-                  }
-                }
+                const app = reg.find(r => r.id === id); if (app) appName = app.name;
               } catch {}
-
               const next = reg.filter((r) => r.id !== id);
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(next, null, 2));
-
-              const removalTargets = new Set<string>();
-              removalTargets.add(`src/apps/${id}`);
-              if (canonicalDir) removalTargets.add(canonicalDir);
-              if (!id.startsWith('app-')) {
-                removalTargets.add(`src/apps/app-${id}`);
-              }
-
-              const removedPaths: string[] = [];
-              for (const targetPath of removalTargets) {
-                try {
-                  await fnsRef.current.remove(targetPath, { recursive: true });
-                  removedPaths.push(targetPath);
-                } catch {
-                  // Ignore failures—directories may already be gone.
-                }
-              }
-
-              addToolResult({
-                tool: tc.toolName,
-                toolCallId: tc.toolCallId,
-                output: { ok: true, id, name: appName, removedPaths },
-              });
+              const p1 = `src/apps/${id}`; const p2 = `src/apps/app-${id}`;
+              try { await fnsRef.current.remove(p1, { recursive: true }); } catch {}
+              try { await fnsRef.current.remove(p2, { recursive: true }); } catch {}
+              addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, id, name: appName, removedPaths: [p1, p2] } });
               break;
             }
             addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: false, error: `Unsupported action: ${String(action)}` } });
