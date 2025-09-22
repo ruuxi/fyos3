@@ -21,6 +21,7 @@ export interface PersonaPostProcessOptions {
 }
 
 const PERSONA_MODEL_ID = process.env.AGENT_PERSONA_MODEL_ID ?? 'google/gemini-2.0-flash';
+type TextStreamChunk = { type?: string; delta?: string; id?: string; [key: string]: unknown };
 
 const buildPersonaRewritePrompt = (text: string): string => {
   return [
@@ -158,27 +159,26 @@ export class PersonaPostProcessorController {
     return this.processedPromise;
   }
 
-  wrapStream(stream: ReadableStream<any>): ReadableStream<any> {
+  wrapStream(stream: ReadableStream<unknown>): ReadableStream<unknown> {
     if (!this.enabled || this.personaMode || this.capabilityIntent === 'banter') {
       return stream;
     }
 
     let textBuffer = '';
     let textChunkId: string | undefined;
-    let pendingTextEnd: unknown = null;
+    let pendingTextEnd: TextStreamChunk | null = null;
     let finishHandled = false;
-    const controller = this;
 
-    return stream.pipeThrough(new TransformStream<any, any>({
+    return stream.pipeThrough(new TransformStream<unknown, unknown>({
       start() {
         // noop
       },
-      async transform(chunk: unknown, outputController) {
-        const messageChunk = chunk as { type?: string; delta?: string; id?: string };
-        if (!messageChunk || typeof messageChunk !== 'object') {
+      transform: async (chunk, outputController) => {
+        if (!chunk || typeof chunk !== 'object') {
           outputController.enqueue(chunk);
           return;
         }
+        const messageChunk = chunk as TextStreamChunk;
 
         if (messageChunk.type === 'text-start') {
           textChunkId = typeof messageChunk.id === 'string' ? messageChunk.id : textChunkId;
@@ -200,14 +200,15 @@ export class PersonaPostProcessorController {
         if (messageChunk.type === 'finish') {
           finishHandled = true;
           if (textBuffer) {
-            const outcome = await controller.process(textBuffer);
+            const outcome = await this.process(textBuffer);
             const personaDelta = outcome.text;
             if (personaDelta) {
-              outputController.enqueue({ type: 'text-delta', delta: personaDelta, id: textChunkId } as any);
+              const personaChunk: TextStreamChunk = { type: 'text-delta', delta: personaDelta, id: textChunkId };
+              outputController.enqueue(personaChunk);
             }
           }
           if (pendingTextEnd) {
-            outputController.enqueue(pendingTextEnd as any);
+            outputController.enqueue(pendingTextEnd);
             pendingTextEnd = null;
           }
           outputController.enqueue(chunk);
@@ -216,15 +217,16 @@ export class PersonaPostProcessorController {
 
         outputController.enqueue(chunk);
       },
-      async flush(outputController) {
+      flush: async (outputController) => {
         if (textBuffer && !finishHandled) {
-          const outcome = await controller.process(textBuffer);
+          const outcome = await this.process(textBuffer);
           const personaDelta = outcome.text;
           if (personaDelta) {
-            outputController.enqueue({ type: 'text-delta', delta: personaDelta, id: textChunkId } as any);
+            const personaChunk: TextStreamChunk = { type: 'text-delta', delta: personaDelta, id: textChunkId };
+            outputController.enqueue(personaChunk);
           }
           if (pendingTextEnd) {
-            outputController.enqueue(pendingTextEnd as any);
+            outputController.enqueue(pendingTextEnd);
             pendingTextEnd = null;
           }
         }

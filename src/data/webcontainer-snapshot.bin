@@ -3065,31 +3065,6 @@ export default function AppStore() {
   )
 }
 
-¶finderÅ°dÅ©index.tsxÅ°fÅ°c≈import React from 'react'
-export default function Finder(){
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Finder</div>
-        <span className="badge">Home</span>
-      </div>
-      <p className="muted">This is a simple Finder. It lists installed apps:</p>
-      <AppsList />
-    </div>
-  )
-}
-
-type App = { id: string; name: string; icon: string }
-
-function AppsList(){
-  const [apps, setApps] = React.useState<App[]>([])
-  React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
-  return (
-    <ul className="list">
-      {apps.map(a=> <li key={a.id}>{a.icon} {a.name} <code style={{color:'#6b7280'}}>{a.id.slice(0,8)}</code></li>)}
-    </ul>
-  )
-}
 •notesÅ°dÅ©index.tsxÅ°fÅ°c≈öimport React from 'react'
 export default function Notes(){
   const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])
@@ -3124,6 +3099,31 @@ export default function Safari(){
         <input style={{width:'100%',padding:8,borderRadius:6,border:'1px solid #d1d5db'}} placeholder="https://example.com" disabled />
       </div>
     </div>
+  )
+}
+¶finderÅ°dÅ©index.tsxÅ°fÅ°c≈import React from 'react'
+export default function Finder(){
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{fontWeight:600}}>Finder</div>
+        <span className="badge">Home</span>
+      </div>
+      <p className="muted">This is a simple Finder. It lists installed apps:</p>
+      <AppsList />
+    </div>
+  )
+}
+
+type App = { id: string; name: string; icon: string }
+
+function AppsList(){
+  const [apps, setApps] = React.useState<App[]>([])
+  React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
+  return (
+    <ul className="list">
+      {apps.map(a=> <li key={a.id}>{a.icon} {a.name} <code style={{color:'#6b7280'}}>{a.id.slice(0,8)}</code></li>)}
+    </ul>
   )
 }
 ®settingsÅ°dÅ©index.tsxÅ°fÅ°c≈Bimport React from 'react'
@@ -3805,28 +3805,6 @@ const TabsContent = React.forwardRef<
 TabsContent.displayName = TabsPrimitive.Content.displayName
 
 export { Tabs, TabsList, TabsTrigger, TabsContent }
-¨textarea.tsxÅ°fÅ°c≈âimport * as React from "react"
-
-import { cn } from "@/lib/utils"
-
-const Textarea = React.forwardRef<
-  HTMLTextAreaElement,
-  React.ComponentProps<"textarea">
->(({ className, ...props }, ref) => {
-  return (
-    <textarea
-      className={cn(
-        "flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        className
-      )}
-      ref={ref}
-      {...props}
-    />
-  )
-})
-Textarea.displayName = "Textarea"
-
-export { Textarea }
 ©badge.tsxÅ°fÅ°c≈timport * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -3863,7 +3841,29 @@ function Badge({ className, variant, ...props }: BadgeProps) {
 }
 
 export { Badge, badgeVariants }
-ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈Á"import React, { useEffect, useRef, useState } from 'react'
+¨textarea.tsxÅ°fÅ°c≈âimport * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+const Textarea = React.forwardRef<
+  HTMLTextAreaElement,
+  React.ComponentProps<"textarea">
+>(({ className, ...props }, ref) => {
+  return (
+    <textarea
+      className={cn(
+        "flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+        className
+      )}
+      ref={ref}
+      {...props}
+    />
+  )
+})
+Textarea.displayName = "Textarea"
+
+export { Textarea }
+ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈Ï◊import React, { useEffect, useRef, useState } from 'react'
 
 // Shared constants
 const DEFAULT_WINDOW_POS = { left: 90, top: 90 }
@@ -3884,6 +3884,7 @@ const LS_APP_ORDER_KEY = 'desktop.appOrder'
 const EVT_OPEN_APP = 'FYOS_OPEN_APP'
 const EVT_DESKTOP_READY = 'FYOS_DESKTOP_READY'
 const THEME_KEY = 'fyos.desktop.theme'
+const THEME_TOKENS_KEY = 'fyos.desktop.themeTokens'
 const EVT_SET_THEME = 'FYOS_SET_THEME'
 const EVT_USER_MODE = 'FYOS_USER_MODE'
 
@@ -4374,6 +4375,24 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
   )
 }
 
+function applyThemeTokens(tokens: Record<string, unknown> | null | undefined) {
+  if (typeof document === 'undefined' || !tokens || typeof tokens !== 'object') return
+  const root = document.documentElement
+  if (!root) return
+  Object.entries(tokens).forEach(([token, value]) => {
+    if (typeof value !== 'string') return
+    if (token.startsWith('--')) {
+      root.style.setProperty(token, value)
+      return
+    }
+    if (token.startsWith('css.')) {
+      const cssVar = `--${token.slice(4)}`
+      root.style.setProperty(cssVar, value)
+      return
+    }
+  })
+}
+
 export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
   const appsByIdRef = useRef<Record<string, App>>({})
@@ -4399,6 +4418,12 @@ export default function Desktop(){
           try { if (json.windowGeometries) localStorage.setItem(LS_WINDOW_GEOM_KEY, JSON.stringify(json.windowGeometries)); } catch {}
           try { if (json.windowTabs) localStorage.setItem(LS_WINDOW_TABS_KEY, JSON.stringify(json.windowTabs)); } catch {}
           try { if (json.appOrder) localStorage.setItem(LS_APP_ORDER_KEY, JSON.stringify(json.appOrder)); } catch {}
+          try {
+            if (json.themeTokens && typeof json.themeTokens === 'object') {
+              localStorage.setItem(THEME_TOKENS_KEY, JSON.stringify(json.themeTokens))
+              applyThemeTokens(json.themeTokens as Record<string, unknown>)
+            }
+          } catch {}
         }
       } catch {}
     })();
@@ -5095,6 +5120,15 @@ export default function Desktop(){
       try { document.body.classList.remove('desktop-window-moving') } catch {}
     }
   }, [])
+  useEffect(()=>{
+    try {
+      const raw = localStorage.getItem(THEME_TOKENS_KEY)
+      if (raw) {
+        const tokens = JSON.parse(raw)
+        applyThemeTokens(tokens as Record<string, unknown>)
+      }
+    } catch {}
+  }, [])
 
 
   useEffect(()=>{
@@ -5188,6 +5222,12 @@ export default function Desktop(){
       if (!payload || typeof payload !== 'object') return
       const record = payload as { [key: string]: unknown }
       const typeValue = typeof record.type === 'string' ? record.type : ''
+      if (typeValue === 'FYOS_DESKTOP_THEME_TOKENS') {
+        const payloadTokens = record.payload as Record<string, unknown> | undefined
+        applyThemeTokens(payloadTokens)
+        try { if (payloadTokens) localStorage.setItem(THEME_TOKENS_KEY, JSON.stringify(payloadTokens)) } catch {}
+        return
+      }
       if (typeValue === 'FYOS_AGENT_RUN_STARTED' || typeValue === 'FYOS_AGENT_RUN_ENDED') {
         try {
           const frames = Array.from(document.querySelectorAll('iframe')) as HTMLIFrameElement[]
