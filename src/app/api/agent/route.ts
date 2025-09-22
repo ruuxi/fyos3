@@ -1,4 +1,15 @@
-import { convertToModelMessages, streamText, UIMessage, stepCountIs } from 'ai';
+import {
+  convertToModelMessages,
+  streamText,
+  stepCountIs,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  generateText,
+  tool,
+  generateId,
+  type UIMessage,
+  type UIMessageChunk,
+} from 'ai';
 // z is used in tool schemas but not directly here
 import {
   TOOL_NAMES,
@@ -12,10 +23,11 @@ import {
   AiGenerateInput,
   MediaListInput,
   CodeEditAstInput,
+  MemoryCheckpointInput,
 } from '@/lib/agentTools';
 import { agentLogger } from '@/lib/agentLogger';
 import { SYSTEM_PROMPT } from '@/lib/prompts';
-import type { Id } from '../../../../convex/_generated/dataModel';
+import type { Doc, Id } from '../../../../convex/_generated/dataModel';
 import { api as convexApi } from '../../../../convex/_generated/api';
 import { getInstalledAppNames, sanitizeToolInput, getConvexClientOptional } from '@/lib/agent/server/agentServerHelpers';
 import { buildServerTools } from '@/lib/agent/server/agentServerTools';
@@ -32,38 +44,6 @@ type AgentPostPayload = {
 type SanitizedMessage = Omit<UIMessage, 'id'>;
 type MessageEnvelope = (UIMessage | SanitizedMessage) & { content?: string; toolCalls?: unknown[] };
 type TextUIPart = { type: 'text'; text: string };
-
-interface TokenUsageSummary {
-  inputTokens?: number;
-  outputTokens?: number;
-  totalTokens?: number;
-  reasoningTokens?: number;
-  cachedInputTokens?: number;
-}
-
-interface ToolCallSummary {
-  toolCallId?: string;
-  toolName?: string;
-  input?: unknown;
-  args?: unknown;
-}
-
-interface ToolResultSummary extends ToolCallSummary {
-  result?: unknown;
-  state?: unknown;
-  isError?: boolean;
-  errorMessage?: string;
-}
-
-interface StepEventSummary {
-  text?: string;
-  toolCalls?: ToolCallSummary[];
-  toolResults?: ToolResultSummary[];
-  finishReason?: string;
-  usage?: TokenUsageSummary;
-}
-
-type StreamFinishEvent = StepEventSummary & { steps?: StepEventSummary[] };
 
 const isAttachmentHint = (value: AttachmentHint | unknown): value is AttachmentHint => {
   if (!value || typeof value !== 'object') return false;
@@ -110,6 +90,75 @@ const hasErrorField = (value: unknown): value is { error: unknown } => {
   return typeof value === 'object' && value !== null && 'error' in value;
 };
 
+type MessageMetadata = {
+  mode?: string;
+  session?: number;
+  sessionStart?: boolean;
+  control?: string;
+  [key: string]: unknown;
+};
+
+const PERSONA_TRANSLATOR_SYSTEM_PROMPT = `You rewrite ai assitant/agent responses as "Sim", an edgy, confident teen voice. Keep it playful, sarcastic, and zoomer. Keep outputs short. Never mention underlying tools, models, or raw implementation details. Avoid technical jargon—translate it into everyday language. If the agent output is empty, produce a quick upbeat acknowledgement based on the latest user request and any hints provided.`;
+
+const MEMORY_SUMMARY_SYSTEM_PROMPT = `You archive completed chat sessions. Given a transcript, return a 6-12 word descriptor capturing the main accomplishment. Output only the descriptor.`;
+
+const getMessageMetadata = (message: MessageEnvelope): MessageMetadata | undefined => {
+  const metadata = (message as { metadata?: unknown }).metadata;
+  if (!metadata || typeof metadata !== 'object') return undefined;
+  return metadata as MessageMetadata;
+};
+
+const resolveMessageMode = (message: MessageEnvelope): string | undefined => {
+  const metadata = getMessageMetadata(message);
+  if (metadata && typeof metadata.mode === 'string') return metadata.mode;
+  const directMode = (message as { mode?: unknown }).mode;
+  return typeof directMode === 'string' ? directMode : undefined;
+};
+
+const readSessionFromMetadata = (metadata: MessageMetadata | undefined): number | null => {
+  if (!metadata) return null;
+  const value = metadata.session;
+  return typeof value === 'number' ? value : null;
+};
+
+const isSessionStartMetadata = (metadata: MessageMetadata | undefined): boolean => {
+  return Boolean(metadata && metadata.sessionStart === true);
+};
+
+const stripMessageId = (message: MessageEnvelope): SanitizedMessage => {
+  if ('id' in message) {
+    const { id: _omit, ...rest } = message as UIMessage;
+    return rest;
+  }
+  return message as SanitizedMessage;
+};
+
+type GenericToolCall = {
+  toolCallId?: string;
+  toolName?: string;
+  input?: unknown;
+  args?: unknown;
+};
+
+type GenericToolResult = GenericToolCall & {
+  output?: unknown;
+  providerExecuted?: boolean;
+  dynamic?: boolean;
+  preliminary?: boolean;
+};
+
+const summarizeToolResults = (toolResults?: GenericToolResult[]): string | null => {
+  if (!toolResults || toolResults.length === 0) return null;
+  const lines = toolResults.map((result) => {
+    const name = result.toolName || 'tool';
+    const outcome = result.output;
+    if (hasErrorField(outcome)) return `${name} encountered an issue`;
+    return `${name} completed successfully`;
+  });
+  const unique = Array.from(new Set(lines));
+  return unique.length > 0 ? unique.join('\n') : null;
+};
+
 export async function POST(req: Request) {
   const body: unknown = await req.json();
   const payload = body as Partial<AgentPostPayload>;
@@ -120,7 +169,6 @@ export async function POST(req: Request) {
   const messagesWithHints: MessageEnvelope[] = [...messages];
 
   console.log('🧩 [AGENT] attachmentHints received:', hints.length > 0 ? hints : 'none');
-  // Also detect client-side appended hint user message
   try {
     const last = messagesWithHints[messagesWithHints.length - 1];
     if (last?.role === 'user') {
@@ -133,7 +181,7 @@ export async function POST(req: Request) {
 
   if (messagesWithHints.length > 0) {
     const lastUserIdx = (() => {
-      for (let i = messagesWithHints.length - 1; i >= 0; i--) {
+      for (let i = messagesWithHints.length - 1; i >= 0; i -= 1) {
         if (messagesWithHints[i]?.role === 'user') return i;
       }
       return -1;
@@ -145,13 +193,10 @@ export async function POST(req: Request) {
           .filter(hint => /^https?:\/\//i.test(hint.url))
           .map(hint => `Attached ${hint.contentType || 'file'}: ${hint.url}`);
         if (lines.length > 0) {
-          const hintText = `\n${lines.join('\n')}`;
-          const target = messagesWithHints[lastUserIdx];
-          appendHintText(target, hintText);
+          appendHintText(messagesWithHints[lastUserIdx], `\n${lines.join('\n')}`);
           appended = true;
         }
       }
-      // Fallback: parse legacy Attachments block in the last user message and synthesize lines
       if (!appended) {
         const target = messagesWithHints[lastUserIdx];
         const text = extractTextFromMessage(target);
@@ -167,51 +212,100 @@ export async function POST(req: Request) {
           }
           if (urls.length > 0) {
             const lines = urls.map(u => `Attached file: ${u}`).join('\n');
-            const hintText = `\n${lines}`;
-            appendHintText(target, hintText);
+            appendHintText(target, `\n${lines}`);
           }
         }
       }
     }
   }
 
-  // Generate session ID for this conversation
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-  // Strip message IDs to avoid gateway duplicate-id issues but keep repeats intact
-  const sanitizedMessages: SanitizedMessage[] = messagesWithHints.map((message) => {
-    if ('id' in message) {
-      const { id: _omit, ...rest } = message;
-      return rest;
-    }
-    return message;
-  });
-
-  console.log('🔵 [AGENT] Incoming request with messages:', sanitizedMessages.map(message => {
+  console.log('🔵 [AGENT] Incoming request with messages:', messagesWithHints.map(message => {
     const text = extractTextFromMessage(message);
     const preview = text ? (text.length > 160 ? `${text.slice(0, 160)}…` : text) : '[non-text content]';
     return {
       role: message.role,
+      mode: resolveMessageMode(message) || 'unknown',
       textPreview: preview,
       toolCalls: countToolCalls(message),
     };
   }));
 
+  const convexClient = await getConvexClientOptional();
+  let existingMemories: Doc<'chat_memories'>[] = [];
+  if (threadIdRaw && convexClient) {
+    try {
+      existingMemories = await convexClient.query(convexApi.chat.listMemories, {
+        threadId: threadIdRaw as Id<'chat_threads'>,
+      });
+    } catch (error) {
+      console.warn('⚠️ [AGENT] Failed to load chat memories', error);
+    }
+  }
+
+  const recordedSessions = existingMemories
+    .map(entry => (typeof entry.session === 'number' ? entry.session : -1))
+    .filter(session => session >= 0);
+  const highestRecordedSession = recordedSessions.length > 0 ? Math.max(...recordedSessions) : -1;
+  const fallbackSession = highestRecordedSession + 1;
+
+  const deriveLatestSession = (): number | null => {
+    for (let i = messagesWithHints.length - 1; i >= 0; i -= 1) {
+      const session = readSessionFromMetadata(getMessageMetadata(messagesWithHints[i]));
+      if (session !== null) return session;
+    }
+    return null;
+  };
+  const currentSession = deriveLatestSession() ?? fallbackSession;
+
+  const lastSessionStartIndex = (() => {
+    for (let i = messagesWithHints.length - 1; i >= 0; i -= 1) {
+      if (isSessionStartMetadata(getMessageMetadata(messagesWithHints[i]))) return i;
+    }
+    return -1;
+  })();
+  const sliceStartIndex = lastSessionStartIndex >= 0 ? lastSessionStartIndex + 1 : 0;
+  const contextEnvelopes = messagesWithHints.slice(sliceStartIndex);
+  const agentContextEnvelopes = contextEnvelopes.filter((message) => {
+    if (message.role === 'assistant' && resolveMessageMode(message) === 'persona') {
+      return false;
+    }
+    return true;
+  });
+  const sanitizedMessages = agentContextEnvelopes.map(stripMessageId);
+
+  let systemPrompt = SYSTEM_PROMPT;
+  try {
+    const installed = await getInstalledAppNames();
+    if (installed.length > 0) {
+      systemPrompt += '\n\nCurrent apps installed:\n' + installed.map(n => `- ${n}`).join('\n');
+    }
+  } catch {}
+  if (existingMemories.length > 0) {
+    const sortedMemories = [...existingMemories].sort((a, b) => (a.session ?? 0) - (b.session ?? 0));
+    const memoryLines = sortedMemories.map((entry) => {
+      const label = `Session ${entry.session ?? 0}`;
+      return `${label}: ${entry.descriptor}`;
+    });
+    systemPrompt += '\n\nMemory log:\n' + memoryLines.join('\n');
+  }
+
   const appendMessageToThread = async (
     role: 'user' | 'assistant',
-    content: string
+    content: string,
+    mode?: 'agent' | 'persona',
+    session?: number,
   ) => {
-    if (!threadIdRaw) return;
+    if (!threadIdRaw || !convexClient) return;
     try {
-      const client = await getConvexClientOptional();
-      if (client) {
-        await client.mutation(convexApi.chat.appendMessage, {
-          threadId: threadIdRaw as Id<'chat_threads'>,
-          role,
-          content,
-          mode: role === 'assistant' ? 'agent' : undefined,
-        });
-      }
+      await convexClient.mutation(convexApi.chat.appendMessage, {
+        threadId: threadIdRaw as Id<'chat_threads'>,
+        role,
+        content,
+        mode,
+        session,
+      });
     } catch (error) {
       console.warn('⚠️ [AGENT] Failed to append message to thread', error);
     }
@@ -224,25 +318,93 @@ export async function POST(req: Request) {
       ? lastMessage.id
       : `user_${Date.now()}`;
     await agentLogger.logMessage(sessionId, messageId, 'user', content);
-    await appendMessageToThread('user', content);
+    await appendMessageToThread('user', content, undefined, currentSession);
   }
 
-  // Use the comprehensive system prompt
-  let systemPrompt = SYSTEM_PROMPT;
+  let memoryRecorded = false;
+  let recordedDescriptor: string | null = null;
+  let recordedMetadata: { userSummary?: string; confidence?: number | null } | null = null;
+  let personaSession = currentSession;
+  let markSessionStartOnPersona = false;
+  const lastUserText = lastMessage?.role === 'user' ? extractTextFromMessage(lastMessage) : '';
 
-  // Attachments guidance is now included in the main SYSTEM_PROMPT
+  const memoryCheckpointTool = tool({
+    description: 'Use when the latest user message introduces a brand-new topic. Summarize the previous session and reset context.',
+    inputSchema: MemoryCheckpointInput,
+    async execute({ userSummary, confidence }, { messages: toolMessages }) {
+      if (!threadIdRaw) {
+        return { recorded: false, reset: false, reason: 'no-thread' };
+      }
+      if (memoryRecorded) {
+        return {
+          recorded: true,
+          descriptor: recordedDescriptor,
+          reset: true,
+          session: personaSession,
+          message: 'Memory already captured. Continue in fresh context.',
+        };
+      }
+      let transcript = '';
+      try {
+        const segments = Array.isArray(toolMessages)
+          ? toolMessages.map((msg) => {
+              const content = Array.isArray((msg as { content?: unknown }).content)
+                ? ((msg as { content?: { text?: string }[] }).content || []).map(part => (part?.text ?? '')).join('\n')
+                : typeof (msg as { content?: unknown }).content === 'string'
+                  ? (msg as { content?: string }).content
+                  : '';
+              return `${msg.role}: ${content}`;
+            })
+          : [];
+        transcript = segments.join('\n').slice(-6000);
+      } catch {}
 
-  // Append list of installed apps as plain names (one per line)
-  try {
-    const installed = await getInstalledAppNames();
-    if (installed.length > 0) {
-      systemPrompt += '\n\nCurrent apps installed:\n' + installed.map(n => `- ${n}`).join('\n');
-    }
-  } catch {}
+      let descriptor = '';
+      try {
+        const summaryPrompt = `Transcript:\n${transcript}\n\nUser hint: ${userSummary}`;
+        const summaryResult = await generateText({
+          model: 'xai/grok-4-fast-non-reasoning',
+          system: MEMORY_SUMMARY_SYSTEM_PROMPT,
+          prompt: summaryPrompt,
+        });
+        descriptor = (summaryResult.text || '').trim();
+      } catch (error) {
+        console.warn('⚠️ [AGENT] Memory summarizer failed', error);
+      }
+      if (!descriptor) {
+        descriptor = userSummary.slice(0, 160) || 'General request archived';
+      }
 
-  // Define all available tools
+      memoryRecorded = true;
+      recordedDescriptor = descriptor;
+      recordedMetadata = { userSummary, confidence };
+      personaSession = currentSession + 1;
+      markSessionStartOnPersona = true;
+
+      if (convexClient) {
+        try {
+          await convexClient.mutation(convexApi.chat.recordMemory, {
+            threadId: threadIdRaw as Id<'chat_threads'>,
+            descriptor,
+            session: currentSession,
+            metadata: recordedMetadata,
+          });
+        } catch (error) {
+          console.warn('⚠️ [AGENT] Failed to record memory', error);
+        }
+      }
+
+      return {
+        recorded: true,
+        descriptor,
+        reset: true,
+        session: personaSession,
+        instructions: 'Previous session archived. Treat the latest user request as a fresh conversation and avoid referencing earlier context.',
+      };
+    },
+  });
+
   const allTools = {
-    // File operations
     [TOOL_NAMES.web_fs_find]: {
       description: 'List files/folders with glob/prefix and pagination; keep pages small.',
       inputSchema: WebFsFindInput,
@@ -259,24 +421,19 @@ export async function POST(req: Request) {
       description: 'Remove a file or directory (recursive by default). Destructive—use with care.',
       inputSchema: WebFsRmInput,
     },
-    // Process execution
     [TOOL_NAMES.web_exec]: {
       description: 'Run package manager commands (e.g., pnpm add). Do NOT run dev/build/start.',
       inputSchema: WebExecInput,
     },
-    // App management
     [TOOL_NAMES.app_manage]: {
       description: 'Manage apps via action=create|rename|remove; handles scaffolding and registry updates.',
       inputSchema: AppManageInput,
     },
-    // Validation
     [TOOL_NAMES.validate_project]: {
       description: 'Validate the project: typecheck + lint (changed files); full also runs production build.',
       inputSchema: ValidateProjectInput,
     },
-    // Web search (server-side implementation)
     ...buildServerTools(sessionId),
-    // AI Media Tools (unified)
     [TOOL_NAMES.ai_generate]: {
       description: 'Generate media using provider=fal|eleven with input only. Model selection happens behind the scenes; outputs are auto‑ingested and returned with durable URLs.',
       inputSchema: AiGenerateInput,
@@ -285,170 +442,241 @@ export async function POST(req: Request) {
       description: 'List previously generated or ingested media assets with optional filters.',
       inputSchema: MediaListInput,
     },
-    // Code editing
     [TOOL_NAMES.code_edit_ast]: {
       description: 'Edit TypeScript/JavaScript via AST transformations (imports, function bodies, JSX, code insertion). Prefer this over full rewrites for precise changes.',
       inputSchema: CodeEditAstInput,
     },
+    [TOOL_NAMES.memory_checkpoint]: memoryCheckpointTool,
   };
 
-  // Use all available tools
   const tools = allTools;
-
-  // Track tool call timings to avoid duplicate logging
   const toolCallTimings = new Map<string, number>();
 
-  const result = streamText({
-    model: 'xai/grok-code-fast-1',
-    providerOptions: {
-      gateway: {
-        order: ['xai', 'groq'], // Try Amazon Bedrock first, then Anthropic
-      },
-      openai: {
-        reasoningEffort: 'low',
-      },
-    },
-    messages: convertToModelMessages(sanitizedMessages),
-    stopWhen: stepCountIs(15),
-    onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }: StepEventSummary) => {
-      console.log('📊 [USAGE-STEP] Step finished:', {
-        finishReason,
-        textLength: text?.length || 0,
-        toolCallsCount: toolCalls?.length || 0,
-        toolResultsCount: toolResults?.length || 0,
-        usage: usage ? {
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          totalTokens: usage.totalTokens,
-          reasoningTokens: usage.reasoningTokens,
-          cachedInputTokens: usage.cachedInputTokens,
-        } : null,
-      });
-      
-      // Track start times for tool calls (for timing)
-      if (toolCalls?.length) {
-        console.log('🔧 [USAGE-STEP] Tool calls:', toolCalls.map((tc) => ({
-          name: tc.toolName,
-          id: tc.toolCallId ? tc.toolCallId.slice(0, 8) : 'unknown',
-        })));
+  const stream = createUIMessageStream({
+    originalMessages: messages,
+    execute: async ({ writer }) => {
+      const agentResult = streamText({
+        model: 'xai/grok-code-fast-1',
+        providerOptions: {
+          gateway: {
+            order: ['xai', 'groq'],
+          },
+          openai: {
+            reasoningEffort: 'low',
+          },
+        },
+        messages: convertToModelMessages(sanitizedMessages),
+        system: systemPrompt,
+        tools,
+        stopWhen: stepCountIs(15),
+        onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }) => {
+          console.log('📊 [USAGE-STEP] Step finished:', {
+            finishReason,
+            textLength: text?.length || 0,
+            toolCallsCount: toolCalls?.length || 0,
+            toolResultsCount: toolResults?.length || 0,
+            usage: usage ? {
+              inputTokens: usage.inputTokens,
+              outputTokens: usage.outputTokens,
+              totalTokens: usage.totalTokens,
+              reasoningTokens: usage.reasoningTokens,
+              cachedInputTokens: usage.cachedInputTokens,
+            } : null,
+          });
 
-        // Record start times for duration tracking
-        for (const tc of toolCalls) {
-          if (tc.toolCallId) {
-            toolCallTimings.set(tc.toolCallId, Date.now());
+          const toolCallsList = (toolCalls ?? []) as GenericToolCall[];
+          if (toolCallsList.length > 0) {
+            console.log('🔧 [USAGE-STEP] Tool calls:', toolCallsList.map((tc) => ({
+              name: tc.toolName,
+              id: tc.toolCallId ? tc.toolCallId.slice(0, 8) : 'unknown',
+            })));
+            for (const tc of toolCallsList) {
+              if (tc.toolCallId) {
+                toolCallTimings.set(tc.toolCallId, Date.now());
+              }
+            }
           }
-        }
-      }
 
-      // Log completed tool calls with results and timing
-      if (toolResults?.length) {
-        for (const result of toolResults) {
-          const toolCallId = result.toolCallId ?? `tool_${Date.now()}`;
-          const startTime = toolCallTimings.get(toolCallId) ?? Date.now();
-          const duration = Date.now() - startTime;
-          
-          // Sanitize large content from tool inputs before logging
-          const rawInput = (result.args ?? result.input ?? {}) as Record<string, unknown>;
-          const sanitizedInput = sanitizeToolInput(result.toolName || 'unknown', rawInput);
+          const toolResultsList = (toolResults ?? []) as GenericToolResult[];
+          if (toolResultsList.length > 0) {
+            for (const result of toolResultsList) {
+              const toolCallId = result.toolCallId ?? `tool_${Date.now()}`;
+              const startTime = toolCallTimings.get(toolCallId) ?? Date.now();
+              const duration = Date.now() - startTime;
+              const sanitizedInput = sanitizeToolInput(result.toolName || 'unknown', (result.input ?? {}) as Record<string, unknown>);
+              const output = result.output;
+              const isError = hasErrorField(output);
+              await agentLogger.logToolCall(
+                sessionId,
+                result.toolName || 'unknown',
+                toolCallId,
+                sanitizedInput,
+                {
+                  result: output,
+                  state: undefined,
+                  isError,
+                  errorMessage: isError ? String((output as { error: unknown }).error) : undefined,
+                },
+                duration,
+              );
+              toolCallTimings.delete(toolCallId);
+            }
+          }
+        },
+        onFinish: async (event) => {
+          console.log('🎯 [AI] Response finished:', {
+            finishReason: event.finishReason,
+            textLength: event.text?.length || 0,
+            toolCalls: event.toolCalls?.length || 0,
+            toolResults: event.toolResults?.length || 0,
+            stepCount: event.steps?.length || 0,
+          });
 
-          await agentLogger.logToolCall(
-            sessionId,
-            result.toolName || 'unknown',
-            toolCallId,
-            sanitizedInput,
-            {
-              result: result.result,
-              state: result.state,
-              isError: result.isError ?? false,
-              errorMessage: result.errorMessage,
-            },
-            duration
-          );
-          
-          // Clean up timing tracking
-          toolCallTimings.delete(toolCallId);
-        }
-      }
-    },
-    onFinish: async (event: StreamFinishEvent) => {
-      // Enhanced usage logging
-      console.log('🎯 [AI] Response finished:', {
-        finishReason: event.finishReason,
-        textLength: event.text?.length || 0,
-        toolCalls: event.toolCalls?.length || 0,
-        toolResults: event.toolResults?.length || 0,
-        stepCount: event.steps?.length || 0,
+          const agentText = (event.text || '').trim();
+          if (agentText) {
+            await agentLogger.logMessage(sessionId, `assistant_${Date.now()}`, 'assistant', agentText);
+            await appendMessageToThread('assistant', agentText, 'agent', personaSession);
+          }
+
+          if (event.usage) {
+            console.log('📊 [USAGE-TOTAL] Token consumption:', {
+              inputTokens: event.usage.inputTokens || 0,
+              outputTokens: event.usage.outputTokens || 0,
+              totalTokens: event.usage.totalTokens || 0,
+              reasoningTokens: event.usage.reasoningTokens || 0,
+              cachedInputTokens: event.usage.cachedInputTokens || 0,
+            });
+            const inputCostPerMillion = 2.00;
+            const outputCostPerMillion = 2.00;
+            const estimatedCost =
+              ((event.usage.inputTokens || 0) / 1000000) * inputCostPerMillion +
+              ((event.usage.outputTokens || 0) / 1000000) * outputCostPerMillion;
+            console.log('💰 [USAGE-COST] qwen3-coder estimated cost: $' + estimatedCost.toFixed(6));
+            await agentLogger.logTokenUsage(
+              sessionId,
+              event.usage.inputTokens || 0,
+              event.usage.outputTokens || 0,
+              event.usage.totalTokens || 0,
+              'qwen3-coder',
+              estimatedCost,
+            );
+          }
+
+          const finishToolCalls = (event.toolCalls ?? []) as GenericToolCall[];
+          if (finishToolCalls.length > 0) {
+            console.log('🔧 [AI] Tool calls made:', finishToolCalls.map((tc) => ({
+              name: tc.toolName,
+              input: tc.input,
+              id: tc.toolCallId ? tc.toolCallId.slice(0, 8) : 'unknown',
+            })));
+          }
+          const finishToolResults = (event.toolResults ?? []) as GenericToolResult[];
+          if (finishToolResults.length > 0) {
+            console.log('📋 [AI] Tool results received:', finishToolResults.map((tr) => ({
+              name: tr.toolName,
+              success: !hasErrorField(tr.output),
+              id: tr.toolCallId ? tr.toolCallId.slice(0, 8) : 'unknown',
+            })));
+          }
+
+          const toolSummary = summarizeToolResults(finishToolResults);
+          const personaSource = agentText || toolSummary || 'Handled your request — no direct response returned.';
+
+          const personaMetadata: MessageMetadata = {
+            mode: 'persona',
+            session: personaSession,
+          };
+          if (markSessionStartOnPersona) {
+            personaMetadata.sessionStart = true;
+          }
+
+          const streamPersona = async () => {
+            try {
+              const personaResult = streamText({
+                model: 'xai/grok-4-fast-non-reasoning',
+                system: PERSONA_TRANSLATOR_SYSTEM_PROMPT,
+                messages: [
+                  {
+                    role: 'user',
+                    content: `Latest user request:\n${lastUserText || '(none)'}\n\nAgent notes:\n${personaSource}`,
+                  },
+                ],
+              });
+
+              writer.write({
+                type: 'start',
+                messageId: generateId(),
+                messageMetadata: personaMetadata,
+              });
+              writer.merge(personaResult.toUIMessageStream({
+                sendStart: false,
+                messageMetadata: () => personaMetadata,
+              }));
+
+              const response = await personaResult.response;
+              const personaText = response.messages
+                .filter(msg => msg.role === 'assistant')
+                .map((msg) => {
+                  const content = (msg as { content?: unknown }).content;
+                  if (Array.isArray(content)) {
+                    return content
+                      .map((part) => {
+                        if (part && typeof part === 'object' && 'text' in (part as { text?: unknown })) {
+                          const textValue = (part as { text?: unknown }).text;
+                          return typeof textValue === 'string' ? textValue : '';
+                        }
+                        return '';
+                      })
+                      .join('');
+                  }
+                  if (typeof content === 'string') {
+                    return content;
+                  }
+                  return '';
+                })
+                .join('')
+                .trim();
+
+              if (personaText) {
+                await agentLogger.logMessage(sessionId, `persona_${Date.now()}`, 'assistant', personaText);
+                await appendMessageToThread('assistant', personaText, 'persona', personaSession);
+              }
+            } catch (error) {
+              console.warn('⚠️ [AGENT] Persona translator failed', error);
+              const fallback = 'All set! Let me know what you want next.';
+              writer.write({
+                type: 'start',
+                messageId: generateId(),
+                messageMetadata: personaMetadata,
+              });
+              const fallbackChunk: UIMessageChunk = {
+                type: 'text-delta',
+                id: generateId(),
+                delta: fallback,
+              };
+              writer.write(fallbackChunk);
+              writer.write({
+                type: 'finish',
+                messageMetadata: personaMetadata,
+              });
+              await agentLogger.logMessage(sessionId, `persona_${Date.now()}`, 'assistant', fallback);
+              await appendMessageToThread('assistant', fallback, 'persona', personaSession);
+            }
+          };
+
+          await streamPersona();
+        },
       });
 
-      // Log the complete assistant response including tool calls
-      if (event.text) {
-        await agentLogger.logMessage(sessionId, `assistant_${Date.now()}`, 'assistant', event.text);
-        await appendMessageToThread('assistant', event.text);
-      }
+      writer.merge(agentResult.toUIMessageStream({
+        sendReasoning: false,
+        messageMetadata: () => ({ mode: 'agent', session: personaSession }),
+      }));
 
-      // Tool calls are now logged in onStepFinish with proper timing and results
-      // No need to duplicate logging here
-
-      // Detailed token usage logging
-      if (event.usage) {
-        console.log('📊 [USAGE-TOTAL] Token consumption:', {
-          inputTokens: event.usage.inputTokens || 0,
-          outputTokens: event.usage.outputTokens || 0,
-          totalTokens: event.usage.totalTokens || 0,
-          reasoningTokens: event.usage.reasoningTokens || 0,
-          cachedInputTokens: event.usage.cachedInputTokens || 0,
-        });
-
-        // Calculate cost estimates based on model pricing
-        // qwen3-coder: $2.00 per million tokens (input and output)
-        const inputCostPerMillion = 2.00; // $2.00 per 1M input tokens
-        const outputCostPerMillion = 2.00; // $2.00 per 1M output tokens
-        const estimatedCost = 
-          ((event.usage.inputTokens || 0) / 1000000) * inputCostPerMillion +
-          ((event.usage.outputTokens || 0) / 1000000) * outputCostPerMillion;
-        
-        console.log('💰 [USAGE-COST] qwen3-coder estimated cost: $' + estimatedCost.toFixed(6));
-        
-        // Log token usage and cost to file
-        await agentLogger.logTokenUsage(
-          sessionId,
-          event.usage.inputTokens || 0,
-          event.usage.outputTokens || 0,
-          event.usage.totalTokens || 0,
-          'qwen3-coder',
-          estimatedCost
-        );
-      }
-
-      // Log step-by-step breakdown if multiple steps
-      if (event.steps && event.steps.length > 1) {
-        console.log('📈 [USAGE-STEPS] Step breakdown:');
-        event.steps.forEach((step, index) => {
-          console.log(`  Step ${index}: ${step.text?.length || 0} chars, ${step.toolCalls?.length || 0} tools`);
-        });
-      }
-
-      // Console logging for development (tool calls already logged in onStepFinish)
-      if (event.toolCalls?.length) {
-        console.log('🔧 [AI] Tool calls made:', event.toolCalls.map((tc) => ({
-          name: tc.toolName,
-          input: tc.input ?? tc.args,
-          id: tc.toolCallId ? tc.toolCallId.slice(0, 8) : 'unknown',
-        })));
-      }
-
-      if (event.toolResults?.length) {
-        console.log('📋 [AI] Tool results received:', event.toolResults.map((tr) => ({
-          name: tr.toolName,
-          success: !hasErrorField(tr.result),
-          id: tr.toolCallId ? tr.toolCallId.slice(0, 8) : 'unknown',
-        })));
-      }
+      await agentResult.response;
     },
-    system: systemPrompt,
-    tools,
   });
 
   console.log('📤 [AGENT] Returning streaming response');
-  return result.toUIMessageStreamResponse();
+  return createUIMessageStreamResponse({ stream });
 }

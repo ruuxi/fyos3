@@ -127,6 +127,20 @@ export const MediaListInput = z.object({
   responseFormat: ResponseFormat.optional().describe('concise (default) or detailed.'),
 });
 
+export const MemoryCheckpointInput = z.object({
+  userSummary: z
+    .string()
+    .min(4)
+    .max(400)
+    .describe('Short plain-language summary of why the user message begins a new topic.'),
+  confidence: z
+    .number()
+    .min(0)
+    .max(1)
+    .optional()
+    .describe('Confidence the topic is new (0-1). Optional but helpful.'),
+});
+
 // Types
 export type TWebFsFindInput = z.infer<typeof WebFsFindInput>;
 export type TWebFsReadInput = z.infer<typeof WebFsReadInput>;
@@ -139,6 +153,7 @@ export type TCodeEditAstInput = z.infer<typeof CodeEditAstInput>;
 export type TWebSearchInput = z.infer<typeof WebSearchInput>;
 export type TAiGenerateInput = z.infer<typeof AiGenerateInput>;
 export type TMediaListInput = z.infer<typeof MediaListInput>;
+export type TMemoryCheckpointInput = z.infer<typeof MemoryCheckpointInput>;
 // Tool names
 export const TOOL_NAMES = {
   web_fs_find: 'web_fs_find',
@@ -152,6 +167,7 @@ export const TOOL_NAMES = {
   ai_generate: 'ai_generate',
   media_list: 'media_list',
   code_edit_ast: 'code_edit_ast',
+  memory_checkpoint: 'memory_checkpoint',
 } as const;
 
 export type ToolName = typeof TOOL_NAMES[keyof typeof TOOL_NAMES];

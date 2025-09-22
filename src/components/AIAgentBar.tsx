@@ -22,6 +22,15 @@ import { buildDesktopSnapshot, restoreDesktopSnapshot } from '@/utils/desktop-sn
 import { getMutableWindow } from '@/components/agent/AIAgentBar/utils/window';
 import type { Doc } from '../../convex/_generated/dataModel';
 
+type AgentWebContainerFns = {
+  mkdir: (path: string, recursive?: boolean) => Promise<void>;
+  writeFile: (path: string, content: string) => Promise<void>;
+  readFile: (path: string, encoding?: 'utf-8' | 'base64') => Promise<string>;
+  readdirRecursive: (path?: string, maxDepth?: number) => Promise<{ path: string; type: 'file' | 'dir' }[]>;
+  remove: (path: string, opts?: { recursive?: boolean }) => Promise<void>;
+  spawn: (command: string, args?: string[], opts?: { cwd?: string }) => Promise<{ exitCode: number; output: string }>;
+};
+
 export default function AIAgentBar() {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'compact' | 'chat' | 'visit' | 'media' | 'friends'>('chat');
@@ -102,8 +111,8 @@ export default function AIAgentBar() {
 
   // Keep latest instance and fs helpers in refs so tool callbacks don't capture stale closures
   const instanceRef = useRef(instance);
-  const baseFnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
-  const fnsRef = useRef({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
+  const baseFnsRef = useRef<AgentWebContainerFns>({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
+  const fnsRef = useRef<AgentWebContainerFns>({ mkdir, writeFile, readFile, readdirRecursive, remove, spawn });
   useEffect(() => { instanceRef.current = instance; }, [instance]);
   useEffect(() => { baseFnsRef.current = { mkdir, writeFile, readFile, readdirRecursive, remove, spawn }; }, [mkdir, writeFile, readFile, readdirRecursive, remove, spawn]);
 

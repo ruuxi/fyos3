@@ -323,6 +323,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
           const mode = resolveMode(m);
           const isAssistant = m.role === 'assistant';
           const isAgentAssistant = isAssistant && mode === 'agent';
+          const hasToolResults = Boolean((m.parts || []).some(isToolResultPart));
           let isFinalAgentReply = true;
           if (isAssistant && mode === 'agent') {
             for (let cursor = idx + 1; cursor < displayMessages.length; cursor += 1) {
@@ -350,9 +351,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
               }
             }
           });
-          const effectiveSegments = isAgentAssistant && textSegments.length > 0
-            ? [textSegments[textSegments.length - 1]]
-            : textSegments;
+          const effectiveSegments = isAgentAssistant ? [] : textSegments;
           const textNodes: ReactNode[] = effectiveSegments.map((segment, index) => (
             <span key={`t-${index}`}>{segment}</span>
           ));
@@ -373,7 +372,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
             return null;
           }
 
-          if (isAgentAssistant && !showVerbAnimation && textNodes.length === 0) {
+          if (isAgentAssistant && !showVerbAnimation && textNodes.length === 0 && !hasToolResults) {
             return null;
           }
 

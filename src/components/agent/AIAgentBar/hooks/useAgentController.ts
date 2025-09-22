@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
+import type { RefObject, Dispatch, SetStateAction } from 'react';
 import type { UIMessage } from 'ai';
 import type { WebContainer as WebContainerAPI } from '@webcontainer/api';
 import { useThreads } from './useThreads';
@@ -7,7 +7,7 @@ import { useAgentChat } from './useAgentChat';
 import { useValidationDiagnostics } from './useValidationDiagnostics';
 import { getMutableWindow } from '../utils/window';
 import type { Attachment } from '../ui/ChatComposer';
-import type { Id } from '../../../../convex/_generated/dataModel';
+import type { Id } from '../../../../../convex/_generated/dataModel';
 
 export type OptimisticChatMessage = {
   id: string;
@@ -26,7 +26,11 @@ export type AppRegistryEntry = {
 const AGENT_APP_CREATED_EVENT = 'fyos:agent-app-created';
 
 type WebContainerFns = {
+  mkdir: (path: string, recursive?: boolean) => Promise<void>;
+  writeFile: (path: string, content: string) => Promise<void>;
   readFile: (path: string, encoding?: 'utf-8' | 'base64') => Promise<string>;
+  readdirRecursive: (path?: string, maxDepth?: number) => Promise<{ path: string; type: 'file' | 'dir' }[]>;
+  remove: (path: string, opts?: { recursive?: boolean }) => Promise<void>;
   spawn: (command: string, args?: string[], opts?: { cwd?: string }) => Promise<{ exitCode: number; output: string }>;
 };
 
@@ -38,9 +42,9 @@ type UseAgentControllerArgs = {
   forceFollow: () => void;
   projectAttachmentsToDurable: (attachments: Attachment[]) => Attachment[];
   busyUpload: boolean;
-  loadMedia: (args: { limit?: number }) => Promise<void> | void;
-  instanceRef: MutableRefObject<WebContainerAPI | null>;
-  fnsRef: MutableRefObject<WebContainerFns & Record<string, unknown>>;
+  loadMedia: () => Promise<void>;
+  instanceRef: RefObject<WebContainerAPI | null>;
+  fnsRef: RefObject<WebContainerFns>;
 };
 
 type AgentComposerHandlers = {
@@ -50,8 +54,8 @@ type AgentComposerHandlers = {
 type AgentThreadsState = ReturnType<typeof useThreads> & {
   showThreadHistory: boolean;
   setShowThreadHistory: Dispatch<SetStateAction<boolean>>;
-  activeThreadIdImmediateRef: MutableRefObject<string | null>;
-  activeThreadConvexIdImmediateRef: MutableRefObject<Id<'chat_threads'> | null>;
+  activeThreadIdImmediateRef: RefObject<string | null>;
+  activeThreadConvexIdImmediateRef: RefObject<Id<'chat_threads'> | null>;
 };
 
 type AgentChatState = {
@@ -100,6 +104,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     startBlankThread,
     ensureActiveThread,
     closeThread,
+    deleteThread,
     isAuthenticated: isChatAuthenticated,
   } = useThreads();
 
@@ -495,6 +500,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     startBlankThread,
     ensureActiveThread,
     closeThread,
+    deleteThread,
     isAuthenticated: isChatAuthenticated,
     showThreadHistory,
     setShowThreadHistory,
@@ -514,6 +520,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     startBlankThread,
     ensureActiveThread,
     closeThread,
+    deleteThread,
     isChatAuthenticated,
     showThreadHistory,
     activeThreadIdImmediateRef,

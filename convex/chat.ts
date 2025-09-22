@@ -50,6 +50,7 @@ export const appendMessage = mutation({
     role: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
     mode: v.optional(v.union(v.literal("agent"), v.literal("persona"))),
+    session: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -67,12 +68,74 @@ export const appendMessage = mutation({
       role: args.role,
       content: args.content,
       mode: args.mode,
+      session: args.session,
       contentHash: contentHash ?? undefined,
       createdAt: now,
     });
 
     await ctx.db.patch(args.threadId, { updatedAt: now, lastMessageAt: now });
     return id;
+  },
+});
+
+export const recordMemory = mutation({
+  args: {
+    threadId: v.id("chat_threads"),
+    descriptor: v.string(),
+    session: v.number(),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const ownerId = getOwnerId(identity);
+
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread || thread.ownerId !== ownerId) throw new Error("Not found");
+
+    const existing = await ctx.db
+      .query("chat_memories")
+      .withIndex("by_thread_session", (q) => q.eq("threadId", args.threadId).eq("session", args.session))
+      .first();
+
+    const now = Date.now();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        descriptor: args.descriptor,
+        metadata: args.metadata,
+        createdAt: now,
+      });
+      return existing._id;
+    }
+
+    return ctx.db.insert("chat_memories", {
+      threadId: args.threadId,
+      ownerId,
+      descriptor: args.descriptor,
+      session: args.session,
+      createdAt: now,
+      metadata: args.metadata,
+    });
+  },
+});
+
+export const listMemories = query({
+  args: { threadId: v.id("chat_threads") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const ownerId = getOwnerId(identity);
+
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread || thread.ownerId !== ownerId) throw new Error("Not found");
+
+    const entries = await ctx.db
+      .query("chat_memories")
+      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+      .order("asc")
+      .collect();
+
+    return entries;
   },
 });
 

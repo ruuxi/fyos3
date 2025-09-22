@@ -130,10 +130,24 @@ export default defineSchema({
     mode: v.optional(v.union(v.literal("agent"), v.literal("persona"))),
     contentHash: v.optional(v.string()),
     createdAt: v.number(),
+    session: v.optional(v.number()),
   })
     .index("by_thread", ["threadId"]) 
     .index("by_thread_hash", ["threadId", "contentHash"]) 
     .index("by_createdAt", ["createdAt"]),
+
+  // Topic memories captured whenever a chat session is reset.
+  chat_memories: defineTable({
+    threadId: v.id("chat_threads"),
+    ownerId: v.string(),
+    descriptor: v.string(),
+    session: v.number(),
+    createdAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_thread", ["threadId"]) 
+    .index("by_owner_createdAt", ["ownerId", "createdAt"]) 
+    .index("by_thread_session", ["threadId", "session"]),
 
   // User profile (nickname, email for friend discovery)
   profiles: defineTable({
