@@ -9,9 +9,12 @@ import { guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 import type { TCodeEditAstInput, TWebFsReadInput } from '@/lib/agentTools';
 import { performFastAppCreate, type FastAppCreateRequest, type FastAppCreateSuccess } from '@/lib/apps/fastAppCreate';
 import { performDesktopCustomize, type DesktopCustomizeRequest } from '@/lib/apps/desktopCustomize';
+import { evaluateCapabilityHeuristics, isLikelyAppBuildText } from '@/lib/agent/intents/capabilityHeuristics';
+import { createDesktopStateAdapter } from '@/lib/apps/desktopCustomize/adapter';
 
 const DEPS_READY_TIMEOUT_MS = 120_000;
 const DEPS_READY_INTERVAL_MS = 150;
+const CAPABILITY_ROUTER_ENABLED = process.env.NEXT_PUBLIC_AGENT_CAPABILITY_ROUTER === 'true';
 
 type WebContainerFns = {
   mkdir: (path: string, recursive?: boolean) => Promise<void>;
@@ -86,78 +89,13 @@ const extractTextFromUiMessage = (message: UIMessage | undefined): string => {
   return typeof content === 'string' ? content : '';
 };
 
-// Heuristic: only treat as app build when the user explicitly
-// mentions an app-like target near the creation verb. This avoids
-// false positives like "create a poem" or "make a song".
 const isLikelyAppBuildMessage = (message: UIMessage | undefined): boolean => {
-  const text = extractTextFromUiMessage(message).toLowerCase();
+  const text = extractTextFromUiMessage(message);
   if (!text) return false;
-
-  // Negative intents we never want to classify as app-builds
-  // Keep the pattern case-insensitive; avoid unsupported regex flags in browsers (e.g. /.../ix would throw).
-  const nonAppContentKeywords = /(poem|poetry|story|essay|email|message|note|lyrics|song|music|melody|image|picture|photo|art|video|animation|tweet|post|bio|joke|summary|summar(?:y|ise|ize)|article|blog|outline|script|recipe|caption|code snippet|application\s+(letter|form|draft|checklist)|site\s+(visit|report|plan)|project\s+(report|update|recap|name|draft)|website\s+draft)/i;
-  if (nonAppContentKeywords.test(text)) return false;
-
-  // Require an app-like noun close (within ~6 words) to the verb
-  // Tighter: avoid plain "project" and prefer explicit software nouns.
-  const createAppPattern = /\b(build|create|scaffold|make|generate|spin\s*up|draft)\b(?:\s+\w+){0,6}?\s+\b(app|apps|application|applications|website|web\s*site|web\s*app|ui)\b/i;
-
-  // Also allow explicit short forms like "new app"
-  const newAppPattern = /\bnew\s+(app|apps|application|applications)\b/i;
-
-  return createAppPattern.test(text) || newAppPattern.test(text);
+  return isLikelyAppBuildText(text);
 };
-// Gating only applies when the last user message matches the create‑app regex; all other 
-// requests keep the full toolset and 15‑step budget, so edits are unaffected.
-
-const MEDIA_VERB_REGEX = /(generate|create|make|produce|render|draw|paint|compose|remix|stylize|transform|edit|enhance|upscale|riff|animate|record|shoot|film|write)/i;
-const MEDIA_NOUN_REGEX = /(image|images|photo|photos|picture|art|visual|graphic|logo|icon|poster|banner|illustration|video|videos|clip|clips|animation|animations|gif|music|song|audio|sound|voice|track|sfx|effect|3d|model|asset|texture)/i;
-const DESKTOP_KEYWORD_REGEX = /(desktop|workspace|fromyou|from\s*you|launcher|window|wallpaper|background|theme|palette|layout|grid|arrangement|dock|taskbar|ambient|vibe|icon\s*pack|icon\s*set|widgets?)/i;
-const DESKTOP_ACTION_REGEX = /(customize|refresh|change|tweak|restyle|retheme|recolor|set|apply|switch|update)/i;
-const DESKTOP_APP_PHRASE_REGEX = /desktop\s+(app|application)/i;
 
 type AttachmentHintPayload = { contentType?: string; url: string };
-
-const hasMediaAttachmentHint = (hints: AttachmentHintPayload[]): boolean => {
-  return hints.some((hint) => {
-    const type = (hint.contentType || '').toLowerCase();
-    if (type.startsWith('image/') || type.startsWith('video/') || type.startsWith('audio/')) {
-      return true;
-    }
-    if (type === 'model/gltf+json' || type === 'model/obj' || type === 'model/glb') {
-      return true;
-    }
-    return /\.(png|jpe?g|gif|bmp|webp|mp4|mov|m4v|avi|mp3|wav|flac|ogg|glb|gltf|obj)$/i.test(hint.url);
-  });
-};
-
-const isLikelyMediaMessage = (message: UIMessage | undefined, hints: AttachmentHintPayload[]): boolean => {
-  const text = extractTextFromUiMessage(message).toLowerCase();
-  if (MEDIA_NOUN_REGEX.test(text) && MEDIA_VERB_REGEX.test(text)) {
-    return true;
-  }
-  if (hints.length === 0) return false;
-  const mediaAttachment = hasMediaAttachmentHint(hints);
-  if (!mediaAttachment) return false;
-  if (!text) return true;
-  if (isLikelyAppBuildMessage(message)) return false;
-  return /(edit|transform|styl(?:e|ize)|remix|turn|make|generate|create|polish|refine|convert)/i.test(text);
-};
-
-const isLikelyDesktopCustomizationMessage = (message: UIMessage | undefined): boolean => {
-  const text = extractTextFromUiMessage(message).toLowerCase();
-  if (!text) return false;
-  if (DESKTOP_APP_PHRASE_REGEX.test(text)) return false;
-
-  const mentionsWallpaperOrTheme = /(wallpaper|background|theme|palette|ambient|vibe|accent)/i.test(text);
-  const mentionsDesktopContext = DESKTOP_KEYWORD_REGEX.test(text);
-  const mentionsAction = DESKTOP_ACTION_REGEX.test(text) || mentionsWallpaperOrTheme;
-
-  if (mentionsWallpaperOrTheme && mentionsDesktopContext) return true;
-  if (mentionsDesktopContext && mentionsAction) return true;
-  if (mentionsWallpaperOrTheme) return true;
-  return false;
-};
 
 type MutableWindow = Window & {
   __FYOS_FIRST_TOOL_CALLED_REF?: { current: boolean };
@@ -256,13 +194,14 @@ const SAFE_TOOL_NAMES = new Set<string>([
   'media_list',
   'app_manage',
   'desktop_customize',
+  'web_search',
 ]);
 
 const EXEC_GATED_TOOL_NAMES = new Set<string>(['web_exec', 'validate_project']);
 
 // Tools that can proceed without an initialized WebContainer instance because
 // they only require the fs bridge exposed via fnsRef (e.g., fast_app_create).
-const INSTANCE_OPTIONAL_TOOL_NAMES = new Set<string>(['fast_app_create', 'desktop_customize']);
+const INSTANCE_OPTIONAL_TOOL_NAMES = new Set<string>(['fast_app_create', 'desktop_customize', 'web_search']);
 
 export function useAgentChat(opts: UseAgentChatOptions) {
   const { id, initialMessages, activeThreadId, wc, runValidation, attachmentsProvider } = opts;
@@ -365,14 +304,25 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             lastClearedUserMessageRef.current = lastUserKey;
           }
         }
-        if (isLikelyAppBuildMessage(lastUserMessage)) {
-          body.intent = 'create-app';
+        const lastUserText = extractTextFromUiMessage(lastUserMessage);
+        const capabilityProbe = evaluateCapabilityHeuristics({
+          text: lastUserText,
+          hints: attachmentHints,
+        });
+
+        if (CAPABILITY_ROUTER_ENABLED && capabilityProbe.intent === 'factual_lookup' && capabilityProbe.confidence !== 'low') {
+          body.intent = 'factual_lookup';
           body.forceAgentMode = true;
-        } else if (isLikelyMediaMessage(lastUserMessage, attachmentHints)) {
+        } else if (capabilityProbe.intent === 'media') {
           body.intent = 'media';
           body.forceAgentMode = true;
-        } else if (isLikelyDesktopCustomizationMessage(lastUserMessage)) {
+        } else if (capabilityProbe.intent === 'desktop') {
           body.intent = 'desktop';
+          body.forceAgentMode = true;
+        }
+
+        if (!body.intent && isLikelyAppBuildMessage(lastUserMessage)) {
+          body.intent = 'create-app';
           body.forceAgentMode = true;
         }
         return { body };
@@ -876,7 +826,20 @@ export function useAgentChat(opts: UseAgentChatOptions) {
           case 'desktop_customize': {
             const input = tc.input as DesktopCustomizeRequest;
             try {
-              const result = await performDesktopCustomize({ input });
+              const adapter = createDesktopStateAdapter({
+                fs: {
+                  readFile: (path, encoding) => fnsRef.current.readFile(path, encoding),
+                  writeFile: (path, content) => fnsRef.current.writeFile(path, content),
+                  mkdir: (path, recursive) => fnsRef.current.mkdir(path, recursive),
+                },
+                instanceRef,
+              });
+              const result = await performDesktopCustomize({ input, adapter });
+              if (result.ok && result.manifest.status === 'applied') {
+                try {
+                  window.postMessage({ type: 'FYOS_DESKTOP_CUSTOMIZE_APPLIED', payload: result.manifest }, '*');
+                } catch {}
+              }
               await logAndAddResult(result);
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : String(err);

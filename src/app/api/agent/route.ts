@@ -1,4 +1,4 @@
-import { convertToModelMessages, streamText, UIMessage, stepCountIs, generateText } from 'ai';
+import { convertToModelMessages, streamText, UIMessage, stepCountIs, generateText, createUIMessageStreamResponse } from 'ai';
 import { createHash } from 'crypto';
 import { auth } from '@clerk/nextjs/server';
 // z is used in tool schemas but not directly here
@@ -15,13 +15,26 @@ import {
   MediaListInput,
   CodeEditAstInput,
   FastAppCreateInput,
+  DesktopCustomizeInput,
 } from '@/lib/agentTools';
 import { agentLogger } from '@/lib/agentLogger';
-import { 
-  SYSTEM_PROMPT,
+import {
   PERSONA_PROMPT,
-  CLASSIFIER_PROMPT
+  CLASSIFIER_PROMPT,
+  buildSystemPrompt,
+  resolveSystemPromptSegments,
 } from '@/lib/prompts';
+import type { SystemPromptIntent } from '@/lib/prompts';
+import { routeCapabilityIntent, type CapabilityRouterDecision } from '@/lib/agent/capabilityRouter';
+import {
+  hasMediaAttachment,
+  isMediaRequestText,
+  isDesktopCustomizationText,
+  isLikelyAppBuildText,
+  type AttachmentHint as CapabilityAttachmentHint,
+  type CapabilityIntent,
+} from '@/lib/agent/intents/capabilityHeuristics';
+import { createPersonaPostProcessor } from '@/lib/agent/personaPostProcessor';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { api as convexApi } from '../../../../convex/_generated/api';
 import { getInstalledAppNames, sanitizeToolInput, getConvexClientOptional, summarizeToolResult } from '@/lib/agent/server/agentServerHelpers';
@@ -39,7 +52,10 @@ import {
 // Some tool actions (like package installs) may take longer than 30s
 export const maxDuration = 300;
 
-type AttachmentHint = { contentType?: string | null; url: string };
+const ENABLE_INTENT_TOOL_SUBSETTING = process.env.AGENT_INTENT_TOOL_SUBSETTING === 'true';
+const ENABLE_CAPABILITY_ROUTER = process.env.AGENT_CAPABILITY_ROUTER === 'true';
+
+type AttachmentHint = CapabilityAttachmentHint;
 type AgentPostPayload = {
   messages: UIMessage[];
   threadId?: string;
@@ -139,21 +155,6 @@ const extractTextFromMessage = (message: MessageEnvelope): string => {
   return typeof message.content === 'string' ? message.content : '';
 };
 
-// Mirror client-side heuristic to keep behavior consistent.
-// Avoid false positives like "create a poem" by requiring
-// an app-like noun near the verb and filtering out common
-// non-app content requests.
-const NON_APP_CONTENT_REGEX = /(poem|poetry|story|essay|email|message|note|lyrics|song|music|melody|image|picture|photo|art|video|animation|tweet|post|bio|joke|summary|summar(?:y|ise|ize)|article|blog|outline|script|recipe|caption|code snippet|application\s+(letter|form|draft|checklist)|site\s+(visit|report|plan)|project\s+(report|update|recap|name|draft)|website\s+draft)/i;
-// Tighter: avoid plain "project" and prefer explicit software nouns.
-const CREATE_APP_REGEX = /\b(build|create|scaffold|make|generate|spin\s*up|draft)\b(?:\s+\w+){0,6}?\s+\b(app|apps|application|applications|website|web\s*site|web\s*app|ui)\b/i;
-const NEW_APP_REGEX = /\bnew\s+(app|apps|application|applications)\b/i;
-
-const isLikelyAppBuildText = (text: string): boolean => {
-  if (!text) return false;
-  if (NON_APP_CONTENT_REGEX.test(text)) return false;
-  return CREATE_APP_REGEX.test(text) || NEW_APP_REGEX.test(text);
-};
-
 const appendHintText = (message: MessageEnvelope, text: string) => {
   if (Array.isArray(message.parts)) {
     const textPart: TextUIPart = { type: 'text', text };
@@ -162,6 +163,165 @@ const appendHintText = (message: MessageEnvelope, text: string) => {
     message.content = message.content + text;
   } else {
     message.content = text.trimStart();
+  }
+};
+
+const normalizeClientIntent = (intent: string | undefined): SystemPromptIntent | undefined => {
+  if (!intent) return undefined;
+  const normalized = intent.toLowerCase();
+  switch (normalized) {
+    case 'create':
+    case 'create-app':
+    case 'fast_app_create':
+      return 'create';
+    case 'media':
+    case 'generate-media':
+    case 'media-generate':
+      return 'media';
+    case 'desktop':
+    case 'desktop_customize':
+    case 'desktop-customize':
+      return 'desktop';
+    case 'edit':
+    case 'edit-app':
+    case 'update-app':
+      return 'edit';
+    case 'factual_lookup':
+    case 'lookup':
+      return 'edit';
+    default:
+      return undefined;
+  }
+};
+
+const deriveAgentIntent = ({
+  clientIntent,
+  lastUserText,
+  hints,
+  capabilityIntent,
+}: {
+  clientIntent?: SystemPromptIntent;
+  lastUserText: string;
+  hints: AttachmentHint[];
+  capabilityIntent?: CapabilityIntent;
+}): { intent: SystemPromptIntent; source: string; reason?: string } => {
+  const text = lastUserText || '';
+  const hasAttachments = hints.length > 0;
+
+  if (capabilityIntent && capabilityIntent !== 'build_edit') {
+    switch (capabilityIntent) {
+      case 'media':
+        return { intent: 'media', source: 'capability-router', reason: 'capability:media' };
+      case 'desktop':
+        return { intent: 'desktop', source: 'capability-router', reason: 'capability:desktop' };
+      case 'factual_lookup':
+        return { intent: 'edit', source: 'capability-router', reason: 'capability:factual_lookup' };
+      case 'banter':
+        return { intent: 'edit', source: 'capability-router', reason: 'capability:banter' };
+      default:
+        break;
+    }
+  }
+
+  if (clientIntent && clientIntent !== 'edit') {
+    return { intent: clientIntent, source: 'client', reason: `client-intent:${clientIntent}` };
+  }
+
+  const mediaAttachmentDetected = hasAttachments ? hasMediaAttachment(hints) : false;
+  const mediaLanguageDetected = isMediaRequestText(text);
+  const desktopLanguageDetected = isDesktopCustomizationText(text);
+  const createLanguageDetected = isLikelyAppBuildText(text);
+
+  if (desktopLanguageDetected) {
+    return { intent: 'desktop', source: 'heuristic-desktop', reason: 'desktop-keywords-detected' };
+  }
+
+  if ((hasAttachments && mediaLanguageDetected) || (mediaAttachmentDetected && mediaLanguageDetected)) {
+    return { intent: 'media', source: 'heuristic-media', reason: 'media-language-with-attachments' };
+  }
+
+  if (mediaAttachmentDetected && !createLanguageDetected) {
+    return { intent: 'media', source: 'heuristic-media', reason: 'media-attachments' };
+  }
+
+  if (createLanguageDetected) {
+    return {
+      intent: 'create',
+      source: clientIntent ? 'heuristic-create-override' : 'heuristic-create',
+      reason: 'app-creation-language',
+    };
+  }
+
+  if (clientIntent === 'edit') {
+    return { intent: 'edit', source: 'client', reason: 'client-intent:edit' };
+  }
+
+  return { intent: 'edit', source: 'default', reason: 'fallback' };
+};
+
+const pickToolsForIntent = <T extends Record<string, unknown>>(
+  intent: SystemPromptIntent,
+  allTools: T,
+  capabilityIntent?: CapabilityIntent,
+): T => {
+  const includeIfPresent = (keys: string[]): Partial<T> => {
+    return keys.reduce<Partial<T>>((acc, key) => {
+      if (key in allTools) {
+        acc[key as keyof T] = allTools[key as keyof T];
+      }
+      return acc;
+    }, {});
+  };
+
+  if (capabilityIntent === 'factual_lookup') {
+    const lookupTools = includeIfPresent([
+      TOOL_NAMES.web_search,
+    ]);
+    return (Object.keys(lookupTools).length > 0 ? lookupTools : allTools) as T;
+  }
+
+  if (!ENABLE_INTENT_TOOL_SUBSETTING) {
+    if (intent === 'create') {
+      const minimal = includeIfPresent([
+        TOOL_NAMES.web_fs_find,
+        TOOL_NAMES.web_fs_read,
+        TOOL_NAMES.web_fs_write,
+        TOOL_NAMES.web_fs_rm,
+        TOOL_NAMES.app_manage,
+        TOOL_NAMES.media_list,
+        TOOL_NAMES.fast_app_create,
+        TOOL_NAMES.web_search,
+      ]);
+      return (Object.keys(minimal).length > 0 ? minimal : allTools) as T;
+    }
+    return allTools;
+  }
+
+  switch (intent) {
+    case 'create':
+      return includeIfPresent([
+        TOOL_NAMES.web_fs_find,
+        TOOL_NAMES.web_fs_read,
+        TOOL_NAMES.web_fs_write,
+        TOOL_NAMES.web_fs_rm,
+        TOOL_NAMES.app_manage,
+        TOOL_NAMES.media_list,
+        TOOL_NAMES.fast_app_create,
+        TOOL_NAMES.web_search,
+      ]) as T;
+    case 'media':
+      return includeIfPresent([
+        TOOL_NAMES.ai_generate,
+        TOOL_NAMES.media_list,
+      ]) as T;
+    case 'desktop':
+      return includeIfPresent([
+        TOOL_NAMES.desktop_customize,
+        TOOL_NAMES.media_list,
+      ]) as T;
+    case 'edit':
+    default:
+      return allTools;
   }
 };
 
@@ -239,7 +399,7 @@ export async function POST(req: Request) {
   const hints = attachmentHintsRaw.filter(isAttachmentHint);
   const messagesWithHints: MessageEnvelope[] = [...messages];
   const intentRaw = typeof payload.intent === 'string' ? payload.intent.trim().toLowerCase() : undefined;
-  const forceAgentMode = payload.forceAgentMode === true;
+  let forceAgentMode = payload.forceAgentMode === true;
 
   console.log('🧩 [AGENT] attachmentHints received:', hints.length > 0 ? hints : 'none');
   // Also detect client-side appended hint user message
@@ -319,7 +479,34 @@ export async function POST(req: Request) {
 
   const lastUserSanitized = [...sanitizedMessages].reverse().find((message) => message?.role === 'user');
   const lastUserText = lastUserSanitized ? extractTextFromMessage(lastUserSanitized as MessageEnvelope) : '';
-  const isCreateAppIntent = intentRaw === 'create-app' || isLikelyAppBuildText(lastUserText);
+  const clientIntent = normalizeClientIntent(intentRaw);
+
+  let capabilityDecision: CapabilityRouterDecision | null = null;
+  if (ENABLE_CAPABILITY_ROUTER) {
+    try {
+      capabilityDecision = await routeCapabilityIntent({
+        text: lastUserText,
+        hints,
+      });
+      console.log('🧭 [CAPABILITY] Router decision:', capabilityDecision);
+    } catch (error) {
+      console.warn('⚠️ [CAPABILITY] Router failed, falling back to heuristics', error);
+    }
+  }
+
+  const capabilityIntent = capabilityDecision?.intent;
+  if (ENABLE_CAPABILITY_ROUTER && capabilityIntent === 'factual_lookup') {
+    forceAgentMode = true;
+  }
+  const intentResolution = deriveAgentIntent({
+    clientIntent,
+    lastUserText,
+    hints,
+    capabilityIntent,
+  });
+  const agentIntent: SystemPromptIntent = intentResolution.intent;
+  const isCreateIntent = agentIntent === 'create';
+  const hasAttachments = hints.length > 0;
 
   const messagePreviews: AgentMessagePreview[] = sanitizedMessages.map((message) => {
     const text = extractTextFromMessage(message as MessageEnvelope);
@@ -381,15 +568,30 @@ export async function POST(req: Request) {
   // Persona-only mode: returns a parallel, personality-driven stream that does not use tools
   const url = new URL(req.url);
   let personaMode = url.searchParams.get('persona') === '1' || url.searchParams.get('mode') === 'persona';
+  const personaRequested = personaMode;
   const classifierModelId = 'google/gemini-2.0-flash';
   let classificationDecision: ClassificationDecisionEvent | null = null;
 
-  if (forceAgentMode || isCreateAppIntent) {
+  if (ENABLE_CAPABILITY_ROUTER) {
+    if (capabilityIntent === 'banter') {
+      personaMode = true;
+    } else if (capabilityIntent && !personaRequested) {
+      personaMode = false;
+    }
+  }
+
+  if (forceAgentMode || agentIntent !== 'edit') {
     personaMode = false;
   }
 
+  const shouldRunLegacyClassifier =
+    !personaMode &&
+    !forceAgentMode &&
+    agentIntent === 'edit' &&
+    (!ENABLE_CAPABILITY_ROUTER || !capabilityIntent || capabilityIntent === 'banter');
+
   // If not explicitly forced, auto-classify last user message using CLASSIFIER_PROMPT (0=persona, 1=agent)
-  if (!personaMode && !forceAgentMode && !isCreateAppIntent) {
+  if (shouldRunLegacyClassifier) {
     try {
       const lastUser = [...sanitizedMessages].reverse().find(m => m.role === 'user');
       const lastText = lastUser ? extractTextFromMessage(lastUser) : '';
@@ -468,17 +670,23 @@ export async function POST(req: Request) {
       }
     }
   }
-  if (!personaMode && (forceAgentMode || isCreateAppIntent) && !classificationDecision) {
+  const capabilityForcesAgent = ENABLE_CAPABILITY_ROUTER && capabilityIntent && capabilityIntent !== 'banter';
+  if (!personaMode && (forceAgentMode || agentIntent !== 'edit' || capabilityForcesAgent) && !classificationDecision) {
     const now = Date.now();
+    const overrideModelLabel = forceAgentMode
+      ? 'manual_override:force_agent_mode'
+      : capabilityForcesAgent
+        ? 'manual_override:capability_router'
+        : 'manual_override:app_intent';
     classificationDecision = {
-      model: forceAgentMode ? 'manual_override:force_agent_mode' : 'manual_override:app_intent',
+      model: overrideModelLabel,
       result: 'agent',
       startedAt: now,
       finishedAt: now,
       durationMs: 0,
       inputCharCount: lastUserText.length,
       attachmentsCount: hints.length,
-      rawOutputPreview: forceAgentMode ? 'force_agent_mode' : 'app_intent',
+      rawOutputPreview: forceAgentMode ? 'force_agent_mode' : capabilityForcesAgent ? 'capability_router' : 'app_intent',
     };
   }
 
@@ -540,18 +748,22 @@ export async function POST(req: Request) {
     return result.toUIMessageStreamResponse();
   }
 
-  // Use the comprehensive system prompt
-  let systemPrompt = SYSTEM_PROMPT;
-
-  // Attachments guidance is now included in the main SYSTEM_PROMPT
-
-  // Append list of installed apps as plain names (one per line)
+  let installedApps: string[] = [];
   try {
-    const installed = await getInstalledAppNames();
-    if (installed.length > 0) {
-      systemPrompt += '\n\nCurrent apps installed:\n' + installed.map(n => `- ${n}`).join('\n');
-    }
-  } catch {}
+    installedApps = await getInstalledAppNames();
+  } catch (error) {
+    console.warn('⚠️ [AGENT] Failed to load installed apps for prompt context', error);
+    installedApps = [];
+  }
+
+  const promptOptions = {
+    intent: agentIntent,
+    hasAttachments,
+    includeStylingDetails: agentIntent === 'create' || agentIntent === 'edit',
+    installedApps,
+  };
+  const promptSegments = resolveSystemPromptSegments(promptOptions);
+  const systemPrompt = buildSystemPrompt(promptOptions);
 
   const serverTools = buildServerTools(sessionId);
 
@@ -595,6 +807,10 @@ export async function POST(req: Request) {
       description: 'Create a new app by batching metadata/registry updates and optional file writes. Executes inside the client WebContainer for instant feedback.',
       inputSchema: FastAppCreateInput,
     },
+    [TOOL_NAMES.desktop_customize]: {
+      description: 'Customize the active desktop by applying layout/theme mutations with reversible metadata.',
+      inputSchema: DesktopCustomizeInput,
+    },
     // AI Media Tools (unified)
     [TOOL_NAMES.ai_generate]: {
       description: 'Generate media using provider=fal|eleven with input only. Model selection happens behind the scenes; outputs are auto‑ingested and returned with durable URLs.',
@@ -611,20 +827,21 @@ export async function POST(req: Request) {
     },
   };
 
-  // For initial app creation, expose a minimal fast-path toolset to avoid slow validation/exec
-  const tools = isCreateAppIntent
-    ? {
-        [TOOL_NAMES.web_fs_find]: allTools[TOOL_NAMES.web_fs_find],
-        [TOOL_NAMES.web_fs_read]: allTools[TOOL_NAMES.web_fs_read],
-        [TOOL_NAMES.web_fs_write]: allTools[TOOL_NAMES.web_fs_write],
-        [TOOL_NAMES.web_fs_rm]: allTools[TOOL_NAMES.web_fs_rm],
-        [TOOL_NAMES.app_manage]: allTools[TOOL_NAMES.app_manage],
-        [TOOL_NAMES.media_list]: allTools[TOOL_NAMES.media_list],
-        // Keep search + fast scaffolding available for intent classification; omit exec/validation/code-edit for speed
-        [TOOL_NAMES.fast_app_create]: allTools[TOOL_NAMES.fast_app_create],
-        [TOOL_NAMES.web_search]: allTools[TOOL_NAMES.web_search],
-      }
-    : allTools;
+  const tools = pickToolsForIntent(agentIntent, allTools, capabilityIntent);
+
+  console.log('🧠 [AGENT] Intent resolution', {
+    sessionId,
+    clientIntent,
+    intentRaw,
+    resolvedIntent: agentIntent,
+    intentSource: intentResolution.source,
+    intentReason: intentResolution.reason,
+    attachmentsCount: hints.length,
+    promptSegments: promptSegments.map((segment) => segment.id),
+    toolCount: Object.keys(tools).length,
+    toolNames: Object.keys(tools),
+    toolSubsettingEnabled: ENABLE_INTENT_TOOL_SUBSETTING,
+  });
   const modelId = 'alibaba/qwen3-coder';
   const availableToolNames = Object.keys(tools);
 
@@ -644,6 +861,13 @@ export async function POST(req: Request) {
     sessionStartedAt: sessionStartTimestamp,
   }, sequenceBase);
 
+  const personaPostProcessor = createPersonaPostProcessor({
+    capabilityIntent,
+    personaMode,
+    enabled: ENABLE_CAPABILITY_ROUTER,
+    eventEmitter,
+  });
+
   void eventEmitter.emit('session_started', {
     personaMode,
     attachmentsCount: hints.length,
@@ -658,6 +882,20 @@ export async function POST(req: Request) {
       dedupeKey: `${sessionId}:classification_decided`,
       timestamp: classificationDecision.finishedAt,
     });
+  }
+
+  if (capabilityDecision) {
+    void eventEmitter.emit('capability_routed', {
+      capabilityIntent: capabilityDecision.intent,
+      confidence: capabilityDecision.confidence,
+      source: capabilityDecision.source,
+      reason: capabilityDecision.reason,
+      modelId: capabilityDecision.modelId,
+      heuristicIntent: capabilityDecision.heuristic?.intent,
+      heuristicReason: capabilityDecision.heuristic?.reason,
+      resolvedAgentIntent: agentIntent,
+      toolNames: availableToolNames,
+    }, { dedupeKey: `${sessionId}:capability_routed`, timestamp: Date.now() });
   }
 
   const emitMessageEvent = (
@@ -688,7 +926,7 @@ export async function POST(req: Request) {
   }
 
   // Keep initial app creation snappy: at most one or two actions
-  const maxAgentSteps = isCreateAppIntent ? 2 : 15;
+  const maxAgentSteps = isCreateIntent ? 2 : 15;
 
   let stepIndex = 0;
   let sessionUsageActual: AgentUsageEstimates = {};
@@ -929,10 +1167,17 @@ export async function POST(req: Request) {
       });
 
       if (event.text) {
+        const personaOutcome = await personaPostProcessor.process(event.text);
+        const finalText = personaOutcome.text;
         const assistantMessageId = `assistant_${Date.now()}`;
-        await agentLogger.logMessage(sessionId, assistantMessageId, 'assistant', event.text);
-        appendMessageToThread('assistant', event.text, 'agent');
-        emitMessageEvent('assistant', assistantMessageId, event.text, stepIndex, finishedAt);
+        await agentLogger.logMessage(sessionId, assistantMessageId, 'assistant', finalText);
+        appendMessageToThread('assistant', finalText, 'agent');
+        emitMessageEvent('assistant', assistantMessageId, finalText, stepIndex, finishedAt);
+        console.log('🎭 [PERSONA] Post-processing outcome:', {
+          applied: personaOutcome.applied,
+          reason: personaOutcome.reason,
+          modelId: personaOutcome.modelId,
+        });
       }
 
       if (event.usage) {
@@ -1100,6 +1345,11 @@ export async function POST(req: Request) {
     tools,
   });
 
+  const uiStream = result.toUIMessageStream();
+  const personaStream = personaPostProcessor.wrapStream(uiStream);
+
   console.log('📤 [AGENT] Returning streaming response');
-  return result.toUIMessageStreamResponse();
+  return createUIMessageStreamResponse({ stream: personaStream });
 }
+
+export { normalizeClientIntent, deriveAgentIntent };

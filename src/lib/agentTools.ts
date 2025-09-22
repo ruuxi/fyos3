@@ -82,6 +82,53 @@ export const FastAppCreateInput = z.object({
     .describe('Optional batch of files to create under the new app directory.'),
 });
 
+const DesktopCustomizeMetadata = z
+  .object({
+    requestId: z.string().optional().describe('Client-provided identifier for correlating responses.'),
+    desktopId: z.string().optional().describe('Which desktop to target (defaults to active).'),
+    snapshotId: z.string().optional().describe('Latest snapshot identifier for optimistic rollback.'),
+    priorStateHash: z.string().optional().describe('Hash of prior state to validate undo lineage.'),
+    actor: z.string().optional().describe('Agent or user identifier issuing the mutation.'),
+  })
+  .catchall(z.unknown());
+
+const DesktopCustomizeLayoutMutation = z
+  .object({
+    target: z.string().min(1).describe('ID or path of the layout node to adjust.'),
+    action: z
+      .enum(['add', 'remove', 'move', 'resize', 'split', 'reparent', 'swap', 'toggle'])
+      .or(z.string().min(1))
+      .describe('Mutation type to apply.'),
+    payload: z.record(z.string(), z.any()).optional().describe('Arbitrary action payload (dimensions, parentId, order, etc).'),
+    confidence: z.number().min(0).max(1).optional().describe('Model confidence in the action.'),
+  })
+  .catchall(z.unknown());
+
+const DesktopCustomizeThemeMutation = z
+  .object({
+    token: z.string().min(1).describe('Theme token or asset identifier to update.'),
+    value: z.string().min(1).describe('New value to assign to the token.'),
+    confidence: z.number().min(0).max(1).optional().describe('Model confidence in the change.'),
+  })
+  .catchall(z.unknown());
+
+const DesktopCustomizeAsset = z
+  .object({
+    path: z.string().min(1).describe('Virtual path for the asset (relative to desktop store).'),
+    contents: z.string().describe('Raw or encoded asset payload.'),
+    encoding: z.enum(['utf-8', 'base64']).default('utf-8').describe('Encoding for contents.'),
+    mediaType: z.string().optional().describe('Optional MIME type for downstream routing.'),
+  })
+  .catchall(z.unknown());
+
+export const DesktopCustomizeInput = z.object({
+  metadata: DesktopCustomizeMetadata.describe('Request metadata including snapshot lineage for undo.'),
+  layoutMutations: z.array(DesktopCustomizeLayoutMutation).default([]).describe('Batch of layout operations (add/move/split/etc).'),
+  themeMutations: z.array(DesktopCustomizeThemeMutation).default([]).describe('Theme token updates (colors, backgrounds, typography).'),
+  assets: z.array(DesktopCustomizeAsset).default([]).describe('Generated assets to persist alongside the desktop configuration.'),
+  followUps: z.array(z.string().min(1)).default([]).describe('Clarifying questions or TODOs the agent should surface.'),
+});
+
 // Validation
 export const ValidateProjectInput = z.object({
   scope: z.enum(['quick', 'full']).default('quick').describe('quick: typecheck + lint; full: also runs production build.'),
@@ -169,6 +216,7 @@ export type TWebFsRmInput = z.infer<typeof WebFsRmInput>;
 export type TWebExecInput = z.infer<typeof WebExecInput>;
 export type TAppManageInput = z.infer<typeof AppManageInput>;
 export type TFastAppCreateInput = z.infer<typeof FastAppCreateInput>;
+export type TDesktopCustomizeInput = z.infer<typeof DesktopCustomizeInput>;
 export type TValidateProjectInput = z.infer<typeof ValidateProjectInput>;
 export type TCodeEditAstInput = z.infer<typeof CodeEditAstInput>;
 export type TWebSearchInput = z.infer<typeof WebSearchInput>;
@@ -189,6 +237,7 @@ export const TOOL_NAMES = {
   media_list: 'media_list',
   code_edit_ast: 'code_edit_ast',
   fast_app_create: 'fast_app_create',
+  desktop_customize: 'desktop_customize',
 } as const;
 
 export type ToolName = typeof TOOL_NAMES[keyof typeof TOOL_NAMES];

@@ -836,6 +836,26 @@ export default function Document() {
             return;
           }
 
+          if (isRecord(data) && data.type === 'FYOS_DESKTOP_THEME_TOKENS') {
+            try {
+              const target = iframeRef.current?.contentWindow;
+              if (target) {
+                target.postMessage({ type: 'FYOS_DESKTOP_THEME_TOKENS', payload: data.payload ?? {} }, '*');
+              }
+            } catch {}
+            return;
+          }
+
+          if (isRecord(data) && data.type === 'FYOS_DESKTOP_CUSTOMIZE_APPLIED') {
+            try {
+              const target = iframeRef.current?.contentWindow;
+              if (target) {
+                target.postMessage({ type: 'FYOS_DESKTOP_CUSTOMIZE_APPLIED', payload: data.payload ?? data }, '*');
+              }
+            } catch {}
+            return;
+          }
+
           // Forward agent run gating to preview iframe (Desktop) so it can propagate to apps
           if (
             isRecord(data) &&

@@ -1,3 +1,15 @@
+import type { CapabilityIntent } from '@/lib/agent/intents/capabilityHeuristics';
+import type { SystemPromptIntent } from '@/lib/prompts';
+
+export type PersonaPostProcessReason =
+  | 'skipped-disabled'
+  | 'skipped-empty'
+  | 'skipped-structured'
+  | 'skipped-persona-mode'
+  | 'skipped-banter'
+  | 'skipped-error'
+  | 'applied';
+
 export type AgentEventKind =
   | 'session_started'
   | 'session_finished'
@@ -7,7 +19,9 @@ export type AgentEventKind =
   | 'tool_call_outbound'
   | 'tool_call_inbound'
   | 'message_logged'
-  | 'classification_decided';
+  | 'classification_decided'
+  | 'capability_routed'
+  | 'persona_post_processed';
 
 export interface AgentUsageEstimates {
   promptTokens?: number;
@@ -189,6 +203,34 @@ export interface AgentClassificationDecidedEvent extends AgentEventBase {
   };
 }
 
+export interface AgentCapabilityRoutedEvent extends AgentEventBase {
+  kind: 'capability_routed';
+  payload: {
+    capabilityIntent: CapabilityIntent;
+    confidence: 'low' | 'medium' | 'high';
+    source: 'heuristic' | 'model';
+    reason: string;
+    modelId?: string;
+    heuristicIntent?: CapabilityIntent;
+    heuristicReason?: string;
+    resolvedAgentIntent: SystemPromptIntent;
+    toolNames: string[];
+  };
+}
+
+export interface AgentPersonaPostProcessedEvent extends AgentEventBase {
+  kind: 'persona_post_processed';
+  payload: {
+    applied: boolean;
+    reason: PersonaPostProcessReason;
+    originalCharCount: number;
+    finalCharCount: number;
+    modelId?: string;
+    durationMs?: number;
+    capabilityIntent?: CapabilityIntent;
+  };
+}
+
 export type AgentIngestEvent =
   | AgentSessionStartedEvent
   | AgentSessionFinishedEvent
@@ -198,7 +240,9 @@ export type AgentIngestEvent =
   | AgentToolCallOutboundEvent
   | AgentToolCallInboundEvent
   | AgentMessageLoggedEvent
-  | AgentClassificationDecidedEvent;
+  | AgentClassificationDecidedEvent
+  | AgentCapabilityRoutedEvent
+  | AgentPersonaPostProcessedEvent;
 
 export interface AgentSessionMeta {
   sessionId: string;

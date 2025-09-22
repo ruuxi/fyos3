@@ -19,6 +19,7 @@ const LS_APP_ORDER_KEY = 'desktop.appOrder'
 const EVT_OPEN_APP = 'FYOS_OPEN_APP'
 const EVT_DESKTOP_READY = 'FYOS_DESKTOP_READY'
 const THEME_KEY = 'fyos.desktop.theme'
+const THEME_TOKENS_KEY = 'fyos.desktop.themeTokens'
 const EVT_SET_THEME = 'FYOS_SET_THEME'
 const EVT_USER_MODE = 'FYOS_USER_MODE'
 
@@ -509,6 +510,24 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
   )
 }
 
+function applyThemeTokens(tokens: Record<string, unknown> | null | undefined) {
+  if (typeof document === 'undefined' || !tokens || typeof tokens !== 'object') return
+  const root = document.documentElement
+  if (!root) return
+  Object.entries(tokens).forEach(([token, value]) => {
+    if (typeof value !== 'string') return
+    if (token.startsWith('--')) {
+      root.style.setProperty(token, value)
+      return
+    }
+    if (token.startsWith('css.')) {
+      const cssVar = `--${token.slice(4)}`
+      root.style.setProperty(cssVar, value)
+      return
+    }
+  })
+}
+
 export default function Desktop(){
   const [apps, setApps] = useState<App[]>([])
   const appsByIdRef = useRef<Record<string, App>>({})
@@ -534,6 +553,12 @@ export default function Desktop(){
           try { if (json.windowGeometries) localStorage.setItem(LS_WINDOW_GEOM_KEY, JSON.stringify(json.windowGeometries)); } catch {}
           try { if (json.windowTabs) localStorage.setItem(LS_WINDOW_TABS_KEY, JSON.stringify(json.windowTabs)); } catch {}
           try { if (json.appOrder) localStorage.setItem(LS_APP_ORDER_KEY, JSON.stringify(json.appOrder)); } catch {}
+          try {
+            if (json.themeTokens && typeof json.themeTokens === 'object') {
+              localStorage.setItem(THEME_TOKENS_KEY, JSON.stringify(json.themeTokens))
+              applyThemeTokens(json.themeTokens as Record<string, unknown>)
+            }
+          } catch {}
         }
       } catch {}
     })();
@@ -1230,6 +1255,15 @@ export default function Desktop(){
       try { document.body.classList.remove('desktop-window-moving') } catch {}
     }
   }, [])
+  useEffect(()=>{
+    try {
+      const raw = localStorage.getItem(THEME_TOKENS_KEY)
+      if (raw) {
+        const tokens = JSON.parse(raw)
+        applyThemeTokens(tokens as Record<string, unknown>)
+      }
+    } catch {}
+  }, [])
 
 
   useEffect(()=>{
@@ -1323,6 +1357,12 @@ export default function Desktop(){
       if (!payload || typeof payload !== 'object') return
       const record = payload as { [key: string]: unknown }
       const typeValue = typeof record.type === 'string' ? record.type : ''
+      if (typeValue === 'FYOS_DESKTOP_THEME_TOKENS') {
+        const payloadTokens = record.payload as Record<string, unknown> | undefined
+        applyThemeTokens(payloadTokens)
+        try { if (payloadTokens) localStorage.setItem(THEME_TOKENS_KEY, JSON.stringify(payloadTokens)) } catch {}
+        return
+      }
       if (typeValue === 'FYOS_AGENT_RUN_STARTED' || typeValue === 'FYOS_AGENT_RUN_ENDED') {
         try {
           const frames = Array.from(document.querySelectorAll('iframe')) as HTMLIFrameElement[]
