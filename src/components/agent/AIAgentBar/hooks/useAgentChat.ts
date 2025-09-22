@@ -7,7 +7,7 @@ import { persistAssetsFromAIResult, extractOriginalMediaUrlsFromResult, type Med
 import { autoIngestInputs } from '@/utils/auto-ingest';
 import { guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 import type { TCodeEditAstInput, TWebFsReadInput } from '@/lib/agentTools';
-import { performFastAppCreate, type FastAppCreateRequest } from '@/lib/apps/fastAppCreate';
+import { performFastAppCreate, type FastAppCreateRequest, type FastAppCreateSuccess } from '@/lib/apps/fastAppCreate';
 
 const DEPS_READY_TIMEOUT_MS = 120_000;
 const DEPS_READY_INTERVAL_MS = 150;
@@ -226,7 +226,7 @@ export function useAgentChat(opts: UseAgentChatOptions) {
     schedulerRef.current = new ToolScheduler();
   }
 
-  const fastAppCreatesRef = useRef<Set<string>>(new Set());
+  const fastAppCreatesRef = useRef<Map<string, FastAppCreateSuccess>>(new Map());
   const lastClearedUserMessageRef = useRef<string | null>(null);
 
   const dirListingCacheRef = useRef<Map<string, string[] | null>>(new Map());
@@ -803,12 +803,27 @@ export function useAgentChat(opts: UseAgentChatOptions) {
           }
           case 'fast_app_create': {
             const input = tc.input as FastAppCreateRequest;
-            try {
-              if (fastAppCreatesRef.current.has(input.id)) {
-                await logAndAddResult({ ok: false, error: 'App already scaffolded in this run; use write tools to modify it.' });
+            const rawRequestedId = typeof input.id === 'string' ? input.id : '';
+            const trimmedRequestedId = rawRequestedId.trim();
+            const cacheLookupKeys: string[] = [];
+            if (trimmedRequestedId) cacheLookupKeys.push(trimmedRequestedId);
+            if (rawRequestedId && rawRequestedId !== trimmedRequestedId) cacheLookupKeys.push(rawRequestedId);
+
+            let cachedResult: FastAppCreateSuccess | undefined;
+            for (const key of cacheLookupKeys) {
+              const candidate = fastAppCreatesRef.current.get(key);
+              if (candidate) {
+                cachedResult = candidate;
                 break;
               }
+            }
 
+            if (cachedResult) {
+              await logAndAddResult({ ...cachedResult, cached: true, message: 'App already scaffolded earlier this run—reuse the existing files with write tools instead of re-uploading.' });
+              break;
+            }
+
+            try {
               const fs = fnsRef.current;
               if (!fs) {
                 await logAndAddResult({ ok: false, error: 'WebContainer file system unavailable.' });
@@ -826,7 +841,12 @@ export function useAgentChat(opts: UseAgentChatOptions) {
 
               if (result.ok) {
                 try { dirListingCacheRef.current.clear(); } catch {}
-                fastAppCreatesRef.current.add(result.id);
+                const keysToStore = new Set<string>([result.id]);
+                if (trimmedRequestedId) keysToStore.add(trimmedRequestedId);
+                if (rawRequestedId && rawRequestedId !== trimmedRequestedId) keysToStore.add(rawRequestedId);
+                for (const key of keysToStore) {
+                  fastAppCreatesRef.current.set(key, result);
+                }
               }
 
               await logAndAddResult(result);
@@ -838,9 +858,33 @@ export function useAgentChat(opts: UseAgentChatOptions) {
           }
           case 'app_manage': {
             const { action, id: requestedId, name, icon } = tc.input as { action: 'create'|'rename'|'remove'; id: string; name?: string; icon?: string };
+            const checkFastAppCache = (id: string | undefined | null): FastAppCreateSuccess | undefined => {
+              if (!id) return undefined;
+              const candidates = [id, id.trim()].filter(Boolean) as string[];
+              for (const candidate of candidates) {
+                const cached = fastAppCreatesRef.current.get(candidate);
+                if (cached) return cached;
+              }
+              return undefined;
+            };
+
             if (action === 'create') {
               const id = requestedId;
               if (!name) throw new Error('app_manage.create requires name');
+
+              const cachedCreate = checkFastAppCache(id);
+              if (cachedCreate) {
+                await logAndAddResult({
+                  ok: true,
+                  id: cachedCreate.id,
+                  name: cachedCreate.name,
+                  base: cachedCreate.base,
+                  cached: true,
+                  message: 'App already created via fast_app_create; skipping redundant app_manage.create.'
+                });
+                break;
+              }
+
               let registry: Array<{ id: string; name: string; icon?: string; path: string }> = [];
               try {
                 const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');

@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import type { Doc, Id, TableNames } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 
 type IncomingEvent = {
@@ -19,6 +19,12 @@ type IncomingEvent = {
 };
 
 type UsageRecord = Partial<Record<'promptTokens' | 'completionTokens' | 'totalTokens' | 'reasoningTokens' | 'cachedInputTokens' | 'charCount', number>>;
+type SessionPatch = Partial<Doc<'agent_sessions'>>;
+type SessionHandler = (
+  ctx: MutationCtx,
+  event: IncomingEvent,
+  session: Doc<'agent_sessions'>,
+) => Promise<SessionPatch>;
 
 const usageKeys: Array<keyof UsageRecord> = [
   'promptTokens',
@@ -47,6 +53,24 @@ const mergeUsage = (base?: UsageRecord, delta?: UsageRecord): UsageRecord => {
     const total = baseValue + deltaValue;
     if (total > 0) {
       result[key] = Number(total.toFixed(4));
+    }
+  }
+  return result;
+};
+
+const mergeSessionPatches = (...patches: SessionPatch[]): SessionPatch => {
+  const result: SessionPatch = {};
+  for (const patch of patches) {
+    for (const [key, value] of Object.entries(patch) as Array<
+      [keyof Doc<'agent_sessions'>, Doc<'agent_sessions'>[keyof Doc<'agent_sessions'>]]
+    >) {
+      if (value === undefined) continue;
+      if (key === 'updatedAt' && typeof value === 'number') {
+        const current = result.updatedAt;
+        result.updatedAt = typeof current === 'number' ? Math.max(current, value) : value;
+      } else {
+        result[key] = value;
+      }
     }
   }
   return result;
@@ -83,10 +107,18 @@ const deepEqual = (a: unknown, b: unknown): boolean => {
 const applySessionPatch = async (
   ctx: MutationCtx,
   session: Doc<'agent_sessions'>,
-  updates: Partial<Doc<'agent_sessions'>>,
+  updates: SessionPatch,
 ): Promise<Doc<'agent_sessions'>> => {
   const filtered = pickDefined(updates);
-  const patch: Partial<Doc<'agent_sessions'>> = {};
+
+  if (typeof filtered.updatedAt === 'number') {
+    const currentUpdatedAt = typeof session.updatedAt === 'number' ? session.updatedAt : undefined;
+    if (typeof currentUpdatedAt === 'number' && filtered.updatedAt < currentUpdatedAt) {
+      filtered.updatedAt = currentUpdatedAt;
+    }
+  }
+
+  const patch: SessionPatch = {};
   let changed = false;
 
   for (const [key, value] of Object.entries(filtered) as Array<
@@ -238,6 +270,32 @@ const getSessionByRequestId = async (ctx: MutationCtx, requestId: string): Promi
     .first();
 };
 
+const deriveEnsureDefaults = (event: IncomingEvent): SessionPatch => {
+  if (event.kind === 'session_started') {
+    const payload = event.payload ?? {};
+    return pickDefined({
+      userIdentifier: event.userIdentifier ?? (payload.userIdentifier as string | undefined),
+      threadId: event.threadId,
+      model: event.model,
+      personaMode: (payload.personaMode as boolean | undefined) ?? event.personaMode ?? false,
+      toolNames: Array.isArray(payload.toolNames) ? (payload.toolNames as string[]) : [],
+      attachmentsCount: typeof payload.attachmentsCount === 'number' ? (payload.attachmentsCount as number) : undefined,
+      messagePreviews: payload.messagePreviews,
+      sessionStartedAt: typeof payload.sessionStartedAt === 'number' ? (payload.sessionStartedAt as number) : event.timestamp,
+      createdAt: event.timestamp,
+      updatedAt: event.timestamp,
+    }) as SessionPatch;
+  }
+
+  return pickDefined({
+    userIdentifier: event.userIdentifier,
+    threadId: event.threadId,
+    model: event.model,
+    personaMode: event.personaMode,
+    updatedAt: event.timestamp,
+  }) as SessionPatch;
+};
+
 const ensureSessionRecord = async (
   ctx: MutationCtx,
   event: IncomingEvent,
@@ -326,11 +384,8 @@ const recordEvent = async (ctx: MutationCtx, event: IncomingEvent): Promise<Id<'
   });
 };
 
-const updateSessionTiming = async (ctx: MutationCtx, event: IncomingEvent) => {
-  const session = await getSessionBySessionId(ctx, event.sessionId);
-  if (!session) return;
-
-  const patch: Partial<Doc<'agent_sessions'>> = {};
+const buildTimingPatch = (session: Doc<'agent_sessions'>, event: IncomingEvent): SessionPatch => {
+  const patch: SessionPatch = {};
   const timestamp = event.timestamp;
 
   const currentFirstEvent = typeof session.firstEventAt === 'number' ? session.firstEventAt : undefined;
@@ -360,81 +415,57 @@ const updateSessionTiming = async (ctx: MutationCtx, event: IncomingEvent) => {
     }
   }
 
-  if (Object.keys(patch).length > 0) {
-    const nextSession = { ...session, ...patch } as Doc<'agent_sessions'>;
-    const timing = deriveEndToEndTiming(nextSession);
+  const nextSession = { ...session, ...patch } as Doc<'agent_sessions'>;
+  const timing = deriveEndToEndTiming(nextSession);
 
-    if (timing.startedAt !== session.endToEndStartedAt) {
-      patch.endToEndStartedAt = timing.startedAt;
-    }
-    if (timing.finishedAt !== session.endToEndFinishedAt) {
-      patch.endToEndFinishedAt = timing.finishedAt;
-    }
-    if (timing.durationMs !== session.endToEndDurationMs) {
-      patch.endToEndDurationMs = timing.durationMs;
-    }
-
-    const nextUpdatedAt = session.updatedAt > timestamp ? session.updatedAt : timestamp;
-    patch.updatedAt = nextUpdatedAt;
-
-    await applySessionPatch(ctx, session, patch);
-  } else {
-    const hasExistingTiming =
-      typeof session.endToEndStartedAt === 'number' &&
-      typeof session.endToEndFinishedAt === 'number' &&
-      typeof session.endToEndDurationMs === 'number';
-
-    if (!hasExistingTiming) {
-      const timing = deriveEndToEndTiming(session);
-      if (
-        timing.startedAt !== session.endToEndStartedAt ||
-        timing.finishedAt !== session.endToEndFinishedAt ||
-        timing.durationMs !== session.endToEndDurationMs
-      ) {
-        await applySessionPatch(ctx, session, {
-          endToEndStartedAt: timing.startedAt,
-          endToEndFinishedAt: timing.finishedAt,
-          endToEndDurationMs: timing.durationMs,
-          updatedAt: session.updatedAt > timestamp ? session.updatedAt : timestamp,
-        });
-      }
-    }
+  if (timing.startedAt !== session.endToEndStartedAt) {
+    patch.endToEndStartedAt = timing.startedAt;
   }
+  if (timing.finishedAt !== session.endToEndFinishedAt) {
+    patch.endToEndFinishedAt = timing.finishedAt;
+  }
+  if (timing.durationMs !== session.endToEndDurationMs) {
+    patch.endToEndDurationMs = timing.durationMs;
+  }
+
+  const currentUpdatedAt = typeof session.updatedAt === 'number' ? session.updatedAt : undefined;
+  const nextUpdatedAt = typeof currentUpdatedAt === 'number' && currentUpdatedAt > timestamp ? currentUpdatedAt : timestamp;
+  if (nextUpdatedAt !== currentUpdatedAt) {
+    patch.updatedAt = nextUpdatedAt;
+  }
+
+  return patch;
 };
 
-const handleSessionStarted = async (ctx: MutationCtx, event: IncomingEvent) => {
+const handleSessionStarted = async (
+  _ctx: MutationCtx,
+  event: IncomingEvent,
+  _session: Doc<'agent_sessions'>,
+): Promise<SessionPatch> => {
   const payload = event.payload ?? {};
-  const defaults: Partial<Doc<'agent_sessions'>> = {
+
+  const patch = pickDefined({
     userIdentifier: event.userIdentifier ?? (payload.userIdentifier as string | undefined),
     threadId: event.threadId,
     model: event.model,
-    personaMode: (payload.personaMode as boolean | undefined) ?? event.personaMode ?? false,
-    toolNames: Array.isArray(payload.toolNames) ? (payload.toolNames as string[]) : [],
+    personaMode: (payload.personaMode as boolean | undefined) ?? event.personaMode,
+    toolNames: Array.isArray(payload.toolNames) ? (payload.toolNames as string[]) : undefined,
     attachmentsCount: typeof payload.attachmentsCount === 'number' ? (payload.attachmentsCount as number) : undefined,
     messagePreviews: payload.messagePreviews,
-    sessionStartedAt: typeof payload.sessionStartedAt === 'number' ? (payload.sessionStartedAt as number) : event.timestamp,
-    createdAt: event.timestamp,
-    updatedAt: event.timestamp,
-  };
+    sessionStartedAt: typeof payload.sessionStartedAt === 'number' ? (payload.sessionStartedAt as number) : undefined,
+  }) as SessionPatch;
 
-  const session = await ensureSessionRecord(ctx, event, defaults);
-  await applySessionPatch(ctx, session, {
-    userIdentifier: defaults.userIdentifier,
-    threadId: event.threadId ?? session.threadId,
-    model: event.model ?? session.model,
-    personaMode: defaults.personaMode,
-    toolNames: defaults.toolNames,
-    attachmentsCount: defaults.attachmentsCount,
-    messagePreviews: defaults.messagePreviews,
-    sessionStartedAt: defaults.sessionStartedAt,
-    updatedAt: event.timestamp,
-  });
+  patch.updatedAt = event.timestamp;
+  return patch;
 };
 
-const handleStepFinished = async (ctx: MutationCtx, event: IncomingEvent) => {
+const handleStepFinished = async (
+  ctx: MutationCtx,
+  event: IncomingEvent,
+  session: Doc<'agent_sessions'>,
+): Promise<SessionPatch> => {
   const payload = event.payload ?? {};
   const stepIndex = typeof payload.stepIndex === 'number' ? (payload.stepIndex as number) : 0;
-  const session = await ensureSessionRecord(ctx, event);
 
   const existingStep = await ctx.db
     .query('agent_steps')
@@ -472,19 +503,22 @@ const handleStepFinished = async (ctx: MutationCtx, event: IncomingEvent) => {
 
   const currentStepCount = session.stepCount ?? 0;
   const desiredStepCount = Math.max(currentStepCount, stepIndex + 1);
-  await applySessionPatch(ctx, session, {
+
+  return {
     stepCount: desiredStepCount,
     updatedAt: event.timestamp,
-  });
+  };
 };
 
-const handleToolCallStarted = async (ctx: MutationCtx, event: IncomingEvent) => {
+const handleToolCallStarted = async (
+  ctx: MutationCtx,
+  event: IncomingEvent,
+  _session: Doc<'agent_sessions'>,
+): Promise<SessionPatch> => {
   const payload = event.payload ?? {};
   const toolCallId = typeof payload.toolCallId === 'string' ? (payload.toolCallId as string) : `tc_${event.sequence}`;
   const toolName = typeof payload.toolName === 'string' ? (payload.toolName as string) : 'unknown';
   const stepIndex = typeof payload.stepIndex === 'number' ? (payload.stepIndex as number) : 0;
-
-  await ensureSessionRecord(ctx, event);
 
   const existing = await ctx.db
     .query('agent_tool_calls')
@@ -519,9 +553,15 @@ const handleToolCallStarted = async (ctx: MutationCtx, event: IncomingEvent) => 
   } else {
     await ctx.db.insert('agent_tool_calls', { ...insertBase, ...optionalFields });
   }
+
+  return { updatedAt: event.timestamp };
 };
 
-const handleToolCallOutbound = async (ctx: MutationCtx, event: IncomingEvent) => {
+const handleToolCallOutbound = async (
+  ctx: MutationCtx,
+  event: IncomingEvent,
+  _session: Doc<'agent_sessions'>,
+): Promise<SessionPatch> => {
   const payload = event.payload ?? {};
   const toolCallId = typeof payload.toolCallId === 'string' ? (payload.toolCallId as string) : `tc_${event.sequence}`;
   const toolName = typeof payload.toolName === 'string' ? (payload.toolName as string) : 'unknown';
@@ -529,8 +569,6 @@ const handleToolCallOutbound = async (ctx: MutationCtx, event: IncomingEvent) =>
   const argsSummary = typeof payload.argsSummary === 'object' && payload.argsSummary !== null
     ? (payload.argsSummary as Record<string, unknown>)
     : undefined;
-
-  const session = await ensureSessionRecord(ctx, event);
 
   const existing = await ctx.db
     .query('agent_tool_calls')
@@ -569,10 +607,14 @@ const handleToolCallOutbound = async (ctx: MutationCtx, event: IncomingEvent) =>
     await ctx.db.insert('agent_tool_calls', { ...insertBase, ...optionalFields });
   }
 
-  await applySessionPatch(ctx, session, { updatedAt: event.timestamp });
+  return { updatedAt: event.timestamp };
 };
 
-const handleToolCallFinished = async (ctx: MutationCtx, event: IncomingEvent) => {
+const handleToolCallFinished = async (
+  ctx: MutationCtx,
+  event: IncomingEvent,
+  session: Doc<'agent_sessions'>,
+): Promise<SessionPatch> => {
   const payload = event.payload ?? {};
   const toolCallId = typeof payload.toolCallId === 'string' ? (payload.toolCallId as string) : `tc_${event.sequence}`;
   const toolName = typeof payload.toolName === 'string' ? (payload.toolName as string) : 'unknown';
@@ -582,8 +624,6 @@ const handleToolCallFinished = async (ctx: MutationCtx, event: IncomingEvent) =>
   const tokenUsage = payload.tokenUsage as UsageRecord | undefined;
   const resultSummary = payload.resultSummary ?? {};
   const isError = typeof resultSummary === 'object' && resultSummary !== null ? Boolean((resultSummary as { isError?: boolean }).isError) : false;
-
-  const session = await ensureSessionRecord(ctx, event);
 
   const existing = await ctx.db
     .query('agent_tool_calls')
@@ -632,23 +672,29 @@ const handleToolCallFinished = async (ctx: MutationCtx, event: IncomingEvent) =>
   if (!alreadyCompleted) {
     const estimatedUsage = hasUsage(tokenUsage)
       ? mergeUsage(session.estimatedUsage as UsageRecord | undefined, tokenUsage)
-      : (session.estimatedUsage as UsageRecord | undefined);
+      : undefined;
     const newEstimatedCost = typeof costUSD === 'number'
       ? Number(((session.estimatedCostUSD ?? 0) + costUSD).toFixed(6))
-      : session.estimatedCostUSD;
+      : undefined;
 
-    await applySessionPatch(ctx, session, {
+    const patch = pickDefined({
       toolCallCount: (session.toolCallCount ?? 0) + 1,
       estimatedUsage,
       estimatedCostUSD: newEstimatedCost,
-      updatedAt: event.timestamp,
-    });
-  } else {
-    await applySessionPatch(ctx, session, { updatedAt: event.timestamp });
+    }) as SessionPatch;
+
+    patch.updatedAt = event.timestamp;
+    return patch;
   }
+
+  return { updatedAt: event.timestamp };
 };
 
-const handleToolCallInbound = async (ctx: MutationCtx, event: IncomingEvent) => {
+const handleToolCallInbound = async (
+  ctx: MutationCtx,
+  event: IncomingEvent,
+  _session: Doc<'agent_sessions'>,
+): Promise<SessionPatch> => {
   const payload = event.payload ?? {};
   const toolCallId = typeof payload.toolCallId === 'string' ? (payload.toolCallId as string) : `tc_${event.sequence}`;
   const toolName = typeof payload.toolName === 'string' ? (payload.toolName as string) : 'unknown';
@@ -660,8 +706,6 @@ const handleToolCallInbound = async (ctx: MutationCtx, event: IncomingEvent) => 
   const tokenUsage = payload.tokenUsage as UsageRecord | undefined;
   const costUSD = typeof payload.costUSD === 'number' ? (payload.costUSD as number) : undefined;
   const isError = Boolean((resultSummary?.isError as boolean | undefined) ?? false);
-
-  const session = await ensureSessionRecord(ctx, event);
 
   const existing = await ctx.db
     .query('agent_tool_calls')
@@ -710,35 +754,37 @@ const handleToolCallInbound = async (ctx: MutationCtx, event: IncomingEvent) => 
     await ctx.db.insert('agent_tool_calls', { ...insertBase, ...optionalFields });
   }
 
-  await applySessionPatch(ctx, session, { updatedAt: event.timestamp });
+  return { updatedAt: event.timestamp };
 };
 
-const handleSessionFinished = async (ctx: MutationCtx, event: IncomingEvent) => {
+const handleSessionFinished = async (
+  _ctx: MutationCtx,
+  event: IncomingEvent,
+  _session: Doc<'agent_sessions'>,
+): Promise<SessionPatch> => {
   const payload = event.payload ?? {};
-  const session = await ensureSessionRecord(ctx, event);
-
   const estimatedUsage = payload.estimatedUsage as UsageRecord | undefined;
   const actualUsage = payload.actualUsage as UsageRecord | undefined;
-  const estimatedCostUSD = typeof payload.estimatedCostUSD === 'number'
-    ? Number((payload.estimatedCostUSD as number).toFixed(6))
-    : session.estimatedCostUSD;
-  const actualCostUSD = typeof payload.actualCostUSD === 'number'
-    ? Number((payload.actualCostUSD as number).toFixed(6))
-    : session.actualCostUSD;
 
-  await applySessionPatch(ctx, session, {
+  const patch = pickDefined({
     sessionFinishedAt: event.timestamp,
-    stepCount: typeof payload.stepCount === 'number' ? (payload.stepCount as number) : session.stepCount,
-    toolCallCount: typeof payload.toolCallCount === 'number' ? (payload.toolCallCount as number) : session.toolCallCount,
-    estimatedUsage: hasUsage(estimatedUsage) ? estimatedUsage : session.estimatedUsage,
-    actualUsage: hasUsage(actualUsage) ? actualUsage : session.actualUsage,
-    estimatedCostUSD,
-    actualCostUSD,
-    updatedAt: event.timestamp,
-  });
+    stepCount: typeof payload.stepCount === 'number' ? (payload.stepCount as number) : undefined,
+    toolCallCount: typeof payload.toolCallCount === 'number' ? (payload.toolCallCount as number) : undefined,
+    estimatedUsage: hasUsage(estimatedUsage) ? estimatedUsage : undefined,
+    actualUsage: hasUsage(actualUsage) ? actualUsage : undefined,
+    estimatedCostUSD: typeof payload.estimatedCostUSD === 'number'
+      ? Number((payload.estimatedCostUSD as number).toFixed(6))
+      : undefined,
+    actualCostUSD: typeof payload.actualCostUSD === 'number'
+      ? Number((payload.actualCostUSD as number).toFixed(6))
+      : undefined,
+  }) as SessionPatch;
+
+  patch.updatedAt = event.timestamp;
+  return patch;
 };
 
-const kindHandlers: Record<string, (ctx: MutationCtx, event: IncomingEvent) => Promise<void>> = {
+const kindHandlers: Record<string, SessionHandler> = {
   session_started: handleSessionStarted,
   step_finished: handleStepFinished,
   tool_call_started: handleToolCallStarted,
@@ -770,15 +816,21 @@ export const ingestEvent = mutation({
 
     await recordEvent(ctx, event);
 
-    const handler = kindHandlers[event.kind];
-    if (handler) {
-      await handler(ctx, event);
-    } else {
-      const session = await ensureSessionRecord(ctx, event);
-      await applySessionPatch(ctx, session, { updatedAt: event.timestamp });
-    }
+    const ensureDefaults = deriveEnsureDefaults(event);
+    const session = await ensureSessionRecord(ctx, event, ensureDefaults);
 
-    await updateSessionTiming(ctx, event);
+    const handler = kindHandlers[event.kind];
+    const handlerPatch = (handler
+      ? await handler(ctx, event, session)
+      : ({ updatedAt: event.timestamp } as SessionPatch)) ?? ({} as SessionPatch);
+
+    const sessionAfterHandler = { ...session, ...handlerPatch } as Doc<'agent_sessions'>;
+    const timingPatch = buildTimingPatch(sessionAfterHandler, event);
+    const mergedPatch = mergeSessionPatches(handlerPatch, timingPatch);
+
+    if (Object.keys(mergedPatch).length > 0) {
+      await applySessionPatch(ctx, session, mergedPatch);
+    }
 
     return { ok: true } as const;
   },
@@ -1010,19 +1062,29 @@ export const deleteSession = mutation({
       return { ok: false as const, error: 'not_found' as const };
     }
 
-    const deleteBySession = async <T extends TableNames>(
-      table: T,
-      index: string,
-    ) => {
-      const records = await ctx.db.query(table as any).withIndex(index as any, (q: any) => q.eq('sessionId', args.sessionId)).collect();
-      for (const rec of records) {
-        await ctx.db.delete(rec._id as Id<any>);
-      }
-    };
+    const deleteAgentEvents = await ctx.db
+      .query('agent_events')
+      .withIndex('by_session', (q) => q.eq('sessionId', args.sessionId))
+      .collect();
+    for (const record of deleteAgentEvents) {
+      await ctx.db.delete(record._id);
+    }
 
-    await deleteBySession('agent_events', 'by_session');
-    await deleteBySession('agent_steps', 'by_session');
-    await deleteBySession('agent_tool_calls', 'by_session');
+    const deleteAgentSteps = await ctx.db
+      .query('agent_steps')
+      .withIndex('by_session', (q) => q.eq('sessionId', args.sessionId))
+      .collect();
+    for (const record of deleteAgentSteps) {
+      await ctx.db.delete(record._id);
+    }
+
+    const deleteAgentToolCalls = await ctx.db
+      .query('agent_tool_calls')
+      .withIndex('by_session', (q) => q.eq('sessionId', args.sessionId))
+      .collect();
+    for (const record of deleteAgentToolCalls) {
+      await ctx.db.delete(record._id);
+    }
 
     await ctx.db.delete(session._id);
 

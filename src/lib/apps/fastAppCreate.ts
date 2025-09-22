@@ -4,7 +4,7 @@ export type FastAppCreateRequest = TFastAppCreateInput;
 
 export type FastAppCreateFileEntry = {
   path: string;
-  content: string;
+  content?: string;
 };
 
 export type FastAppCreateMirror = {
@@ -178,6 +178,14 @@ const parseRegistry = (raw: string | undefined | null) => {
   return [] as Array<{ id: string; name: string; icon?: string; path: string }>;
 };
 
+const isAlreadyExistsError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const code = (error as { code?: unknown }).code;
+  if (code === 'EEXIST') return true;
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' && /already exists/i.test(message);
+};
+
 export async function performFastAppCreate(options: FastAppCreateOptions): Promise<FastAppCreateResult> {
   const { input, fs, appsRoot = DEFAULT_APPS_ROOT, registryPath = DEFAULT_REGISTRY_PATH, now = () => Date.now() } = options;
 
@@ -248,19 +256,30 @@ export async function performFastAppCreate(options: FastAppCreateOptions): Promi
       }
       const fullPath = normalizeRelativePath(joinPaths(appBase, normalized));
       const dir = getDirname(fullPath);
-      if (dir) {
+      if (dir && dir !== appBase) {
         await fs.mkdirp(dir);
       }
       await fs.writeFile(fullPath, content);
       createdFiles.push(normalized);
-      mirrorFiles.push({ path: normalized, content });
+      mirrorFiles.push({ path: normalized });
     };
 
     const metadataPath = normalizeRelativePath(joinPaths(appBase, 'metadata.json'));
-    await fs.mkdirp(appBase);
-    await fs.writeFile(metadataPath, metadataContent);
-    createdFiles.unshift('metadata.json');
-    mirrorFiles.unshift({ path: 'metadata.json', content: metadataContent });
+    let metadataCreated = false;
+    try {
+      await fs.writeFile(metadataPath, metadataContent);
+      metadataCreated = true;
+    } catch (error) {
+      if (isAlreadyExistsError(error)) {
+        console.info(`[fastAppCreate] metadata.json already exists for ${finalId}, preserving current file.`);
+      } else {
+        throw error;
+      }
+    }
+    if (metadataCreated) {
+      createdFiles.unshift('metadata.json');
+    }
+    mirrorFiles.unshift({ path: 'metadata.json' });
 
     for (const file of normalizedFiles) {
       await writeAppFile(file.path, file.content);
