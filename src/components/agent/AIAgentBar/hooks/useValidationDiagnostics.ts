@@ -77,7 +77,7 @@ export function useValidationDiagnostics({ spawn, sendMessage, getStatus }: Opti
     return null;
   }
 
-  async function runValidation(scope: 'quick' | 'full', changed: string[] = []) {
+  async function runValidation(changed: string[] = []) {
     if (validateRunningRef.current) return;
     validateRunningRef.current = true;
     try {
@@ -100,7 +100,6 @@ export function useValidationDiagnostics({ spawn, sendMessage, getStatus }: Opti
             'eslint',
             '--format',
             'json',
-            '--max-warnings=0',
             ...lintTargets,
           ]);
           if (eslint.exitCode !== 0) {

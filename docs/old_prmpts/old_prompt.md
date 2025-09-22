@@ -558,7 +558,7 @@ export const TOOL_DESCRIPTIONS = {
   // Code Operations
   code_edit_ast: 'Edit code using AST transformations for precise, minimal modifications.',
   web_exec: 'Run package manager commands (e.g., pnpm add). Do NOT run dev/build/start.',
-  validate_project: 'Validate project: typecheck + lint; full includes production build.',
+  validate_project: 'Validate project: typecheck + lint.',
 
   // Web Search (User-Requested Only)
   web_search: 'Search the web for current information. ONLY use when the user explicitly requests web search or real‑time data.',

@@ -430,7 +430,7 @@ export async function POST(req: Request) {
       inputSchema: AppManageInput,
     },
     [TOOL_NAMES.validate_project]: {
-      description: 'Validate the project: typecheck + lint (changed files); full also runs production build.',
+      description: 'Validate the project: typecheck + lint (changed files).',
       inputSchema: ValidateProjectInput,
     },
     ...buildServerTools(sessionId),

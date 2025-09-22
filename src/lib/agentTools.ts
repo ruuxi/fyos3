@@ -50,7 +50,6 @@ export const AppManageInput = z.object({
 
 // Validation
 export const ValidateProjectInput = z.object({
-  scope: z.enum(['quick', 'full']).default('quick').describe('quick: typecheck + lint; full: also runs production build.'),
   files: z.array(z.string()).optional().describe('Optional explicit file list to lint.'),
 });
 

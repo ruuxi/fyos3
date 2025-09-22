@@ -30,7 +30,7 @@ type UseAgentChatOptions = {
   media: {
     loadMedia: () => Promise<void>;
   };
-  runValidation: (scope: 'quick' | 'full', files?: string[]) => Promise<void>;
+  runValidation: (files?: string[]) => Promise<void>;
   attachmentsProvider?: () => Array<{ name: string; publicUrl: string; contentType: string }>;
   onFirstToolCall?: () => void;
   onToolProgress?: (toolName: string) => void;
@@ -308,9 +308,9 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             break;
           }
           case 'validate_project': {
-            const { scope = 'quick', files = [] } = tc.input as { scope?: 'quick' | 'full'; files?: string[] };
-            await runValidation(scope, files);
-            addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, scope, files } });
+            const { files = [] } = tc.input as { files?: string[] };
+            await runValidation(files);
+            addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, files } });
             break;
           }
           case 'ai_generate': {
