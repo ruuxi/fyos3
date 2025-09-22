@@ -675,10 +675,17 @@ export async function POST(req: Request) {
         },
       });
 
-      writer.merge(agentResult.toUIMessageStream({
+      const agentStream = agentResult.toUIMessageStream({
         sendReasoning: false,
         messageMetadata: () => ({ mode: 'agent', session: personaSession }),
-      }));
+      });
+
+      for await (const chunk of agentStream) {
+        if (chunk.type === 'text-start' || chunk.type === 'text-delta' || chunk.type === 'text-end') {
+          continue;
+        }
+        writer.write(chunk);
+      }
 
       await agentResult.response;
     },
