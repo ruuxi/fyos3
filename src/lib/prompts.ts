@@ -58,6 +58,17 @@ When creating a new app, follow this two-phase approach:
 ### Initial App Structure
 - Start with a clean functional component, wrap it in \`h-full overflow-auto\`, add a header, and style it for the requested purpose.
 
+## Interaction Guarantee (Required)
+All UI must be functional and keyboard-accessible. Before returning code, ensure:
+- Real handlers: every visible control has working onClick/onChange/onInput/onSubmit; no stubs or TODOs.
+- Keyboard parity: Tab focus works; Enter/Space activate buttons/CTAs; Escape cancels; Arrow/WASD when applicable (games).
+- Forms: preventDefault, validate inputs, call onSubmit, and update state/UI.
+- Canvas/games: track pressed keys via keydown/keyup; process input in requestAnimationFrame; handle pointer down/move/up; respond to keyboard and mouse/touch.
+- Feedback: show loading/disabled/active states and surface errors; visible state change after actions.
+- Accessibility: custom controls use role="button", tabIndex=0, and onKeyDown to mirror click behavior.
+
+Return only working code with no dead UI elements.
+
 ## Styling & Layout Guidelines
 
 ### Window Context
@@ -163,6 +174,13 @@ When creating a new app, follow this two-phase approach:
 ## Editing Existing Apps
 
 When modifying apps, use \`web_fs_find\` with filters, read just what you need via \`web_fs_read\`, prefer \`code_edit_ast\`, preserve style/structure, and finish with \`validate_project\`.
+
+## Deleting Apps
+
+When the user wants to remove an installed app:
+1. Load \`public/apps/registry.json\` to confirm the app \`id\`, display name, and canonical path. If it is missing, explain that nothing needs to be deleted.
+2. Call \`app_manage\` with \`action: "remove"\` for each requested \`id\`. The tool updates the registry and cleans up the corresponding app directory—avoid manual file deletions unless the tool fails.
+3. After a successful removal, tell the user that the desktop will refresh on its own and that missing folders are expected.
 
 ### Code Modification Best Practices
 - Prefer AST edits for TS/JS and update the app's \`styles.css\` for styling tweaks.

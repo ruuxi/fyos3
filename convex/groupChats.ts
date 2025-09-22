@@ -122,7 +122,9 @@ async function getAutoRoomForMember(ctx: AnyCtx, memberId: string) {
 export const listGroupChats = query({
   args: {},
   handler: async (ctx) => {
-    const { ownerId } = await ensureIdentity(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const ownerId = getOwnerId(identity);
     const memberships = await ctx.db
       .query("group_members")
       .withIndex("by_member", (q) => q.eq("memberId", ownerId))
@@ -163,7 +165,9 @@ export const listGroupChats = query({
 export const listGroupMembers = query({
   args: { chatId: v.id("group_chats") },
   handler: async (ctx, args) => {
-    const { ownerId } = await ensureIdentity(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const ownerId = getOwnerId(identity);
     await assertMembership(ctx, args.chatId, ownerId);
     return listMembers(ctx, args.chatId);
   },
@@ -172,7 +176,9 @@ export const listGroupMembers = query({
 export const listGroupMessages = query({
   args: { chatId: v.id("group_chats"), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const { ownerId } = await ensureIdentity(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const ownerId = getOwnerId(identity);
     await assertMembership(ctx, args.chatId, ownerId);
     const limit = Math.min(Math.max(args.limit ?? 200, 1), 500);
     const messages = await ctx.db
@@ -304,7 +310,9 @@ export const sendGroupMessage = mutation({
 export const getMyAutoRoom = query({
   args: {},
   handler: async (ctx) => {
-    const { ownerId } = await ensureIdentity(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const ownerId = getOwnerId(identity);
     const current = await getAutoRoomForMember(ctx, ownerId);
     if (!current) return null;
     const members = await listMembers(ctx, current.chat._id);

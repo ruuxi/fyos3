@@ -10,7 +10,7 @@ export const getMyProfile = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    if (!identity) return null;
     const ownerId = getOwnerId(identity);
     const existing = await ctx.db.query("profiles").withIndex("by_owner", (q) => q.eq("ownerId", ownerId)).first();
     if (!existing) return null;
@@ -95,7 +95,7 @@ export const listFriends = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    if (!identity) return [];
     const ownerId = getOwnerId(identity);
     const rows = await ctx.db.query("friendships").withIndex("by_owner", (q) => q.eq("ownerId", ownerId)).collect();
     const friends: Array<{ ownerId: string; nickname?: string; email?: string }> = [];
@@ -131,7 +131,7 @@ export const listDmMessages = query({
   args: { peerId: v.string(), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    if (!identity) return [];
     const ownerId = getOwnerId(identity);
     const lim = Math.min(Math.max(args.limit ?? 200, 1), 500);
     const page = await ctx.db
@@ -147,7 +147,7 @@ export const listDmThreads = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    if (!identity) return [];
     const ownerId = getOwnerId(identity);
 
     const latestByPeer = new Map<

@@ -58,7 +58,7 @@ export const listThreads = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    if (!identity) return [];
     const ownerId = getOwnerId(identity);
     const all = await ctx.db
       .query("chat_threads")
@@ -73,7 +73,7 @@ export const listMessages = query({
   args: { threadId: v.id("chat_threads"), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    if (!identity) return [];
     const ownerId = getOwnerId(identity);
 
     const thread = await ctx.db.get(args.threadId);
@@ -96,7 +96,9 @@ export const listMessagesPage = query({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    if (!identity) {
+      return { page: [], isDone: true, continueCursor: null };
+    }
     const ownerId = getOwnerId(identity);
 
     const thread = await ctx.db.get(args.threadId);

@@ -125,7 +125,7 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
     if (!instance) throw new Error('WebContainer not ready');
     const startTime = Date.now();
     const isRecursive = opts?.recursive ?? true;
-    
+
     try {
       await instance.fs.rm(path, { recursive: isRecursive });
       const duration = Date.now() - startTime;
@@ -134,6 +134,13 @@ export function WebContainerProvider({ children }: { children: React.ReactNode }
       }
     } catch (error) {
       const duration = Date.now() - startTime;
+      const code = (error as { code?: string }).code;
+      if (code === 'ENOENT') {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug?.(`🗑️ [FileOp] REMOVE: ${path} (missing, treated as no-op) (${duration}ms)`);
+        }
+        return;
+      }
       console.error(`❌ [FileOp] REMOVE FAILED: ${path} (${duration}ms)`, error);
       throw error;
     }

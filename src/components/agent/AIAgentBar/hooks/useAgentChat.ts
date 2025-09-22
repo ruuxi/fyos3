@@ -927,18 +927,48 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             }
             if (action === 'remove') {
               const { id } = tc.input as { action: 'remove'; id: string };
-              let reg: Array<{ id: string; name: string; icon?: string; path: string }> = []; let appName = 'Unknown';
+              let reg: Array<{ id: string; name: string; icon?: string; path: string }> = [];
+              let appName = 'Unknown';
+              let canonicalDir: string | null = null;
+
               try {
                 const regRaw = await fnsRef.current.readFile('public/apps/registry.json', 'utf-8');
                 reg = JSON.parse(regRaw);
-                const app = reg.find(r => r.id === id); if (app) appName = app.name;
+                const app = reg.find(r => r.id === id);
+                if (app) {
+                  appName = app.name;
+                  const pathDir = typeof app.path === 'string' ? app.path.replace(/^\/+/, '') : '';
+                  if (pathDir.includes('/')) {
+                    canonicalDir = pathDir.slice(0, pathDir.lastIndexOf('/'));
+                  }
+                }
               } catch {}
+
               const next = reg.filter((r) => r.id !== id);
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(next, null, 2));
-              const p1 = `src/apps/${id}`; const p2 = `src/apps/app-${id}`;
-              try { await fnsRef.current.remove(p1, { recursive: true }); } catch {}
-              try { await fnsRef.current.remove(p2, { recursive: true }); } catch {}
-              addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: true, id, name: appName, removedPaths: [p1, p2] } });
+
+              const removalTargets = new Set<string>();
+              removalTargets.add(`src/apps/${id}`);
+              if (canonicalDir) removalTargets.add(canonicalDir);
+              if (!id.startsWith('app-')) {
+                removalTargets.add(`src/apps/app-${id}`);
+              }
+
+              const removedPaths: string[] = [];
+              for (const targetPath of removalTargets) {
+                try {
+                  await fnsRef.current.remove(targetPath, { recursive: true });
+                  removedPaths.push(targetPath);
+                } catch {
+                  // Ignore failures—directories may already be gone.
+                }
+              }
+
+              addToolResult({
+                tool: tc.toolName,
+                toolCallId: tc.toolCallId,
+                output: { ok: true, id, name: appName, removedPaths },
+              });
               break;
             }
             addToolResult({ tool: tc.toolName, toolCallId: tc.toolCallId, output: { ok: false, error: `Unsupported action: ${String(action)}` } });
