@@ -127,9 +127,9 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
                 type="button"
                 onClick={onContinue}
                 className="px-5 py-2 rounded-full border border-white/20 text-white bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors"
-                aria-label="Continue without signing in"
+                aria-label="Continue as guest"
               >
-                Continue
+                Continue as guest
               </button>
             </div>
           )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { WebContainer as WebContainerAPI, type WebContainerProcess } from '@webcontainer/api';
 // Binary snapshot approach for faster mounting
 import { useWebContainer } from './WebContainerProvider';
@@ -70,6 +70,8 @@ type AppConsoleMessage = AgentMessageBase & {
   search?: string;
   hash?: string;
 };
+
+type UserMode = 'auth' | 'anon';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
@@ -155,7 +157,7 @@ export default function WebContainer() {
   const webcontainerInstanceRef = useRef<WebContainerAPI | null>(null);
   useEffect(() => { webcontainerInstanceRef.current = webcontainerInstance; }, [webcontainerInstance]);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingStage, setLoadingStage] = useState<string>('Initializing…');
+  const [loadingStage, setLoadingStage] = useState<string>("Select how you'd like to start…");
   const [displayProgress, setDisplayProgress] = useState<number>(2);
   const [targetProgress, setTargetProgress] = useState<number>(2);
   const progressTargetRef = useRef<number>(2);
@@ -177,12 +179,32 @@ export default function WebContainer() {
   useEffect(() => { convexClientRef.current = convexClient; }, [convexClient]);
   const convexReadyRef = useRef(convexReady);
   useEffect(() => { convexReadyRef.current = convexReady; }, [convexReady]);
-  const [userMode, setUserMode] = useState<'auth'|'anon'>('auth');
-  const userModeRef = useRef(userMode);
+  const [userMode, setUserMode] = useState<UserMode | null>(null);
+  const userModeRef = useRef<UserMode | null>(userMode);
   useEffect(() => { userModeRef.current = userMode; }, [userMode]);
+  const [bootRequested, setBootRequested] = useState(false);
+  const hasBootedRef = useRef(false);
   const canProceed = isSignedIn || userMode === 'anon';
 
   useEffect(() => {
+    if (!isSignedIn || bootRequested) {
+      return;
+    }
+    setUserMode('auth');
+    setBootRequested(true);
+  }, [isSignedIn, bootRequested]);
+
+  const handleContinueAsGuest = useCallback(() => {
+    if (bootRequested) return;
+    setUserMode('anon');
+    setBootRequested(true);
+  }, [bootRequested]);
+
+  useEffect(() => {
+    if (!bootRequested || hasBootedRef.current) {
+      return;
+    }
+    hasBootedRef.current = true;
     let mounted = true;
     let cleanupMessageListener: (() => void) | null = null;
     let visibilityHandler: (() => void) | null = null;
@@ -791,7 +813,9 @@ export default function Document() {
             desktopReadyRef.current = true;
             const target = iframeRef.current?.contentWindow;
             // Announce user mode to the desktop iframe
-            try { target?.postMessage({ type: 'FYOS_USER_MODE', payload: { mode: userModeRef.current } }, '*') } catch {}
+            if (userModeRef.current && target) {
+              try { target.postMessage({ type: 'FYOS_USER_MODE', payload: { mode: userModeRef.current } }, '*'); } catch {}
+            }
             // Send current theme as soon as desktop is ready
             try {
               const raw = window.localStorage.getItem('fyos.desktop.theme');
@@ -863,7 +887,7 @@ export default function Document() {
         }
       } catch {}
     };
-  }, []);
+  }, [bootRequested]);
 
   // Keep a ref in sync with the latest target for stable reads inside rAF loop
   useEffect(() => {
@@ -981,7 +1005,7 @@ export default function Document() {
           onSignIn={() => {
             try { openSignIn({}) } catch { try { window.location.href = '/sign-in'; } catch {} }
           }}
-          onContinue={() => { setUserMode('anon'); }}
+          onContinue={handleContinueAsGuest}
         />
       )}
       <iframe
