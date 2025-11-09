@@ -7,7 +7,7 @@ import { useAgentChat } from './useAgentChat';
 import { useValidationDiagnostics } from './useValidationDiagnostics';
 import { getMutableWindow } from '../utils/window';
 import type { Attachment } from '../ui/ChatComposer';
-import type { Id } from '../../../../convex/_generated/dataModel';
+import type { Id } from '../../../../../convex/_generated/dataModel';
 
 export type OptimisticChatMessage = {
   id: string;
@@ -24,7 +24,11 @@ export type AppRegistryEntry = {
 };
 
 type WebContainerFns = {
+  mkdir: (path: string, recursive?: boolean) => Promise<void>;
+  writeFile: (path: string, content: string) => Promise<void>;
   readFile: (path: string, encoding?: 'utf-8' | 'base64') => Promise<string>;
+  readdirRecursive: (path?: string, maxDepth?: number) => Promise<{ path: string; type: 'file' | 'dir' }[]>;
+  remove: (path: string, opts?: { recursive?: boolean }) => Promise<void>;
   spawn: (command: string, args?: string[], opts?: { cwd?: string }) => Promise<{ exitCode: number; output: string }>;
 };
 
@@ -38,7 +42,7 @@ type UseAgentControllerArgs = {
   busyUpload: boolean;
   loadMedia: (args: { limit?: number }) => Promise<void> | void;
   instanceRef: MutableRefObject<WebContainerAPI | null>;
-  fnsRef: MutableRefObject<WebContainerFns & Record<string, unknown>>;
+  fnsRef: MutableRefObject<WebContainerFns>;
 };
 
 type AgentComposerHandlers = {
@@ -98,6 +102,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     startBlankThread,
     ensureActiveThread,
     closeThread,
+    deleteThread,
     isAuthenticated: isChatAuthenticated,
   } = useThreads();
 
@@ -148,7 +153,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     activeThreadId,
     getActiveThreadId: () => activeThreadIdImmediateRef.current,
     wc: { instanceRef, fnsRef },
-    media: { loadMedia },
+    media: { loadMedia: async () => { await loadMedia({}); } },
     runValidation,
     attachmentsProvider: () => (pendingAttachmentsRef.current || attachmentsRef.current || []),
     onFirstToolCall: () => {
@@ -438,6 +443,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     startBlankThread,
     ensureActiveThread,
     closeThread,
+    deleteThread,
     isAuthenticated: isChatAuthenticated,
     showThreadHistory,
     setShowThreadHistory,
@@ -457,6 +463,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     startBlankThread,
     ensureActiveThread,
     closeThread,
+    deleteThread,
     isChatAuthenticated,
     showThreadHistory,
     activeThreadIdImmediateRef,
