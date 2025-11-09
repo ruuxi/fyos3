@@ -241,7 +241,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 For questions, issues, or feature requests, please:
 - Open an issue on GitHub
 - Check the [documentation](./docs)
-- Visit [fromyou.ai](https://fromyou.ai)
+- Visit [fromyou.io](https://fromyou.io)
 
 ---
 
