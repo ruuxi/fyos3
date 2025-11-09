@@ -306,15 +306,15 @@ export async function POST(req: Request) {
   const toolCallTimings = new Map<string, number>();
 
   const result = streamText({
-    model: 'moonshotai/kimi-k2-0905',
-    providerOptions: {
-      gateway: {
-        order: ['groq', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
-      },
-      openai: {
-        reasoningEffort: 'high',
-      },
-    },
+    model: 'anthropic/claude-sonnet-4.5',
+    //providerOptions: {
+    //  gateway: {
+    //    order: ['groq', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
+    //  },
+    //  openai: {
+    //    reasoningEffort: 'high',
+    //  },
+    //},
     messages: convertToModelMessages(sanitizedMessages),
     stopWhen: stepCountIs(15),
     onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }: StepEventSummary) => {
