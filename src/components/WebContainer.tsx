@@ -386,7 +386,7 @@ export default function WebContainer() {
           console.warn('[WebContainer] Could not check latest private snapshot:', e);
         }
 
-        if (!restored && userModeRef.current === 'auth') {
+        if (!restored) {
           try {
             const hasSaved = await hasPersistedVfs();
             if (hasSaved) {
@@ -607,17 +607,23 @@ export default function Document() {
           }
         };
 
+        const persistLocalVfs = () => {
+          try {
+            void persistNow(instance);
+          } catch {}
+        };
+
         const handleVisibility = () => {
           if (document.visibilityState === 'hidden') {
+            persistLocalVfs();
             if (userModeRef.current === 'auth') {
-              void persistNow(instance);
               void savePrivateSnapshot();
             }
           }
         };
         const handleBeforeUnload = () => {
+          persistLocalVfs();
           if (userModeRef.current === 'auth') {
-            void persistNow(instance);
             void savePrivateSnapshot();
           }
         };
