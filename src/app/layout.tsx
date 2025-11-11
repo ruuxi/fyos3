@@ -10,8 +10,50 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "FromYou",
-  description: "Infinite Customizable Desktop Environment",
+  title: "FromYou - AI Powered Desktop OS",
+  description: "An AI-first infinite creation desktop and personal operating system. Build and run apps instantly through natural language, customize your environment, and share your creations.",
+  keywords: [
+    "AI OS",
+    "AI Desktop",
+    "AI Operating System",
+    "Personal Environment",
+    "App Builder",
+    "WebContainer",
+    "AI Agent",
+    "Desktop Environment",
+    "Custom Desktop",
+    "AI-Powered Apps",
+    "No-Code Platform",
+    "Visual Desktop",
+  ],
+  authors: [{ name: "FromYou" }],
+  creator: "FromYou",
+  publisher: "FromYou",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://fromyou.app",
+    title: "FromYou - AI Powered Desktop OS",
+    description: "An AI first infinite creation desktop and personal operating system. Build and run apps instantly through natural language.",
+    siteName: "FromYou",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "FromYou - AI Powered Desktop OS",
+    description: "An AI first infinite creation desktop and personal operating system. Build and run apps instantly through natural language.",
+    creator: "@fromyou",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 };
 
 export default function RootLayout({
