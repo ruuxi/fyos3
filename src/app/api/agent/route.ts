@@ -1,4 +1,5 @@
 import { convertToModelMessages, streamText, UIMessage, stepCountIs } from 'ai';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 // z is used in tool schemas but not directly here
 import {
   TOOL_NAMES,
@@ -305,17 +306,21 @@ export async function POST(req: Request) {
   // Track tool call timings to avoid duplicate logging
   const toolCallTimings = new Map<string, number>();
 
+  // Initialize OpenRouter provider
+  const openrouter = createOpenRouter({
+    apiKey: process.env.OPENROUTER_API_KEY,
+  });
+
   const result = streamText({
-    model: 'anthropic/claude-sonnet-4.5',
-    //providerOptions: {
-    //  gateway: {
-    //    order: ['groq', 'alibaba'], // Try Amazon Bedrock first, then Anthropic
-    //  },
-    //  openai: {
-    //    reasoningEffort: 'high',
-    //  },
-    //},
+    model: openrouter('z-ai/glm-4.6:nitro'),
+    providerOptions: {
+      openrouter: {
+        order: ['cerebras', 'fireworks'],
+      },
+    },
     messages: convertToModelMessages(sanitizedMessages),
+    // Tools are declared client-side and executed via onToolCall in useChat
+    // Server only provides the model inference, not tool execution
     stopWhen: stepCountIs(15),
     onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }: StepEventSummary) => {
       console.log('📊 [USAGE-STEP] Step finished:', {
@@ -406,15 +411,15 @@ export async function POST(req: Request) {
           cachedInputTokens: event.usage.cachedInputTokens || 0,
         });
 
-        // Calculate cost estimates based on model pricing
-        // qwen3-coder: $2.00 per million tokens (input and output)
-        const inputCostPerMillion = 2.00; // $2.00 per 1M input tokens
-        const outputCostPerMillion = 2.00; // $2.00 per 1M output tokens
+        // Calculate cost estimates based on model pricing (via OpenRouter)
+        // Claude Sonnet 4.5: pricing varies, check OpenRouter for current rates
+        const inputCostPerMillion = 3.00; // Approximate - check OpenRouter for exact pricing
+        const outputCostPerMillion = 15.00; // Approximate - check OpenRouter for exact pricing
         const estimatedCost = 
           ((event.usage.inputTokens || 0) / 1000000) * inputCostPerMillion +
           ((event.usage.outputTokens || 0) / 1000000) * outputCostPerMillion;
         
-        console.log('💰 [USAGE-COST] qwen3-coder estimated cost: $' + estimatedCost.toFixed(6));
+        console.log('💰 [USAGE-COST] Estimated cost (via OpenRouter): $' + estimatedCost.toFixed(6));
         
         // Log token usage and cost to file
         await agentLogger.logTokenUsage(
@@ -422,7 +427,7 @@ export async function POST(req: Request) {
           event.usage.inputTokens || 0,
           event.usage.outputTokens || 0,
           event.usage.totalTokens || 0,
-          'qwen3-coder',
+          'anthropic/claude-sonnet-4.5',
           estimatedCost
         );
       }
