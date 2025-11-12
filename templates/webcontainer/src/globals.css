@@ -4,3 +4,41 @@
 
 /* Global overrides or design tokens for the desktop runtime can live here. */
 
+vite-error-overlay {
+  display: none !important;
+}
+
+.hmr-mask {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  z-index: 2147483646;
+  background: var(--hmr-mask-bg, rgba(5, 8, 18, 0.78));
+  backdrop-filter: blur(6px);
+}
+
+.hmr-mask.active {
+  opacity: 1;
+}
+
+.hmr-mask[data-mode='error'] {
+  --hmr-mask-bg: rgba(12, 3, 15, 0.82);
+}
+
+.hmr-mask[data-mode='agent'] {
+  --hmr-mask-bg: rgba(4, 10, 24, 0.8);
+}
+
+.hmr-mask[data-mode='hmr'] {
+  --hmr-mask-bg: rgba(2, 6, 18, 0.72);
+}
+
+.hmr-mask [data-hmr-snapshot] {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  filter: saturate(0.92);
+  opacity: 0.98;
+}

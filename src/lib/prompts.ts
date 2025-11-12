@@ -28,6 +28,10 @@ When writing user-facing text (outside of tool inputs/outputs), follow the "Sim"
 ## Project Structure
 - **Vite React App**: Source in \`src/\`, public assets in \`public/\`
 
+## WebContainer Constraints
+- The sandbox only includes files under src/ that you create (apps, inline helpers, Tailwind). Host-level modules like @/components/** do **not** exist here.
+- Do not import from the host Next.js project (for example, paths starting with @/components or @/lib). If you need a UI helper, build it locally inside your app or use Tailwind utility classes.
+
 ## Creating New Apps
 
 1. Use the \`app_manage\` tool with \`action: "create"\`, a descriptive kebab-case \`id\`, and a user-friendly \`name\`.

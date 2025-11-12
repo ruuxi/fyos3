@@ -9,19 +9,141 @@
       /* Ensure scrolling happens inside the app mount, not the iframe viewport */
       #mount{overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
       body{background:#0b1020;overflow:hidden}
+      #vite-hmr-mask{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .16s ease;z-index:2147483646;background:rgba(5,8,18,.78);backdrop-filter:blur(6px)}
+      #vite-hmr-mask.active{opacity:1}
+      #vite-hmr-mask[data-mode="error"]{background:rgba(35,4,12,.85)}
+      #vite-hmr-mask[data-mode="agent"]{background:rgba(4,10,24,.82)}
+      #vite-hmr-mask[data-mode="hmr"]{background:rgba(2,6,18,.74)}
+      #vite-hmr-mask [data-hmr-snapshot]{width:100%;height:100%;pointer-events:none;opacity:.97;filter:saturate(.92)}
     </style>
   </head>
   <body>
     <div id="mount" style="height:100%"></div>
     <div id="vite-hmr-mask" style="position:fixed;inset:0;background:#0b1020;opacity:0;pointer-events:none;transition:opacity .12s ease;z-index:2147483646"></div>
     <script type="module">
-      // Disable Vite error overlay in iframe
+      class SnapshotMask {
+        constructor(getRoot) {
+          this.getRoot = getRoot;
+          this.overlay = document.getElementById('vite-hmr-mask');
+          if (this.overlay) {
+            this.overlay.classList.add('hmr-mask');
+          }
+          this.hideTimer = null;
+          this.pinned = null;
+        }
+        getRootNode() {
+          try {
+            return typeof this.getRoot === 'function' ? this.getRoot() : null;
+          } catch {
+            return null;
+          }
+        }
+        takeSnapshot() {
+          if (!this.overlay) return;
+          const root = this.getRootNode();
+          if (!root) return;
+          const clone = root.cloneNode(true);
+          clone.setAttribute('aria-hidden', 'true');
+          clone.setAttribute('data-hmr-snapshot', 'true');
+          const scripts = clone.querySelectorAll('script');
+          scripts.forEach((node) => {
+            try { node.remove(); } catch {}
+          });
+          this.overlay.replaceChildren(clone);
+        }
+        show(mode) {
+          if (!this.overlay) return;
+          this.takeSnapshot();
+          if (mode) this.overlay.dataset.mode = mode;
+          this.overlay.classList.add('active');
+        }
+        flash() {
+          if (this.pinned) {
+            this.takeSnapshot();
+            return;
+          }
+          this.show('hmr');
+          this.scheduleHide();
+        }
+        pin(mode) {
+          this.pinned = mode;
+          this.show(mode || 'hmr');
+        }
+        unpin(mode) {
+          if (mode && this.pinned && this.pinned !== mode) return;
+          this.pinned = null;
+          this.clear();
+        }
+        scheduleHide() {
+          if (!this.overlay) return;
+          if (this.hideTimer) window.clearTimeout(this.hideTimer);
+          this.hideTimer = window.setTimeout(() => {
+            if (!this.pinned) {
+              this.clear();
+            }
+          }, 160);
+        }
+        clear() {
+          if (!this.overlay) return;
+          this.overlay.classList.remove('active');
+          this.overlay.dataset.mode = '';
+          if (this.overlay.childNodes.length) {
+            this.overlay.replaceChildren();
+          }
+        }
+      }
+      const hmrMask = new SnapshotMask(() => document.getElementById('mount'));
+
+      const announceBuildEvent = (type, payload) => {
+        try {
+          const target = window.top || window.parent;
+          if (!target) return;
+          if (type === 'APP_BUILD_ERROR') {
+            const detail = (payload && payload.err) ? payload.err : (payload || {});
+            target.postMessage({
+              type,
+              message: detail.message || 'Unknown build error',
+              stack: detail.stack || '',
+              plugin: detail.plugin || '',
+              id: detail.id || '',
+              frame: detail.frame || '',
+              pathname: location.pathname,
+              search: location.search,
+              hash: location.hash,
+              scope: 'app',
+              timestamp: Date.now()
+            }, '*');
+          } else {
+            target.postMessage({
+              type,
+              pathname: location.pathname,
+              search: location.search,
+              hash: location.hash,
+              scope: 'app',
+              timestamp: Date.now()
+            }, '*');
+          }
+        } catch {}
+      };
+
+      // Disable Vite error overlay in iframe and forward diagnostics upstream
       if (import.meta.hot) {
         import.meta.hot.on('vite:error', (payload) => {
-          // Prevent Vite error overlay from showing
           console.error('[App iframe] Vite error:', payload);
+          hmrMask.pin('error');
+          announceBuildEvent('APP_BUILD_ERROR', payload);
         });
-        
+        import.meta.hot.on('vite:beforeUpdate', () => {
+          hmrMask.flash();
+        });
+        import.meta.hot.on('vite:afterUpdate', () => {
+          hmrMask.unpin('error');
+          hmrMask.flash();
+          announceBuildEvent('APP_BUILD_ERROR_CLEARED');
+        });
+        import.meta.hot.on('full-reload', () => {
+          hmrMask.pin('reload');
+        });
       }
       
       // Block vite-error-overlay custom element
@@ -47,6 +169,18 @@
         });
       });
       observer.observe(document.body, { childList: true, subtree: true });
+
+      window.addEventListener('message', (e) => {
+        try {
+          const payload = e?.data;
+          if (!payload || typeof payload.type !== 'string') return;
+          if (payload.type === 'FYOS_AGENT_RUN_STARTED') {
+            hmrMask.pin('agent');
+          } else if (payload.type === 'FYOS_AGENT_RUN_ENDED') {
+            hmrMask.unpin('agent');
+          }
+        } catch {}
+      });
 
       // Immediately isolate this iframe from parent errors
       window.addEventListener('error', (e) => {
@@ -247,27 +381,6 @@
           showOverlay('App setup error: ' + err)
         }
       }
-
-      // HMR anti-flash + gating inside app iframe
-      try {
-        const mask = document.getElementById('vite-hmr-mask')
-        const show = () => { if (mask) { mask.style.opacity = '.9' } }
-        const hideSoon = () => { setTimeout(() => { if (mask) mask.style.opacity = '0' }, 120) }
-        if (import.meta && import.meta.hot) {
-          // Gating: drop HMR updates while paused; resume on run end with a reload
-          let paused = false
-          window.addEventListener('message', (e) => {
-            try {
-              if (!e || !e.data || typeof e.data.type !== 'string') return
-              if (e.data.type === 'FYOS_AGENT_RUN_STARTED') paused = true
-              if (e.data.type === 'FYOS_AGENT_RUN_ENDED') { paused = false; location.reload() }
-            } catch {}
-          })
-          import.meta.hot.on('vite:beforeUpdate', (payload) => { if (paused) return; show() })
-          import.meta.hot.on('vite:afterUpdate', (payload) => { if (paused) return; hideSoon() })
-          import.meta.hot.on('full-reload', (payload) => { if (paused) return; show() })
-        }
-      } catch {}
     </script>
   </body>
   </html>

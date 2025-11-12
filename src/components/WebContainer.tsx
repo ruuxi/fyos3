@@ -14,7 +14,6 @@ import { useAuth, useClerk } from '@clerk/nextjs';
 declare global {
   interface Window {
     webcontainerInstance?: WebContainerAPI;
-    __FYOS_HMR_PAUSED?: boolean;
     __FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL?: number;
   }
 }
@@ -62,6 +61,25 @@ type AppRuntimeErrorMessage = AgentMessageBase & {
   stack?: string;
 };
 
+type AppBuildErrorMessage = AgentMessageBase & {
+  type: 'APP_BUILD_ERROR';
+  message?: string;
+  stack?: string;
+  plugin?: string;
+  id?: string;
+  frame?: string;
+  pathname?: string;
+  search?: string;
+  hash?: string;
+};
+
+type AppBuildErrorClearedMessage = AgentMessageBase & {
+  type: 'APP_BUILD_ERROR_CLEARED';
+  pathname?: string;
+  search?: string;
+  hash?: string;
+};
+
 type AppConsoleMessage = AgentMessageBase & {
   type: 'APP_CONSOLE';
   level?: string;
@@ -102,6 +120,14 @@ const isDesktopStateMessage = (value: unknown): value is DesktopStateMessage => 
 
 const isAppRuntimeErrorMessage = (value: unknown): value is AppRuntimeErrorMessage => {
   return isRecord(value) && value.type === 'APP_RUNTIME_ERROR';
+};
+
+const isAppBuildErrorMessage = (value: unknown): value is AppBuildErrorMessage => {
+  return isRecord(value) && value.type === 'APP_BUILD_ERROR';
+};
+
+const isAppBuildErrorClearedMessage = (value: unknown): value is AppBuildErrorClearedMessage => {
+  return isRecord(value) && value.type === 'APP_BUILD_ERROR_CLEARED';
 };
 
 const isAppConsoleMessage = (value: unknown): value is AppConsoleMessage => {
@@ -319,36 +345,6 @@ export default function WebContainer() {
                 } catch {}
               }, true);
 
-              // HMR gating: pause Vite HMR updates during agent runs and only apply after end
-              try {
-                window.__FYOS_HMR_PAUSED = false;
-                const origDispatch = WebSocket.prototype.dispatchEvent;
-                WebSocket.prototype.dispatchEvent = function(evt){
-                  try {
-                    if (window.__FYOS_HMR_PAUSED && evt && evt.type === 'message') {
-                      const data = evt && evt.data;
-                      const txt = typeof data === 'string' ? data : (data ? String(data) : '');
-                      if (txt && (txt.indexOf('"type":"update"') !== -1 || txt.indexOf('"type":"full-reload"') !== -1)) {
-                        // Drop HMR update while paused
-                        return true;
-                      }
-                    }
-                  } catch {}
-                  return origDispatch.call(this, evt);
-                };
-                window.addEventListener('message', (e) => {
-                  try {
-                    if (!e || !e.data || typeof e.data.type !== 'string') return;
-                    if (e.data.type === 'FYOS_AGENT_RUN_STARTED') {
-                      window.__FYOS_HMR_PAUSED = true;
-                    } else if (e.data.type === 'FYOS_AGENT_RUN_ENDED') {
-                      window.__FYOS_HMR_PAUSED = false;
-                      // Apply all changes at once
-                      try { location.reload(); } catch {}
-                    }
-                  } catch {}
-                });
-              } catch {}
             } catch {}
           })();`;
           try { await previewContainer.setPreviewScript?.(script); } catch {}
@@ -761,6 +757,34 @@ export default function Document() {
               const detail = { source: 'preview' as const, title, description, content: `Error at ${loc}\n\nStack trace:\n${stack}` };
               window.dispatchEvent(new CustomEvent('wc-preview-error', { detail }));
             } catch {}
+            return;
+          }
+
+          if (isAppBuildErrorMessage(data)) {
+            try {
+              const suppressUntil = window.__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL;
+              if (typeof suppressUntil === 'number' && Date.now() < suppressUntil) {
+                return;
+              }
+              const title = 'App Build Error';
+              const description = data.message ?? 'Unknown build error';
+              const loc = `${data.pathname ?? ''}${data.search ?? ''}${data.hash ?? ''}`;
+              const plugin = data.plugin ? `Plugin: ${data.plugin}\n` : '';
+              const id = data.id ? `File: ${data.id}\n` : '';
+              const frame = data.frame ? `Frame:\n${data.frame}\n` : '';
+              const stack = data.stack ?? '';
+              const detail = {
+                source: 'preview' as const,
+                title,
+                description,
+                content: `Build error at ${loc}\n${plugin}${id}${frame}\n${stack}`,
+              };
+              window.dispatchEvent(new CustomEvent('wc-preview-error', { detail }));
+            } catch {}
+            return;
+          }
+
+          if (isAppBuildErrorClearedMessage(data)) {
             return;
           }
 
