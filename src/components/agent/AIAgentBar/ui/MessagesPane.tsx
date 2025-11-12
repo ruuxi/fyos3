@@ -1,8 +1,7 @@
-import type { CSSProperties, ReactNode, RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { useConvexAuth, useQuery } from 'convex/react';
 import { api as convexApi } from '../../../../../convex/_generated/api';
 import { formatBytes, guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
-import AgentVerbCarousel from './AgentVerbCarousel';
 import type { Doc } from '../../../../../convex/_generated/dataModel';
 
 type ChatMode = 'agent' | 'persona';
@@ -263,7 +262,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
   const {
     messages,
     optimisticMessages = [],
-    status,
+    status: _status,
     messagesContainerRef,
     messagesInnerRef,
     containerHeight: _containerHeight,
@@ -271,7 +270,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
     bubbleAnimatingIds,
     lastSentAttachments,
     activeThreadId,
-    agentActive,
+    agentActive: _agentActive,
     onSuggestionSelect,
   } = props;
   const displayMessages: DisplayMessage[] = optimisticMessages.length > 0 ? [...messages, ...optimisticMessages] : messages;
@@ -319,24 +318,9 @@ export default function MessagesPane(props: MessagesPaneProps) {
             </div>
           </div>
         )}
-        {displayMessages.map((m, idx) => {
+        {displayMessages.map((m, _idx) => {
           const metadata = 'metadata' in m ? (m.metadata as AgentMessageMetadata | undefined) : undefined;
           const mode = resolveMode(m);
-          const isAssistant = m.role === 'assistant';
-          const isAgentAssistant = isAssistant && mode === 'agent';
-          const hasToolResults = Boolean((m.parts || []).some(isToolResultPart));
-          let isFinalAgentReply = true;
-          if (isAssistant && mode === 'agent') {
-            for (let cursor = idx + 1; cursor < displayMessages.length; cursor += 1) {
-              const next = displayMessages[cursor];
-              if (!next) break;
-              if (next.role === 'user') break;
-              if (next.role === 'assistant') {
-                isFinalAgentReply = false;
-                break;
-              }
-            }
-          }
 
           // Build content and collect any attachments referenced in text
           const textSegments: string[] = [];
@@ -352,30 +336,14 @@ export default function MessagesPane(props: MessagesPaneProps) {
               }
             }
           });
-          const effectiveSegments = isAgentAssistant ? [] : textSegments;
-          const textNodes: ReactNode[] = effectiveSegments.map((segment, index) => (
+          const textNodes: ReactNode[] = textSegments.map((segment, index) => (
             <span key={`t-${index}`}>{segment}</span>
           ));
           const isLastUser = m.role === 'user' && m.id === lastUserMessageId;
           const optimisticAttachmentOverride = getOptimisticAttachments(metadata);
-          const previewItems = isAgentAssistant
-            ? []
-            : collectedFromText.length > 0
-              ? collectedFromText
-              : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
-
-          const runActive = status === 'streaming' || status === 'submitted' || agentActive;
-          const isStreamingAgentMessage = isAgentAssistant && idx === displayMessages.length - 1 && runActive;
-          const showVerbAnimation = isStreamingAgentMessage && textNodes.length === 0;
-
-          // Hide non-final agent replies to avoid intermediate output flashes
-          if (isAssistant && mode === 'agent' && !isFinalAgentReply) {
-            return null;
-          }
-
-          if (isAgentAssistant && !showVerbAnimation && textNodes.length === 0 && !hasToolResults) {
-            return null;
-          }
+          const previewItems = collectedFromText.length > 0
+            ? collectedFromText
+            : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
 
           const personaLabel = 'Sim';
           const authorLabel = m.role === 'assistant' ? (mode === 'persona' ? personaLabel : 'AI Agent') : 'You';
@@ -387,28 +355,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
             ? 'bg-sky-500 text-white max-w-full'
             : assistantBubble;
           const bubbleClass = isOptimistic ? `${bubbleBase} opacity-80` : bubbleBase;
-          const bubbleStyle: CSSProperties | undefined = showVerbAnimation
-            ? {
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                borderColor: 'rgba(255, 255, 255, 0.14)',
-              }
-            : undefined;
-
-          const textContent: ReactNode | ReactNode[] = (() => {
-            if (!isAssistant) {
-              return textNodes;
-            }
-            if (!isAgentAssistant) {
-              return textNodes;
-            }
-            if (showVerbAnimation) {
-              return <AgentVerbCarousel />;
-            }
-            if (textNodes.length > 0) {
-              return textNodes;
-            }
-            return null;
-          })();
+          const textContent: ReactNode | ReactNode[] = textNodes.length > 0 ? textNodes : null;
 
           return (
             <div key={m.id} className={`text-sm flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} ${isOptimistic ? 'opacity-80' : ''}`}>
@@ -418,12 +365,11 @@ export default function MessagesPane(props: MessagesPaneProps) {
                 </div>
                 <div
                   className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${bubbleClass} ${bubbleAnimatingIds.has(m.id) ? 'ios-pop' : ''}`}
-                  style={bubbleStyle}
                 >
                   {/* Render agent-friendly content or original text */}
                   {textContent}
                   {/* Render tool results and media blocks */}
-                  {(!isAgentAssistant) && (m.parts || []).map((part, index: number) => {
+                  {(m.parts || []).map((part, index: number) => {
                     if (!isToolResultPart(part)) return null;
                     const payload = getToolResultPayload(part);
                     if (payload && payload.ephemeralAssets && payload.ephemeralAssets.length > 0) {
@@ -504,7 +450,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   )}
 
                   {/* Reactive media: if authenticated and thread-bound media exists, show new thumbnails below last assistant message */}
-                  {!isAgentAssistant && isFinalAgentReply && liveMediaList.length > 0 && (
+                  {liveMediaList.length > 0 && (
                     <div className="mt-2 space-y-2">
                       {liveMediaList.map((asset, assetIndex) => {
                         const publicUrl = asset.publicUrl || '';
