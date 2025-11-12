@@ -14,7 +14,7 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: 'https://fromyou.app/sitemap.xml',
+    sitemap: 'https://fromyou.io/sitemap.xml',
   }
 }
 

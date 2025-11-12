@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://fromyou.app",
+    url: "https://fromyou.io",
     title: "FromYou - AI Powered Desktop OS",
     description: "An AI first infinite creation desktop and personal operating system. Build and run apps instantly through natural language.",
     siteName: "FromYou",
