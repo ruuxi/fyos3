@@ -324,29 +324,115 @@ export default function MessagesPane(props: MessagesPaneProps) {
           const metadata = 'metadata' in m ? (m.metadata as AgentMessageMetadata | undefined) : undefined;
           const mode = resolveMode(m);
 
-          // Build content and collect any attachments referenced in text
-          let collectedFromText: AttachmentPreview[] = [];
-          const textParts = (m.parts || [])
-            .filter(isTextPart)
-            .map((part) => {
-              const { cleanedText, items } = extractAttachmentsFromText(part.text || '');
-              if (items.length) {
-                collectedFromText = collectedFromText.concat(items);
-              }
-              return cleanedText;
-            })
-            .filter(Boolean);
           const isUser = m.role === 'user';
           const isLastUser = isUser && m.id === lastUserMessageId;
           const optimisticAttachmentOverride = getOptimisticAttachments(metadata);
-          const previewItems = collectedFromText.length > 0
-            ? collectedFromText
-            : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
           const personaLabel = 'Sim';
           const authorLabel = m.role === 'assistant' ? (mode === 'persona' ? personaLabel : 'AI Agent') : 'You';
           const isOptimistic = hasOptimisticFlag(metadata);
           const showStreaming = !isUser && (status === 'streaming' || status === 'submitted') && idx === displayMessages.length - 1;
           const showLiveMedia = !isUser && idx === displayMessages.length - 1 && liveMediaList.length > 0;
+          // Build content and collect any attachments referenced in text while leaving message content intact
+          let collectedFromText: AttachmentPreview[] = [];
+          const partNodes = (m.parts || []).map((part, index: number) => {
+            if (isTextPart(part)) {
+              const { items } = extractAttachmentsFromText(part.text || '');
+              if (items.length) {
+                collectedFromText = collectedFromText.concat(items);
+              }
+              return (
+                <MessageResponse
+                  key={`text-${index}`}
+                  parseIncompleteMarkdown={showStreaming}
+                  isAnimating={showStreaming}
+                >
+                  {part.text || ''}
+                </MessageResponse>
+              );
+            }
+            if (isToolResultPart(part)) {
+              const payload = getToolResultPayload(part);
+              if (payload && payload.ephemeralAssets && payload.ephemeralAssets.length > 0) {
+                const assets = toMediaAssetArray(payload.ephemeralAssets);
+                return (
+                  <div key={`tool-${index}`} className="mt-2 space-y-2">
+                    {assets.map((asset, assetIndex) => {
+                      const { publicUrl, contentType } = asset || {};
+                      if (!publicUrl) return null;
+                      const isImage = (contentType || '').startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(publicUrl);
+                      const isAudio = (contentType || '').startsWith('audio/') || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(publicUrl);
+                      const isVideo = (contentType || '').startsWith('video/') || /\.(mp4|webm|mov|m4v|mkv)$/i.test(publicUrl);
+                      return (
+                        <div key={assetIndex} className="w-full">
+                          {isImage && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
+                          )}
+                          {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
+                          {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              }
+              if (payload && payload.persistedAssets && payload.persistedAssets.length > 0) {
+                const assets = toMediaAssetArray(payload.persistedAssets);
+                return (
+                  <div key={`tool-${index}`} className="mt-2 space-y-2">
+                    {assets.map((asset, assetIndex) => {
+                      const { publicUrl, contentType, size } = asset;
+                      if (!publicUrl) return null;
+                      const isImage = contentType?.startsWith('image/');
+                      const isAudio = contentType?.startsWith('audio/');
+                      const isVideo = contentType?.startsWith('video/');
+                      return (
+                        <div key={assetIndex} className="w-full">
+                          {isImage && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
+                          )}
+                          {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
+                          {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
+                          {contentType && size && (<div className="mt-1 text-xs text-white/60">{contentType} • {formatBytes(size)}</div>)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              }
+              if (payload?.publicUrl && payload?.contentType) {
+                const { publicUrl, contentType, size } = payload;
+                const isImage = contentType.startsWith('image/');
+                const isAudio = contentType.startsWith('audio/');
+                const isVideo = contentType.startsWith('video/');
+                return (
+                  <div key={`tool-${index}`} className="mt-2">
+                    {isImage && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={publicUrl} alt="Uploaded content" className="w-full max-w-sm rounded" />
+                    )}
+                    {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
+                    {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
+                    {size && (<div className="mt-1 text-xs text-white/60">{contentType} • {formatBytes(size)}</div>)}
+                  </div>
+                );
+              }
+              return (
+                <pre key={`tool-${index}`} className="mt-2 overflow-auto rounded bg-black/20 p-2 text-xs">
+                  {JSON.stringify(part.result ?? part.output ?? null, null, 2)}
+                </pre>
+              );
+            }
+            return (
+              <pre key={`raw-${index}`} className="mt-2 overflow-auto rounded bg-black/20 p-2 text-xs">
+                {JSON.stringify(part, null, 2)}
+              </pre>
+            );
+          });
+          const previewItems = collectedFromText.length > 0
+            ? collectedFromText
+            : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
 
           const contentClass = cn(
             'rounded-2xl px-3 py-2 whitespace-pre-wrap break-words border',
@@ -440,12 +526,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
                 {authorLabel}
               </div>
               <MessageContent className={contentClass}>
-                {textParts.map((text, index) => (
-                  <MessageResponse key={index} parseIncompleteMarkdown={showStreaming} isAnimating={showStreaming}>
-                    {text}
-                  </MessageResponse>
-                ))}
-                {toolResultNodes}
+                {partNodes}
                 {previewItems && previewItems.length > 0 && (
                   <div className="mt-2">{renderAttachments(previewItems)}</div>
                 )}

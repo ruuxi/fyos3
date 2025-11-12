@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import Desktop from './desktop/Desktop'
+import './globals.css'
 import './desktop/styles.css'
 
 type ViteHotEvent = 'vite:beforeUpdate' | 'vite:afterUpdate' | 'full-reload'

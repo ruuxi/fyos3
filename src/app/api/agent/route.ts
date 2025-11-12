@@ -319,8 +319,9 @@ export async function POST(req: Request) {
       },
     },
     messages: convertToModelMessages(sanitizedMessages),
-    // Tools are declared client-side and executed via onToolCall in useChat
-    // Server only provides the model inference, not tool execution
+    // Note: Most tools are executed CLIENT-SIDE via onToolCall in useAgentChat.ts
+    // They are declared here so the model knows about them, but execution happens on client
+    // Only server-side tools (web_search) have execute functions
     system: systemPrompt,
     tools,
     stopWhen: stepCountIs(15),
