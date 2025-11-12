@@ -321,6 +321,8 @@ export async function POST(req: Request) {
     messages: convertToModelMessages(sanitizedMessages),
     // Tools are declared client-side and executed via onToolCall in useChat
     // Server only provides the model inference, not tool execution
+    system: systemPrompt,
+    tools,
     stopWhen: stepCountIs(15),
     onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }: StepEventSummary) => {
       console.log('📊 [USAGE-STEP] Step finished:', {
@@ -457,8 +459,6 @@ export async function POST(req: Request) {
         })));
       }
     },
-    system: systemPrompt,
-    tools,
   });
 
   console.log('📤 [AGENT] Returning streaming response');
