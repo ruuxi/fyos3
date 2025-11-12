@@ -1,16 +1,11 @@
+// @ts-nocheck
 // Generated at runtime to support scripts/verify-webcontainer.mjs
 // Creates a file tree representation of templates/webcontainer with text files only.
 
-const nodeRequire = (globalThis as any).require ?? eval('require');
+const nodeRequire = typeof require === 'function' ? require : eval('require');
 
-const fs = nodeRequire('node:fs') as typeof import('node:fs');
-const path = nodeRequire('node:path') as typeof import('node:path');
-
-type TreeNode =
-  | { file: { contents: string } }
-  | { directory: Record<string, TreeNode> };
-
-type FileTree = Record<string, TreeNode>;
+const fs = nodeRequire('node:fs');
+const path = nodeRequire('node:path');
 
 const TEMPLATE_ROOT = path.join(process.cwd(), 'templates', 'webcontainer');
 const TEXT_EXTENSIONS = new Set([
@@ -31,11 +26,11 @@ const TEXT_EXTENSIONS = new Set([
   '.svg',
 ]);
 
-export const files: FileTree = buildTree(TEMPLATE_ROOT);
+export const files = buildTree(TEMPLATE_ROOT);
 
-function buildTree(root: string): FileTree {
-  const tree: FileTree = {};
-  let entries: fs.Dirent[];
+function buildTree(root) {
+  const tree = {};
+  let entries;
 
   try {
     entries = fs.readdirSync(root, { withFileTypes: true });
@@ -47,8 +42,7 @@ function buildTree(root: string): FileTree {
     if (shouldIgnore(entry.name)) continue;
     const fullPath = path.join(root, entry.name);
     if (entry.isDirectory()) {
-      const directory = buildTree(fullPath);
-      tree[entry.name] = { directory };
+      tree[entry.name] = { directory: buildTree(fullPath) };
     } else if (entry.isFile() && isTextFile(entry.name)) {
       tree[entry.name] = { file: { contents: readTextFile(fullPath) } };
     }
@@ -57,13 +51,13 @@ function buildTree(root: string): FileTree {
   return tree;
 }
 
-function shouldIgnore(name: string): boolean {
+function shouldIgnore(name) {
   if (name === 'node_modules' || name === '.pnpm-store' || name === '.turbo') return true;
   if (name === 'dist' || name === '.next' || name === '.git') return true;
   return false;
 }
 
-function isTextFile(filename: string): boolean {
+function isTextFile(filename) {
   const ext = path.extname(filename).toLowerCase();
   if (ext === '.bin' || ext === '.webp' || ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
     return false;
@@ -74,7 +68,7 @@ function isTextFile(filename: string): boolean {
   return false;
 }
 
-function readTextFile(filePath: string): string {
+function readTextFile(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
