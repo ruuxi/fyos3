@@ -416,7 +416,43 @@ export function useAgentChat(opts: UseAgentChatOptions) {
               await fnsRef.current.writeFile(`${base}/metadata.json`, JSON.stringify(metadata, null, 2));
               const appIndexTsx = `import React from 'react'\nimport './styles.css'\n\nexport default function App(){\n  return (\n    <div className=\"h-full overflow-y-auto bg-slate-950 text-slate-100\">\n      <div className=\"mx-auto flex min-h-full w-full max-w-5xl flex-col gap-6 px-6 py-10\">\n        <header className=\"app-glass flex flex-col gap-6 md:flex-row md:items-center md:justify-between\">\n          <div className=\"space-y-3\">\n            <span className=\"inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-sky-300\">Tailwind ready</span>\n            <h1 className=\"text-3xl font-semibold tracking-tight text-white\">${finalName}</h1>\n            <p className=\"max-w-2xl text-sm text-slate-300\">Tailwind CSS is already wired up inside this workspace. Drop your components here, remix the layout, and keep what you love.</p>\n          </div>\n          <div className=\"flex flex-wrap gap-3\">\n            <button type=\"button\" className=\"app-primary-btn\">Primary action</button>\n            <button type=\"button\" className=\"app-secondary-btn\">Secondary</button>\n          </div>\n        </header>\n\n        <main className=\"app-main\">\n          <section className=\"app-glass space-y-4\">\n            <div>\n              <h2 className=\"app-section-title\">Quick overview</h2>\n              <p className=\"app-section-subtitle\">Swap these cards for your real content. They exist to show off the depth, spacing, and glassmorphism defaults.</p>\n            </div>\n            <div className=\"app-grid\">\n              <article className=\"app-card\">\n                <h3 className=\"text-lg font-semibold text-white\">Drop in widgets</h3>\n                <p className=\"text-sm text-slate-300\">Use the utility classes directly in JSX or create patterns in <code className=\"rounded bg-white/10 px-1.5 py-0.5 text-xs\">styles.css</code> with <code className=\"font-mono text-xs\">@apply</code>.</p>\n              </article>\n              <article className=\"app-card\">\n                <h3 className=\"text-lg font-semibold text-white\">Focus on flow</h3>\n                <p className=\"text-sm text-slate-300\">The shell already handles sticky headers, responsive breathing room, and smooth scroll areas.</p>\n              </article>\n              <article className=\"app-card\">\n                <h3 className=\"text-lg font-semibold text-white\">Ship the vibe</h3>\n                <p className=\"text-sm text-slate-300\">Lean into gradients, neon borders, or whatever fits—Tailwind ships the tokens, you bring the taste.</p>\n              </article>\n            </div>\n          </section>\n\n          <section className=\"app-glass space-y-4\">\n            <div>\n              <h2 className=\"app-section-title\">Suggested next steps</h2>\n              <p className=\"app-section-subtitle\">Keep or toss this list. It’s just a gentle nudge toward building something sick.</p>\n            </div>\n            <ul className=\"app-list\">\n              <li>Wire up real data or fake it with fixtures.</li>\n              <li>Swap the CTA buttons for actions that matter.</li>\n              <li>Layer in media, charts, or anything wild.</li>\n            </ul>\n          </section>\n        </main>\n      </div>\n    </div>\n  )\n}`;
               await fnsRef.current.writeFile(`${base}/index.tsx`, appIndexTsx);
-              const appStylesCss = `@layer components {\n  .app-main {\n    @apply space-y-6;\n  }\n  .app-glass {\n    @apply rounded-3xl border border-white/10 bg-white/10 p-6 shadow-sim-xl backdrop-blur-2xl transition hover:border-white/20 hover:bg-white/15;\n  }\n  .app-primary-btn {\n    @apply inline-flex items-center justify-center rounded-full bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(14,165,233,0.35)] transition hover:bg-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300;\n  }\n  .app-secondary-btn {\n    @apply inline-flex items-center justify-center rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-slate-100/90 transition hover:border-white/40 hover:text-white;\n  }\n  .app-section-title {\n    @apply text-lg font-semibold text-white;\n  }\n  .app-section-subtitle {\n    @apply text-sm text-slate-300;\n  }\n  .app-card {\n    @apply rounded-2xl border border-white/15 bg-white/[0.08] p-5 transition hover:border-white/30 hover:bg-white/[0.12];\n  }\n  .app-grid {\n    @apply grid gap-4 md:grid-cols-2 xl:grid-cols-3;\n  }\n  .app-list {\n    @apply list-disc space-y-2 pl-6 text-sm text-slate-200/90;\n  }\n}`;
+              const appStylesCss = `/* Tailwind helpers for the default scaffold */
+.app-main {
+  @apply space-y-6;
+}
+
+.app-glass {
+  @apply rounded-3xl border border-white/10 bg-white/10 p-6 shadow-sim-xl backdrop-blur-2xl transition hover:border-white/20 hover:bg-white/15;
+}
+
+.app-primary-btn {
+  @apply inline-flex items-center justify-center rounded-full bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(14,165,233,0.35)] transition hover:bg-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300;
+}
+
+.app-secondary-btn {
+  @apply inline-flex items-center justify-center rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-slate-100/90 transition hover:border-white/40 hover:text-white;
+}
+
+.app-section-title {
+  @apply text-lg font-semibold text-white;
+}
+
+.app-section-subtitle {
+  @apply text-sm text-slate-300;
+}
+
+.app-card {
+  @apply rounded-2xl border border-white/15 bg-white/[0.08] p-5 transition hover:border-white/30 hover:bg-white/[0.12];
+}
+
+.app-grid {
+  @apply grid gap-4 md:grid-cols-2 xl:grid-cols-3;
+}
+
+.app-list {
+  @apply list-disc space-y-2 pl-6 text-sm text-slate-200/90;
+}
+`;
               await fnsRef.current.writeFile(`${base}/styles.css`, appStylesCss);
               registry.push({ id: finalId, name: finalName, icon: metadata.icon, path: `/${base}/index.tsx` });
               await fnsRef.current.writeFile('public/apps/registry.json', JSON.stringify(registry, null, 2));

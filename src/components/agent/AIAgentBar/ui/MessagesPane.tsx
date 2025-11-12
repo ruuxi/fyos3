@@ -1,4 +1,5 @@
 import type { RefObject } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useConvexAuth, useQuery } from 'convex/react';
 import { api as convexApi } from '../../../../../convex/_generated/api';
 import { formatBytes, guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
@@ -116,6 +117,29 @@ const welcomeSuggestions = [
   'Change my background',
   'Add sound effects on clicks',
   'Help me get started',
+] as const;
+
+const actionVerbs = [
+  'Building',
+  'Creating',
+  'Writing',
+  'Reading',
+  'Installing',
+  'Executing',
+  'Generating',
+  'Compiling',
+  'Analyzing',
+  'Deploying',
+  'Optimizing',
+  'Validating',
+  'Crafting',
+  'Brewing',
+  'Cooking',
+  'Mixing',
+  'Shaping',
+  'Polishing',
+  'Tuning',
+  'Weaving',
 ] as const;
 
 export type MessagesPaneProps = {
@@ -284,6 +308,75 @@ export default function MessagesPane(props: MessagesPaneProps) {
   const liveMediaList: Doc<'media_public'>[] = Array.isArray(liveMedia) ? liveMedia : [];
   const lastUserMessage = [...displayMessages].reverse().find(m => m.role === 'user');
   const lastUserMessageId = lastUserMessage?.id;
+
+  // Verb carousel state
+  const [currentVerb, setCurrentVerb] = useState<string | null>(null);
+  const [showVerbCarousel, setShowVerbCarousel] = useState(false);
+  const lastMessageLengthRef = useRef(0);
+  const lastToolCallCountRef = useRef(0);
+  const lastTextMessageIdRef = useRef<string | null>(null);
+
+  // Monitor messages for tool calls and text content
+  useEffect(() => {
+    if (displayMessages.length === 0) {
+      setShowVerbCarousel(false);
+      setCurrentVerb(null);
+      return;
+    }
+
+    const lastMessage = displayMessages[displayMessages.length - 1];
+    
+    // Only track assistant messages
+    if (lastMessage.role !== 'assistant') {
+      return;
+    }
+
+    const parts = Array.isArray(lastMessage.parts) ? lastMessage.parts : [];
+    
+    // Check for text parts with actual content (not just whitespace)
+    const hasActualText = parts.some(part => {
+      if (!isTextPart(part)) return false;
+      const text = (part.text || '').trim();
+      return text.length > 0;
+    });
+
+    // Check for tool-related parts (tool-result or any part with "tool" in type)
+    const toolParts = parts.filter(part => {
+      if (!part || typeof part !== 'object') return false;
+      const partType = (part as { type?: string }).type || '';
+      return partType.startsWith('tool-') || partType === 'tool-result';
+    });
+
+    const currentToolCallCount = toolParts.length;
+
+    // If we have a new text part with actual content, hide the carousel
+    if (hasActualText && lastMessage.id !== lastTextMessageIdRef.current) {
+      lastTextMessageIdRef.current = lastMessage.id;
+      setShowVerbCarousel(false);
+      setCurrentVerb(null);
+      lastToolCallCountRef.current = 0;
+      return;
+    }
+
+    // If we have new tool calls and no actual text yet, show/update the carousel
+    if (currentToolCallCount > lastToolCallCountRef.current && !hasActualText) {
+      const randomVerb = actionVerbs[Math.floor(Math.random() * actionVerbs.length)];
+      setCurrentVerb(randomVerb);
+      setShowVerbCarousel(true);
+      lastToolCallCountRef.current = currentToolCallCount;
+    }
+
+    // Also check if streaming status indicates active tool use
+    if ((status === 'streaming' || status === 'submitted') && !hasActualText && currentToolCallCount > 0) {
+      if (!showVerbCarousel) {
+        const randomVerb = actionVerbs[Math.floor(Math.random() * actionVerbs.length)];
+        setCurrentVerb(randomVerb);
+        setShowVerbCarousel(true);
+      }
+    }
+
+    lastMessageLengthRef.current = displayMessages.length;
+  }, [displayMessages, status, showVerbCarousel]);
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div
@@ -418,110 +511,46 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   </div>
                 );
               }
-              return (
-                <pre key={`tool-${index}`} className="mt-2 overflow-auto rounded bg-black/20 p-2 text-xs">
-                  {JSON.stringify(part.result ?? part.output ?? null, null, 2)}
-                </pre>
-              );
+              // Don't render tool result JSON - hide it
+              return null;
             }
-            return (
-              <pre key={`raw-${index}`} className="mt-2 overflow-auto rounded bg-black/20 p-2 text-xs">
-                {JSON.stringify(part, null, 2)}
-              </pre>
-            );
-          });
+            // Hide other tool parts like step-start and tool-* types
+            if (part && typeof part === 'object' && 'type' in part) {
+              const partType = (part as { type?: string }).type || '';
+              if (partType.startsWith('tool-') || partType === 'step-start') {
+                return null;
+              }
+            }
+            // Don't render raw unknown parts
+            return null;
+          }).filter(Boolean);
           const previewItems = collectedFromText.length > 0
             ? collectedFromText
             : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
 
+          // Check if there's actual text content (not just whitespace)
+          const hasActualText = (m.parts || []).some(part => {
+            if (!isTextPart(part)) return false;
+            const text = (part.text || '').trim();
+            return text.length > 0;
+          });
+
+          // Don't render assistant messages that have no visible content (only tool parts or whitespace)
+          const hasVisibleContent = hasActualText || (previewItems && previewItems.length > 0) || showLiveMedia;
+          if (!isUser && !hasVisibleContent) {
+            return null;
+          }
+
           const contentClass = cn(
-            'rounded-2xl px-3 py-2 whitespace-pre-wrap break-words border max-w-full overflow-x-auto',
+            'rounded-2xl py-2 whitespace-pre-wrap break-words border max-w-full overflow-x-auto',
             isUser
-              ? 'bg-sky-500 text-white border-sky-400/60 backdrop-blur-md group-[.is-user]:bg-sky-500 group-[.is-user]:text-white group-[.is-user]:px-3 group-[.is-user]:py-2'
-              : mode === 'persona'
-                ? 'bg-white/8 !text-white border-white/15'
-                : 'bg-white/8 !text-white border-white/15',
+              ? 'px-3 bg-sky-500 text-white border-sky-400/60 backdrop-blur-md group-[.is-user]:bg-sky-500 group-[.is-user]:text-white group-[.is-user]:px-3 group-[.is-user]:py-2'
+              : 'px-4 bg-white/8 !text-white border-white/15',
             bubbleAnimatingIds.has(m.id) && 'ios-pop'
           );
 
-          const toolResultNodes = (m.parts || []).map((part, index: number) => {
-            if (!isToolResultPart(part)) return null;
-            const payload = getToolResultPayload(part);
-            if (payload && payload.ephemeralAssets && payload.ephemeralAssets.length > 0) {
-              const assets = toMediaAssetArray(payload.ephemeralAssets);
-              return (
-                <div key={`ep-${index}`} className="mt-2 space-y-2">
-                  {assets.map((asset, assetIndex) => {
-                    const { publicUrl, contentType } = asset || {};
-                    if (!publicUrl) return null;
-                    const isImage = (contentType || '').startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(publicUrl);
-                    const isAudio = (contentType || '').startsWith('audio/') || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(publicUrl);
-                    const isVideo = (contentType || '').startsWith('video/') || /\.(mp4|webm|mov|m4v|mkv)$/i.test(publicUrl);
-                    return (
-                      <div key={assetIndex} className="w-full">
-                        {isImage && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
-                        )}
-                        {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
-                        {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            }
-            if (payload && payload.persistedAssets && payload.persistedAssets.length > 0) {
-              const assets = toMediaAssetArray(payload.persistedAssets);
-              return (
-                <div key={`tr-${index}`} className="mt-2 space-y-2">
-                  {assets.map((asset, assetIndex) => {
-                    const { publicUrl, contentType, size } = asset;
-                    if (!publicUrl) return null;
-                    const isImage = contentType?.startsWith('image/');
-                    const isAudio = contentType?.startsWith('audio/');
-                    const isVideo = contentType?.startsWith('video/');
-                    return (
-                      <div key={assetIndex} className="w-full">
-                        {isImage && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
-                        )}
-                        {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
-                        {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
-                        {contentType && size && (<div className="mt-1 text-xs text-white/60">{contentType} • {formatBytes(size)}</div>)}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            }
-            if (payload?.publicUrl && payload?.contentType) {
-              const { publicUrl, contentType, size } = payload;
-              const isImage = contentType.startsWith('image/');
-              const isAudio = contentType.startsWith('audio/');
-              const isVideo = contentType.startsWith('video/');
-              return (
-                <div key={`tr-${index}`} className="mt-2">
-                  {isImage && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={publicUrl} alt="Uploaded content" className="w-full max-w-sm rounded" />
-                  )}
-                  {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
-                  {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
-                  {size && (<div className="mt-1 text-xs text-white/60">{contentType} • {formatBytes(size)}</div>)}
-                </div>
-              );
-            }
-            return (
-              <pre key={`tr-${index}`} className="mt-2 overflow-auto rounded bg-black/20 p-2 text-xs">
-                {JSON.stringify(part.result ?? part.output ?? null, null, 2)}
-              </pre>
-            );
-          });
-
           return (
-            <Message key={m.id} from={isUser ? 'user' : 'assistant'} className={cn(isOptimistic && 'opacity-80')}>
+            <Message key={m.id} from={isUser ? 'user' : 'assistant'} className={cn(isOptimistic && 'opacity-80', !isUser && 'max-w-[95%]')}>
               <div className={cn('text-xs text-white/60', isUser ? 'ml-auto pr-1' : 'pl-1')}>
                 {authorLabel}
               </div>
@@ -556,8 +585,72 @@ export default function MessagesPane(props: MessagesPaneProps) {
             </Message>
           );
         })}
+        {showVerbCarousel && currentVerb && (
+          <Message key="verb-carousel" from="assistant" className={cn("verb-carousel-message", "max-w-[95%]")}>
+            <div className="text-xs text-white/60 pl-1">
+              AI Agent
+            </div>
+            <MessageContent className="rounded-2xl px-3 py-2 whitespace-pre-wrap break-words border bg-white/8 !text-white border-white/15 verb-carousel-bubble">
+              <div className="flex items-center gap-2">
+                <div className="verb-carousel-spinner">
+                  <svg className="animate-spin h-4 w-4 text-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+                <span className="verb-carousel-text font-medium text-white/90">{currentVerb}...</span>
+              </div>
+            </MessageContent>
+          </Message>
+        )}
         </div>
       </div>
+      <style jsx>{`
+        @keyframes verb-fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(-4px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .verb-carousel-bubble {
+          animation: verb-fade-in 0.3s ease-out;
+        }
+
+        .verb-carousel-text {
+          animation: verb-fade-in 0.3s ease-out;
+        }
+
+        :global(.ios-pop) {
+          animation: bubble-pop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes bubble-pop {
+          0% { transform: scale(0.8); opacity: 0; }
+          50% { transform: scale(1.05); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+
+        :global([class*="rounded-2xl"]) :global(ul),
+        :global([class*="rounded-2xl"]) :global(ol) {
+          margin-left: 0 !important;
+          padding-left: 1.5rem !important;
+          margin-top: 0.5rem;
+          margin-bottom: 0.5rem;
+          list-style-position: inside;
+        }
+
+        :global([class*="rounded-2xl"]) :global(li) {
+          margin-left: 0 !important;
+          padding-left: 0;
+          margin-top: 0.25rem;
+          margin-bottom: 0.25rem;
+        }
+      `}</style>
     </div>
   );
 }
