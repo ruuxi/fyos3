@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  transpilePackages: ['shiki', 'streamdown'],
 };
 
 export default nextConfig;

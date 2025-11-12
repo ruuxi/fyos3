@@ -4,6 +4,7 @@ import { api as convexApi } from '../../../../../convex/_generated/api';
 import { formatBytes, guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 import AgentVerbCarousel from './AgentVerbCarousel';
 import type { Doc } from '../../../../../convex/_generated/dataModel';
+import { Streamdown } from 'streamdown';
 
 type ChatMode = 'agent' | 'persona';
 
@@ -340,19 +341,20 @@ export default function MessagesPane(props: MessagesPaneProps) {
           const showVerbAnimation = isAgentAssistant && isFinalAgentReply && agentActive;
 
           // Build content and collect any attachments referenced in text
-          const textNodes: ReactNode[] = [];
+          const textParts: string[] = [];
           let collectedFromText: AttachmentPreview[] = [];
-          (m.parts || []).forEach((part, index: number) => {
+          (m.parts || []).forEach((part) => {
             if (isTextPart(part)) {
               const { cleanedText, items } = extractAttachmentsFromText(part.text || '');
               if (cleanedText) {
-                textNodes.push(<span key={`t-${index}`}>{cleanedText}</span>);
+                textParts.push(cleanedText);
               }
               if (items.length) {
                 collectedFromText = collectedFromText.concat(items);
               }
             }
           });
+          const fullText = textParts.join('\n');
           const isLastUser = m.role === 'user' && m.id === lastUserMessageId;
           const optimisticAttachmentOverride = getOptimisticAttachments(metadata);
           const previewItems = collectedFromText.length > 0
@@ -381,18 +383,23 @@ export default function MessagesPane(props: MessagesPaneProps) {
               }
             : undefined;
 
+          // Determine if this message is currently streaming
+          const isStreaming = _status === 'streaming' && idx === displayMessages.length - 1 && isAssistant;
+          
           const textContent: ReactNode | ReactNode[] = (() => {
-            if (!isAssistant) {
-              return textNodes;
-            }
-            if (!isAgentAssistant) {
-              return textNodes;
-            }
             if (showVerbAnimation) {
               return <AgentVerbCarousel />;
             }
-            if (textNodes.length > 0) {
-              return textNodes;
+            if (fullText && fullText.trim()) {
+              // Use Streamdown for markdown rendering with streaming support
+              return (
+                <Streamdown 
+                  parseIncompleteMarkdown={isStreaming}
+                  isAnimating={isStreaming}
+                >
+                  {fullText}
+                </Streamdown>
+              );
             }
             return null;
           })();
