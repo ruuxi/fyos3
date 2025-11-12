@@ -14,20 +14,18 @@ export default function GroupMessagesPane({ active, emptyLabel, messages, member
 
   return (
     <div
-      className="overflow-auto pt-2 pb-2 modern-scrollbar pr-2 pl-2"
+      className="modern-scrollbar overflow-auto px-3 py-2"
       style={{
-        maxHeight: '60vh',
+        height: '100%',
         transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
         willChange: 'height',
         scrollBehavior: 'auto',
-        paddingLeft: '12px',
-        paddingRight: '12px',
       }}
     >
       <div className="space-y-4 px-1">
         <div className="flex flex-wrap gap-2 text-xs text-white/70">
           {roster.length > 0 ? roster.map((label) => (
-            <span key={label} className="px-2 py-1 bg-white/10 rounded-full border border-white/15">
+            <span key={label} className="rounded-full border border-white/15 bg-white/10 px-2 py-1">
               {label}
             </span>
           )) : (

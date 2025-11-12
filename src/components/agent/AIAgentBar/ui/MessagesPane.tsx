@@ -4,7 +4,6 @@ import { api as convexApi } from '../../../../../convex/_generated/api';
 import { formatBytes, guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 import AgentVerbCarousel from './AgentVerbCarousel';
 import type { Doc } from '../../../../../convex/_generated/dataModel';
-import { Streamdown } from 'streamdown';
 
 type ChatMode = 'agent' | 'persona';
 
@@ -222,7 +221,7 @@ function extractAttachmentsFromText(text: string): { cleanedText: string; items:
 function renderAttachments(items: AttachmentPreview[]) {
   if (!items || items.length === 0) return null;
   return (
-    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
       {items.map((a, idx) => {
         const ct = (a.contentType || '').toLowerCase();
         const isImage = ct.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(a.publicUrl);
@@ -232,18 +231,18 @@ function renderAttachments(items: AttachmentPreview[]) {
           <div key={idx} className="w-full">
             {isImage && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={a.publicUrl} alt={a.name} className="w-full rounded max-w-sm" />
+              <img src={a.publicUrl} alt={a.name} className="w-full max-w-sm rounded" />
             )}
             {isVideo && (
-              <video controls src={a.publicUrl} className="w-full rounded max-w-sm" />
+              <video controls src={a.publicUrl} className="w-full max-w-sm rounded" />
             )}
             {isAudio && (
               <audio controls src={a.publicUrl} className="w-full" />
             )}
             {!isImage && !isVideo && !isAudio && (
-              <div className="text-xs text-white/70 break-all">{a.publicUrl}</div>
+              <div className="break-all text-xs text-white/70">{a.publicUrl}</div>
             )}
-            <div className="text-[10px] text-white/60 mt-1 truncate" title={a.name}>{a.name}</div>
+            <div className="mt-1 truncate text-[10px] text-white/60" title={a.name}>{a.name}</div>
           </div>
         );
       })}
@@ -264,10 +263,10 @@ export default function MessagesPane(props: MessagesPaneProps) {
   const {
     messages,
     optimisticMessages = [],
-    status: _status,
+    status,
     messagesContainerRef,
     messagesInnerRef,
-    containerHeight,
+    containerHeight: _containerHeight,
     didAnimateWelcome,
     bubbleAnimatingIds,
     lastSentAttachments,
@@ -285,33 +284,32 @@ export default function MessagesPane(props: MessagesPaneProps) {
   const lastUserMessage = [...displayMessages].reverse().find(m => m.role === 'user');
   const lastUserMessageId = lastUserMessage?.id;
   return (
-    <div
-      ref={messagesContainerRef}
-      className="overflow-auto pt-0 pb-1 modern-scrollbar pr-0"
-      style={{
-        height: containerHeight > 0 ? `${containerHeight}px` : undefined,
-        maxHeight: '60vh',
-        transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
-        willChange: 'height',
-        scrollBehavior: 'auto',
-        paddingLeft: '0px',
-        paddingRight: '0px',
-      }}
-    >
-      <div ref={messagesInnerRef} className="space-y-3 px-1">
+    <div className="flex h-full min-h-0 flex-col">
+      <div
+        ref={messagesContainerRef}
+        className="modern-scrollbar flex-1 min-h-0 overflow-y-auto pb-1 pr-0 pt-0"
+        style={{
+          transition: 'height 420ms cubic-bezier(0.22, 1, 0.36, 1)',
+          willChange: 'height',
+          scrollBehavior: 'auto',
+          paddingLeft: '0px',
+          paddingRight: '0px',
+        }}
+      >
+        <div ref={messagesInnerRef} className="space-y-3 px-1">
         {displayMessages.length === 0 && (
-          <div className="text-sm flex justify-start" aria-label="Welcome message">
-            <div className="max-w-full flex-1">
-              <div className="text-xs mb-1 text-white/60 pl-1">AI Agent</div>
-              <div className={`inline-block max-w-[80%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words bg-white/10 border border-white/15 text-white ${!didAnimateWelcome ? 'ios-pop' : ''}`}>
+          <div className="flex min-h-[60vh] items-center justify-center py-10 text-base" aria-label="Welcome message">
+            <div className="w-full max-w-3xl px-3 text-center">
+              <div className="mb-3 text-sm text-white/60">AI Agent</div>
+              <div className={`mx-auto inline-block max-w-[880px] whitespace-pre-wrap break-words border border-white/15 bg-white/10 px-6 py-4 text-white ${!didAnimateWelcome ? 'ios-pop' : ''}`}>
                 {"Hello! What can I do for you?"}
               </div>
-              <div className="flex flex-wrap gap-2 mt-3 pl-1" aria-label="Suggested prompts">
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3" aria-label="Suggested prompts">
                 {welcomeSuggestions.map((suggestion) => (
                   <button
                     key={suggestion}
                     type="button"
-                    className="rounded-2xl border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                    className="rounded-2xl border border-white/20 bg-white/5 px-4 py-1.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
                     onClick={() => onSuggestionSelect?.(suggestion)}
                   >
                     {suggestion}
@@ -326,6 +324,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
           const mode = resolveMode(m);
           const isAssistant = m.role === 'assistant';
           const isAgentAssistant = isAssistant && mode === 'agent';
+          const hasToolResults = Boolean((m.parts || []).some(isToolResultPart));
           let isFinalAgentReply = true;
           if (isAssistant && mode === 'agent') {
             for (let cursor = idx + 1; cursor < displayMessages.length; cursor += 1) {
@@ -338,31 +337,43 @@ export default function MessagesPane(props: MessagesPaneProps) {
               }
             }
           }
-          const showVerbAnimation = isAgentAssistant && isFinalAgentReply && agentActive;
 
           // Build content and collect any attachments referenced in text
-          const textParts: string[] = [];
+          const textSegments: string[] = [];
           let collectedFromText: AttachmentPreview[] = [];
           (m.parts || []).forEach((part) => {
             if (isTextPart(part)) {
               const { cleanedText, items } = extractAttachmentsFromText(part.text || '');
               if (cleanedText) {
-                textParts.push(cleanedText);
+                textSegments.push(cleanedText);
               }
               if (items.length) {
                 collectedFromText = collectedFromText.concat(items);
               }
             }
           });
-          const fullText = textParts.join('\n');
+          const effectiveSegments = isAgentAssistant ? [] : textSegments;
+          const textNodes: ReactNode[] = effectiveSegments.map((segment, index) => (
+            <span key={`t-${index}`}>{segment}</span>
+          ));
           const isLastUser = m.role === 'user' && m.id === lastUserMessageId;
           const optimisticAttachmentOverride = getOptimisticAttachments(metadata);
-          const previewItems = collectedFromText.length > 0
-            ? collectedFromText
-            : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
+          const previewItems = isAgentAssistant
+            ? []
+            : collectedFromText.length > 0
+              ? collectedFromText
+              : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
+
+          const runActive = status === 'streaming' || status === 'submitted' || agentActive;
+          const isStreamingAgentMessage = isAgentAssistant && idx === displayMessages.length - 1 && runActive;
+          const showVerbAnimation = isStreamingAgentMessage && textNodes.length === 0;
 
           // Hide non-final agent replies to avoid intermediate output flashes
           if (isAssistant && mode === 'agent' && !isFinalAgentReply) {
+            return null;
+          }
+
+          if (isAgentAssistant && !showVerbAnimation && textNodes.length === 0 && !hasToolResults) {
             return null;
           }
 
@@ -383,23 +394,18 @@ export default function MessagesPane(props: MessagesPaneProps) {
               }
             : undefined;
 
-          // Determine if this message is currently streaming
-          const isStreaming = _status === 'streaming' && idx === displayMessages.length - 1 && isAssistant;
-          
           const textContent: ReactNode | ReactNode[] = (() => {
+            if (!isAssistant) {
+              return textNodes;
+            }
+            if (!isAgentAssistant) {
+              return textNodes;
+            }
             if (showVerbAnimation) {
               return <AgentVerbCarousel />;
             }
-            if (fullText && fullText.trim()) {
-              // Use Streamdown for markdown rendering with streaming support
-              return (
-                <Streamdown 
-                  parseIncompleteMarkdown={isStreaming}
-                  isAnimating={isStreaming}
-                >
-                  {fullText}
-                </Streamdown>
-              );
+            if (textNodes.length > 0) {
+              return textNodes;
             }
             return null;
           })();
@@ -417,10 +423,9 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   {/* Render agent-friendly content or original text */}
                   {textContent}
                   {/* Render tool results and media blocks */}
-                  {(m.parts || []).map((part, index: number) => {
+                  {(!isAgentAssistant) && (m.parts || []).map((part, index: number) => {
                     if (!isToolResultPart(part)) return null;
                     const payload = getToolResultPayload(part);
-                    // Ephemeral assets from provider (surface immediately)
                     if (payload && payload.ephemeralAssets && payload.ephemeralAssets.length > 0) {
                       const assets = toMediaAssetArray(payload.ephemeralAssets);
                       return (
@@ -435,10 +440,10 @@ export default function MessagesPane(props: MessagesPaneProps) {
                               <div key={assetIndex} className="w-full">
                                 {isImage && (
                                   // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={publicUrl} alt="Generated content" className="w-full rounded max-w-sm" />
+                                  <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
                                 )}
                                 {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
-                                {isVideo && (<video controls src={publicUrl} className="w-full rounded max-w-sm" />)}
+                                {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
                               </div>
                             );
                           })}
@@ -459,11 +464,11 @@ export default function MessagesPane(props: MessagesPaneProps) {
                               <div key={assetIndex} className="w-full">
                                 {isImage && (
                                   // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={publicUrl} alt="Generated content" className="w-full rounded max-w-sm" />
+                                  <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
                                 )}
                                 {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
-                                {isVideo && (<video controls src={publicUrl} className="w-full rounded max-w-sm" />)}
-                                {contentType && size && (<div className="text-xs text-white/60 mt-1">{contentType} • {formatBytes(size)}</div>)}
+                                {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
+                                {contentType && size && (<div className="mt-1 text-xs text-white/60">{contentType} • {formatBytes(size)}</div>)}
                               </div>
                             );
                           })}
@@ -479,16 +484,16 @@ export default function MessagesPane(props: MessagesPaneProps) {
                         <div key={`tr-${index}`} className="mt-2">
                           {isImage && (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={publicUrl} alt="Uploaded content" className="w-full rounded max-w-sm" />
+                            <img src={publicUrl} alt="Uploaded content" className="w-full max-w-sm rounded" />
                           )}
                           {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
-                          {isVideo && (<video controls src={publicUrl} className="w-full rounded max-w-sm" />)}
-                          {size && (<div className="text-xs text-white/60 mt-1">{contentType} • {formatBytes(size)}</div>)}
+                          {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
+                          {size && (<div className="mt-1 text-xs text-white/60">{contentType} • {formatBytes(size)}</div>)}
                         </div>
                       );
                     }
                     return (
-                      <pre key={`tr-${index}`} className="text-xs bg-black/20 rounded p-2 mt-2 overflow-auto">
+                      <pre key={`tr-${index}`} className="mt-2 overflow-auto rounded bg-black/20 p-2 text-xs">
                         {JSON.stringify(part.result ?? part.output ?? null, null, 2)}
                       </pre>
                     );
@@ -499,7 +504,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
                   )}
 
                   {/* Reactive media: if authenticated and thread-bound media exists, show new thumbnails below last assistant message */}
-                  {isFinalAgentReply && liveMediaList.length > 0 && (
+                  {!isAgentAssistant && isFinalAgentReply && liveMediaList.length > 0 && (
                     <div className="mt-2 space-y-2">
                       {liveMediaList.map((asset, assetIndex) => {
                         const publicUrl = asset.publicUrl || '';
@@ -512,10 +517,10 @@ export default function MessagesPane(props: MessagesPaneProps) {
                           <div key={`live-${assetIndex}`} className="w-full">
                             {isImage && (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={publicUrl} alt="Generated content" className="w-full rounded max-w-sm" />
+                              <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
                             )}
                             {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
-                            {isVideo && (<video controls src={publicUrl} className="w-full rounded max-w-sm" />)}
+                            {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
                           </div>
                         );
                       })}
@@ -526,7 +531,9 @@ export default function MessagesPane(props: MessagesPaneProps) {
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );
 }
+

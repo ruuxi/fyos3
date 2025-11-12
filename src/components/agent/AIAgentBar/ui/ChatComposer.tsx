@@ -22,119 +22,125 @@ export type ChatComposerProps = {
 
 export default function ChatComposer(props: ChatComposerProps) {
   const { input, setInput, status, attachments, removeAttachment, onSubmit, onFileSelect, onStop, onFocus, uploadBusy, canUndo, onUndo } = props;
+  const canSend = status === 'ready' || status === 'error';
   return (
     <form onSubmit={onSubmit}>
-      <div className="flex items-center gap-2">
-        <div className="flex-1 relative">
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2 px-16">
-              {attachments.map((a, index) => {
-                const ct = (a.contentType || '').toLowerCase();
-                const isImage = ct.startsWith('image/');
-                const isVideo = ct.startsWith('video/');
-                const isAudio = ct.startsWith('audio/');
-                const isText = ct.startsWith('text/') || /(\.txt|\.md|\.json|\.csv|\.log)$/i.test(a.name);
-                return (
-                  <div key={index} className="relative w-28 h-20 rounded border border-white/20 overflow-hidden bg-white/10">
-                    {isImage && a.publicUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={a.publicUrl} alt={a.name} className="w-full h-full object-cover" />
-                    ) : isVideo && a.publicUrl ? (
-                      <video src={a.publicUrl} className="w-full h-full object-cover" muted playsInline />
+      {attachments.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-2 px-2">
+          {attachments.map((a, index) => {
+            const ct = (a.contentType || '').toLowerCase();
+            const isImage = ct.startsWith('image/');
+            const isVideo = ct.startsWith('video/');
+            const isAudio = ct.startsWith('audio/');
+            const isText = ct.startsWith('text/') || /(\.txt|\.md|\.json|\.csv|\.log)$/i.test(a.name);
+            return (
+              <div key={index} className="relative h-20 w-28 overflow-hidden rounded-lg border border-white/20 bg-white/10">
+                {isImage && a.publicUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={a.publicUrl} alt={a.name} className="h-full w-full object-cover" />
+                ) : isVideo && a.publicUrl ? (
+                  <video src={a.publicUrl} className="h-full w-full object-cover" muted playsInline />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-white/90">
+                    {isAudio ? (
+                      <FileAudio2 className="h-6 w-6" />
+                    ) : isText ? (
+                      <FileText className="h-6 w-6" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-white/90">
-                        {isAudio ? (
-                          <FileAudio2 className="w-6 h-6" />
-                        ) : isText ? (
-                          <FileText className="w-6 h-6" />
-                        ) : (
-                          <FileIcon className="w-6 h-6" />
-                        )}
-                      </div>
+                      <FileIcon className="h-6 w-6" />
                     )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-[10px] px-1 py-0.5 truncate" title={a.name}>
-                      {a.name}
-                    </div>
-                    <button
-                      onClick={() => removeAttachment(index)}
-                      className="absolute top-1 right-1 bg-black/50 hover:bg-black/70 rounded p-0.5 text-white"
-                      aria-label="Remove attachment"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                )}
+                <div className="absolute bottom-0 left-0 right-0 truncate bg-black/50 px-1 py-0.5 text-[10px]" title={a.name}>
+                  {a.name}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(index)}
+                  className="absolute right-1 top-1 rounded bg-black/60 p-0.5 text-white hover:bg-black/80"
+                  aria-label="Remove attachment"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="bg-transparent p-2">
+        <div className="grid grid-cols-[1fr_auto] items-end gap-2">
           <Textarea
             value={input}
             onFocus={onFocus}
             onChange={e => setInput(e.target.value)}
-            placeholder="'Create a Notes app, Change my background!'"
-            className="pl-24 pr-12 h-10 min-h-0 py-2 resize-none rounded-none bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none text-white placeholder:text-white/60 caret-sky-300 text-base leading-6"
-            rows={1}
+            placeholder="Change my background."
+            className="min-h-[72px] w-full resize-none border-0 bg-transparent py-3 pl-0 text-[17px] font-medium text-white placeholder:text-white/60 caret-sky-300 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none outline-none"
+            rows={3}
             disabled={false}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (input.trim() && status === 'ready' && !uploadBusy) {
+                if (input.trim() && canSend && !uploadBusy) {
                   e.currentTarget.form?.requestSubmit();
                 }
               }
             }}
           />
-        </div>
-        <div className="flex items-center gap-2">
-          {(status === 'submitted' || status === 'streaming') && (
-            <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            {(status === 'submitted' || status === 'streaming') && (
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="h-10 w-10 rounded-none text-white hover:bg-white/10 flex items-center justify-center"
+                size="icon"
+                className="h-9 w-9 rounded-full text-white hover:bg-white/10"
                 onClick={onStop}
                 title="Stop"
                 aria-label="Stop"
               >
-                <Square className="w-4 h-4" />
+                <Square className="h-4 w-4" />
+              </Button>
+            )}
+            {canUndo && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full text-white hover:bg-white/10"
+                onClick={onUndo}
+                disabled={status !== 'ready'}
+                aria-label="Undo last agent changes"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            )}
+            <div className="relative">
+              <input
+                type="file"
+                accept="image/*,video/*,audio/*,.txt,.md,.json,.csv"
+                multiple
+                onChange={(e) => { if (e.target.files) { onFileSelect(e.target.files); e.target.value = ''; } }}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                id="file-upload"
+              />
+              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" asChild>
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  <Paperclip className="h-4 w-4" />
+                </label>
               </Button>
             </div>
-          )}
-          <div className="relative">
-            <input
-              type="file"
-              accept="image/*,video/*,audio/*,.txt,.md,.json,.csv"
-              multiple
-              onChange={(e) => { if (e.target.files) { onFileSelect(e.target.files); e.target.value = ''; } }}
-              className="absolute inset-0 opacity-0 cursor-pointer"
-              id="file-upload"
-            />
-            <Button type="button" variant="ghost" size="sm" className="h-10 rounded-none text-white hover:bg-white/10" asChild>
-              <label htmlFor="file-upload" className="cursor-pointer">
-                <Paperclip className="w-4 h-4" />
-              </label>
+            <Button
+              type="submit"
+              disabled={!input.trim() || !canSend || !!uploadBusy}
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 rounded-full text-white hover:bg-white/10"
+              aria-label="Send"
+            >
+              <Send className="h-4 w-4" />
             </Button>
           </div>
-          {canUndo && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-10 rounded-none text-white hover:bg-white/10"
-              onClick={onUndo}
-              disabled={status !== 'ready'}
-              aria-label="Undo last agent changes"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </Button>
-          )}
-          <Button type="submit" disabled={!input.trim() || status !== 'ready' || !!uploadBusy} size="sm" variant="ghost" className="h-10 rounded-none text-white hover:bg-white/10">
-            <Send className="w-4 h-4" />
-          </Button>
         </div>
       </div>
     </form>
   );
 }
-
