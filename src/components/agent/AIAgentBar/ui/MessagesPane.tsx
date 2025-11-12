@@ -1,8 +1,10 @@
-import type { ReactNode, RefObject } from 'react';
+import type { RefObject } from 'react';
 import { useConvexAuth, useQuery } from 'convex/react';
 import { api as convexApi } from '../../../../../convex/_generated/api';
 import { formatBytes, guessContentTypeFromFilename } from '@/lib/agent/agentUtils';
 import type { Doc } from '../../../../../convex/_generated/dataModel';
+import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
+import { cn } from '@/lib/utils';
 
 type ChatMode = 'agent' | 'persona';
 
@@ -262,7 +264,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
   const {
     messages,
     optimisticMessages = [],
-    status: _status,
+    status,
     messagesContainerRef,
     messagesInnerRef,
     containerHeight: _containerHeight,
@@ -318,163 +320,159 @@ export default function MessagesPane(props: MessagesPaneProps) {
             </div>
           </div>
         )}
-        {displayMessages.map((m, _idx) => {
+        {displayMessages.map((m, idx) => {
           const metadata = 'metadata' in m ? (m.metadata as AgentMessageMetadata | undefined) : undefined;
           const mode = resolveMode(m);
 
           // Build content and collect any attachments referenced in text
-          const textSegments: string[] = [];
           let collectedFromText: AttachmentPreview[] = [];
-          (m.parts || []).forEach((part) => {
-            if (isTextPart(part)) {
+          const textParts = (m.parts || [])
+            .filter(isTextPart)
+            .map((part) => {
               const { cleanedText, items } = extractAttachmentsFromText(part.text || '');
-              if (cleanedText) {
-                textSegments.push(cleanedText);
-              }
               if (items.length) {
                 collectedFromText = collectedFromText.concat(items);
               }
-            }
-          });
-          const textNodes: ReactNode[] = textSegments.map((segment, index) => (
-            <span key={`t-${index}`}>{segment}</span>
-          ));
-          const isLastUser = m.role === 'user' && m.id === lastUserMessageId;
+              return cleanedText;
+            })
+            .filter(Boolean);
+          const isUser = m.role === 'user';
+          const isLastUser = isUser && m.id === lastUserMessageId;
           const optimisticAttachmentOverride = getOptimisticAttachments(metadata);
           const previewItems = collectedFromText.length > 0
             ? collectedFromText
             : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
-
           const personaLabel = 'Sim';
           const authorLabel = m.role === 'assistant' ? (mode === 'persona' ? personaLabel : 'AI Agent') : 'You';
-          const assistantBubble = mode === 'persona'
-            ? 'inline-block max-w-[80%] bg-white/10 border border-white/20 text-white'
-            : 'inline-block max-w-[80%] bg-white/10 border border-white/15 text-white';
           const isOptimistic = hasOptimisticFlag(metadata);
-          const bubbleBase = m.role === 'user'
-            ? 'bg-sky-500 text-white max-w-full'
-            : assistantBubble;
-          const bubbleClass = isOptimistic ? `${bubbleBase} opacity-80` : bubbleBase;
-          const textContent: ReactNode | ReactNode[] = textNodes.length > 0 ? textNodes : null;
+          const showStreaming = !isUser && (status === 'streaming' || status === 'submitted') && idx === displayMessages.length - 1;
+          const showLiveMedia = !isUser && idx === displayMessages.length - 1 && liveMediaList.length > 0;
+
+          const contentClass = cn(
+            'rounded-2xl px-3 py-2 whitespace-pre-wrap break-words border',
+            isUser
+              ? 'bg-sky-500 text-white border-sky-400/60 backdrop-blur-md group-[.is-user]:bg-sky-500 group-[.is-user]:text-white group-[.is-user]:px-3 group-[.is-user]:py-2'
+              : mode === 'persona'
+                ? 'bg-white/8 !text-white border-white/15'
+                : 'bg-white/8 !text-white border-white/15',
+            bubbleAnimatingIds.has(m.id) && 'ios-pop'
+          );
+
+          const toolResultNodes = (m.parts || []).map((part, index: number) => {
+            if (!isToolResultPart(part)) return null;
+            const payload = getToolResultPayload(part);
+            if (payload && payload.ephemeralAssets && payload.ephemeralAssets.length > 0) {
+              const assets = toMediaAssetArray(payload.ephemeralAssets);
+              return (
+                <div key={`ep-${index}`} className="mt-2 space-y-2">
+                  {assets.map((asset, assetIndex) => {
+                    const { publicUrl, contentType } = asset || {};
+                    if (!publicUrl) return null;
+                    const isImage = (contentType || '').startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(publicUrl);
+                    const isAudio = (contentType || '').startsWith('audio/') || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(publicUrl);
+                    const isVideo = (contentType || '').startsWith('video/') || /\.(mp4|webm|mov|m4v|mkv)$/i.test(publicUrl);
+                    return (
+                      <div key={assetIndex} className="w-full">
+                        {isImage && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
+                        )}
+                        {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
+                        {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            }
+            if (payload && payload.persistedAssets && payload.persistedAssets.length > 0) {
+              const assets = toMediaAssetArray(payload.persistedAssets);
+              return (
+                <div key={`tr-${index}`} className="mt-2 space-y-2">
+                  {assets.map((asset, assetIndex) => {
+                    const { publicUrl, contentType, size } = asset;
+                    if (!publicUrl) return null;
+                    const isImage = contentType?.startsWith('image/');
+                    const isAudio = contentType?.startsWith('audio/');
+                    const isVideo = contentType?.startsWith('video/');
+                    return (
+                      <div key={assetIndex} className="w-full">
+                        {isImage && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
+                        )}
+                        {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
+                        {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
+                        {contentType && size && (<div className="mt-1 text-xs text-white/60">{contentType} • {formatBytes(size)}</div>)}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            }
+            if (payload?.publicUrl && payload?.contentType) {
+              const { publicUrl, contentType, size } = payload;
+              const isImage = contentType.startsWith('image/');
+              const isAudio = contentType.startsWith('audio/');
+              const isVideo = contentType.startsWith('video/');
+              return (
+                <div key={`tr-${index}`} className="mt-2">
+                  {isImage && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={publicUrl} alt="Uploaded content" className="w-full max-w-sm rounded" />
+                  )}
+                  {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
+                  {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
+                  {size && (<div className="mt-1 text-xs text-white/60">{contentType} • {formatBytes(size)}</div>)}
+                </div>
+              );
+            }
+            return (
+              <pre key={`tr-${index}`} className="mt-2 overflow-auto rounded bg-black/20 p-2 text-xs">
+                {JSON.stringify(part.result ?? part.output ?? null, null, 2)}
+              </pre>
+            );
+          });
 
           return (
-            <div key={m.id} className={`text-sm flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} ${isOptimistic ? 'opacity-80' : ''}`}>
-              <div className={`${m.role === 'user' ? 'flex flex-col items-end max-w-[80%]' : 'max-w-full flex-1'}`}>
-                <div className={`text-xs mb-1 ${m.role === 'user' ? 'text-white/60 pr-1' : 'text-white/60 pl-1'}`}>
-                  {authorLabel}
-                </div>
-                <div
-                  className={`rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${bubbleClass} ${bubbleAnimatingIds.has(m.id) ? 'ios-pop' : ''}`}
-                >
-                  {/* Render agent-friendly content or original text */}
-                  {textContent}
-                  {/* Render tool results and media blocks */}
-                  {(m.parts || []).map((part, index: number) => {
-                    if (!isToolResultPart(part)) return null;
-                    const payload = getToolResultPayload(part);
-                    if (payload && payload.ephemeralAssets && payload.ephemeralAssets.length > 0) {
-                      const assets = toMediaAssetArray(payload.ephemeralAssets);
-                      return (
-                        <div key={`ep-${index}`} className="mt-2 space-y-2">
-                          {assets.map((asset, assetIndex) => {
-                            const { publicUrl, contentType } = asset || {};
-                            if (!publicUrl) return null;
-                            const isImage = (contentType || '').startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(publicUrl);
-                            const isAudio = (contentType || '').startsWith('audio/') || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(publicUrl);
-                            const isVideo = (contentType || '').startsWith('video/') || /\.(mp4|webm|mov|m4v|mkv)$/i.test(publicUrl);
-                            return (
-                              <div key={assetIndex} className="w-full">
-                                {isImage && (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
-                                )}
-                                {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
-                                {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    }
-                    if (payload && payload.persistedAssets && payload.persistedAssets.length > 0) {
-                      const assets = toMediaAssetArray(payload.persistedAssets);
-                      return (
-                        <div key={`tr-${index}`} className="mt-2 space-y-2">
-                          {assets.map((asset, assetIndex) => {
-                            const { publicUrl, contentType, size } = asset;
-                            if (!publicUrl) return null;
-                            const isImage = contentType?.startsWith('image/');
-                            const isAudio = contentType?.startsWith('audio/');
-                            const isVideo = contentType?.startsWith('video/');
-                            return (
-                              <div key={assetIndex} className="w-full">
-                                {isImage && (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
-                                )}
-                                {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
-                                {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
-                                {contentType && size && (<div className="mt-1 text-xs text-white/60">{contentType} • {formatBytes(size)}</div>)}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    }
-                    if (payload?.publicUrl && payload?.contentType) {
-                      const { publicUrl, contentType, size } = payload;
+            <Message key={m.id} from={isUser ? 'user' : 'assistant'} className={cn(isOptimistic && 'opacity-80')}>
+              <div className={cn('text-xs text-white/60', isUser ? 'ml-auto pr-1' : 'pl-1')}>
+                {authorLabel}
+              </div>
+              <MessageContent className={contentClass}>
+                {textParts.map((text, index) => (
+                  <MessageResponse key={index} parseIncompleteMarkdown={showStreaming} isAnimating={showStreaming}>
+                    {text}
+                  </MessageResponse>
+                ))}
+                {toolResultNodes}
+                {previewItems && previewItems.length > 0 && (
+                  <div className="mt-2">{renderAttachments(previewItems)}</div>
+                )}
+                {showLiveMedia && (
+                  <div className="mt-2 space-y-2">
+                    {liveMediaList.map((asset, assetIndex) => {
+                      const publicUrl = asset.publicUrl || '';
+                      if (!publicUrl) return null;
+                      const contentType = asset.contentType || '';
                       const isImage = contentType.startsWith('image/');
                       const isAudio = contentType.startsWith('audio/');
                       const isVideo = contentType.startsWith('video/');
                       return (
-                        <div key={`tr-${index}`} className="mt-2">
+                        <div key={`live-${assetIndex}`} className="w-full">
                           {isImage && (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={publicUrl} alt="Uploaded content" className="w-full max-w-sm rounded" />
+                            <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
                           )}
                           {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
                           {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
-                          {size && (<div className="mt-1 text-xs text-white/60">{contentType} • {formatBytes(size)}</div>)}
                         </div>
                       );
-                    }
-                    return (
-                      <pre key={`tr-${index}`} className="mt-2 overflow-auto rounded bg-black/20 p-2 text-xs">
-                        {JSON.stringify(part.result ?? part.output ?? null, null, 2)}
-                      </pre>
-                    );
-                  })}
-                  {/* Render attachments parsed from text or last-sent preview */}
-                  {previewItems && previewItems.length > 0 && (
-                    <div className="mt-2">{renderAttachments(previewItems)}</div>
-                  )}
-
-                  {/* Reactive media: if authenticated and thread-bound media exists, show new thumbnails below last assistant message */}
-                  {liveMediaList.length > 0 && (
-                    <div className="mt-2 space-y-2">
-                      {liveMediaList.map((asset, assetIndex) => {
-                        const publicUrl = asset.publicUrl || '';
-                        if (!publicUrl) return null;
-                        const contentType = asset.contentType || '';
-                        const isImage = contentType.startsWith('image/');
-                        const isAudio = contentType.startsWith('audio/');
-                        const isVideo = contentType.startsWith('video/');
-                        return (
-                          <div key={`live-${assetIndex}`} className="w-full">
-                            {isImage && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={publicUrl} alt="Generated content" className="w-full max-w-sm rounded" />
-                            )}
-                            {isAudio && (<audio controls src={publicUrl} className="w-full" />)}
-                            {isVideo && (<video controls src={publicUrl} className="w-full max-w-sm rounded" />)}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+                    })}
+                  </div>
+                )}
+              </MessageContent>
+            </Message>
           );
         })}
         </div>

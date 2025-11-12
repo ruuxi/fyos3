@@ -17,7 +17,6 @@ export type ChatComposerProps = {
   uploadBusy?: boolean;
   canUndo?: boolean;
   onUndo?: () => void;
-
 };
 
 export default function ChatComposer(props: ChatComposerProps) {
@@ -34,7 +33,7 @@ export default function ChatComposer(props: ChatComposerProps) {
             const isAudio = ct.startsWith('audio/');
             const isText = ct.startsWith('text/') || /(\.txt|\.md|\.json|\.csv|\.log)$/i.test(a.name);
             return (
-              <div key={index} className="relative h-20 w-28 overflow-hidden rounded-lg border border-white/20 bg-white/10">
+              <div key={index} className="relative h-16 w-20 overflow-hidden rounded-lg border border-white/20 bg-white/10">
                 {isImage && a.publicUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={a.publicUrl} alt={a.name} className="h-full w-full object-cover" />
@@ -43,39 +42,39 @@ export default function ChatComposer(props: ChatComposerProps) {
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-white/90">
                     {isAudio ? (
-                      <FileAudio2 className="h-6 w-6" />
+                      <FileAudio2 className="h-5 w-5" />
                     ) : isText ? (
-                      <FileText className="h-6 w-6" />
+                      <FileText className="h-5 w-5" />
                     ) : (
-                      <FileIcon className="h-6 w-6" />
+                      <FileIcon className="h-5 w-5" />
                     )}
                   </div>
                 )}
-                <div className="absolute bottom-0 left-0 right-0 truncate bg-black/50 px-1 py-0.5 text-[10px]" title={a.name}>
+                <div className="absolute bottom-0 left-0 right-0 truncate bg-black/50 px-1 py-0.5 text-[9px]" title={a.name}>
                   {a.name}
                 </div>
                 <button
                   type="button"
                   onClick={() => removeAttachment(index)}
-                  className="absolute right-1 top-1 rounded bg-black/60 p-0.5 text-white hover:bg-black/80"
+                  className="absolute right-0.5 top-0.5 rounded bg-black/60 p-0.5 text-white transition hover:bg-black/80"
                   aria-label="Remove attachment"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-2.5 w-2.5" />
                 </button>
               </div>
             );
           })}
         </div>
       )}
-      <div className="bg-transparent p-2">
+      <div className="bg-transparent px-3 py-2">
         <div className="grid grid-cols-[1fr_auto] items-end gap-2">
           <Textarea
             value={input}
             onFocus={onFocus}
             onChange={e => setInput(e.target.value)}
             placeholder="Change my background."
-            className="min-h-[72px] w-full resize-none border-0 bg-transparent py-3 pl-0 text-[17px] font-medium text-white placeholder:text-white/60 caret-sky-300 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none outline-none"
-            rows={3}
+            className="min-h-[48px] w-full resize-none border-0 bg-transparent py-1 pl-0 text-[15px] font-medium text-white placeholder:text-white/60 caret-sky-300 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none outline-none"
+            rows={2}
             disabled={false}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -86,18 +85,18 @@ export default function ChatComposer(props: ChatComposerProps) {
               }
             }}
           />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 pb-1">
             {(status === 'submitted' || status === 'streaming') && (
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-full text-white hover:bg-white/10"
+                className="h-8 w-8 rounded-full text-white hover:bg-white/10"
                 onClick={onStop}
                 title="Stop"
                 aria-label="Stop"
               >
-                <Square className="h-4 w-4" />
+                <Square className="h-3.5 w-3.5" />
               </Button>
             )}
             {canUndo && (
@@ -105,12 +104,12 @@ export default function ChatComposer(props: ChatComposerProps) {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-full text-white hover:bg-white/10"
+                className="h-8 w-8 rounded-full text-white hover:bg-white/10"
                 onClick={onUndo}
                 disabled={status !== 'ready'}
                 aria-label="Undo last agent changes"
               >
-                <RotateCcw className="h-4 w-4" />
+                <RotateCcw className="h-3.5 w-3.5" />
               </Button>
             )}
             <div className="relative">
@@ -122,9 +121,9 @@ export default function ChatComposer(props: ChatComposerProps) {
                 className="absolute inset-0 cursor-pointer opacity-0"
                 id="file-upload"
               />
-              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" asChild>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-white/10" asChild>
                 <label htmlFor="file-upload" className="cursor-pointer">
-                  <Paperclip className="h-4 w-4" />
+                  <Paperclip className="h-3.5 w-3.5" />
                 </label>
               </Button>
             </div>
@@ -133,10 +132,10 @@ export default function ChatComposer(props: ChatComposerProps) {
               disabled={!input.trim() || !canSend || !!uploadBusy}
               size="icon"
               variant="ghost"
-              className="h-9 w-9 rounded-full text-white hover:bg-white/10"
+              className="h-8 w-8 rounded-full text-white hover:bg-white/10"
               aria-label="Send"
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
