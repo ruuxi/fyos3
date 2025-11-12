@@ -435,7 +435,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
             : (optimisticAttachmentOverride ?? (isLastUser ? lastSentAttachments ?? [] : []));
 
           const contentClass = cn(
-            'rounded-2xl px-3 py-2 whitespace-pre-wrap break-words border',
+            'rounded-2xl px-3 py-2 whitespace-pre-wrap break-words border max-w-full overflow-x-auto',
             isUser
               ? 'bg-sky-500 text-white border-sky-400/60 backdrop-blur-md group-[.is-user]:bg-sky-500 group-[.is-user]:text-white group-[.is-user]:px-3 group-[.is-user]:py-2'
               : mode === 'persona'
