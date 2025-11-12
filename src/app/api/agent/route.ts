@@ -312,10 +312,10 @@ export async function POST(req: Request) {
   });
 
   const result = streamText({
-    model: openrouter('moonshotai/kimi-k2-0905:nitro'),
+    model: openrouter('z-ai/glm-4.6:nitro'),
     providerOptions: {
       openrouter: {
-        order: ['groq', 'fireworks'],
+        order: ['cerebras', 'fireworks'],
       },
     },
     messages: convertToModelMessages(sanitizedMessages),

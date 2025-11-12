@@ -22,6 +22,34 @@ import {
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
 import { createContext, memo, useContext, useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
+import {
+  ChainOfThought,
+  ChainOfThoughtHeader,
+  ChainOfThoughtStep,
+  ChainOfThoughtSearchResults,
+  ChainOfThoughtSearchResult,
+  ChainOfThoughtContent,
+  ChainOfThoughtImage,
+} from "./chain-of-thought";
+import {
+  Reasoning,
+  ReasoningTrigger,
+  ReasoningContent,
+} from "./reasoning";
+import {
+  Task,
+  TaskTrigger,
+  TaskContent,
+  TaskItem,
+  TaskItemFile,
+} from "./task";
+import {
+  Tool,
+  ToolHeader,
+  ToolContent,
+  ToolInput,
+  ToolOutput,
+} from "./tool";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
@@ -306,6 +334,38 @@ export const MessageBranchPage = ({
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
+const customComponents = {
+  // Reasoning components
+  reasoning: Reasoning,
+  "reasoning-trigger": ReasoningTrigger,
+  "reasoning-content": ReasoningContent,
+  think: Reasoning,
+  thinking: Reasoning,
+  
+  // Chain of Thought components
+  "chain-of-thought": ChainOfThought,
+  "chain-of-thought-header": ChainOfThoughtHeader,
+  "chain-of-thought-step": ChainOfThoughtStep,
+  "chain-of-thought-search-results": ChainOfThoughtSearchResults,
+  "chain-of-thought-search-result": ChainOfThoughtSearchResult,
+  "chain-of-thought-content": ChainOfThoughtContent,
+  "chain-of-thought-image": ChainOfThoughtImage,
+  
+  // Task components
+  task: Task,
+  "task-trigger": TaskTrigger,
+  "task-content": TaskContent,
+  "task-item": TaskItem,
+  "task-item-file": TaskItemFile,
+  
+  // Tool components
+  tool: Tool,
+  "tool-header": ToolHeader,
+  "tool-content": ToolContent,
+  "tool-input": ToolInput,
+  "tool-output": ToolOutput,
+} as const;
+
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <Streamdown
@@ -313,6 +373,9 @@ export const MessageResponse = memo(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         className
       )}
+      shikiTheme={["one-light", "one-dark-pro"]}
+      // @ts-expect-error - Custom components for AI elements
+      components={customComponents}
       {...props}
     />
   ),
