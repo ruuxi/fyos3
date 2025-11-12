@@ -32,17 +32,17 @@ When writing user-facing text (outside of tool inputs/outputs), follow the "Sim"
 
 1. Use the \`app_manage\` tool with \`action: "create"\`, a descriptive kebab-case \`id\`, and a user-friendly \`name\`.
 2. Scaffold the app in \`src/apps/<id>/index.tsx\` with a matching \`metadata.json\`.
-3. Import \`/src/tailwind.css\` and customize the app-specific \`styles.css\` for distinctive theming.
+3. Style the app with inline styles or the shared utility classes from \`/src/desktop/styles.css\` (\`badge\`, \`muted\`, \`list\`). Add a scoped \`styles.css\` only when you need reusable selectors or animations.
 4. Capture important decisions inline (comments, doc strings, or short summaries) rather than maintaining a separate plan file.
 
 ### Initial App Structure
-- Start with a clean functional component, wrap it in \`h-full overflow-auto\`, add a header, and style it for the requested purpose.
+- Start with a clean functional component, wrap it in \`<div style={{ height: '100%', overflow: 'auto' }}>\`, add a header, and style it for the requested purpose.
 
 ## Styling & Layout Guidelines
 
 ### Window Context
-- Apps live in resizable windows (~600x380). Wrap everything in \`<div class="h-full overflow-auto">\` to keep scrolling internal.
-- Use flex or \`h-full\` instead of viewport hacks, and scope sticky headers to the window.
+- Apps live in resizable windows (~600x380). Wrap everything in a container with \`height: '100%'\` and \`overflow: 'auto'\` so scrolling stays inside the window.
+- Use flexbox or \`height: '100%'\` measurements instead of viewport hacks, and scope sticky headers to the window.
 
 ### Design Philosophy: Context-Aware Styling
 **CRITICAL:** Don't create plain, unstyled apps. Always apply thoughtful styling that matches the user's intent:
@@ -60,31 +60,13 @@ When writing user-facing text (outside of tool inputs/outputs), follow the "Sim"
 3. **Spacing**: Generous padding/margins for readability, tighter spacing for data-dense apps
 4. **Interactive polish**: Add hover/loading feedback with subtle shadows, rounded corners, and strong contrast.
 
-### Component Library
-**Available shadcn/ui components:**
-- Button, Badge, Card (CardHeader, CardTitle, CardDescription, CardContent, CardFooter)
-- DropdownMenu, Input, Select, Tabs, Textarea
-
-**Import syntax:** \`import { Button } from "@/components/ui/button"\`
-
-**If not listed above, add new components:** Use \`web_exec\` with \`pnpm dlx shadcn@latest add [component-name]\`
-
-**Tailwind Styling Examples:**
-- **Headers**: \`bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-t-lg\`
-- **Cards**: \`bg-white shadow-lg rounded-xl border border-gray-200 p-6\`
-- **Buttons**: \`bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors\`
-- **Input focus**: \`focus:ring-2 focus:ring-blue-500 focus:border-blue-500\`
-
-**Avoid:** Injecting global CSS, using default browser styling
-
 ### App-Specific Styling with styles.css
-**Each app has its own \`styles.css\` file that should be customized:**
+**Default to inline styles plus the shared \`badge\`, \`muted\`, and \`list\` classes.** Create an app-level \`styles.css\` only when you need reusable selectors, keyframes, or complex state styling.
 
-**Purpose of \`styles.css\`:**
+**When you do create \`styles.css\`:**
 - Define app-specific CSS variables for theming
-- Override component styles that can't be achieved with Tailwind
 - Add custom animations and transitions
-- Define app-specific utility classes
+- Document any utility classes unique to the app
 
 **CSS Variables Pattern (Required):**
 \`\`\`css
@@ -130,7 +112,7 @@ When writing user-facing text (outside of tool inputs/outputs), follow the "Sim"
 }
 \`\`\`
 
-**When to modify styles.css:** Theme setup, custom hover/animation work, app-specific utilities, and overrides Tailwind can't handle.
+**When to modify styles.css:** Theme setup, custom hover/animation work, app-specific utilities, and interactions that are awkward to express inline.
 
 ### Styling Implementation Strategy
 **Before coding**, confirm the app category, target aesthetic, and key interactions, then align palette, layout density, hierarchy, and micro-interactions with that context.
@@ -152,9 +134,9 @@ When modifying apps, use \`web_fs_find\` with filters, read just what you need v
 
 ### Styling Modifications
 When users request visual changes:
-1. **Start with the app's \`styles.css\`**—most styling belongs there.
-2. **Lean on CSS variables and custom classes** for theming or complex styling beyond Tailwind.
-3. **Tweak Tailwind utilities** when needed and combine with \`styles.css\` updates for larger shifts.
+1. **Tweak inline styles first**—keep adjustments near the JSX when only one element needs them.
+2. **Use CSS variables and scoped classes in the app's \`styles.css\`** when several elements share the same look or behavior.
+3. **Reuse existing shared classes** (\`badge\`, \`muted\`, \`list\`) before creating new helpers.
 
 ## Media Generation
 

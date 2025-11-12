@@ -10,9 +10,6 @@
       #mount{overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
       body{background:#0b1020;overflow:hidden}
     </style>
-    <!-- Preload Tailwind CSS to ensure it's available immediately -->
-    <link rel="preload" href="/src/tailwind.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/src/tailwind.css"></noscript>
   </head>
   <body>
     <div id="mount" style="height:100%"></div>
@@ -195,8 +192,6 @@
 
       
       import { createRoot } from '/src/iframe-root.js';
-      // Hint Vite/Tailwind to include all app entry modules in the module graph
-      // so Tailwind v4 can detect their classes even when loaded dynamically.
       const loaders = import.meta.glob('/src/apps/**/index.{tsx,ts,jsx,js}');
       // Expect query: ?path=/src/apps/xxx/index.tsx&name=...&id=...
       const params = new URLSearchParams(location.search)
@@ -205,21 +200,9 @@
       const mountEl = document.getElementById('mount')
       
       // Import CSS for styling (always load; URL flags can disable if set to 0)
-      // Flags: base=0 (disable index.css), ui=0 (disable desktop/ui), tw=0 (disable tailwind)
+      // Flag: ui=0 (disable desktop chrome)
       try {
-        const loadBase = params.get('base') !== '0'
         const loadUi = params.get('ui') !== '0'
-        const loadTw = params.get('tw') !== '0'
-        
-        // Always load Tailwind first to ensure utilities are available
-        if (loadTw) {
-          await import('/src/tailwind.css')
-          console.log('[App iframe] Tailwind CSS loaded')
-        }
-        if (loadBase) {
-          await import('/src/index.css')
-          console.log('[App iframe] Base CSS loaded')
-        }
         if (loadUi) {
           await import('/src/desktop/styles.css')
           console.log('[App iframe] Desktop UI CSS loaded')

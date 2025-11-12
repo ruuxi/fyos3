@@ -463,7 +463,7 @@ function Window({ app, zIndex, onClose, onMinimize, onFocus, onMove, onResize, t
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
   const isBlank = !activeTab || !activeTab.appId;
-  const iframeSrc = !isBlank ? `/app.html?path=${encodeURIComponent(activeTab.path||'')}&id=${encodeURIComponent(activeTab.appId||'')}&name=${encodeURIComponent(activeTab.title)}&base=0&ui=1&tw=1` : '';
+  const iframeSrc = !isBlank ? `/app.html?path=${encodeURIComponent(activeTab.path||'')}&id=${encodeURIComponent(activeTab.appId||'')}&name=${encodeURIComponent(activeTab.title)}&ui=1` : '';
 
   return (
     <div ref={rootRef} className={classes.join(' ')} data-app-id={app.id} style={{ ...resolveAppGeometry(app), zIndex, background: 'rgba(12,18,36,0.10)' }} onMouseDown={onFocus}>
