@@ -89,6 +89,13 @@ type AppConsoleMessage = AgentMessageBase & {
   hash?: string;
 };
 
+type MaskMode = 'agent' | 'error' | 'reload' | 'hmr' | 'boot';
+
+type MaskCommand =
+  | { type: 'FYOS_MASK_PIN'; mode?: MaskMode }
+  | { type: 'FYOS_MASK_UNPIN'; mode?: MaskMode }
+  | { type: 'FYOS_MASK_FLASH'; mode?: MaskMode };
+
 type UserMode = 'auth' | 'anon';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -211,6 +218,15 @@ export default function WebContainer() {
   const [bootRequested, setBootRequested] = useState(false);
   const hasBootedRef = useRef(false);
   const canProceed = isSignedIn || userMode === 'anon';
+  const bootMaskPinnedRef = useRef(false);
+
+  const postMaskCommand = (command: MaskCommand) => {
+    const target = iframeRef.current?.contentWindow;
+    if (!target) return;
+    try {
+      target.postMessage(command, '*');
+    } catch {}
+  };
 
   useEffect(() => {
     const nextMode: UserMode = isSignedIn ? 'auth' : 'anon';
@@ -981,10 +997,17 @@ export default function Document() {
       iframe.classList.add('iframe-ready');
 
       // When iframe opacity transition finishes, trigger boot overlay exit
+      const exitBoot = () => {
+        if (!bootMaskPinnedRef.current) {
+          bootMaskPinnedRef.current = true;
+          postMaskCommand({ type: 'FYOS_MASK_PIN', mode: 'boot' });
+        }
+        setShouldExitBoot(true);
+      };
       const onTransitionEnd = (ev: TransitionEvent) => {
         if (ev.propertyName === 'opacity') {
           iframe.removeEventListener('transitionend', onTransitionEnd);
-          setShouldExitBoot(true);
+          exitBoot();
         }
       };
       iframe.addEventListener('transitionend', onTransitionEnd);
@@ -992,7 +1015,7 @@ export default function Document() {
       // Fallback in case transitionend doesn't fire
       const fallbackId = window.setTimeout(() => {
         try { iframe.removeEventListener('transitionend', onTransitionEnd); } catch {}
-        setShouldExitBoot(true);
+        exitBoot();
       }, 700);
 
       // Clean up transition listener on unmount
@@ -1006,6 +1029,13 @@ export default function Document() {
       window.clearTimeout(delayTimeout);
     };
   }, [serverReady, isLoading]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!bootMaskPinnedRef.current) return;
+    bootMaskPinnedRef.current = false;
+    postMaskCommand({ type: 'FYOS_MASK_UNPIN', mode: 'boot' });
+  }, [isLoading]);
 
   if (error) {
     return (

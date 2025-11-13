@@ -128,8 +128,12 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .list{padding-left:16px}
 
 /* HMR mask to suppress white flashes during full reloads/HMR swaps */
-.hmr-mask{position:fixed;inset:0;background:#0b1020;opacity:0;pointer-events:none;transition:opacity .12s ease;z-index:2147483646}
+.hmr-mask{position:fixed;inset:0;background:var(--hmr-mask-bg,#0b1020);opacity:0;pointer-events:none;transition:opacity .12s ease;z-index:2147483646;backdrop-filter:blur(6px)}
 .hmr-mask.active{opacity:.9}
+.hmr-mask[data-mode='error']{--hmr-mask-bg:rgba(12,3,15,0.82)}
+.hmr-mask[data-mode='agent']{--hmr-mask-bg:rgba(4,10,24,0.8)}
+.hmr-mask[data-mode='hmr']{--hmr-mask-bg:rgba(2,6,18,0.72)}
+.hmr-mask[data-mode='boot']{--hmr-mask-bg:rgba(2,6,18,0.72)}
 
 /* Sidebar */
 .desktop-sidebar{background:rgba(12,18,36,0.42);border-right:1px solid rgba(255,255,255,0.14);backdrop-filter:saturate(150%) blur(14px);-webkit-backdrop-filter:saturate(150%) blur(14px);color:#f7fafc}

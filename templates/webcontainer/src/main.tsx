@@ -4,6 +4,8 @@ import Desktop from './desktop/Desktop'
 import './globals.css'
 import './desktop/styles.css'
 
+type MaskMode = 'agent' | 'error' | 'reload' | 'hmr' | 'boot'
+
 type ViteHotEvent = 'vite:beforeUpdate' | 'vite:afterUpdate' | 'full-reload' | 'vite:error'
 
 type ViteHot = {
@@ -23,7 +25,7 @@ type ViteErrorPayload = {
 class SnapshotMask {
   private overlay: HTMLDivElement
   private hideTimer: number | null = null
-  private pinned: 'agent' | 'error' | 'reload' | null = null
+  private pinned: MaskMode | null = null
 
   constructor() {
     this.overlay = this.ensureOverlay()
@@ -53,27 +55,27 @@ class SnapshotMask {
     this.overlay.replaceChildren(clone)
   }
 
-  private show(mode: 'agent' | 'error' | 'reload' | 'hmr') {
+  private show(mode: MaskMode) {
     this.takeSnapshot()
     this.overlay.dataset.mode = mode
     this.overlay.classList.add('active')
   }
 
-  flash() {
+  flash(mode: MaskMode = 'hmr') {
     if (this.pinned) {
       this.takeSnapshot()
       return
     }
-    this.show('hmr')
+    this.show(mode)
     this.scheduleHide()
   }
 
-  pin(mode: 'agent' | 'error' | 'reload') {
+  pin(mode: MaskMode = 'hmr') {
     this.pinned = mode
     this.show(mode)
   }
 
-  unpin(mode?: 'agent' | 'error' | 'reload') {
+  unpin(mode?: MaskMode) {
     if (mode && this.pinned && this.pinned !== mode) return
     this.pinned = null
     this.clear()
@@ -105,6 +107,9 @@ createRoot(document.getElementById('root')!).render(
 
 const hot = (import.meta as ImportMeta & { hot?: ViteHot }).hot
 const mask = typeof window !== 'undefined' ? new SnapshotMask() : null
+
+const MASK_MODES: MaskMode[] = ['agent', 'error', 'reload', 'hmr', 'boot']
+const isMaskMode = (value: unknown): value is MaskMode => typeof value === 'string' && MASK_MODES.includes(value as MaskMode)
 
 const sendBuildEvent = (type: 'APP_BUILD_ERROR' | 'APP_BUILD_ERROR_CLEARED', payload?: ViteErrorPayload) => {
   if (typeof window === 'undefined') return
@@ -142,6 +147,32 @@ const sendBuildEvent = (type: 'APP_BUILD_ERROR' | 'APP_BUILD_ERROR_CLEARED', pay
   }
 }
 
+
+if (typeof window !== 'undefined' && mask) {
+  const onMessage = (event: MessageEvent) => {
+    const payload = event.data
+    if (!payload || typeof payload !== 'object') return
+    const type = (payload as { type?: unknown }).type
+    if (type === 'FYOS_MASK_PIN') {
+      const modeValue = (payload as { mode?: unknown }).mode
+      const mode = isMaskMode(modeValue) ? modeValue : 'hmr'
+      mask.pin(mode)
+      return
+    }
+    if (type === 'FYOS_MASK_UNPIN') {
+      const modeValue = (payload as { mode?: unknown }).mode
+      const mode = isMaskMode(modeValue) ? modeValue : undefined
+      mask.unpin(mode)
+      return
+    }
+    if (type === 'FYOS_MASK_FLASH') {
+      const modeValue = (payload as { mode?: unknown }).mode
+      const mode = isMaskMode(modeValue) ? modeValue : 'hmr'
+      mask.flash(mode)
+    }
+  }
+  window.addEventListener('message', onMessage)
+}
 
 if (hot) {
   try {

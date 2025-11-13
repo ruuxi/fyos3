@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 
 type BootScreenProps = {
   message?: string;
@@ -15,17 +15,12 @@ type BootScreenProps = {
 
 export default function BootScreen({ message = 'Preparing…', progress, complete = false, onExited, isSignedIn = false, onSignIn, canProceed = false, onContinue }: BootScreenProps) {
   const clamped = Math.max(0, Math.min(100, progress));
-  const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
-    if (complete && canProceed && !exiting) {
-      setExiting(true);
-      const t = window.setTimeout(() => {
-        onExited?.();
-      }, 800);
-      return () => window.clearTimeout(t);
+    if (complete && canProceed) {
+      onExited?.();
     }
-  }, [complete, canProceed, exiting, onExited]);
+  }, [complete, canProceed, onExited]);
 
   const widthStyle = useMemo(() => ({ width: `${clamped}%` }), [clamped]);
   const wallpaperStyle = useMemo<React.CSSProperties>(() => {
@@ -39,7 +34,7 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
   };
 
   return (
-    <div className={`boot-overlay absolute inset-0 z-20 flex items-center text-white ${exiting ? 'boot-overlay--exit' : ''}`} aria-busy={!exiting}>
+    <div className="boot-overlay absolute inset-0 z-20 flex items-center text-white" aria-busy={!complete}>
       {/* Wallpaper + glass */}
       <div className="absolute inset-0 -z-10" style={wallpaperStyle} />
       <div className="absolute inset-0 -z-10 pointer-events-none" style={glassStyle} />
@@ -90,14 +85,6 @@ export default function BootScreen({ message = 'Preparing…', progress, complet
         @keyframes shimmer {
           0% { transform: translateX(-30%); }
           100% { transform: translateX(30%); }
-        }
-        .boot-overlay {
-          clip-path: circle(150% at 50% 50%);
-          transition: clip-path 800ms cubic-bezier(0.16, 1, 0.3, 1), opacity 600ms ease;
-        }
-        .boot-overlay--exit {
-          clip-path: circle(0% at 50% 50%);
-          opacity: 0;
         }
         .boot-brand-text {
           font-family: 'Playfair Display', serif;

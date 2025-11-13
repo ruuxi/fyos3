@@ -14,6 +14,7 @@
       #vite-hmr-mask[data-mode="error"]{background:rgba(35,4,12,.85)}
       #vite-hmr-mask[data-mode="agent"]{background:rgba(4,10,24,.82)}
       #vite-hmr-mask[data-mode="hmr"]{background:rgba(2,6,18,.74)}
+      #vite-hmr-mask[data-mode="boot"]{background:rgba(2,6,18,.74)}
       #vite-hmr-mask [data-hmr-snapshot]{width:100%;height:100%;pointer-events:none;opacity:.97;filter:saturate(.92)}
     </style>
   </head>
@@ -57,17 +58,17 @@
           if (mode) this.overlay.dataset.mode = mode;
           this.overlay.classList.add('active');
         }
-        flash() {
+        flash(mode) {
           if (this.pinned) {
             this.takeSnapshot();
             return;
           }
-          this.show('hmr');
+          this.show(mode || 'hmr');
           this.scheduleHide();
         }
         pin(mode) {
-          this.pinned = mode;
-          this.show(mode || 'hmr');
+          this.pinned = mode || 'hmr';
+          this.show(this.pinned);
         }
         unpin(mode) {
           if (mode && this.pinned && this.pinned !== mode) return;
@@ -93,6 +94,26 @@
         }
       }
       const hmrMask = new SnapshotMask(() => document.getElementById('mount'));
+
+      window.addEventListener('message', (event) => {
+        const payload = event.data;
+        if (!payload || typeof payload !== 'object') return;
+        const type = payload.type;
+        if (type === 'FYOS_MASK_PIN') {
+          const mode = typeof payload.mode === 'string' ? payload.mode : 'hmr';
+          hmrMask.pin(mode);
+          return;
+        }
+        if (type === 'FYOS_MASK_UNPIN') {
+          const mode = typeof payload.mode === 'string' ? payload.mode : undefined;
+          hmrMask.unpin(mode);
+          return;
+        }
+        if (type === 'FYOS_MASK_FLASH') {
+          const mode = typeof payload.mode === 'string' ? payload.mode : 'hmr';
+          hmrMask.flash(mode);
+        }
+      });
 
       const announceBuildEvent = (type, payload) => {
         try {
