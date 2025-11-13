@@ -1,4 +1,4 @@
-Å°då®app.htmlÅ°fÅ°c≈<œ<!doctype html>
+Å°då®app.htmlÅ°fÅ°c≈=Å<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -353,8 +353,11 @@
       try {
         const loadUi = params.get('ui') !== '0'
         if (loadUi) {
+          // Import Tailwind CSS first (contains @tailwind directives)
+          await import('/src/globals.css')
+          // Then import custom desktop styles
           await import('/src/desktop/styles.css')
-          console.log('[App iframe] Desktop UI CSS loaded')
+          console.log('[App iframe] Tailwind CSS and desktop UI CSS loaded')
         }
       } catch (e) {
         console.error('[App iframe] CSS import error:', e)
@@ -415,31 +418,7 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
-</html>¨package.jsonÅ°fÅ°c≈{
-  "name": "mac-desktop",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@types/node": "^24.3.1",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.13",
-    "vite": "^5.0.8"
-  }
-}Æpnpm-lock.yamlÅ°fÅ°c≈‰álockfileVersion: '9.0'
+</html>Æpnpm-lock.yamlÅ°fÅ°c≈‰álockfileVersion: '9.0'
 
 settings:
   autoInstallPeers: true
@@ -2272,7 +2251,31 @@ snapshots:
       strip-ansi: 7.1.2
 
   yallist@3.1.1: {}
-±postcss.config.jsÅ°fÅ°cƒRexport default {
+¨package.jsonÅ°fÅ°c≈{
+  "name": "mac-desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@types/node": "^24.3.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.13",
+    "vite": "^5.0.8"
+  }
+}±postcss.config.jsÅ°fÅ°cƒRexport default {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},
@@ -5087,10 +5090,11 @@ if (hot) {
 }
 
 // No agent-run masking: HMR updates flow normally without pausing
-≤tailwind.config.jsÅ°fÅ°c≈©/** @type {import('tailwindcss').Config} */
+≤tailwind.config.jsÅ°fÅ°c≈ª/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     './index.html',
+    './app.html',
     './src/**/*.{js,ts,jsx,tsx}'
   ],
   theme: {

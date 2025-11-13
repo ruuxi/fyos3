@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { auth } from '@clerk/nextjs/server';
 import { api as convexApi } from '../../../../../convex/_generated/api';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 type IngestBody = {
   sourceUrl?: string;
@@ -69,15 +71,32 @@ function getPublicUrlFromEnv(r2Key: string): string | undefined {
   return undefined;
 }
 
-async function getConvexClient() {
+async function getConvexClient(): Promise<ConvexHttpClient | null> {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!url) throw new Error('Missing NEXT_PUBLIC_CONVEX_URL');
   const client = new ConvexHttpClient(url);
   const { getToken } = await auth();
   const token = await getToken({ template: 'convex' });
-  if (!token) throw new Error('Unauthorized');
+  if (!token) return null; // Anonymous user
   client.setAuth(token);
   return client;
+}
+
+function getR2Client() {
+  const endpoint = process.env.R2_ENDPOINT;
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+  const region = process.env.R2_REGION || 'auto';
+  
+  if (!endpoint || !accessKeyId || !secretAccessKey) {
+    throw new Error('R2 credentials not configured');
+  }
+  
+  return new S3Client({
+    region,
+    endpoint,
+    credentials: { accessKeyId, secretAccessKey },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -125,53 +144,101 @@ export async function POST(req: NextRequest) {
 
     const client = await getConvexClient();
 
-    // Dedup check
-    const existing = await client.query(convexApi.media.getMediaByHash, { sha256 });
-    if (existing) {
-      return NextResponse.json({ ok: true, deduped: true, publicUrl: existing.publicUrl, r2Key: existing.r2Key, sha256: existing.sha256, size: existing.size, contentType: existing.contentType });
-    }
-
-    // Request signed URL
-    const { url, r2Key } = await client.mutation(convexApi.media.startIngest, {
-      sha256,
-      size,
-      contentType: detected,
-      desktopId: body.scope?.desktopId,
-      appId: body.scope?.appId,
-    });
-
-    // Upload to signed URL
-    const uploadRes = await fetch(url, { method: 'PUT', body: bytes, headers: { 'Content-Type': detected } });
-    if (!uploadRes.ok) {
-      return NextResponse.json({ error: `Upload failed: ${uploadRes.status}` }, { status: 502 });
-    }
-
-    // Derive public URL
-    let publicUrl = getPublicUrlFromEnv(r2Key);
-    if (!publicUrl) {
-      try {
-        // Fallback via Convex query (avoids importing server r2 client here)
-        publicUrl = await client.query(convexApi.media.getUrlForKey, { r2Key, expiresIn: 86400 });
-      } catch {
-        publicUrl = undefined;
+    // === AUTHENTICATED FLOW ===
+    if (client) {
+      // Dedup check
+      const existing = await client.query(convexApi.media.getMediaByHash, { sha256 });
+      if (existing) {
+        return NextResponse.json({ ok: true, deduped: true, publicUrl: existing.publicUrl, r2Key: existing.r2Key, sha256: existing.sha256, size: existing.size, contentType: existing.contentType });
       }
+
+      // Request signed URL
+      const { url, r2Key } = await client.mutation(convexApi.media.startIngest, {
+        sha256,
+        size,
+        contentType: detected,
+        desktopId: body.scope?.desktopId,
+        appId: body.scope?.appId,
+      });
+
+      // Upload to signed URL
+      const uploadRes = await fetch(url, { method: 'PUT', body: bytes, headers: { 'Content-Type': detected } });
+      if (!uploadRes.ok) {
+        return NextResponse.json({ error: `Upload failed: ${uploadRes.status}` }, { status: 502 });
+      }
+
+      // Derive public URL
+      let publicUrl = getPublicUrlFromEnv(r2Key);
+      if (!publicUrl) {
+        try {
+          // Fallback via Convex query (avoids importing server r2 client here)
+          publicUrl = await client.query(convexApi.media.getUrlForKey, { r2Key, expiresIn: 86400 });
+        } catch {
+          publicUrl = undefined;
+        }
+      }
+
+      // Finalize record
+      const id = await client.mutation(convexApi.media.finalizeIngest, {
+        desktopId: body.scope?.desktopId,
+        appId: body.scope?.appId,
+        threadId: body.scope?.threadId,
+        requestId: body.scope?.requestId,
+        sha256,
+        size,
+        contentType: detected,
+        r2Key,
+        publicUrl,
+        metadata: body.metadata,
+      });
+
+      return NextResponse.json({ ok: true, id, publicUrl, r2Key, sha256, size, contentType: detected });
     }
 
-    // Finalize record
-    const id = await client.mutation(convexApi.media.finalizeIngest, {
-      desktopId: body.scope?.desktopId,
-      appId: body.scope?.appId,
-      threadId: body.scope?.threadId,
-      requestId: body.scope?.requestId,
+    // === ANONYMOUS FLOW ===
+    // Upload to R2 with short TTL (1 hour), no database record
+    const r2Client = getR2Client();
+    const bucketName = process.env.R2_BUCKET;
+    if (!bucketName) {
+      return NextResponse.json({ error: 'R2 bucket not configured' }, { status: 500 });
+    }
+
+    // Use anon/ prefix and timestamp for anonymous uploads
+    const timestamp = Date.now();
+    const ext = detected.split('/')[1] || 'bin';
+    const r2Key = `anon/${timestamp}-${sha256.slice(0, 12)}.${ext}`;
+
+    const putCommand = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: r2Key,
+      Body: bytes,
+      ContentType: detected,
+      // Set lifecycle/expiration via object metadata (Cloudflare R2 supports this)
+      Metadata: {
+        'ephemeral': 'true',
+        'created': timestamp.toString(),
+      },
+    });
+
+    await r2Client.send(putCommand);
+
+    // Generate public URL
+    const publicUrl = getPublicUrlFromEnv(r2Key);
+    if (!publicUrl) {
+      return NextResponse.json({ error: 'Could not generate public URL' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      anonymous: true,
+      publicUrl,
+      r2Key,
       sha256,
       size,
       contentType: detected,
-      r2Key,
-      publicUrl,
-      metadata: body.metadata,
+      expiresIn: 3600, // 1 hour in seconds
+      warning: 'This URL will expire in 1 hour and is not saved to your account',
     });
-
-    return NextResponse.json({ ok: true, id, publicUrl, r2Key, sha256, size, contentType: detected });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Ingest failed';
     return NextResponse.json({ error: message }, { status: 500 });

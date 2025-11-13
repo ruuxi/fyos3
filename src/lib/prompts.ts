@@ -36,17 +36,23 @@ When writing user-facing text (outside of tool inputs/outputs), follow the "Sim"
 
 1. Use the \`app_manage\` tool with \`action: "create"\`, a descriptive kebab-case \`id\`, and a user-friendly \`name\`.
 2. Scaffold the app in \`src/apps/<id>/index.tsx\` with a matching \`metadata.json\`.
-3. Style the app with inline styles or the shared utility classes from \`/src/desktop/styles.css\` (\`badge\`, \`muted\`, \`list\`). Add a scoped \`styles.css\` only when you need reusable selectors or animations.
+3. **Tailwind CSS is fully configured and available** for all apps. Use Tailwind utility classes as your primary styling approach. You can also use the shared utility classes from \`/src/desktop/styles.css\` (\`badge\`, \`muted\`, \`list\`). Add a scoped \`styles.css\` only when you need custom CSS variables, reusable selectors, or complex animations.
 4. Capture important decisions inline (comments, doc strings, or short summaries) rather than maintaining a separate plan file.
 
 ### Initial App Structure
-- Start with a clean functional component, wrap it in \`<div style={{ height: '100%', overflow: 'auto' }}>\`, add a header, and style it for the requested purpose.
+- Start with a clean functional component, wrap it in \`<div className="h-full overflow-auto">\` or \`<div style={{ height: '100%', overflow: 'auto' }}>\`, add a header, and style it for the requested purpose using Tailwind utilities.
 
 ## Styling & Layout Guidelines
 
+### Tailwind CSS Configuration
+**IMPORTANT: Tailwind CSS is fully configured and loaded for all apps.** All Tailwind utility classes (spacing, colors, flexbox, grid, typography, etc.) are available and should be your primary styling method. The complete Tailwind CSS setup includes:
+- All base styles, components, and utilities from Tailwind
+- PostCSS with autoprefixer configured
+- Custom theme extensions in \`tailwind.config.js\`
+
 ### Window Context
-- Apps live in resizable windows (~600x380). Wrap everything in a container with \`height: '100%'\` and \`overflow: 'auto'\` so scrolling stays inside the window.
-- Use flexbox or \`height: '100%'\` measurements instead of viewport hacks, and scope sticky headers to the window.
+- Apps live in resizable windows (~600x380). Wrap everything in a container with \`className="h-full overflow-auto"\` or \`style={{ height: '100%', overflow: 'auto' }}\` so scrolling stays inside the window.
+- Use Tailwind flexbox utilities (\`flex\`, \`flex-col\`, etc.) or height utilities (\`h-full\`, \`h-screen\`) instead of viewport hacks, and scope sticky headers to the window.
 
 ### Design Philosophy: Context-Aware Styling
 **CRITICAL:** Don't create plain, unstyled apps. Always apply thoughtful styling that matches the user's intent:
@@ -65,25 +71,32 @@ When writing user-facing text (outside of tool inputs/outputs), follow the "Sim"
 4. **Interactive polish**: Add hover/loading feedback with subtle shadows, rounded corners, and strong contrast.
 
 ### Styling Guardrails: Prevent CSS Conflicts
-1. Pick ONE layout system per container. Default to Tailwind utilities for layout/spacing/positioning (display, flex/grid, gap, justify/align, width/height, padding/margin). Use inline style only for:
-   - Computed/dynamic values
-   - Complex gradients or CSS variables not expressible via utilities
-   - Canvas/SVG or vendor-specific attributes
-2. Never set the same property both inline and via utilities. Examples:
-   - Avoid combining \`style={{ height: '100%' }}\` with \`h-full\`
-   - Avoid combining inline \`display:flex\` with \`flex\`
-   - Avoid mixing inline margins/padding with \`m-*/p-*\` on the same element
-3. Backgrounds rule. If you use an inline gradient/background, add \`bg-transparent\` and avoid any \`bg-*\` utilities on that element (or vice versa).
-4. Root shell pattern. Wrap apps with a root container using either:
-   - Tailwind: \`className="flex flex-col h-full min-h-0 overflow-auto"\`, or
-   - Inline: \`style={{ height: '100%', overflow: 'auto', display: 'flex', flexDirection: 'column' }}\`
-   but do not mix the same properties across style and class on the same element.
-5. Centering. Avoid centering on the full-height root; center an inner wrapper instead.
-6. Grid with spans. When using \`row-span-*\`, define rows explicitly (e.g., \`grid-rows-[auto_1fr_auto]\` or \`auto-rows-[minmax(0,1fr)]\`) so spans behave predictably.
-7. Width constraints. Apply \`max-w-*\` to an inner content wrapper, not the full-height root, to prevent overflow + centering conflicts.
+**PREFER Tailwind utilities over inline styles.** Tailwind is fully configured and provides a complete design system.
+
+1. **Use Tailwind first.** For layout/spacing/positioning (display, flex/grid, gap, justify/align, width/height, padding/margin), colors, typography, and most styling needs, use Tailwind utility classes. Use inline styles only for:
+   - Computed/dynamic values that change at runtime
+   - Complex gradients or CSS variables not expressible via Tailwind utilities
+   - Canvas/SVG positioning or vendor-specific attributes
+   
+2. **Never duplicate properties.** Don't set the same property both inline and via Tailwind utilities. Examples to AVOID:
+   - ❌ Combining \`style={{ height: '100%' }}\` with \`h-full\`
+   - ❌ Combining \`style={{ display: 'flex' }}\` with \`flex\`
+   - ❌ Mixing \`style={{ padding: '8px' }}\` with \`p-2\` on the same element
+   
+3. **Backgrounds rule.** If you use an inline gradient/background, add \`bg-transparent\` and avoid any \`bg-*\` utilities on that element (or vice versa).
+
+4. **Root container pattern.** Wrap apps with a root container using Tailwind:
+   - ✅ Recommended: \`className="flex flex-col h-full min-h-0 overflow-auto"\`
+   - ⚠️ Fallback: \`style={{ height: '100%', overflow: 'auto' }}\` (but don't mix both)
+   
+5. **Centering.** Avoid centering on the full-height root; center an inner wrapper instead using \`flex items-center justify-center\`.
+
+6. **Grid with spans.** When using \`row-span-*\`, define rows explicitly (e.g., \`grid-rows-[auto_1fr_auto]\` or \`auto-rows-[minmax(0,1fr)]\`) so spans behave predictably.
+
+7. **Width constraints.** Apply \`max-w-*\` to an inner content wrapper, not the full-height root, to prevent overflow + centering conflicts.
 
 ### App-Specific Styling with styles.css
-**Default to inline styles plus the shared \`badge\`, \`muted\`, and \`list\` classes.** Create an app-level \`styles.css\` only when you need reusable selectors, keyframes, or complex state styling.
+**Default to Tailwind utilities plus the shared \`badge\`, \`muted\`, and \`list\` classes.** Create an app-level \`styles.css\` only when you need custom CSS variables, reusable selectors, keyframes, or complex state styling that can't be achieved with Tailwind.
 
 **When you do create \`styles.css\`:**
 - Define app-specific CSS variables for theming
@@ -156,9 +169,10 @@ When modifying apps, use \`web_fs_find\` with filters, read just what you need v
 
 ### Styling Modifications
 When users request visual changes:
-1. **Tweak inline styles first**—keep adjustments near the JSX when only one element needs them.
-2. **Use CSS variables and scoped classes in the app's \`styles.css\`** when several elements share the same look or behavior.
-3. **Reuse existing shared classes** (\`badge\`, \`muted\`, \`list\`) before creating new helpers.
+1. **Use Tailwind utilities first**—adjust or add Tailwind classes for colors, spacing, layout, etc. This is the fastest and most consistent approach.
+2. **Tweak inline styles** only for computed/dynamic values that can't be expressed with Tailwind.
+3. **Use CSS variables and scoped classes in the app's \`styles.css\`** when you need custom CSS that Tailwind doesn't support (e.g., complex animations, pseudo-elements).
+4. **Reuse existing shared classes** (\`badge\`, \`muted\`, \`list\`) before creating new helpers.
 
 ## Media Generation
 

@@ -353,8 +353,11 @@
       try {
         const loadUi = params.get('ui') !== '0'
         if (loadUi) {
+          // Import Tailwind CSS first (contains @tailwind directives)
+          await import('/src/globals.css')
+          // Then import custom desktop styles
           await import('/src/desktop/styles.css')
-          console.log('[App iframe] Desktop UI CSS loaded')
+          console.log('[App iframe] Tailwind CSS and desktop UI CSS loaded')
         }
       } catch (e) {
         console.error('[App iframe] CSS import error:', e)
