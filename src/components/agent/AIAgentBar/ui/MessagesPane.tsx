@@ -542,7 +542,7 @@ export default function MessagesPane(props: MessagesPaneProps) {
           }
 
           const contentClass = cn(
-            'rounded-2xl py-2 whitespace-pre-wrap break-words border max-w-full overflow-x-auto',
+            'rounded-2xl py-2 whitespace-pre-wrap break-words border max-w-full overflow-x-auto leading-relaxed',
             isUser
               ? 'px-3 bg-sky-500 text-white border-sky-400/60 backdrop-blur-md group-[.is-user]:bg-sky-500 group-[.is-user]:text-white group-[.is-user]:px-3 group-[.is-user]:py-2'
               : 'px-4 bg-white/8 !text-white border-white/15',
@@ -635,20 +635,55 @@ export default function MessagesPane(props: MessagesPaneProps) {
           100% { transform: scale(1); opacity: 1; }
         }
 
+        /* Tighten spacing for markdown paragraphs in message bubbles */
+        :global([class*="rounded-2xl"]) :global(p) {
+          margin-top: 0.25em;
+          margin-bottom: 0.25em;
+        }
+
+        :global([class*="rounded-2xl"]) :global(p:first-child) {
+          margin-top: 0;
+        }
+
+        :global([class*="rounded-2xl"]) :global(p:last-child) {
+          margin-bottom: 0;
+        }
+
+        /* Tighten spacing for headers */
+        :global([class*="rounded-2xl"]) :global(h1),
+        :global([class*="rounded-2xl"]) :global(h2),
+        :global([class*="rounded-2xl"]) :global(h3),
+        :global([class*="rounded-2xl"]) :global(h4),
+        :global([class*="rounded-2xl"]) :global(h5),
+        :global([class*="rounded-2xl"]) :global(h6) {
+          margin-top: 0.25em;
+          margin-bottom: 0.25em;
+        }
+
+        :global([class*="rounded-2xl"]) :global(h1:first-child),
+        :global([class*="rounded-2xl"]) :global(h2:first-child),
+        :global([class*="rounded-2xl"]) :global(h3:first-child),
+        :global([class*="rounded-2xl"]) :global(h4:first-child),
+        :global([class*="rounded-2xl"]) :global(h5:first-child),
+        :global([class*="rounded-2xl"]) :global(h6:first-child) {
+          margin-top: 0;
+        }
+
+        /* Tighten spacing for lists */
         :global([class*="rounded-2xl"]) :global(ul),
         :global([class*="rounded-2xl"]) :global(ol) {
           margin-left: 0 !important;
           padding-left: 1.5rem !important;
-          margin-top: 0.5rem;
-          margin-bottom: 0.5rem;
+          margin-top: 0.25em;
+          margin-bottom: 0.25em;
           list-style-position: inside;
         }
 
         :global([class*="rounded-2xl"]) :global(li) {
           margin-left: 0 !important;
           padding-left: 0;
-          margin-top: 0.25rem;
-          margin-bottom: 0.25rem;
+          margin-top: 0.05em;
+          margin-bottom: 0.05em;
         }
       `}</style>
     </div>

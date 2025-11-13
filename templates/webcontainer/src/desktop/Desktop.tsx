@@ -1345,15 +1345,7 @@ export default function Desktop(){
       if (!payload || typeof payload !== 'object') return
       const record = payload as { [key: string]: unknown }
       const typeValue = typeof record.type === 'string' ? record.type : ''
-      if (typeValue === 'FYOS_AGENT_RUN_STARTED' || typeValue === 'FYOS_AGENT_RUN_ENDED') {
-        try {
-          const frames = Array.from(document.querySelectorAll('iframe')) as HTMLIFrameElement[]
-          frames.forEach(f => {
-            try { f.contentWindow?.postMessage(payload, '*') } catch {}
-          })
-        } catch {}
-        return
-      }
+      // FYOS_AGENT_RUN_* forwarding removed; HMR no longer paused during runs
       if (typeValue === EVT_USER_MODE) {
         const raw = (record.payload as { mode?: unknown } | undefined)?.mode
         if (raw === 'auth' || raw === 'anon') setUserMode(raw)

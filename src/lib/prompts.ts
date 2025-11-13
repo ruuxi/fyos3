@@ -64,6 +64,24 @@ When writing user-facing text (outside of tool inputs/outputs), follow the "Sim"
 3. **Spacing**: Generous padding/margins for readability, tighter spacing for data-dense apps
 4. **Interactive polish**: Add hover/loading feedback with subtle shadows, rounded corners, and strong contrast.
 
+### Styling Guardrails: Prevent CSS Conflicts
+1. Pick ONE layout system per container. Default to Tailwind utilities for layout/spacing/positioning (display, flex/grid, gap, justify/align, width/height, padding/margin). Use inline style only for:
+   - Computed/dynamic values
+   - Complex gradients or CSS variables not expressible via utilities
+   - Canvas/SVG or vendor-specific attributes
+2. Never set the same property both inline and via utilities. Examples:
+   - Avoid combining \`style={{ height: '100%' }}\` with \`h-full\`
+   - Avoid combining inline \`display:flex\` with \`flex\`
+   - Avoid mixing inline margins/padding with \`m-*/p-*\` on the same element
+3. Backgrounds rule. If you use an inline gradient/background, add \`bg-transparent\` and avoid any \`bg-*\` utilities on that element (or vice versa).
+4. Root shell pattern. Wrap apps with a root container using either:
+   - Tailwind: \`className="flex flex-col h-full min-h-0 overflow-auto"\`, or
+   - Inline: \`style={{ height: '100%', overflow: 'auto', display: 'flex', flexDirection: 'column' }}\`
+   but do not mix the same properties across style and class on the same element.
+5. Centering. Avoid centering on the full-height root; center an inner wrapper instead.
+6. Grid with spans. When using \`row-span-*\`, define rows explicitly (e.g., \`grid-rows-[auto_1fr_auto]\` or \`auto-rows-[minmax(0,1fr)]\`) so spans behave predictably.
+7. Width constraints. Apply \`max-w-*\` to an inner content wrapper, not the full-height root, to prevent overflow + centering conflicts.
+
 ### App-Specific Styling with styles.css
 **Default to inline styles plus the shared \`badge\`, \`muted\`, and \`list\` classes.** Create an app-level \`styles.css\` only when you need reusable selectors, keyframes, or complex state styling.
 

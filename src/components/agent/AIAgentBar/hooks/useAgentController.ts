@@ -143,7 +143,6 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     getStatus: () => statusRef.current,
   });
 
-  const hmrGateActiveRef = useRef<boolean>(false);
   const agentActiveRef = useRef<boolean>(false);
   const registryBeforeRunRef = useRef<AppRegistryEntry[] | null>(null);
 
@@ -157,8 +156,7 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
     runValidation,
     attachmentsProvider: () => (pendingAttachmentsRef.current || attachmentsRef.current || []),
     onFirstToolCall: () => {
-      hmrGateActiveRef.current = true;
-      try { window.postMessage({ type: 'FYOS_AGENT_RUN_STARTED' }, '*'); } catch {}
+      // Mark agent active; allow UI to reflect busy state without pausing HMR
       agentActiveRef.current = true;
       setAgentActive(true);
     },
@@ -295,18 +293,10 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
       })();
     }
 
-    const runFinishedWithGate = finished && hmrGateActiveRef.current;
-    if (runFinishedWithGate) {
-      try { window.postMessage({ type: 'FYOS_AGENT_RUN_ENDED' }, '*'); } catch {}
-      hmrGateActiveRef.current = false;
+    if (finished) {
+      // End of run
       agentActiveRef.current = false;
       setAgentActive(false);
-    }
-    if (finished && !runFinishedWithGate) {
-      setAgentActive(false);
-    }
-
-    if (runFinishedWithGate) {
       (async () => {
         const previous = registryBeforeRunRef.current;
         registryBeforeRunRef.current = null;
@@ -324,8 +314,6 @@ export function useAgentController(args: UseAgentControllerArgs): AgentControlle
           console.warn('[AGENT] Failed to auto-open created app', error);
         }
       })();
-    } else if (finished) {
-      registryBeforeRunRef.current = null;
     }
 
     agentStatusPrevRef.current = now;

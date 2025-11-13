@@ -257,6 +257,12 @@ export function useAgentChat(opts: UseAgentChatOptions) {
             const encoder = new TextEncoder();
             const byteLength = encoder.encode(content).length;
             const sizeKB = (byteLength / 1024).toFixed(1);
+            // Suppress transient preview error toasts during rapid edits
+            try {
+              if (typeof window !== 'undefined') {
+                (window as unknown as { __FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL?: number }).__FYOS_SUPPRESS_PREVIEW_ERRORS_UNTIL = Date.now() + 1500;
+              }
+            } catch {}
             if (createDirs) {
               const dir = path.split('/').slice(0, -1).join('/') || '.';
               await fnsRef.current.mkdir(dir, true);

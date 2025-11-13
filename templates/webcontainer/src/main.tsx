@@ -142,15 +142,6 @@ const sendBuildEvent = (type: 'APP_BUILD_ERROR' | 'APP_BUILD_ERROR_CLEARED', pay
   }
 }
 
-const handleAgentMessage = (event: MessageEvent) => {
-  const data = event?.data
-  if (!data || typeof data.type !== 'string' || !mask) return
-  if (data.type === 'FYOS_AGENT_RUN_STARTED') {
-    mask.pin('agent')
-  } else if (data.type === 'FYOS_AGENT_RUN_ENDED') {
-    mask.unpin('agent')
-  }
-}
 
 if (hot) {
   try {
@@ -170,6 +161,4 @@ if (hot) {
   } catch {}
 }
 
-if (typeof window !== 'undefined') {
-  window.addEventListener('message', handleAgentMessage)
-}
+// No agent-run masking: HMR updates flow normally without pausing

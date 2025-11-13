@@ -806,17 +806,7 @@ export default function Document() {
             return;
           }
 
-          // Forward agent run gating to preview iframe (Desktop) so it can propagate to apps
-          if (
-            isRecord(data) &&
-            (data.type === 'FYOS_AGENT_RUN_STARTED' || data.type === 'FYOS_AGENT_RUN_ENDED')
-          ) {
-            try {
-              const target = iframeRef.current?.contentWindow;
-              if (target) { target.postMessage(event.data, '*'); }
-            } catch {}
-            return;
-          }
+          // FYOS_AGENT_RUN_* forwarding removed (HMR no longer paused during runs)
 
           // Install App from App Store (bundle download + install inside WebContainer)
           if (isRecord(data) && data.type === 'FYOS_INSTALL_APP') {
