@@ -29,7 +29,7 @@ export default function FlappyBird() {
     }
   })
 
-  const gameLoop = useRef<number>()
+  const gameLoop = useRef<number | undefined>(undefined)
   const birdY = useRef(CANVAS_HEIGHT / 2)
   const birdVelocity = useRef(0)
   const pipes = useRef<Pipe[]>([])
