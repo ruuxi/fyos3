@@ -451,7 +451,7 @@ export default function AIAgentBar() {
   );
 
   const agentConversation = (
-      <div className="flex h-full min-h-0 flex-col px-4 py-3 text-white">
+      <div className="relative flex h-full min-h-0 flex-col px-4 py-3 text-white">
       <div className="mb-3 flex items-center gap-2 text-sm text-white/70">
         <button
           type="button"
@@ -463,7 +463,17 @@ export default function AIAgentBar() {
         </button>
         <span className="text-base font-semibold text-white">Assistant</span>
       </div>
-      <div className="relative flex-1 min-h-0 overflow-hidden p-3">
+      {agentStatus === 'ready' && undoDepth > 1 && (
+        <button
+          onClick={handleUndo}
+          className="absolute right-4 top-3 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white/70 transition-colors hover:text-white"
+          title="Undo changes"
+        >
+          <Undo2 className="h-3.5 w-3.5" />
+          <span>Undo</span>
+        </button>
+      )}
+      <div className="flex-1 min-h-0 overflow-hidden p-3">
         <div className="flex h-full min-h-0 flex-col gap-3">
           <ChatTabs
             openThreads={openThreads}
@@ -515,16 +525,6 @@ export default function AIAgentBar() {
             />
           </div>
         </div>
-        {agentStatus === 'ready' && undoDepth > 1 && (
-          <button
-            onClick={handleUndo}
-            className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white/70 transition-colors hover:text-white"
-            title="Undo changes"
-          >
-            <Undo2 className="h-3.5 w-3.5" />
-            <span>Undo</span>
-          </button>
-        )}
       </div>
     </div>
   );
