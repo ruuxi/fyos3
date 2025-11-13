@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Generated at runtime to support scripts/verify-webcontainer.mjs
 // Creates a file tree representation of templates/webcontainer with text files only.
 
@@ -28,8 +27,8 @@ const TEXT_EXTENSIONS = new Set([
 
 export const files = buildTree(TEMPLATE_ROOT);
 
-function buildTree(root) {
-  const tree = {};
+function buildTree(root: string): Record<string, unknown> {
+  const tree: Record<string, unknown> = {};
   let entries;
 
   try {
@@ -51,13 +50,13 @@ function buildTree(root) {
   return tree;
 }
 
-function shouldIgnore(name) {
+function shouldIgnore(name: string): boolean {
   if (name === 'node_modules' || name === '.pnpm-store' || name === '.turbo') return true;
   if (name === 'dist' || name === '.next' || name === '.git') return true;
   return false;
 }
 
-function isTextFile(filename) {
+function isTextFile(filename: string): boolean {
   const ext = path.extname(filename).toLowerCase();
   if (ext === '.bin' || ext === '.webp' || ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
     return false;
@@ -68,7 +67,7 @@ function isTextFile(filename) {
   return false;
 }
 
-function readTextFile(filePath) {
+function readTextFile(filePath: string): string {
   return fs.readFileSync(filePath, 'utf8');
 }
 

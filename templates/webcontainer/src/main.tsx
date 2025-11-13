@@ -4,7 +4,7 @@ import Desktop from './desktop/Desktop'
 import './globals.css'
 import './desktop/styles.css'
 
-type ViteHotEvent = 'vite:beforeUpdate' | 'vite:afterUpdate' | 'full-reload'
+type ViteHotEvent = 'vite:beforeUpdate' | 'vite:afterUpdate' | 'full-reload' | 'vite:error'
 
 type ViteHot = {
   on(event: ViteHotEvent, callback: (payload?: unknown) => void): void
@@ -154,9 +154,9 @@ if (hot) {
       sendBuildEvent('APP_BUILD_ERROR_CLEARED')
     })
     hot.on('full-reload', () => mask?.pin('reload'))
-    hot.on('vite:error', (payload?: ViteErrorPayload) => {
+    hot.on('vite:error', (payload?: unknown) => {
       mask?.pin('error')
-      sendBuildEvent('APP_BUILD_ERROR', payload)
+      sendBuildEvent('APP_BUILD_ERROR', payload as ViteErrorPayload)
     })
   } catch {}
 }
