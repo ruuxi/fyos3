@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -131,7 +132,7 @@
   .glass-primary {
     /* Even brighter, denser glass (collapsed surfaces) */
     background: color-mix(in oklab, black 45%, white 0%);
-    background: rgba(16, 24, 40, 0.32);
+    background: rgba(16, 24, 40, 0.15);
     border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow:
       0 0 0 1px rgba(56,189,248,0.35),
@@ -142,7 +143,7 @@
   }
   .glass-secondary {
     /* Lighter, more elevated glass (expanded surfaces) */
-    background: rgba(12, 18, 36, 0.42);
+    background: rgba(12, 18, 36, 0.20);
     border: 1px solid rgba(255, 255, 255, 0.18);
     box-shadow:
       0 0 0 1px rgba(56,189,248,0.45),

@@ -20,6 +20,8 @@ import FriendMessagesPane from '@/components/agent/AIAgentBar/ui/FriendMessagesP
 import GroupMessagesPane from '@/components/agent/AIAgentBar/ui/GroupMessagesPane';
 import { buildDesktopSnapshot, restoreDesktopSnapshot } from '@/utils/desktop-snapshot';
 import { getMutableWindow } from '@/components/agent/AIAgentBar/utils/window';
+import { Authenticated, Unauthenticated } from 'convex/react';
+import { SignInButton, UserButton } from '@clerk/nextjs';
 import type { Doc } from '../../convex/_generated/dataModel';
 
 type AgentWebContainerFns = {
@@ -807,20 +809,37 @@ export default function AIAgentBar() {
 
   const navBar = (
     <div className="px-4 bg-white/5 border-b border-white/10">
-      <div className="mx-auto flex w-full max-w-md items-center justify-start gap-2 px-2 py-2">
-        {navItems.map(({ key, label, active, onClick, icon: Icon }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={onClick}
-            className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${active ? 'bg-white/25 text-white' : 'text-white/70 hover:bg-white/10'}`}
-            aria-pressed={active}
-            aria-label={label}
-          >
-            <Icon className="h-4 w-4" />
-            <span className="sr-only">{label}</span>
-          </button>
-        ))}
+      <div className="mx-auto flex w-full max-w-md items-center justify-between gap-2 px-2 py-2">
+        <div className="flex items-center gap-2">
+          {navItems.map(({ key, label, active, onClick, icon: Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={onClick}
+              className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${active ? 'bg-white/25 text-white' : 'text-white/70 hover:bg-white/10'}`}
+              aria-pressed={active}
+              aria-label={label}
+            >
+              <Icon className="h-4 w-4" />
+              <span className="sr-only">{label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center">
+          <Authenticated>
+            <UserButton />
+          </Authenticated>
+          <Unauthenticated>
+            <SignInButton mode="modal">
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/20 bg-sky-500/40 text-white hover:bg-sky-500/60 transition-colors text-xs font-medium" aria-label="Sign In">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span>Sign In</span>
+              </button>
+            </SignInButton>
+          </Unauthenticated>
+        </div>
       </div>
     </div>
   );

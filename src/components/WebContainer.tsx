@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { WebContainer as WebContainerAPI, type WebContainerProcess } from '@webcontainer/api';
 // Binary snapshot approach for faster mounting
 import { useWebContainer } from './WebContainerProvider';
@@ -183,7 +183,7 @@ export default function WebContainer() {
   const webcontainerInstanceRef = useRef<WebContainerAPI | null>(null);
   useEffect(() => { webcontainerInstanceRef.current = webcontainerInstance; }, [webcontainerInstance]);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingStage, setLoadingStage] = useState<string>("Select how you'd like to start…");
+  const [loadingStage, setLoadingStage] = useState<string>('Preparing workspace…');
   const [displayProgress, setDisplayProgress] = useState<number>(2);
   const [targetProgress, setTargetProgress] = useState<number>(2);
   const progressTargetRef = useRef<number>(2);
@@ -213,18 +213,24 @@ export default function WebContainer() {
   const canProceed = isSignedIn || userMode === 'anon';
 
   useEffect(() => {
-    if (!isSignedIn || bootRequested) {
-      return;
-    }
-    setUserMode('auth');
-    setBootRequested(true);
-  }, [isSignedIn, bootRequested]);
+    const nextMode: UserMode = isSignedIn ? 'auth' : 'anon';
+    setUserMode((prev) => (prev === nextMode ? prev : nextMode));
+  }, [isSignedIn]);
 
-  const handleContinueAsGuest = useCallback(() => {
-    if (bootRequested) return;
-    setUserMode('anon');
+  useEffect(() => {
+    if (!userMode || bootRequested) return;
     setBootRequested(true);
-  }, [bootRequested]);
+  }, [userMode, bootRequested]);
+
+  useEffect(() => {
+    if (!userMode) return;
+    if (!desktopReadyRef.current) return;
+    const target = iframeRef.current?.contentWindow;
+    if (!target) return;
+    try {
+      target.postMessage({ type: 'FYOS_USER_MODE', payload: { mode: userMode } }, '*');
+    } catch {}
+  }, [userMode]);
 
   useEffect(() => {
     if (!bootRequested || hasBootedRef.current) {
@@ -1025,7 +1031,6 @@ export default function Document() {
           onSignIn={() => {
             try { openSignIn({}) } catch { try { window.location.href = '/sign-in'; } catch {} }
           }}
-          onContinue={handleContinueAsGuest}
         />
       )}
       <iframe

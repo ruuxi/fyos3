@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 
 // Shared constants
-// Host reserves ~400px on the left for the agent sidebar; include a small gutter.
-const SIDEBAR_WIDTH = 416
+// Host reserves 400px on the left for the agent sidebar
+const SIDEBAR_WIDTH = 400
 const ICON_LAYOUT_VERSION = 'right-aligned-v1'
 const ICON_LAYOUT_VERSION_KEY = 'desktop.iconLayoutVersion'
 const ICON_RIGHT_MARGIN = 32
@@ -23,8 +23,6 @@ const LS_APP_ORDER_KEY = 'desktop.appOrder'
 
 const EVT_OPEN_APP = 'FYOS_OPEN_APP'
 const EVT_DESKTOP_READY = 'FYOS_DESKTOP_READY'
-const THEME_KEY = 'fyos.desktop.theme'
-const EVT_SET_THEME = 'FYOS_SET_THEME'
 const EVT_USER_MODE = 'FYOS_USER_MODE'
 
 const DESKTOP_GRID = { spacingX: 90, spacingY: 90, startX: SIDEBAR_WIDTH + 16, startY: 52, maxPerCol: 6 }
@@ -525,10 +523,6 @@ export default function Desktop(){
   const appOrderRef = useRef(appOrder)
   const [userMode, setUserMode] = useState<'auth'|'anon'>('auth')
   const userModeRef = useRef(userMode)
-  const [theme, setTheme] = useState<{ mode: 'image'|'gradient'; value: string } | null>(null)
-  // const [bootscreen, setBootscreen] = useState<boolean>(false)
-  // const [gradientKey, setGradientKey] = useState<string>('1')
-  // const gradientVar = `var(--desktop-gradient-${gradientKey})`
   // Seed localStorage desktop state from persisted file if present
   useEffect(() => {
     (async () => {
@@ -538,7 +532,6 @@ export default function Desktop(){
         if (!res.ok) return;
         const json = await res.json();
         if (json && typeof json === 'object') {
-          try { if (json.theme && (json.theme.mode === 'image' || json.theme.mode === 'gradient') && typeof json.theme.value === 'string') { localStorage.setItem(THEME_KEY, JSON.stringify(json.theme)); setTheme(json.theme); } } catch {}
           try { if (json.iconPositions) localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(json.iconPositions)); } catch {}
           try { if (json.windowGeometries) localStorage.setItem(LS_WINDOW_GEOM_KEY, JSON.stringify(json.windowGeometries)); } catch {}
           try { if (json.windowTabs) localStorage.setItem(LS_WINDOW_TABS_KEY, JSON.stringify(json.windowTabs)); } catch {}
@@ -567,34 +560,6 @@ export default function Desktop(){
       document.body.style.width = '100%'
       document.body.style.margin = '0'
     } catch {}
-  }, [])
-  // React to theme changes from other windows (BootScreen)
-  useEffect(()=>{
-    function onStorage(e: StorageEvent){
-      try{
-        if (e.key === THEME_KEY && e.newValue){
-          const t = JSON.parse(e.newValue)
-          if (t && (t.mode === 'image' || t.mode === 'gradient') && typeof t.value === 'string') setTheme(t)
-        }
-      } catch {}
-    }
-    window.addEventListener('storage', onStorage)
-    return ()=> window.removeEventListener('storage', onStorage)
-  }, [])
-  // Load theme (from BootScreen selection). If none, default to /2.webp
-  useEffect(()=>{
-    try {
-      const raw = localStorage.getItem(THEME_KEY)
-      if (raw){
-        const t = JSON.parse(raw)
-        if (t && (t.mode === 'image' || t.mode === 'gradient') && typeof t.value === 'string'){
-          setTheme(t)
-          return
-        }
-      }
-    } catch {}
-    // default theme (image 2.webp)
-    setTheme({ mode: 'image', value: '/2.webp' })
   }, [])
   // Load persisted gradient - disabled for now
   // useEffect(()=>{
@@ -1351,13 +1316,6 @@ export default function Desktop(){
         if (raw === 'auth' || raw === 'anon') setUserMode(raw)
         return
       }
-      if (typeValue === EVT_SET_THEME) {
-        const themePayload = record.payload as { mode?: unknown; value?: unknown } | undefined
-        if (themePayload && (themePayload.mode === 'image' || themePayload.mode === 'gradient') && typeof themePayload.value === 'string') {
-          setTheme({ mode: themePayload.mode, value: themePayload.value })
-        }
-        return
-      }
       if (typeValue === 'FYOS_REQUEST_DESKTOP_STATE') {
         try {
           const payload = (userModeRef.current === 'auth')
@@ -1397,9 +1355,7 @@ export default function Desktop(){
     top: '50%',
   }
 
-  const wallpaperStyle: React.CSSProperties = theme?.mode === 'gradient'
-    ? { background: theme.value }
-    : { backgroundImage: `url(${theme?.value || '/2.webp'})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }
+  const wallpaperStyle: React.CSSProperties = { backgroundImage: `url(/2.webp)`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }
 
   return (
     <div
@@ -1408,6 +1364,7 @@ export default function Desktop(){
       onPointerDown={handleDesktopPointerDown}
       onContextMenu={(e)=>{ e.preventDefault() }}
     >
+      <div className="sidebar-background" />
       <div className="wallpaper" style={wallpaperStyle} />
       <div className="wallpaper-glass" />
       {/* MenuBar removed */}
