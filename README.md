@@ -1,6 +1,6 @@
 # FYOS (FromYou OS)
 
-Personal Ai Desktop with full customization (entire desktop and apps). Sharing and friend capabilities. This project is discontinued and is released for educational purposes. 
+Personal Ai Desktop OS with full customization (entire desktop and apps). Sharing and friend capabilities. This project is discontinued and is released for that reason. 
 
 It can create apps on demand, add Ai funtionality to apps (image/video/audio generation) and also output Ai generative content within the chat itself. It has a store for sharing to other users, and a chat feature to talk to your friends or the ai assitant. You can also modify the desktop itself instead of just creating apps. It's the user's personal environment to be shaped in any way they want.
 
