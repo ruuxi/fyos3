@@ -104,7 +104,7 @@ export async function aiRequest<TInput = unknown, TResult = unknown>(provider: A
       // Derive app scope from iframe query params (?id=...&name=...)
       const scope = deriveScope();
       const payload: AIRequestPayload<TInput> = { type: 'AI_REQUEST', id, provider, model, input, scope };
-      // Post directly to the top-level Next.js host to avoid needing a desktop relay
+      // Post directly to the top-level Next.js host
       window.top?.postMessage(payload, '*');
     } catch (err) {
       window.removeEventListener('message', onMessage);

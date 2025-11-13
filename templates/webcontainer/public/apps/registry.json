@@ -1,32 +1,32 @@
 [
   {
-    "id": "finder",
-    "name": "Finder",
-    "icon": "🗂️",
-    "path": "/src/apps/finder/index.tsx"
+    "id": "sketch-studio",
+    "name": "Sketch Studio",
+    "icon": "🎨",
+    "path": "/src/apps/sketch-studio/index.tsx"
   },
   {
-    "id": "safari",
-    "name": "Safari",
-    "icon": "🌐",
-    "path": "/src/apps/safari/index.tsx"
+    "id": "photo-lab",
+    "name": "Photo Lab",
+    "icon": "📸",
+    "path": "/src/apps/photo-lab/index.tsx"
   },
   {
-    "id": "notes",
-    "name": "Notes",
-    "icon": "📝",
-    "path": "/src/apps/notes/index.tsx"
-  },
-  {
-    "id": "terminal",
-    "name": "Terminal",
-    "icon": "🖥️",
-    "path": "/src/apps/terminal/index.tsx"
+    "id": "flappy-bird",
+    "name": "Flappy Bird",
+    "icon": "🐦",
+    "path": "/src/apps/flappy-bird/index.tsx"
   },
   {
     "id": "settings",
     "name": "Settings",
     "icon": "⚙️",
     "path": "/src/apps/settings/index.tsx"
+  },
+  {
+    "id": "guide",
+    "name": "Guide",
+    "icon": "📚",
+    "path": "/src/apps/guide/index.tsx"
   }
 ]

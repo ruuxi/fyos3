@@ -418,7 +418,31 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
-</html>Æpnpm-lock.yamlÅ°fÅ°c≈‰álockfileVersion: '9.0'
+</html>¨package.jsonÅ°fÅ°c≈{
+  "name": "mac-desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@types/node": "^24.3.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.13",
+    "vite": "^5.0.8"
+  }
+}Æpnpm-lock.yamlÅ°fÅ°c≈‰álockfileVersion: '9.0'
 
 settings:
   autoInstallPeers: true
@@ -2251,31 +2275,7 @@ snapshots:
       strip-ansi: 7.1.2
 
   yallist@3.1.1: {}
-¨package.jsonÅ°fÅ°c≈{
-  "name": "mac-desktop",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@types/node": "^24.3.1",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.13",
-    "vite": "^5.0.8"
-  }
-}±postcss.config.jsÅ°fÅ°cƒRexport default {
+±postcss.config.jsÅ°fÅ°cƒRexport default {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},
@@ -2440,39 +2440,39 @@ M«”˚R‡‚*‡çÎ¸	6«t?d-bÇ£Ä8∏x,Ó´Ó«€Ãÿ5®5≠õug”:æ∞≠sÿE¢¶DªNzÁÕísS1£S~+ªõ?wöB∂Ò
 Í¬Wq˜£eKI+¢Èw kÎπMˇ≈&"¶Õç@µ\?ô#q·√mM{è¯£QÂ/â~jx`Í¡ZxD”úôôﬁùøKZ¢gÎ◊,ù	pÅË∞˙àËm√£(∆,√Ù-öj†Ê/]%\‡J¸a‡Û∆œ'(+∏;o‹‰Vz—ÜgöŸ…DJ…Òyú†e∑&_E‡ÊïÜTÏF xC6öÒı´9‚é≥£ÿƒ¡eoﬂu•6∞Hﬂ9{HQ€/ZYI©Lo[ƒm∆KîªësçKL81ÁuL'∏Åñ]áö6Qï§‰0ô“µ∆6‘Qs‘ˆ[ˇMNQEn‘ÉKÄÅ%≠e∞π9ïﬂ$z·üSy,¸øËg5"˚Jh* Ç3ÕWîŒâãgÎg€ö`¬EÏüDR «Ü∞V#‰•2_Q≠´R«eÄÑ~ßeÏN4Uˇµ»›Jr8pò€í5kúÇﬁRÍ©=ó?.)GV@ı¬Ñ5?ä=¿`{¡Z™”QúËƒ€V(˚X§§Ë‰„[Y@3û⁄À1C¥F’ÇC1 5w‡Ba≥ÏßËäKGÚ=ÍmÄÂeï¸«jò∂¡3|£Rƒ»T4imrÁ48ñrIPL,ágzŒÎ¨«)BMÕ^yÙ®•M]s≥â±ÆıÎ_Ûá$©∑˙vØÈTAdn*‡µXõkûA€(c¢*Óˆê»˝‘≥ﬁßj∑¸&ì⁄EHë
 n
 /ûd¡skr^ˇ∆Ö√rlj_«SåÿYfÄl,Î—ZﬂçÖ‡ßF1’’Ùb5jeE¢sﬂYSiÊÀõÂ3∞5“µ_œÆ2Ì*uNtÓkãEØHH„F5…ÕÎSA¬ÓU¥•µÒ“=÷≈ù.–9—r!a¨8gp¬]≠9Fï≈)5"íu»Ø'≤RÈL{"∏04~Õ%h|ÂrÙ‹Éòú} ^ßå‹Ø0Ú±ÌAøcìñXΩ˝5≤Ï†Ñ∆tÚÙ∑¯#ñ	ØBóh„À≤’Q0}!`jS≈QH∏†û`bä·-y3P¶{M⁄øÏπWÃ(«v˛÷…¶é[¢êœJ.¨πp8q≥cMvÏl€»+ı÷I,ê—7t¸∂»µAWï◊[]µá¡Ø]6˛s»x>û≤c/vt
-;VŒè`VjWô∫6§…(7ÄÂé∑•â8â´≥N Æ7Iô…Õà7ÿº‰êá… ˜Áz¨wa+˝Éôá.±õaaö4g.tËgé¡™Ú+¯ƒŸü%c˛â(OŒœrˇÏƒª°wáÿÏk∂)O‰åÉXU$™AúÃêÙTÛ;˙ú≈Á5¢ÃwRLP	àA«%1Ò√OU$»	n…Íπ®blÖõC÷_2î9+ù¨“ÿCá∞òmeæïà`ÄÅ»b© ∆w¿∂o4‡Û ^ïSE\L˛¢‡\©D≤` MÿÿQûË∞/ïDpß´pE∏∫Èf`nø%ºÀ3Zvæ1ﬁa÷®¥˝ï P \öœÄ©ƒ»,ß\#ãXÀsHÏ¶Â^ #k∆/‚˝ù®]ÊP  §appsÅ°dÅ≠registry.jsonÅ°fÅ°c≈D[
+;VŒè`VjWô∫6§…(7ÄÂé∑•â8â´≥N Æ7Iô…Õà7ÿº‰êá… ˜Áz¨wa+˝Éôá.±õaaö4g.tËgé¡™Ú+¯ƒŸü%c˛â(OŒœrˇÏƒª°wáÿÏk∂)O‰åÉXU$™AúÃêÙTÛ;˙ú≈Á5¢ÃwRLP	àA«%1Ò√OU$»	n…Íπ®blÖõC÷_2î9+ù¨“ÿCá∞òmeæïà`ÄÅ»b© ∆w¿∂o4‡Û ^ïSE\L˛¢‡\©D≤` MÿÿQûË∞/ïDpß´pE∏∫Èf`nø%ºÀ3Zvæ1ﬁa÷®¥˝ï P \öœÄ©ƒ»,ß\#ãXÀsHÏ¶Â^ #k∆/‚˝ù®]ÊP  §appsÅ°dÅ≠registry.jsonÅ°fÅ°c≈e[
   {
-    "id": "finder",
-    "name": "Finder",
-    "icon": "üóÇÔ∏è",
-    "path": "/src/apps/finder/index.tsx"
+    "id": "sketch-studio",
+    "name": "Sketch Studio",
+    "icon": "üé®",
+    "path": "/src/apps/sketch-studio/index.tsx"
   },
   {
-    "id": "safari",
-    "name": "Safari",
-    "icon": "üåê",
-    "path": "/src/apps/safari/index.tsx"
+    "id": "photo-lab",
+    "name": "Photo Lab",
+    "icon": "üì∏",
+    "path": "/src/apps/photo-lab/index.tsx"
   },
   {
-    "id": "notes",
-    "name": "Notes",
-    "icon": "üìù",
-    "path": "/src/apps/notes/index.tsx"
-  },
-  {
-    "id": "terminal",
-    "name": "Terminal",
-    "icon": "üñ•Ô∏è",
-    "path": "/src/apps/terminal/index.tsx"
+    "id": "flappy-bird",
+    "name": "Flappy Bird",
+    "icon": "üê¶",
+    "path": "/src/apps/flappy-bird/index.tsx"
   },
   {
     "id": "settings",
     "name": "Settings",
     "icon": "‚öôÔ∏è",
     "path": "/src/apps/settings/index.tsx"
+  },
+  {
+    "id": "guide",
+    "name": "Guide",
+    "icon": "üìö",
+    "path": "/src/apps/guide/index.tsx"
   }
 ]
-£srcÅ°dâ¢aiÅ°dÅ®index.tsÅ°fÅ°c≈1// AI helpers for FYOS apps (client-side, runs inside Vite iframe)
+£srcÅ°dâ¢aiÅ°dÅ®index.tsÅ°fÅ°c≈0Î// AI helpers for FYOS apps (client-side, runs inside Vite iframe)
 export type AIProvider = 'fal' | 'eleven';
 
 type Scope = { appId?: string; appName?: string };
@@ -2578,7 +2578,7 @@ export async function aiRequest<TInput = unknown, TResult = unknown>(provider: A
       // Derive app scope from iframe query params (?id=...&name=...)
       const scope = deriveScope();
       const payload: AIRequestPayload<TInput> = { type: 'AI_REQUEST', id, provider, model, input, scope };
-      // Post directly to the top-level Next.js host to avoid needing a desktop relay
+      // Post directly to the top-level Next.js host
       window.top?.postMessage(payload, '*');
     } catch (err) {
       window.removeEventListener('message', onMessage);
@@ -2812,7 +2812,7 @@ export async function multiviewTo3D(images: Array<File | string>, options: Plain
   for (const img of images) image_urls.push(await ensurePublicUrl(img));
   return callFal('tripo3d/tripo/v2.5/multiview-to-3d', { image_urls, ...options });
 }
-§appsÅ°dá©app-storeÅ°dÅ©index.tsxÅ°fÅ°c≈©import { useEffect, useMemo, useState } from 'react'
+§appsÅ°dã©app-storeÅ°dÅ©index.tsxÅ°fÅ°c≈©import { useEffect, useMemo, useState } from 'react'
 
 type AppRecord = {
   _id: string;
@@ -2899,104 +2899,1642 @@ export default function AppStore() {
   )
 }
 
-¶finderÅ°dÅ©index.tsxÅ°fÅ°c≈import React from 'react'
-export default function Finder(){
+¶finderÅ°dÄ´flappy-birdÅ°dÅ©index.tsxÅ°fÅ°c≈$!import React, { useRef, useState, useEffect, useCallback } from 'react'
+
+type GameState = 'ready' | 'playing' | 'gameover'
+
+interface Pipe {
+  x: number
+  gapY: number
+  passed: boolean
+}
+
+const BIRD_SIZE = 24
+const PIPE_WIDTH = 50
+const PIPE_GAP = 140
+const GRAVITY = 0.5
+const JUMP_STRENGTH = -8
+const PIPE_SPEED = 2.5
+const CANVAS_WIDTH = 400
+const CANVAS_HEIGHT = 500
+
+export default function FlappyBird() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [gameState, setGameState] = useState<GameState>('ready')
+  const [score, setScore] = useState(0)
+  const [highScore, setHighScore] = useState(() => {
+    try {
+      return parseInt(localStorage.getItem('flappy-highscore') || '0', 10)
+    } catch {
+      return 0
+    }
+  })
+
+  const gameLoop = useRef<number>()
+  const birdY = useRef(CANVAS_HEIGHT / 2)
+  const birdVelocity = useRef(0)
+  const pipes = useRef<Pipe[]>([])
+  const frameCount = useRef(0)
+
+  const jump = useCallback(() => {
+    if (gameState === 'ready') {
+      setGameState('playing')
+      birdVelocity.current = JUMP_STRENGTH
+    } else if (gameState === 'playing') {
+      birdVelocity.current = JUMP_STRENGTH
+    }
+  }, [gameState])
+
+  const reset = useCallback(() => {
+    birdY.current = CANVAS_HEIGHT / 2
+    birdVelocity.current = 0
+    pipes.current = []
+    frameCount.current = 0
+    setScore(0)
+    setGameState('ready')
+  }, [])
+
+  const checkCollision = useCallback((birdYPos: number, currentPipes: Pipe[]): boolean => {
+    // Check ground and ceiling
+    if (birdYPos + BIRD_SIZE >= CANVAS_HEIGHT || birdYPos <= 0) {
+      return true
+    }
+
+    // Check pipes
+    const birdX = 80
+    for (const pipe of currentPipes) {
+      if (
+        birdX + BIRD_SIZE > pipe.x &&
+        birdX < pipe.x + PIPE_WIDTH
+      ) {
+        if (birdYPos < pipe.gapY || birdYPos + BIRD_SIZE > pipe.gapY + PIPE_GAP) {
+          return true
+        }
+      }
+    }
+
+    return false
+  }, [])
+
+  const updateGame = useCallback(() => {
+    if (gameState !== 'playing') return
+
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    // Update bird
+    birdVelocity.current += GRAVITY
+    birdY.current += birdVelocity.current
+
+    // Update pipes
+    frameCount.current++
+    if (frameCount.current % 90 === 0) {
+      const gapY = Math.random() * (CANVAS_HEIGHT - PIPE_GAP - 100) + 50
+      pipes.current.push({ x: CANVAS_WIDTH, gapY, passed: false })
+    }
+
+    pipes.current = pipes.current
+      .map(pipe => ({ ...pipe, x: pipe.x - PIPE_SPEED }))
+      .filter(pipe => pipe.x > -PIPE_WIDTH)
+
+    // Update score
+    for (const pipe of pipes.current) {
+      if (!pipe.passed && pipe.x + PIPE_WIDTH < 80) {
+        pipe.passed = true
+        setScore(s => {
+          const newScore = s + 1
+          if (newScore > highScore) {
+            setHighScore(newScore)
+            try {
+              localStorage.setItem('flappy-highscore', newScore.toString())
+            } catch {}
+          }
+          return newScore
+        })
+      }
+    }
+
+    // Check collision
+    if (checkCollision(birdY.current, pipes.current)) {
+      setGameState('gameover')
+      return
+    }
+
+    // Render
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+
+    // Background
+    ctx.fillStyle = 'rgba(135, 206, 235, 0.3)'
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+
+    // Ground
+    ctx.fillStyle = 'rgba(139, 69, 19, 0.4)'
+    ctx.fillRect(0, CANVAS_HEIGHT - 30, CANVAS_WIDTH, 30)
+
+    // Pipes
+    ctx.fillStyle = 'rgba(34, 139, 34, 0.8)'
+    for (const pipe of pipes.current) {
+      // Top pipe
+      ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.gapY)
+      // Bottom pipe
+      ctx.fillRect(pipe.x, pipe.gapY + PIPE_GAP, PIPE_WIDTH, CANVAS_HEIGHT - pipe.gapY - PIPE_GAP)
+      
+      // Pipe borders
+      ctx.strokeStyle = 'rgba(0, 100, 0, 0.8)'
+      ctx.lineWidth = 2
+      ctx.strokeRect(pipe.x, 0, PIPE_WIDTH, pipe.gapY)
+      ctx.strokeRect(pipe.x, pipe.gapY + PIPE_GAP, PIPE_WIDTH, CANVAS_HEIGHT - pipe.gapY - PIPE_GAP)
+    }
+
+    // Bird
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.9)'
+    ctx.beginPath()
+    ctx.arc(80 + BIRD_SIZE/2, birdY.current + BIRD_SIZE/2, BIRD_SIZE/2, 0, Math.PI * 2)
+    ctx.fill()
+    
+    // Bird eye
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+    ctx.beginPath()
+    ctx.arc(80 + BIRD_SIZE/2 + 4, birdY.current + BIRD_SIZE/2 - 3, 3, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Bird beak
+    ctx.fillStyle = 'rgba(255, 140, 0, 0.9)'
+    ctx.beginPath()
+    ctx.moveTo(80 + BIRD_SIZE, birdY.current + BIRD_SIZE/2)
+    ctx.lineTo(80 + BIRD_SIZE + 8, birdY.current + BIRD_SIZE/2 - 3)
+    ctx.lineTo(80 + BIRD_SIZE + 8, birdY.current + BIRD_SIZE/2 + 3)
+    ctx.closePath()
+    ctx.fill()
+
+  }, [gameState, checkCollision, highScore])
+
+  useEffect(() => {
+    if (gameState === 'playing') {
+      const loop = () => {
+        updateGame()
+        gameLoop.current = requestAnimationFrame(loop)
+      }
+      gameLoop.current = requestAnimationFrame(loop)
+    } else if (gameLoop.current) {
+      cancelAnimationFrame(gameLoop.current)
+    }
+
+    return () => {
+      if (gameLoop.current) {
+        cancelAnimationFrame(gameLoop.current)
+      }
+    }
+  }, [gameState, updateGame])
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault()
+        jump()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [jump])
+
+  useEffect(() => {
+    // Draw initial state
+    const canvas = canvasRef.current
+    if (!canvas || gameState !== 'ready') return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    ctx.fillStyle = 'rgba(135, 206, 235, 0.3)'
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    ctx.fillStyle = 'rgba(139, 69, 19, 0.4)'
+    ctx.fillRect(0, CANVAS_HEIGHT - 30, CANVAS_WIDTH, 30)
+
+    // Draw bird
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.9)'
+    ctx.beginPath()
+    ctx.arc(80 + BIRD_SIZE/2, birdY.current + BIRD_SIZE/2, BIRD_SIZE/2, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+    ctx.beginPath()
+    ctx.arc(80 + BIRD_SIZE/2 + 4, birdY.current + BIRD_SIZE/2 - 3, 3, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = 'rgba(255, 140, 0, 0.9)'
+    ctx.beginPath()
+    ctx.moveTo(80 + BIRD_SIZE, birdY.current + BIRD_SIZE/2)
+    ctx.lineTo(80 + BIRD_SIZE + 8, birdY.current + BIRD_SIZE/2 - 3)
+    ctx.lineTo(80 + BIRD_SIZE + 8, birdY.current + BIRD_SIZE/2 + 3)
+    ctx.closePath()
+    ctx.fill()
+  }, [gameState])
+
   return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Finder</div>
-        <span className="badge">Home</span>
+    <div className="h-full overflow-auto flex flex-col items-center justify-center p-4" style={{ background: 'rgba(12,18,36,0.02)', color: '#e5e7eb' }}>
+      <div className="text-center mb-4">
+        <h1 className="text-xl font-semibold mb-2">Flappy Bird</h1>
+        <div className="flex gap-6 justify-center text-sm">
+          <div>
+            <span style={{ color: '#cbd5e1' }}>Score: </span>
+            <span className="font-semibold">{score}</span>
+          </div>
+          <div>
+            <span style={{ color: '#cbd5e1' }}>High Score: </span>
+            <span className="font-semibold">{highScore}</span>
+          </div>
+        </div>
       </div>
-      <p className="muted">This is a simple Finder. It lists installed apps:</p>
-      <AppsList />
+
+      <div className="relative">
+        <canvas
+          ref={canvasRef}
+          width={CANVAS_WIDTH}
+          height={CANVAS_HEIGHT}
+          onClick={jump}
+          className="rounded-lg cursor-pointer"
+          style={{
+            border: '1px solid rgba(255,255,255,0.12)',
+            background: 'rgba(255,255,255,0.05)'
+          }}
+        />
+
+        {gameState === 'ready' && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+            style={{ background: 'rgba(12,18,36,0.6)' }}
+          >
+            <div className="text-center px-4">
+              <p className="text-lg mb-2" style={{ color: '#e5e7eb' }}>Click or press Space to start</p>
+              <p className="text-sm" style={{ color: '#cbd5e1' }}>Tap to keep the bird flying</p>
+            </div>
+          </div>
+        )}
+
+        {gameState === 'gameover' && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center"
+            style={{ background: 'rgba(12,18,36,0.8)' }}
+          >
+            <div className="text-center px-4">
+              <p className="text-2xl font-bold mb-2" style={{ color: '#e5e7eb' }}>Game Over!</p>
+              <p className="text-lg mb-4" style={{ color: '#cbd5e1' }}>Score: {score}</p>
+              <button
+                onClick={reset}
+                className="px-6 py-2 text-sm font-medium rounded transition-all"
+                style={{
+                  background: 'rgba(56,189,248,0.4)',
+                  border: '1px solid rgba(56,189,248,0.5)',
+                  color: '#e5e7eb'
+                }}
+              >
+                Play Again
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 text-xs text-center" style={{ color: '#cbd5e1' }}>
+        Click canvas or press Space to jump
+      </div>
     </div>
   )
 }
 
-type App = { id: string; name: string; icon: string }
+•guideÅ°dÅ©index.tsxÅ°fÅ°c≈Bªimport React, { useState, useEffect } from 'react'
 
-function AppsList(){
-  const [apps, setApps] = React.useState<App[]>([])
-  React.useEffect(()=>{ fetch('/apps/registry.json').then(r=>r.json()).then(setApps) },[])
-  return (
-    <ul className="list">
-      {apps.map(a=> <li key={a.id}>{a.icon} {a.name} <code style={{color:'#6b7280'}}>{a.id.slice(0,8)}</code></li>)}
-    </ul>
-  )
+type Section = 'welcome' | 'ai-apps' | 'desktop' | 'settings' | 'tips'
+
+interface TutorialSection {
+  id: Section
+  title: string
+  icon: string
+  content: React.ReactNode
 }
-•notesÅ°dÅ©index.tsxÅ°fÅ°c≈öimport React from 'react'
-export default function Notes(){
-  const [notes, setNotes] = React.useState([{id:1,text:'Welcome to Notes'}])
-  const [t, setT] = React.useState('')
+
+export default function Guide() {
+  const [activeSection, setActiveSection] = useState<Section>('welcome')
+  const [completedSections, setCompletedSections] = useState<Section[]>(() => {
+    try {
+      const saved = localStorage.getItem('fyos-guide-progress')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('fyos-guide-progress', JSON.stringify(completedSections))
+    } catch {}
+  }, [completedSections])
+
+  const markCompleted = (section: Section) => {
+    if (!completedSections.includes(section)) {
+      setCompletedSections([...completedSections, section])
+    }
+  }
+
+  const openApp = (appId: string) => {
+    try {
+      window.parent?.postMessage({ type: 'FYOS_OPEN_APP', appId }, '*')
+    } catch (e) {
+      console.error('Failed to open app:', e)
+    }
+  }
+
+  const scrollToSection = (section: Section) => {
+    setActiveSection(section)
+    markCompleted(section)
+  }
+
+  const TryItButton: React.FC<{ appId: string; label: string }> = ({ appId, label }) => (
+    <button
+      onClick={() => openApp(appId)}
+      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded transition-all"
+      style={{
+        background: 'rgba(56,189,248,0.3)',
+        border: '1px solid rgba(56,189,248,0.5)',
+        color: '#e5e7eb'
+      }}
+    >
+      <span>‚ñ∂</span> {label}
+    </button>
+  )
+
+  const sections: TutorialSection[] = [
+    {
+      id: 'welcome',
+      title: 'Welcome to FromYou',
+      icon: 'üëã',
+      content: (
+        <div className="space-y-4">
+          <p className="text-base leading-relaxed">
+            Welcome to <strong>FromYou</strong> ‚Äî an AI-first infinite creation desktop where you describe what you want, 
+            and intelligent apps materialize to help you create.
+          </p>
+          
+          <div className="p-4 rounded-lg" style={{ background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)' }}>
+            <h3 className="text-sm font-semibold mb-2">üéØ What You Can Do</h3>
+            <ul className="space-y-2 text-sm" style={{ color: '#cbd5e1' }}>
+              <li>‚ú® Transform sketches into polished artwork with AI</li>
+              <li>üì∏ Edit photos using natural language</li>
+              <li>üéÆ Play games and explore creative apps</li>
+              <li>üé® Customize your desktop experience</li>
+              <li>üöÄ Install and share apps with others</li>
+            </ul>
+          </div>
+
+          <p className="text-sm" style={{ color: '#cbd5e1' }}>
+            This guide will walk you through everything you need to know. Click on sections in the sidebar 
+            to explore, or continue below to learn about AI-powered apps.
+          </p>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => scrollToSection('ai-apps')}
+              className="px-4 py-2 text-sm font-medium rounded transition-all"
+              style={{
+                background: 'rgba(56,189,248,0.4)',
+                border: '1px solid rgba(56,189,248,0.5)',
+                color: '#e5e7eb'
+              }}
+            >
+              Next: AI Apps ‚Üí
+            </button>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'ai-apps',
+      title: 'Using AI Apps',
+      icon: '‚ú®',
+      content: (
+        <div className="space-y-4">
+          <p className="text-base leading-relaxed">
+            FromYou includes powerful AI apps that turn your ideas into reality. Here's what you can create:
+          </p>
+
+          <div className="space-y-3">
+            {/* Sketch Studio */}
+            <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div className="flex items-start gap-3 mb-2">
+                <span className="text-2xl">üé®</span>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold mb-1">Sketch Studio</h3>
+                  <p className="text-xs mb-2" style={{ color: '#cbd5e1' }}>
+                    Draw rough sketches and watch AI transform them into polished artwork. 
+                    Choose from styles like realistic, cartoon, anime, and more.
+                  </p>
+                  <TryItButton appId="sketch-studio" label="Open Sketch Studio" />
+                </div>
+              </div>
+            </div>
+
+            {/* Photo Lab */}
+            <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div className="flex items-start gap-3 mb-2">
+                <span className="text-2xl">üì∏</span>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold mb-1">Photo Lab</h3>
+                  <p className="text-xs mb-2" style={{ color: '#cbd5e1' }}>
+                    Edit photos using natural language. Just describe what you want: 
+                    "make the sky more dramatic" or "change this to autumn colors".
+                  </p>
+                  <TryItButton appId="photo-lab" label="Open Photo Lab" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 rounded" style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.3)' }}>
+            <p className="text-xs" style={{ color: '#cbd5e1' }}>
+              üí° <strong>Tip:</strong> AI processing may take 10-30 seconds. Be patient and describe your vision clearly for best results.
+            </p>
+          </div>
+
+          <button
+            onClick={() => scrollToSection('desktop')}
+            className="px-4 py-2 text-sm rounded"
+            style={{
+              background: 'rgba(56,189,248,0.4)',
+              border: '1px solid rgba(56,189,248,0.5)',
+              color: '#e5e7eb'
+            }}
+          >
+            Next: Desktop Features ‚Üí
+          </button>
+        </div>
+      )
+    },
+    {
+      id: 'desktop',
+      title: 'Desktop Features',
+      icon: 'üñ•Ô∏è',
+      content: (
+        <div className="space-y-4">
+          <p className="text-base leading-relaxed">
+            Your FromYou desktop works like a modern operating system with windows, icons, and multitasking.
+          </p>
+
+          <div className="space-y-3">
+            {/* Windows */}
+            <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <h3 className="text-sm font-semibold mb-2">üìê Windows & Tabs</h3>
+              <ul className="space-y-2 text-sm" style={{ color: '#cbd5e1' }}>
+                <li>‚Ä¢ Click desktop icons to open apps in windows</li>
+                <li>‚Ä¢ Drag window edges to resize, drag title bar to move</li>
+                <li>‚Ä¢ Use tabs (+ button) to open multiple apps in one window</li>
+                <li>‚Ä¢ Minimize, expand, or close windows with buttons</li>
+              </ul>
+            </div>
+
+            {/* Icons */}
+            <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <h3 className="text-sm font-semibold mb-2">üéØ Desktop Icons</h3>
+              <ul className="space-y-2 text-sm" style={{ color: '#cbd5e1' }}>
+                <li>‚Ä¢ Drag icons to rearrange on your desktop</li>
+                <li>‚Ä¢ Click once to launch an app</li>
+                <li>‚Ä¢ Positions are automatically saved</li>
+              </ul>
+            </div>
+
+            {/* More Apps */}
+            <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <h3 className="text-sm font-semibold mb-2">üéÆ More Apps</h3>
+              <ul className="space-y-2 text-sm mb-3" style={{ color: '#cbd5e1' }}>
+                <li>‚Ä¢ Explore all available apps from the desktop</li>
+                <li>‚Ä¢ Each app is designed for a specific creative purpose</li>
+                <li>‚Ä¢ More apps coming soon!</li>
+              </ul>
+              <div className="flex gap-2">
+                <TryItButton appId="flappy-bird" label="Play Flappy Bird" />
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => scrollToSection('settings')}
+            className="px-4 py-2 text-sm rounded"
+            style={{
+              background: 'rgba(56,189,248,0.4)',
+              border: '1px solid rgba(56,189,248,0.5)',
+              color: '#e5e7eb'
+            }}
+          >
+            Next: Settings & Customization ‚Üí
+          </button>
+        </div>
+      )
+    },
+    {
+      id: 'settings',
+      title: 'Settings & Customization',
+      icon: '‚öôÔ∏è',
+      content: (
+        <div className="space-y-4">
+          <p className="text-base leading-relaxed">
+            Customize your desktop experience to match your style and workflow.
+          </p>
+
+          <div className="space-y-3">
+            <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <h3 className="text-sm font-semibold mb-2">üé® Appearance</h3>
+              <ul className="space-y-2 text-sm" style={{ color: '#cbd5e1' }}>
+                <li>‚Ä¢ Choose from 5 beautiful gradient wallpaper themes</li>
+                <li>‚Ä¢ Adjust desktop icon size (48-80px)</li>
+                <li>‚Ä¢ All changes are saved automatically</li>
+              </ul>
+            </div>
+
+            <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <h3 className="text-sm font-semibold mb-2">‚ö° Behavior</h3>
+              <ul className="space-y-2 text-sm" style={{ color: '#cbd5e1' }}>
+                <li>‚Ä¢ Toggle window animations on/off</li>
+                <li>‚Ä¢ Reset window positions if they get messy</li>
+                <li>‚Ä¢ Reset icon positions to default grid</li>
+              </ul>
+            </div>
+
+            <div className="mt-3">
+              <TryItButton appId="settings" label="Open Settings" />
+            </div>
+          </div>
+
+          <button
+            onClick={() => scrollToSection('tips')}
+            className="px-4 py-2 text-sm rounded"
+            style={{
+              background: 'rgba(56,189,248,0.4)',
+              border: '1px solid rgba(56,189,248,0.5)',
+              color: '#e5e7eb'
+            }}
+          >
+            Next: Tips & Shortcuts ‚Üí
+          </button>
+        </div>
+      )
+    },
+    {
+      id: 'tips',
+      title: 'Tips & Shortcuts',
+      icon: 'üí°',
+      content: (
+        <div className="space-y-4">
+          <p className="text-base leading-relaxed">
+            Here are some tips to help you get the most out of FromYou:
+          </p>
+
+          <div className="space-y-3">
+            <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <h3 className="text-sm font-semibold mb-2">üéØ Best Practices</h3>
+              <ul className="space-y-2 text-sm" style={{ color: '#cbd5e1' }}>
+                <li>‚Ä¢ <strong>Be specific with AI:</strong> Detailed descriptions = better results</li>
+                <li>‚Ä¢ <strong>Experiment with styles:</strong> Try different AI styles for unique outputs</li>
+                <li>‚Ä¢ <strong>Save your work:</strong> Download AI-generated images before closing</li>
+                <li>‚Ä¢ <strong>Organize windows:</strong> Use tabs to group related apps together</li>
+              </ul>
+            </div>
+
+            <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <h3 className="text-sm font-semibold mb-2">‚å®Ô∏è Keyboard Shortcuts</h3>
+              <ul className="space-y-2 text-sm" style={{ color: '#cbd5e1' }}>
+                <li>‚Ä¢ <strong>Space:</strong> Jump in Flappy Bird</li>
+                <li>‚Ä¢ <strong>Enter:</strong> Apply edits in Photo Lab</li>
+                <li>‚Ä¢ <strong>Esc:</strong> Close dialogs and modals</li>
+              </ul>
+            </div>
+
+            <div className="p-4 rounded-lg" style={{ background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)' }}>
+              <h3 className="text-sm font-semibold mb-2">üöÄ What's Next?</h3>
+              <p className="text-sm mb-3" style={{ color: '#cbd5e1' }}>
+                You're all set! Start creating amazing things with AI. Need more apps? 
+                Check the App Store or create your own.
+              </p>
+              <div className="flex gap-2">
+                <TryItButton appId="sketch-studio" label="Start Creating" />
+                <button
+                  onClick={() => {
+                    try {
+                      localStorage.removeItem('fyos-guide-progress')
+                      setCompletedSections([])
+                      setActiveSection('welcome')
+                    } catch {}
+                  }}
+                  className="px-3 py-1.5 text-sm rounded"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#e5e7eb'
+                  }}
+                >
+                  Restart Guide
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+  ]
+
+  const currentSection = sections.find(s => s.id === activeSection) || sections[0]
+  const progress = Math.round((completedSections.length / sections.length) * 100)
+
   return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Notes</div>
-        <span className="badge">Local</span>
+    <div className="h-full flex" style={{ background: 'rgba(12,18,36,0.02)', color: '#e5e7eb' }}>
+      {/* Sidebar */}
+      <div 
+        className="w-56 p-4 overflow-auto"
+        style={{ 
+          background: 'rgba(255,255,255,0.05)', 
+          borderRight: '1px solid rgba(255,255,255,0.12)' 
+        }}
+      >
+        <div className="mb-4">
+          <h2 className="text-xs font-semibold mb-2" style={{ color: '#cbd5e1' }}>PROGRESS</h2>
+          <div className="text-sm font-semibold mb-1">{progress}% Complete</div>
+          <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+            <div 
+              className="h-full transition-all"
+              style={{ 
+                width: `${progress}%`, 
+                background: 'linear-gradient(90deg, rgba(56,189,248,0.6), rgba(56,189,248,0.9))' 
+              }}
+            />
+          </div>
+        </div>
+
+        <nav>
+          <h2 className="text-xs font-semibold mb-2" style={{ color: '#cbd5e1' }}>SECTIONS</h2>
+          <ul className="space-y-1">
+            {sections.map(section => (
+              <li key={section.id}>
+                <button
+                  onClick={() => scrollToSection(section.id)}
+                  className="w-full text-left px-3 py-2 text-sm rounded transition-all flex items-center gap-2"
+                  style={{
+                    background: activeSection === section.id ? 'rgba(56,189,248,0.2)' : 'transparent',
+                    border: `1px solid ${activeSection === section.id ? 'rgba(56,189,248,0.4)' : 'transparent'}`,
+                    color: activeSection === section.id ? '#e5e7eb' : '#cbd5e1'
+                  }}
+                >
+                  <span>{section.icon}</span>
+                  <span className="flex-1">{section.title}</span>
+                  {completedSections.includes(section.id) && <span>‚úì</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
-      <div style={{display:'flex',gap:10,marginTop:10}}>
-        <textarea value={t} onChange={e=>setT(e.target.value)} placeholder="Write a note‚Ä¶" style={{flex:1,height:90,border:'1px solid #e5e7eb',borderRadius:8,padding:8}} />
-        <button onClick={()=>{ if(t.trim()){ setNotes(n=>[{id:Date.now(),text:t.trim()},...n]); setT('') } }} style={{padding:'8px 12px'}}>Add</button>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto">
+        <div className="p-6 max-w-3xl mx-auto">
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-3xl">{currentSection.icon}</span>
+              <h1 className="text-2xl font-semibold">{currentSection.title}</h1>
+            </div>
+            {!completedSections.includes(currentSection.id) && (
+              <button
+                onClick={() => markCompleted(currentSection.id)}
+                className="text-xs px-2 py-1 rounded"
+                style={{
+                  background: 'rgba(34,197,94,0.2)',
+                  border: '1px solid rgba(34,197,94,0.4)',
+                  color: '#cbd5e1'
+                }}
+              >
+                Mark as Complete
+              </button>
+            )}
+          </div>
+
+          <div className="prose prose-invert max-w-none">
+            {currentSection.content}
+          </div>
+        </div>
       </div>
-      <ul className="list" style={{marginTop:8}}>
-        {notes.map(n=> <li key={n.id}>{n.text}</li>)}
-      </ul>
     </div>
   )
 }
-¶safariÅ°dÅ©index.tsxÅ°fÅ°c≈–import React from 'react'
-export default function Safari(){
+
+•notesÅ°dÄ¶safariÅ°dÄ®settingsÅ°dÅ©index.tsxÅ°fÅ°c≈&timport { useState } from 'react'
+
+type WallpaperTheme = 'default' | '1' | '2' | '3' | '4' | '5'
+
+export default function Settings() {
+  const [wallpaper, setWallpaper] = useState<WallpaperTheme>(() => {
+    try {
+      return (localStorage.getItem('fyos-wallpaper') as WallpaperTheme) || 'default'
+    } catch {
+      return 'default'
+    }
+  })
+
+  const [animationsEnabled, setAnimationsEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('fyos-animations') !== 'false'
+    } catch {
+      return true
+    }
+  })
+
+  const [iconSize, setIconSize] = useState(() => {
+    try {
+      return parseInt(localStorage.getItem('fyos-icon-size') || '64', 10)
+    } catch {
+      return 64
+    }
+  })
+
+  const themeNames: Record<WallpaperTheme, string> = {
+    'default': 'Default (Image)',
+    '1': 'Deep Purple',
+    '2': 'Slate Blue',
+    '3': 'Forest Green',
+    '4': 'Mystic Pink',
+    '5': 'Ocean Blue'
+  }
+
+  const handleWallpaperChange = (theme: WallpaperTheme) => {
+    setWallpaper(theme)
+    try {
+      localStorage.setItem('fyos-wallpaper', theme)
+      window.parent?.postMessage({
+        type: 'FYOS_SET_WALLPAPER',
+        theme
+      }, '*')
+    } catch (e) {
+      console.error('Failed to update wallpaper:', e)
+    }
+  }
+
+  const handleAnimationsToggle = () => {
+    const newValue = !animationsEnabled
+    setAnimationsEnabled(newValue)
+    try {
+      localStorage.setItem('fyos-animations', newValue.toString())
+      window.parent?.postMessage({
+        type: 'FYOS_SET_ANIMATIONS',
+        enabled: newValue
+      }, '*')
+    } catch (e) {
+      console.error('Failed to update animations:', e)
+    }
+  }
+
+  const handleIconSizeChange = (size: number) => {
+    setIconSize(size)
+    try {
+      localStorage.setItem('fyos-icon-size', size.toString())
+      window.parent?.postMessage({
+        type: 'FYOS_SET_ICON_SIZE',
+        size
+      }, '*')
+    } catch (e) {
+      console.error('Failed to update icon size:', e)
+    }
+  }
+
+  const handleResetWindows = () => {
+    if (!confirm('Reset all window positions and sizes? This cannot be undone.')) {
+      return
+    }
+    
+    try {
+      window.parent?.postMessage({
+        type: 'FYOS_RESET_WINDOWS'
+      }, '*')
+      alert('Window positions have been reset')
+    } catch (e) {
+      console.error('Failed to reset windows:', e)
+    }
+  }
+
+  const handleResetIcons = () => {
+    if (!confirm('Reset all desktop icon positions? This cannot be undone.')) {
+      return
+    }
+    
+    try {
+      window.parent?.postMessage({
+        type: 'FYOS_RESET_ICONS'
+      }, '*')
+      alert('Icon positions have been reset')
+    } catch (e) {
+      console.error('Failed to reset icons:', e)
+    }
+  }
+
   return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Safari</div>
-        <span className="badge">Preview</span>
-      </div>
-      <p className="muted">Minimal browser placeholder. Open external sites is disabled in this preview.</p>
-      <div style={{background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:8,padding:10}}>
-        <div style={{fontSize:13,color:'#6b7280'}}>Address Bar</div>
-        <input style={{width:'100%',padding:8,borderRadius:6,border:'1px solid #d1d5db'}} placeholder="https://example.com" disabled />
+    <div className="h-full overflow-auto" style={{ background: 'rgba(12,18,36,0.02)', color: '#e5e7eb' }}>
+      <div className="p-4 max-w-2xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-xl font-semibold">Settings</h1>
+          <span className="text-xs px-2 py-1 rounded" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)' }}>System</span>
+        </div>
+
+        {/* Appearance */}
+        <section className="mb-6">
+          <h2 className="text-sm font-semibold mb-3" style={{ color: '#cbd5e1' }}>APPEARANCE</h2>
+          
+          <div className="p-4 rounded-lg mb-3" style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <label className="block mb-2 text-sm font-medium">Wallpaper Theme</label>
+            <select
+              value={wallpaper}
+              onChange={(e) => handleWallpaperChange(e.target.value as WallpaperTheme)}
+              className="w-full px-3 py-2 text-sm rounded"
+              style={{
+                background: 'rgba(12,18,36,0.9)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: '#e5e7eb'
+              }}
+            >
+              {(Object.keys(themeNames) as WallpaperTheme[]).map(key => (
+                <option key={key} value={key} style={{ background: '#1a1f36', color: '#e5e7eb' }}>{themeNames[key]}</option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs" style={{ color: '#cbd5e1' }}>
+              Choose a gradient theme for your desktop background
+            </p>
+          </div>
+
+          <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <label className="block mb-2 text-sm font-medium">Desktop Icon Size: {iconSize}px</label>
+            <input
+              type="range"
+              min="48"
+              max="80"
+              step="4"
+              value={iconSize}
+              onChange={(e) => handleIconSizeChange(Number(e.target.value))}
+              className="w-full"
+            />
+            <p className="mt-2 text-xs" style={{ color: '#cbd5e1' }}>
+              Adjust the size of desktop icons (48px - 80px)
+            </p>
+          </div>
+        </section>
+
+        {/* Behavior */}
+        <section className="mb-6">
+          <h2 className="text-sm font-semibold mb-3" style={{ color: '#cbd5e1' }}>BEHAVIOR</h2>
+          
+          <div className="p-4 rounded-lg mb-3" style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <label className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium mb-1">Window Animations</div>
+                <p className="text-xs" style={{ color: '#cbd5e1' }}>
+                  Enable smooth animations for windows
+                </p>
+              </div>
+              <div className="relative inline-block w-12 h-6">
+                <input
+                  type="checkbox"
+                  checked={animationsEnabled}
+                  onChange={handleAnimationsToggle}
+                  className="sr-only peer"
+                />
+                <div
+                  onClick={handleAnimationsToggle}
+                  className="w-12 h-6 rounded-full cursor-pointer transition-colors"
+                  style={{
+                    background: animationsEnabled ? 'rgba(56,189,248,0.6)' : 'rgba(255,255,255,0.2)',
+                    border: `1px solid ${animationsEnabled ? 'rgba(56,189,248,0.8)' : 'rgba(255,255,255,0.3)'}`
+                  }}
+                >
+                  <div
+                    className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform"
+                    style={{
+                      background: '#ffffff',
+                      transform: animationsEnabled ? 'translateX(24px)' : 'translateX(0)'
+                    }}
+                  />
+                </div>
+              </div>
+            </label>
+          </div>
+        </section>
+
+        {/* Window Management */}
+        <section className="mb-6">
+          <h2 className="text-sm font-semibold mb-3" style={{ color: '#cbd5e1' }}>WINDOW MANAGEMENT</h2>
+          
+          <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <div className="mb-3">
+              <div className="text-sm font-medium mb-1">Reset Window Positions</div>
+              <p className="text-xs mb-3" style={{ color: '#cbd5e1' }}>
+                Clear all saved window positions and sizes
+              </p>
+              <button
+                onClick={handleResetWindows}
+                className="px-4 py-2 text-sm rounded transition-all"
+                style={{
+                  background: 'rgba(239,68,68,0.2)',
+                  border: '1px solid rgba(239,68,68,0.4)',
+                  color: '#e5e7eb'
+                }}
+              >
+                Reset Windows
+              </button>
+            </div>
+
+            <div className="pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <div className="text-sm font-medium mb-1">Reset Icon Positions</div>
+              <p className="text-xs mb-3" style={{ color: '#cbd5e1' }}>
+                Reset all desktop icons to default positions
+              </p>
+              <button
+                onClick={handleResetIcons}
+                className="px-4 py-2 text-sm rounded transition-all"
+                style={{
+                  background: 'rgba(239,68,68,0.2)',
+                  border: '1px solid rgba(239,68,68,0.4)',
+                  color: '#e5e7eb'
+                }}
+              >
+                Reset Icons
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* About */}
+        <section>
+          <h2 className="text-sm font-semibold mb-3" style={{ color: '#cbd5e1' }}>ABOUT</h2>
+          
+          <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="text-3xl">üñ•Ô∏è</div>
+              <div>
+                <div className="text-sm font-semibold">FromYou Desktop</div>
+                <div className="text-xs" style={{ color: '#cbd5e1' }}>AI-First Infinite Creation Desktop</div>
+              </div>
+            </div>
+            <div className="text-xs space-y-1" style={{ color: '#cbd5e1' }}>
+              <div>Version: 1.0.0</div>
+              <div>Build: WebContainer Runtime</div>
+              <div className="pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                Create anything with AI-powered apps
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   )
 }
-®settingsÅ°dÅ©index.tsxÅ°fÅ°c≈Bimport React from 'react'
-export default function Settings(){
-  const [dark, setDark] = React.useState(false)
+©photo-labÅ°dÅ©index.tsxÅ°fÅ°c≈(¡import React, { useState, useRef } from 'react'
+import { imageEdit } from '../../ai'
+
+export default function PhotoLab() {
+  const [originalImage, setOriginalImage] = useState<string | null>(null)
+  const [editedImage, setEditedImage] = useState<string | null>(null)
+  const [instruction, setInstruction] = useState('')
+  const [intensity, setIntensity] = useState(0.8)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileSelect = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setOriginalImage(e.target?.result as string)
+      setEditedImage(null)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    
+    const file = e.dataTransfer.files[0]
+    if (file) handleFileSelect(file)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = () => {
+    setIsDragging(false)
+  }
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleFileSelect(file)
+  }
+
+  const applyEdit = async () => {
+    if (!originalImage || !instruction.trim()) {
+      alert('Please upload an image and provide editing instructions')
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      // Convert base64 to File object
+      const response = await fetch(originalImage)
+      const blob = await response.blob()
+      const file = new File([blob], 'image.png', { type: blob.type })
+
+      const result = await imageEdit(file, instruction, {
+        strength: intensity,
+        num_images: 1,
+        image_size: 'square_hd'
+      }) as { images: Array<{ url: string }> }
+
+      if (result?.images?.[0]?.url) {
+        setEditedImage(result.images[0].url)
+      }
+    } catch (error) {
+      console.error('Edit failed:', error)
+      alert('Failed to edit image. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const downloadImage = () => {
+    if (!editedImage) return
+    const a = document.createElement('a')
+    a.href = editedImage
+    a.download = 'edited-photo.png'
+    a.click()
+  }
+
+  const reset = () => {
+    setOriginalImage(null)
+    setEditedImage(null)
+    setInstruction('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const examples = [
+    'make the sky more dramatic',
+    'remove the person in the background',
+    'change this to autumn colors',
+    'make it look vintage',
+    'add sunset lighting',
+    'make it black and white'
+  ]
+
   return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Settings</div>
-        <span className="badge">System</span>
-      </div>
-      <div style={{marginTop:10}}>
-        <label style={{display:'flex',alignItems:'center',gap:8}}>
-          <input type="checkbox" checked={dark} onChange={()=>setDark(v=>!v)} /> Dark Mode (demo)
-        </label>
+    <div className="h-full overflow-auto" style={{ background: 'rgba(12,18,36,0.02)', color: '#e5e7eb' }}>
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-lg font-semibold">Photo Lab</h1>
+          <span className="text-xs px-2 py-1 rounded" style={{ background: 'rgba(56,189,248,0.2)', border: '1px solid rgba(56,189,248,0.4)' }}>AI</span>
+        </div>
+
+        {/* Upload Area */}
+        {!originalImage ? (
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onClick={() => fileInputRef.current?.click()}
+            className="mb-4 p-12 rounded-lg cursor-pointer transition-all text-center"
+            style={{
+              background: isDragging ? 'rgba(56,189,248,0.15)' : 'rgba(255,255,255,0.08)',
+              backdropFilter: 'blur(18px)',
+              border: `2px dashed ${isDragging ? 'rgba(56,189,248,0.5)' : 'rgba(255,255,255,0.2)'}`,
+            }}
+          >
+            <div className="text-4xl mb-3">üì∏</div>
+            <p className="text-sm mb-1" style={{ color: '#e5e7eb' }}>Drop an image here or click to upload</p>
+            <p className="text-xs" style={{ color: '#cbd5e1' }}>Supports JPG, PNG, WebP</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileInput}
+              className="hidden"
+            />
+          </div>
+        ) : (
+          <>
+            {/* Controls */}
+            <div className="mb-4 p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div className="mb-3">
+                <label className="text-xs mb-1 block" style={{ color: '#cbd5e1' }}>Editing Instructions</label>
+                <input
+                  type="text"
+                  value={instruction}
+                  onChange={(e) => setInstruction(e.target.value)}
+                  placeholder="Describe what you want to change..."
+                  className="w-full px-3 py-2 text-sm rounded"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#e5e7eb'
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && !isProcessing && applyEdit()}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="text-xs mb-1 block" style={{ color: '#cbd5e1' }}>Quick Examples</label>
+                <div className="flex flex-wrap gap-2">
+                  {examples.map((ex) => (
+                    <button
+                      key={ex}
+                      onClick={() => setInstruction(ex)}
+                      className="text-xs px-2 py-1 rounded transition-colors"
+                      style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        color: '#cbd5e1'
+                      }}
+                    >
+                      {ex}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label className="text-xs mb-1 block" style={{ color: '#cbd5e1' }}>Effect Strength: {Math.round(intensity * 100)}%</label>
+                <input
+                  type="range"
+                  min="0.3"
+                  max="1"
+                  step="0.1"
+                  value={intensity}
+                  onChange={(e) => setIntensity(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={applyEdit}
+                  disabled={isProcessing || !instruction.trim()}
+                  className="flex-1 px-4 py-2 text-sm font-medium rounded transition-all"
+                  style={{
+                    background: isProcessing || !instruction.trim() ? 'rgba(56,189,248,0.2)' : 'rgba(56,189,248,0.4)',
+                    border: '1px solid rgba(56,189,248,0.5)',
+                    color: '#e5e7eb',
+                    cursor: isProcessing || !instruction.trim() ? 'not-allowed' : 'pointer',
+                    opacity: !instruction.trim() ? 0.5 : 1
+                  }}
+                >
+                  {isProcessing ? '‚ö° Processing...' : '‚ö° Apply Edit'}
+                </button>
+                <button
+                  onClick={reset}
+                  className="px-4 py-2 text-sm rounded transition-colors"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#e5e7eb'
+                  }}
+                >
+                  New Image
+                </button>
+              </div>
+            </div>
+
+            {/* Before/After Comparison */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Original */}
+              <div>
+                <p className="text-xs mb-2" style={{ color: '#cbd5e1' }}>Original</p>
+                <div
+                  className="w-full rounded-lg overflow-hidden"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    minHeight: '300px'
+                  }}
+                >
+                  <img
+                    src={originalImage}
+                    alt="Original"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              </div>
+
+              {/* Edited */}
+              <div>
+                <p className="text-xs mb-2" style={{ color: '#cbd5e1' }}>Edited</p>
+                <div
+                  className="w-full rounded-lg flex items-center justify-center overflow-hidden"
+                  style={{
+                    background: editedImage ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    minHeight: '300px'
+                  }}
+                >
+                  {editedImage ? (
+                    <div className="relative w-full h-full">
+                      <img
+                        src={editedImage}
+                        alt="Edited"
+                        className="w-full h-full object-contain"
+                      />
+                      <button
+                        onClick={downloadImage}
+                        className="absolute bottom-3 right-3 px-3 py-1.5 text-sm rounded transition-all"
+                        style={{
+                          background: 'rgba(56,189,248,0.9)',
+                          border: '1px solid rgba(56,189,248,1)',
+                          color: '#ffffff'
+                        }}
+                      >
+                        ‚¨áÔ∏è Download
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-center px-4" style={{ color: '#cbd5e1' }}>
+                      {isProcessing ? 'AI is processing your image...' : 'Enter instructions and click "Apply Edit"'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
 }
-®terminalÅ°dÅ©index.tsxÅ°fÅ°c≈Øimport React from 'react'
-export default function Terminal(){
-  const [lines, setLines] = React.useState(['Welcome to Terminal'])
-  const [cmd, setCmd] = React.useState('help')
+
+≠sketch-studioÅ°dÅ©index.tsxÅ°fÅ°c≈5@import React, { useRef, useState, useEffect } from 'react'
+import { imageEdit, uploadFileToPublicUrl } from '../../ai'
+
+type Tool = 'pen' | 'eraser'
+type Style = 'realistic' | 'cartoon' | 'anime' | 'digital-art' | 'watercolor'
+
+export default function SketchStudio() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [tool, setTool] = useState<Tool>('pen')
+  const [color, setColor] = useState('#000000')
+  const [brushSize, setBrushSize] = useState(3)
+  const [style, setStyle] = useState<Style>('realistic')
+  const [enhancedImage, setEnhancedImage] = useState<string | null>(null)
+  const [isEnhancing, setIsEnhancing] = useState(false)
+  const [description, setDescription] = useState('')
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    // Set white background
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+  }, [])
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    setIsDrawing(true)
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    const x = (e.clientX - rect.left) * scaleX
+    const y = (e.clientY - rect.top) * scaleY
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+  }
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    const x = (e.clientX - rect.left) * scaleX
+    const y = (e.clientY - rect.top) * scaleY
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : color
+    ctx.lineWidth = brushSize
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  }
+
+  const stopDrawing = () => {
+    setIsDrawing(false)
+  }
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    setEnhancedImage(null)
+  }
+
+  const enhanceWithAI = async () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    
+    setIsEnhancing(true)
+    try {
+      // Downscale and compress canvas to reduce payload (max side 512px, JPEG 0.85)
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        try {
+          const MAX_SIDE = 512
+          const srcW = canvas.width
+          const srcH = canvas.height
+          const scale = Math.min(1, MAX_SIDE / Math.max(srcW, srcH))
+          const dstW = Math.max(1, Math.round(srcW * scale))
+          const dstH = Math.max(1, Math.round(srcH * scale))
+          const off = document.createElement('canvas')
+          off.width = dstW
+          off.height = dstH
+          const ctx = off.getContext('2d')
+          if (!ctx) {
+            reject(new Error('Failed to get 2d context'))
+            return
+          }
+          ctx.imageSmoothingEnabled = true
+          ctx.imageSmoothingQuality = 'high'
+          ctx.drawImage(canvas, 0, 0, srcW, srcH, 0, 0, dstW, dstH)
+          off.toBlob((b) => {
+            if (b) resolve(b)
+            else reject(new Error('Failed to convert scaled canvas to blob'))
+          }, 'image/jpeg', 0.85)
+        } catch (err) {
+          reject(err as Error)
+        }
+      })
+      const file = new File([blob], 'sketch.jpg', { type: 'image/jpeg' })
+      
+      console.log('Uploading sketch...', { size: file.size, type: file.type })
+      
+      // Upload file to get public URL (with better error handling)
+      let publicUrl: string
+      try {
+        publicUrl = await uploadFileToPublicUrl(file)
+        console.log('Upload successful:', publicUrl)
+      } catch (uploadError) {
+        console.error('Upload failed:', uploadError)
+        throw new Error(`Failed to upload sketch: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`)
+      }
+      
+      // Generate prompt based on description and style
+      const stylePrompts: Record<Style, string> = {
+        realistic: 'photorealistic, detailed, high quality',
+        cartoon: 'cartoon style, vibrant colors, clean lines',
+        anime: 'anime art style, beautiful illustration',
+        'digital-art': 'digital art, professional, artistic',
+        watercolor: 'watercolor painting, soft colors, artistic'
+      }
+      
+      const instruction = description 
+        ? `transform into ${description}, ${stylePrompts[style]}`
+        : `transform this sketch into ${stylePrompts[style]}`
+      
+      console.log('Calling AI with instruction:', instruction)
+      
+      const result = await imageEdit(publicUrl, instruction, { 
+        num_images: 1,
+        image_size: 'square_hd',
+        strength: 0.85
+      }) as { images: Array<{ url: string }> }
+      
+      if (result?.images?.[0]?.url) {
+        setEnhancedImage(result.images[0].url)
+      } else {
+        throw new Error('No image returned from AI')
+      }
+    } catch (error) {
+      console.error('Enhancement failed:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred'
+      alert(`Failed to enhance sketch: ${errorMsg}`)
+    } finally {
+      setIsEnhancing(false)
+    }
+  }
+
+  const downloadImage = () => {
+    if (!enhancedImage) return
+    const a = document.createElement('a')
+    a.href = enhancedImage
+    a.download = 'enhanced-sketch.png'
+    a.click()
+  }
+
   return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{fontWeight:600}}>Terminal</div>
-        <span className="badge">Demo</span>
-      </div>
-      <div style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',background:'#111827',color:'#d1d5db',borderRadius:8,padding:10,marginTop:8}}>
-        {lines.map((l,i)=>(<div key={i}>{'>'} {l}</div>))}
-      </div>
-      <div style={{display:'flex',gap:8,marginTop:8}}>
-        <input value={cmd} onChange={e=>setCmd(e.target.value)} style={{flex:1,border:'1px solid #e5e7eb',borderRadius:6,padding:8}} />
-        <button onClick={()=>{ setLines(l=>[...l, 'executed: '+cmd]); setCmd('') }}>Run</button>
+    <div className="h-full overflow-auto" style={{ background: 'rgba(12,18,36,0.02)', color: '#e5e7eb' }}>
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-lg font-semibold">Sketch Studio</h1>
+          <span className="text-xs px-2 py-1 rounded" style={{ background: 'rgba(56,189,248,0.2)', border: '1px solid rgba(56,189,248,0.4)' }}>AI</span>
+        </div>
+
+        {/* Tools */}
+        <div className="mb-4 p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: '#cbd5e1' }}>Tool</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTool('pen')}
+                  className="px-3 py-1.5 text-sm rounded transition-colors"
+                  style={{
+                    background: tool === 'pen' ? 'rgba(56,189,248,0.3)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${tool === 'pen' ? 'rgba(56,189,248,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                    color: '#e5e7eb'
+                  }}
+                >
+                  ‚úèÔ∏è Pen
+                </button>
+                <button
+                  onClick={() => setTool('eraser')}
+                  className="px-3 py-1.5 text-sm rounded transition-colors"
+                  style={{
+                    background: tool === 'eraser' ? 'rgba(56,189,248,0.3)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${tool === 'eraser' ? 'rgba(56,189,248,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                    color: '#e5e7eb'
+                  }}
+                >
+                  üßπ Eraser
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: '#cbd5e1' }}>Color</label>
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-full h-9 rounded cursor-pointer"
+                style={{ border: '1px solid rgba(255,255,255,0.12)' }}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: '#cbd5e1' }}>Brush Size: {brushSize}px</label>
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={brushSize}
+                onChange={(e) => setBrushSize(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: '#cbd5e1' }}>AI Style</label>
+              <select
+                value={style}
+                onChange={(e) => setStyle(e.target.value as Style)}
+                className="w-full px-2 py-1.5 text-sm rounded"
+                style={{
+                  background: 'rgba(12,18,36,0.9)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: '#e5e7eb'
+                }}
+              >
+                <option value="realistic" style={{ background: '#1a1f36', color: '#e5e7eb' }}>Realistic</option>
+                <option value="cartoon" style={{ background: '#1a1f36', color: '#e5e7eb' }}>Cartoon</option>
+                <option value="anime" style={{ background: '#1a1f36', color: '#e5e7eb' }}>Anime</option>
+                <option value="digital-art" style={{ background: '#1a1f36', color: '#e5e7eb' }}>Digital Art</option>
+                <option value="watercolor" style={{ background: '#1a1f36', color: '#e5e7eb' }}>Watercolor</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <label className="text-xs mb-1 block" style={{ color: '#cbd5e1' }}>Describe your sketch (optional)</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g., a cat sitting on a chair"
+              className="w-full px-3 py-2 text-sm rounded"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: '#e5e7eb'
+              }}
+            />
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={enhanceWithAI}
+              disabled={isEnhancing}
+              className="flex-1 px-4 py-2 text-sm font-medium rounded transition-all"
+              style={{
+                background: isEnhancing ? 'rgba(56,189,248,0.2)' : 'rgba(56,189,248,0.4)',
+                border: '1px solid rgba(56,189,248,0.5)',
+                color: '#e5e7eb',
+                cursor: isEnhancing ? 'wait' : 'pointer'
+              }}
+            >
+              {isEnhancing ? '‚ú® Enhancing...' : '‚ú® Enhance with AI'}
+            </button>
+            <button
+              onClick={clearCanvas}
+              className="px-4 py-2 text-sm rounded transition-colors"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: '#e5e7eb'
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {/* Canvas and Result */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Drawing Canvas */}
+          <div>
+            <p className="text-xs mb-2" style={{ color: '#cbd5e1' }}>Your Sketch</p>
+            <canvas
+              ref={canvasRef}
+              width={400}
+              height={400}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              className="w-full rounded-lg cursor-crosshair"
+              style={{
+                background: '#ffffff',
+                border: '1px solid rgba(255,255,255,0.12)',
+                touchAction: 'none'
+              }}
+            />
+          </div>
+
+          {/* Enhanced Result */}
+          <div>
+            <p className="text-xs mb-2" style={{ color: '#cbd5e1' }}>AI Enhanced</p>
+            <div
+              className="w-full rounded-lg flex items-center justify-center"
+              style={{
+                height: '400px',
+                background: enhancedImage ? 'transparent' : 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.12)'
+              }}
+            >
+              {enhancedImage ? (
+                <div className="relative w-full h-full">
+                  <img
+                    src={enhancedImage}
+                    alt="Enhanced"
+                    className="w-full h-full object-contain rounded-lg"
+                  />
+                  <button
+                    onClick={downloadImage}
+                    className="absolute bottom-2 right-2 px-3 py-1.5 text-sm rounded transition-all"
+                    style={{
+                      background: 'rgba(56,189,248,0.9)',
+                      border: '1px solid rgba(56,189,248,1)',
+                      color: '#ffffff'
+                    }}
+                  >
+                    ‚¨áÔ∏è Download
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm" style={{ color: '#cbd5e1' }}>
+                  Draw something and click "Enhance with AI"
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
+
 •visitÅ°dÅ©index.tsxÅ°fÅ°c≈µimport { useEffect, useMemo, useState } from 'react'
 
 type DesktopRecord = {
@@ -3075,7 +4613,7 @@ export default function Visit() {
   )
 }
 
-¶assetsÅ°dÅ©react.svgÅ°fÅ°c≈<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈‚‰import React, { useEffect, useRef, useState } from 'react'
+®terminalÅ°dÄ¶assetsÅ°dÅ©react.svgÅ°fÅ°c≈<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>ßdesktopÅ°dÇ´Desktop.tsxÅ°fÅ°c≈ˆ1import React, { useEffect, useRef, useState } from 'react'
 
 // Shared constants
 // Host reserves 400px on the left for the agent sidebar
@@ -3622,6 +5160,40 @@ export default function Desktop(){
   // Announce readiness to host so it can flush any pending open-app messages
   useEffect(()=>{
     try { window.parent?.postMessage({ type: EVT_DESKTOP_READY }, '*') } catch {}
+  }, [])
+  // Load saved settings on mount
+  useEffect(() => {
+    try {
+      // Load wallpaper theme
+      const savedWallpaper = localStorage.getItem('fyos-wallpaper')
+      if (savedWallpaper && ['default', '1', '2', '3', '4', '5'].includes(savedWallpaper)) {
+        document.documentElement.style.setProperty('--desktop-gradient', `var(--desktop-gradient-${savedWallpaper})`)
+        if (savedWallpaper === 'default') {
+          document.documentElement.style.setProperty('--desktop-background-size', 'cover')
+          document.documentElement.style.setProperty('--desktop-background-position', 'center')
+          document.documentElement.style.setProperty('--desktop-background-repeat', 'no-repeat')
+        } else {
+          document.documentElement.style.setProperty('--desktop-background-size', 'auto')
+          document.documentElement.style.setProperty('--desktop-background-position', 'initial')
+          document.documentElement.style.setProperty('--desktop-background-repeat', 'initial')
+        }
+      }
+      // Load animations setting
+      const savedAnimations = localStorage.getItem('fyos-animations')
+      if (savedAnimations === 'false') {
+        document.documentElement.style.setProperty('--window-open-duration', '0ms')
+        document.documentElement.style.setProperty('--window-close-duration', '0ms')
+        document.documentElement.style.setProperty('--window-minimize-duration', '0ms')
+      }
+      // Load icon size
+      const savedIconSize = localStorage.getItem('fyos-icon-size')
+      if (savedIconSize) {
+        const size = parseInt(savedIconSize, 10)
+        if (size >= 48 && size <= 80) {
+          document.documentElement.style.setProperty('--icon-size', `${size}px`)
+        }
+      }
+    } catch {}
   }, [])
   // Ensure root container stretches full viewport
   useEffect(()=>{
@@ -4354,6 +5926,30 @@ export default function Desktop(){
   useEffect(()=>{
     function onMessage(e: MessageEvent){
       const payload = e.data
+      
+      // Relay AI and media responses from host to app iframes
+      if (payload && typeof payload === 'object') {
+        const msgType = (payload as {type?: unknown}).type
+        if (msgType === 'AI_RESPONSE' || msgType === 'MEDIA_INGEST_RESPONSE') {
+          // Forward to all app iframes
+          try {
+            const iframes = document.querySelectorAll('iframe[data-app-id]')
+            iframes.forEach(iframe => {
+              try {
+                (iframe as HTMLIFrameElement).contentWindow?.postMessage(payload, '*')
+              } catch {}
+            })
+          } catch {}
+          return
+        }
+        if (msgType === 'AI_REQUEST' || msgType === 'MEDIA_INGEST') {
+          try {
+            window.parent?.postMessage(payload, '*')
+          } catch {}
+          return
+        }
+      }
+      
       if (isContextPointerMessage(payload)) {
         if (payload.phase === 'down') {
           const candidateAppId = typeof payload.appId === 'string' ? payload.appId : null
@@ -4402,6 +5998,67 @@ export default function Desktop(){
         } catch {}
         return
       }
+      // Settings: Wallpaper theme
+      if (typeValue === 'FYOS_SET_WALLPAPER') {
+        try {
+          const theme = record.theme
+          if (typeof theme === 'string' && ['default', '1', '2', '3', '4', '5'].includes(theme)) {
+            document.documentElement.style.setProperty('--desktop-gradient', `var(--desktop-gradient-${theme})`)
+            if (theme === 'default') {
+              document.documentElement.style.setProperty('--desktop-background-size', 'cover')
+              document.documentElement.style.setProperty('--desktop-background-position', 'center')
+              document.documentElement.style.setProperty('--desktop-background-repeat', 'no-repeat')
+            } else {
+              document.documentElement.style.setProperty('--desktop-background-size', 'auto')
+              document.documentElement.style.setProperty('--desktop-background-position', 'initial')
+              document.documentElement.style.setProperty('--desktop-background-repeat', 'initial')
+            }
+          }
+        } catch {}
+        return
+      }
+      // Settings: Animations
+      if (typeValue === 'FYOS_SET_ANIMATIONS') {
+        try {
+          const enabled = record.enabled
+          if (typeof enabled === 'boolean') {
+            const duration = enabled ? '' : '0ms'
+            document.documentElement.style.setProperty('--window-open-duration', duration || '340ms')
+            document.documentElement.style.setProperty('--window-close-duration', duration || '220ms')
+            document.documentElement.style.setProperty('--window-minimize-duration', duration || '220ms')
+          }
+        } catch {}
+        return
+      }
+      // Settings: Reset windows
+      if (typeValue === 'FYOS_RESET_WINDOWS') {
+        try {
+          localStorage.removeItem(LS_WINDOW_GEOM_KEY)
+          localStorage.removeItem(LS_WINDOW_TABS_KEY)
+          setWindowGeometries({})
+          setWindowTabs({})
+          setOpen([])
+        } catch {}
+        return
+      }
+      // Settings: Icon size
+      if (typeValue === 'FYOS_SET_ICON_SIZE') {
+        try {
+          const size = record.size
+          if (typeof size === 'number' && size >= 48 && size <= 80) {
+            document.documentElement.style.setProperty('--icon-size', `${size}px`)
+          }
+        } catch {}
+        return
+      }
+      // Settings: Reset icon positions
+      if (typeValue === 'FYOS_RESET_ICONS') {
+        try {
+          localStorage.removeItem(LS_ICON_POS_KEY)
+          setIconPositions({})
+        } catch {}
+        return
+      }
       if (typeValue !== EVT_OPEN_APP) return
       const rawApp = record.app
       const app: App | null = (rawApp && typeof rawApp === 'object') ? rawApp as App : null
@@ -4432,8 +6089,6 @@ export default function Desktop(){
     top: '50%',
   }
 
-  const wallpaperStyle: React.CSSProperties = { backgroundImage: `url(/2.webp)`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }
-
   return (
     <div
       className="desktop"
@@ -4442,7 +6097,7 @@ export default function Desktop(){
       onContextMenu={(e)=>{ e.preventDefault() }}
     >
       <div className="sidebar-background" />
-      <div className="wallpaper" style={wallpaperStyle} />
+      <div className="wallpaper" />
       <div className="wallpaper-glass" />
       {/* MenuBar removed */}
 
@@ -4563,23 +6218,33 @@ export default function Desktop(){
     </div>
   )
 }
-™styles.cssÅ°fÅ°c≈6∆/* Base variables and layout */
+™styles.cssÅ°fÅ°c≈9w/* Base variables and layout */
 :root{--bar:#f6f6f6;--text:#f7fafc;--muted:#cbd5e1;--bg:#0b1020;--glass:rgba(255,255,255,0.25);--dock:rgba(255,255,255,0.3);
   /* Desktop gradient themes */
+  --desktop-gradient-default: url(/2.webp);
   --desktop-gradient-1: linear-gradient(180deg, #0b1020 0%, #1e2760 60%, #462e7e 100%);
   --desktop-gradient-2: linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #0b1020 100%);
   --desktop-gradient-3: linear-gradient(180deg, #0b1020 0%, #0b3a23 60%, #04210f 100%);
   --desktop-gradient-4: linear-gradient(180deg, #12081f 0%, #3a103a 60%, #7a1a4a 100%);
   --desktop-gradient-5: linear-gradient(180deg, #0b1020 0%, #0e223f 45%, #0f1b2e 100%);
-  --desktop-gradient: var(--desktop-gradient-1);
+  --desktop-gradient: var(--desktop-gradient-default);
+  --desktop-background-size: cover;
+  --desktop-background-position: center;
+  --desktop-background-repeat: no-repeat;
+  /* Animation durations */
+  --window-open-duration: 340ms;
+  --window-close-duration: 220ms;
+  --window-minimize-duration: 220ms;
+  /* Icon size */
+  --icon-size: 64px;
 }
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap');
 *{box-sizing:border-box}
 body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 .desktop{height:100%;width:100%;position:relative;color:#f7fafc;overflow:hidden;overscroll-behavior:none}
-.sidebar-background{position:absolute;left:0;top:0;bottom:0;width:400px;background:linear-gradient(135deg, rgba(56,189,248,0.4) 0%, rgba(255,255,255,0.25) 100%);pointer-events:none}
-.wallpaper{position:absolute;left:400px;top:0;right:0;bottom:0;background:var(--desktop-gradient)}
-.wallpaper-glass{position:absolute;left:400px;top:0;right:0;bottom:0;pointer-events:none;background:rgba(255,255,255,0.02);backdrop-filter:saturate(160%) blur(24px);-webkit-backdrop-filter:saturate(160%) blur(24px)}
+.sidebar-background{position:absolute;left:0;top:0;bottom:0;width:400px;background:linear-gradient(135deg, rgba(56,189,248,0.4) 0%, rgba(255,255,255,0.25) 100%);pointer-events:none;z-index:0}
+.wallpaper{position:absolute;left:400px;top:0;right:0;bottom:0;background:var(--desktop-gradient);background-size:var(--desktop-background-size);background-position:var(--desktop-background-position);background-repeat:var(--desktop-background-repeat);z-index:0}
+.wallpaper-glass{position:absolute;left:400px;top:0;right:0;bottom:0;pointer-events:none;background:rgba(255,255,255,0.02);backdrop-filter:saturate(160%) blur(24px);-webkit-backdrop-filter:saturate(160%) blur(24px);z-index:1}
 .menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;background:linear-gradient(to bottom,rgba(255,255,255,.65),rgba(255,255,255,.3));backdrop-filter:saturate(2) blur(10px);border-bottom:1px solid rgba(255,255,255,.35)}
 .menubar .title{font-weight:600;font-size:12px}
 .menubar .right{margin-left:auto;font-size:12px;color:var(--muted)}
@@ -4587,8 +6252,8 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
 /* Dock removed */
 
 /* Desktop icons (absolute + draggable) */
-.desktop-icons{position:absolute;inset:0}
-.desktop-icon{position:absolute;width:64px;text-align:center;color:white;cursor:default;user-select:none;transition:transform .15s ease, filter .2s ease;will-change:transform,filter}
+.desktop-icons{position:absolute;inset:0;z-index:10}
+.desktop-icon{position:absolute;width:var(--icon-size);text-align:center;color:white;cursor:default;user-select:none;transition:transform .15s ease, filter .2s ease;will-change:transform,filter}
 .desktop-icon:hover{transform:translateY(-6px) scale(1.1);filter:drop-shadow(0 8px 12px rgba(0,0,0,.35))}
 .desktop-icon.launching{animation:icon-bounce .6s cubic-bezier(.28,.84,.42,1)}
 .desktop-icon .glyph{transition:inherit}
@@ -4600,7 +6265,7 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
   85%{transform:translateY(-4px) scale(1.04)}
   100%{transform:translateY(0) scale(1)}
 }
-.desktop-icon .glyph{font-size:36px;line-height:36px}
+.desktop-icon .glyph{font-size:calc(var(--icon-size) * 0.5625);line-height:calc(var(--icon-size) * 0.5625)}
 
 /* Window */
 .window{position:absolute;top:90px;left:90px;min-width:280px;min-height:160px;border-radius:0;overflow:hidden;contain:layout paint;backface-visibility:hidden;
@@ -4616,10 +6281,11 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial}
   box-shadow:0 14px 36px rgba(0,0,0,.28);
   /* Keep surface slightly translucent but not overly dark */
   color:#e5e7eb;
+  z-index:100;
 }
-.window.opening{animation:mac-window-open-spring .34s cubic-bezier(.2,.8,.2,1)}
-.window.closing{animation:mac-window-close .22s cubic-bezier(.2,.8,.2,1) forwards}
-.window.minimizing{animation:mac-window-minimize .22s cubic-bezier(.2,.8,.2,1) forwards}
+.window.opening{animation:mac-window-open-spring var(--window-open-duration) cubic-bezier(.2,.8,.2,1)}
+.window.closing{animation:mac-window-close var(--window-close-duration) cubic-bezier(.2,.8,.2,1) forwards}
+.window.minimizing{animation:mac-window-minimize var(--window-minimize-duration) cubic-bezier(.2,.8,.2,1) forwards}
 .window.minimized{opacity:0;transform:translateY(8px) scale(.92);pointer-events:none;visibility:hidden}
 .window .titlebar{display:none}
 .traffic{display:flex;gap:6px;margin-right:6px}

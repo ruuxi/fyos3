@@ -546,6 +546,40 @@ export default function Desktop(){
   useEffect(()=>{
     try { window.parent?.postMessage({ type: EVT_DESKTOP_READY }, '*') } catch {}
   }, [])
+  // Load saved settings on mount
+  useEffect(() => {
+    try {
+      // Load wallpaper theme
+      const savedWallpaper = localStorage.getItem('fyos-wallpaper')
+      if (savedWallpaper && ['default', '1', '2', '3', '4', '5'].includes(savedWallpaper)) {
+        document.documentElement.style.setProperty('--desktop-gradient', `var(--desktop-gradient-${savedWallpaper})`)
+        if (savedWallpaper === 'default') {
+          document.documentElement.style.setProperty('--desktop-background-size', 'cover')
+          document.documentElement.style.setProperty('--desktop-background-position', 'center')
+          document.documentElement.style.setProperty('--desktop-background-repeat', 'no-repeat')
+        } else {
+          document.documentElement.style.setProperty('--desktop-background-size', 'auto')
+          document.documentElement.style.setProperty('--desktop-background-position', 'initial')
+          document.documentElement.style.setProperty('--desktop-background-repeat', 'initial')
+        }
+      }
+      // Load animations setting
+      const savedAnimations = localStorage.getItem('fyos-animations')
+      if (savedAnimations === 'false') {
+        document.documentElement.style.setProperty('--window-open-duration', '0ms')
+        document.documentElement.style.setProperty('--window-close-duration', '0ms')
+        document.documentElement.style.setProperty('--window-minimize-duration', '0ms')
+      }
+      // Load icon size
+      const savedIconSize = localStorage.getItem('fyos-icon-size')
+      if (savedIconSize) {
+        const size = parseInt(savedIconSize, 10)
+        if (size >= 48 && size <= 80) {
+          document.documentElement.style.setProperty('--icon-size', `${size}px`)
+        }
+      }
+    } catch {}
+  }, [])
   // Ensure root container stretches full viewport
   useEffect(()=>{
     try{
@@ -1277,6 +1311,30 @@ export default function Desktop(){
   useEffect(()=>{
     function onMessage(e: MessageEvent){
       const payload = e.data
+      
+      // Relay AI and media responses from host to app iframes
+      if (payload && typeof payload === 'object') {
+        const msgType = (payload as {type?: unknown}).type
+        if (msgType === 'AI_RESPONSE' || msgType === 'MEDIA_INGEST_RESPONSE') {
+          // Forward to all app iframes
+          try {
+            const iframes = document.querySelectorAll('iframe[data-app-id]')
+            iframes.forEach(iframe => {
+              try {
+                (iframe as HTMLIFrameElement).contentWindow?.postMessage(payload, '*')
+              } catch {}
+            })
+          } catch {}
+          return
+        }
+        if (msgType === 'AI_REQUEST' || msgType === 'MEDIA_INGEST') {
+          try {
+            window.parent?.postMessage(payload, '*')
+          } catch {}
+          return
+        }
+      }
+      
       if (isContextPointerMessage(payload)) {
         if (payload.phase === 'down') {
           const candidateAppId = typeof payload.appId === 'string' ? payload.appId : null
@@ -1325,6 +1383,67 @@ export default function Desktop(){
         } catch {}
         return
       }
+      // Settings: Wallpaper theme
+      if (typeValue === 'FYOS_SET_WALLPAPER') {
+        try {
+          const theme = record.theme
+          if (typeof theme === 'string' && ['default', '1', '2', '3', '4', '5'].includes(theme)) {
+            document.documentElement.style.setProperty('--desktop-gradient', `var(--desktop-gradient-${theme})`)
+            if (theme === 'default') {
+              document.documentElement.style.setProperty('--desktop-background-size', 'cover')
+              document.documentElement.style.setProperty('--desktop-background-position', 'center')
+              document.documentElement.style.setProperty('--desktop-background-repeat', 'no-repeat')
+            } else {
+              document.documentElement.style.setProperty('--desktop-background-size', 'auto')
+              document.documentElement.style.setProperty('--desktop-background-position', 'initial')
+              document.documentElement.style.setProperty('--desktop-background-repeat', 'initial')
+            }
+          }
+        } catch {}
+        return
+      }
+      // Settings: Animations
+      if (typeValue === 'FYOS_SET_ANIMATIONS') {
+        try {
+          const enabled = record.enabled
+          if (typeof enabled === 'boolean') {
+            const duration = enabled ? '' : '0ms'
+            document.documentElement.style.setProperty('--window-open-duration', duration || '340ms')
+            document.documentElement.style.setProperty('--window-close-duration', duration || '220ms')
+            document.documentElement.style.setProperty('--window-minimize-duration', duration || '220ms')
+          }
+        } catch {}
+        return
+      }
+      // Settings: Reset windows
+      if (typeValue === 'FYOS_RESET_WINDOWS') {
+        try {
+          localStorage.removeItem(LS_WINDOW_GEOM_KEY)
+          localStorage.removeItem(LS_WINDOW_TABS_KEY)
+          setWindowGeometries({})
+          setWindowTabs({})
+          setOpen([])
+        } catch {}
+        return
+      }
+      // Settings: Icon size
+      if (typeValue === 'FYOS_SET_ICON_SIZE') {
+        try {
+          const size = record.size
+          if (typeof size === 'number' && size >= 48 && size <= 80) {
+            document.documentElement.style.setProperty('--icon-size', `${size}px`)
+          }
+        } catch {}
+        return
+      }
+      // Settings: Reset icon positions
+      if (typeValue === 'FYOS_RESET_ICONS') {
+        try {
+          localStorage.removeItem(LS_ICON_POS_KEY)
+          setIconPositions({})
+        } catch {}
+        return
+      }
       if (typeValue !== EVT_OPEN_APP) return
       const rawApp = record.app
       const app: App | null = (rawApp && typeof rawApp === 'object') ? rawApp as App : null
@@ -1355,8 +1474,6 @@ export default function Desktop(){
     top: '50%',
   }
 
-  const wallpaperStyle: React.CSSProperties = { backgroundImage: `url(/2.webp)`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }
-
   return (
     <div
       className="desktop"
@@ -1365,7 +1482,7 @@ export default function Desktop(){
       onContextMenu={(e)=>{ e.preventDefault() }}
     >
       <div className="sidebar-background" />
-      <div className="wallpaper" style={wallpaperStyle} />
+      <div className="wallpaper" />
       <div className="wallpaper-glass" />
       {/* MenuBar removed */}
 

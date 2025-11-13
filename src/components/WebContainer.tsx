@@ -142,10 +142,15 @@ const isAppConsoleMessage = (value: unknown): value is AppConsoleMessage => {
 };
 
 const getSourceWindow = (source: MessageEventSource | null): Window | null => {
-  if (typeof Window === 'undefined' || !source) {
+  try {
+    if (!source) return null;
+    // In cross-origin contexts, event.source is a WindowProxy which may not satisfy instanceof Window.
+    // Feature-detect postMessage instead of relying on instanceof.
+    const win = source as Window;
+    return typeof win.postMessage === 'function' ? win : null;
+  } catch {
     return null;
   }
-  return source instanceof Window ? source : null;
 };
 
 const DEFAULT_OPEN_APP_DELAY_MS = 2000;
@@ -738,12 +743,6 @@ export default function Document() {
               try { srcWin.postMessage(resp, event.origin); } catch {}
             };
             try {
-              if (userModeRef.current === 'anon') {
-                // In anon mode, skip persistence; return original payload
-                const originalPayload = typeof payload === 'object' && payload !== null ? payload : {};
-                reply({ type: 'MEDIA_INGEST_RESPONSE', id, ok: true, result: { ...originalPayload, persisted: false } });
-                return;
-              }
               const body = { ...(payload ?? {}), scope };
               const res = await fetch('/api/media/ingest', {
                 method: 'POST',
